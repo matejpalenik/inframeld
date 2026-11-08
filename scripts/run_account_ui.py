@@ -323,6 +323,7 @@ class AccountUIRunner:
             "recipient_proof_stack",
             "prepare_contexts",
             "build_stack",
+            "account_browser_stack",
         }:
             raise ValueError("Unknown private account phase.")
         assert self.directory is not None
@@ -368,6 +369,7 @@ account_compose=("$account_runtime" compose -p "$account_project" -f "$account_c
                     str(self.root / "apps/web/tests/fixtures/prepare_build_context.py"),
                     str(self.root),
                     str(self.directory / "web-context"),
+                    "--invitation-guide",
                 ],
                 30,
             ),
@@ -395,21 +397,7 @@ account_compose=("$account_runtime" compose -p "$account_project" -f "$account_c
                 "browser",
                 self._shell("recipient_proof_stack")
                 if self.recipient_proof
-                else [
-                    self.runtime,
-                    "compose",
-                    "-p",
-                    self.project,
-                    "-f",
-                    str(self.root / "compose.account-ui.test.yaml"),
-                    "--profile",
-                    "qualification",
-                    "run",
-                    "--rm",
-                    "--no-deps",
-                    "-T",
-                    "browser-tests",
-                ],
+                else self._shell("account_browser_stack"),
                 300,
             ),
         ]
@@ -423,8 +411,7 @@ account_compose=("$account_runtime" compose -p "$account_project" -f "$account_c
         return 0
 
     def _write_context(self, cleanup_state: str) -> None:
-        """Prepare the isolated build context without modifying the ordinary application checkout.
-        """
+        """Prepare the isolated build context without modifying the ordinary application checkout."""
         assert self.directory is not None
         environment = self._environment()
         values = {

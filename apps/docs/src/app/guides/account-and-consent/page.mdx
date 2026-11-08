@@ -1,0 +1,78 @@
+export const pageMetadata = {
+  title: "Manage your account and review CLI access",
+  description:
+    "Create an identity, sign in, manage account security and review consent on your installation's account site.",
+}
+
+# Manage your account and review CLI access
+
+Alice joins the Support installation. She creates an identity and signs in through its account site, then checks whether her local Inframeld account has access. Signing in proves who she is. Admission and current permissions determine what she can do in Inframeld.
+
+Use the HTTPS account-site address supplied by your installation operator. All paths below belong to that account site, not this documentation site. Keep the same browser profile throughout an account task. A browser session, email code or flow URL is private.
+
+## Create an identity and sign in
+
+1. Open the account site's `/` page and choose **Create identity** (`/registration`). Complete the fields and required method shown by the configured identity provider.
+2. Choose **Verify email** (`/verification`) when verification is required. Use the verification instructions or code delivered to your own configured email address. Verification does not link identities or grant product access.
+3. Choose **Sign in** (`/login`). Use **Use your password**, **Use an email code** or the configured sign-in method actually offered. Follow the displayed field errors if an input is rejected.
+4. Return to account home and review **Signed-in identity** and, when available, **Local Inframeld account**. These are different identifiers: the first names your provider identity, while the second names your local product account.
+
+If a standalone account operation expires or cannot be checked, return to account home and start that task again. If a requesting client started the flow, return to that client for a fresh request. If the page says an interaction is unsupported, stop and ask the operator for a supported path. A stopped form has not skipped its required factors.
+
+## Check your current account access
+
+The account summary reports what it can establish now:
+
+| Observation                                                           | Meaning                                                                                                |
+| --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Local Inframeld account is admitted                                   | Your local identity is admitted. Each later action still checks current permissions.                   |
+| Browser identity is verified, but Inframeld access is not available   | Admission may be required or access may be restricted. This page cannot determine or clear the reason. |
+| Browser identity is verified, but product access could not be checked | No admission or action permission is confirmed.                                                        |
+| No verified browser session, or identity changed during the check     | Sign in as the intended person or check the current account again.                                     |
+
+Use **Check account again** to refresh this read-only observation. It creates no account, grant or invitation and does not repeat a previous write. The account summary hides old details when you leave the page or tab and checks again when you return. Wait for the current result after changing accounts.
+
+[Direct human admission](/guides/admit-human) and [invitation activation](/guides/manage-invitations) have their own authority and prerequisites. Account registration, email verification and consent do not perform them or create starter resources.
+
+## Change your password or configured sign-in methods
+
+Choose **Security settings** (`/settings`) in the same browser profile. Complete the provider's displayed password or account fields and read its result. Available methods depend on the installation.
+
+If **Authenticator app** is offered, follow its enrollment instructions and confirm the time-based code (TOTP). **Backup recovery codes** shows the controls offered by your provider. Store any issued codes privately and use one only when the sign-in form asks for it. A required factor remains required if the page cannot render its interaction.
+
+**Company sign-in** uses an already configured OIDC identity provider. Select the intended provider and follow its sign-in flow. This does not configure a new provider or automatically link accounts by email. A valid OIDC session can remain in use after password setup. Setting a password and using a password for the current sign-in are different facts.
+
+## Preview and activate an invitation
+
+Choose **Use an invitation** on account home, or open `/invitations` on the same account site. Stay signed in as the intended recipient. This page can check your browser identity before local product admission. It does not require the account summary to report that you are already admitted.
+
+1. Choose **Check browser identity** and confirm the displayed identity and installation. This is a read-only check. It does not preview or activate an invitation.
+2. Paste the private token into **Protected invitation token**, then choose **Preview invitation**. Review the intended assignments, resource labels, IDs and expiry. Preview grants no access and performs no password-setup check.
+3. Before a fresh activation, complete the separate [password-setup prerequisite](/guides/manage-invitations#before-you-activate). Privately save your original identity, installation, token, chosen unique activation key, `POST /v1/invitations/activate` and its exact token body.
+4. Preview fills **Original activation identity** with the verified identity. Enter **Original activation key**, acknowledge the checkbox confirming that you saved the exact original context, then choose **Activate reviewed invitation**. The page fixes that original request before sending it. Read **Original activation receipt** if activation is confirmed. Its revisions describe the committed original result, not current permissions.
+
+If the response is lost or you choose **Cancel waiting** after activation may have been sent, the outcome remains unknown. Cancellation does not prove rollback. **Recover original activation** uses the saved original request directly, without a new preview. A consumed invitation may no longer be previewable.
+
+The page keeps its protected context only in memory. Leaving the page or tab hides details; returning checks identity without resubmitting activation. A changed or signed-out identity clears the protected context. A full reload loses it. To restore after reload, enter the saved identity in **Original activation identity**, together with the exact **Protected invitation token** and **Original activation key**. The saved identity must match the current verified browser identity before an activation POST can be sent. A mismatch clears the protected fields instead of sending activation. Typing an identity does not authenticate it. A successful same-identity recheck or an unavailable identity check leaves an unknown activation outcome unknown and preserves its warning. **Discard protected context** clears the saved identity, local inputs and results, not a dispatched server operation. See [the invitation recovery procedure](/guides/manage-invitations#recover-a-lost-activation-response) before another action.
+
+## Keep recovery steps separate
+
+**Recover account** (`/recovery`) opens the provider's native recovery task. After a recovery code is accepted, finish the password-settings step the provider presents. Accepted recovery proof, a persisted password and completed server-owned security cleanup are separate outcomes. A successful code or password form does not prove cleanup finished, clear an access block or activate an invitation.
+
+If access remains unavailable after recovery, follow the installation operator's supported recovery procedure. The account page's generic unavailable or denied result cannot diagnose a cleanup obligation or release it. Use [the invitation guide](/guides/manage-invitations#before-you-activate) for fresh activation and its separate password-setup prerequisite. Do not interpret an account-page success as an invitation receipt.
+
+## Review a request for CLI access
+
+When a supported requesting client opens the **CLI access** page (`/consent`), inspect **Account subject**, **Installation**, **Client** and **Requested scopes**. Use the request supplied by that client rather than constructing a consent URL yourself.
+
+Choose **Allow CLI access** only for the intended account and installation. The optional remembered approval uses the duration shown. An already approved request offers **Continue to CLI**. Choose **Cancel** to reject a request before approval. Consent supplies neither product admission nor Project permissions.
+
+If the account is wrong, cancel before approving, sign out and sign in as the intended person, then start a fresh request from the client. An expired request or changed session must be checked again. A previous screen is not continuing authority.
+
+While **Sending your decision** is displayed, do not submit again. If the result becomes uncertain, stop and follow the requesting client's recovery instructions. Returning to a client does not itself prove that its sign-in completed. This page does not display CLI tokens or provide the [complete saved CLI-login workflow](/clients/cli/setup).
+
+## Sign out of this browser
+
+Open **Sign out of browser** (`/logout`), then activate **Sign out of browser** on the confirmation page. Opening `/logout` alone does not end the session. If sign-out cannot be prepared or confirmed, read the stopped message and check your account again.
+
+Browser sign-out does not revoke existing CLI credentials. Their lifetime and revocation are separate from the browser session.

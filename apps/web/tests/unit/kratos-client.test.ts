@@ -362,6 +362,8 @@ for (const phase of [
   "decision-continuation",
   "decision-callback",
   "decision-click",
+  "invitation-guide",
+  "invitation-activation",
 ] as const) {
   test(`concurrent ${phase} rejection retains its own origin through an outer catch`, async () => {
     const secret = "diagnostic-private-concurrent-error"
@@ -370,11 +372,12 @@ for (const phase of [
         throw nativeFailure(phase, error)
       }
     )
-    const observed = Promise.all([operation, Promise.resolve()]).catch(
-      (error) => {
-        throw nativeFailure("decision-route", error)
-      }
-    )
+    const waiting = phase.startsWith("invitation-")
+      ? Promise.race([operation, new Promise<never>(() => {})])
+      : Promise.all([operation, Promise.resolve()])
+    const observed = waiting.catch((error) => {
+      throw nativeFailure("decision-route", error)
+    })
     await assert.rejects(observed, (error: unknown) => {
       assert.ok(error instanceof Error)
       assert.match(error.message, new RegExp(`"phase":"${phase}"`))
@@ -430,6 +433,7 @@ const config = {
   hydraOrigin: "https://hydra.account.test:8443",
   apiInternalUrl: "http://backend:8000",
   kratosInternalUrl: "http://kratos:4433",
+  oidcFormActionOrigins: [],
 }
 const id = "c1fab4f4-ffce-4e5a-ae73-25cbff832764"
 const cookie = "ory_kratos_session=current; native_csrf=cookie"

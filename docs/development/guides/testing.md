@@ -210,6 +210,10 @@ The isolated check supplies `INFRAMELD_DEV_COMPOSE_FILE` and `INFRAMELD_DEV_COMP
 
 For scaffold-first TDD and meaningful documentation, read the [shared testing contract](../../../.agents/skills/inframeld-coding-standards/references/testing-and-documentation.md). Read [Python test conventions](../../../.agents/skills/inframeld-python-standards/references/testing-and-documentation.md) for backend protocol doubles and [Rust Standards](../../../.agents/skills/inframeld-rust-standards/SKILL.md) for Rust tests. Architecture, import-boundary, naming and composition enforcement tests remain prohibited. Review those conventions manually.
 
+### Standalone account UI
+
+The separate [standalone account UI profile](../../../apps/web/tests/fixtures/README.md) uses `mise exec -- bash scripts/test-account-ui.sh --login-only`. It owns one disposable project, private CA and application/provider databases. Its expanded recovery/invitation/browser-guide cases remain pending native qualification. The existing runner preserves its phase deadlines and independent finalizer, including an independent database verification inside the same browser phase. Unit/type/build checks do not launch that graph or establish those native outcomes. Keep the combined Rust recipient-proof profile and human account/invitation acceptance separate.
+
 ### Native recovery delivery
 
 The private integration graph adds an ephemeral application database, a migration prerequisite, the real callback app and a separate `kratos-recovery` instance. Existing provider probes retain their configurations. No test service publishes a port.

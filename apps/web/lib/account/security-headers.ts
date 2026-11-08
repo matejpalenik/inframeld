@@ -7,13 +7,13 @@ export function accountContentSecurityPolicy(
   const restricted =
     "frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
   try {
-    const { hydraOrigin } = accountConfig(env)
+    const { hydraOrigin, oidcFormActionOrigins } = accountConfig(env)
     if (
       /^https:\/\/(?:[a-z0-9.-]+|\[[a-f0-9:]+\])(?::[0-9]+)?$/i.test(
         hydraOrigin
       )
     )
-      return `${restricted} ${hydraOrigin}`
+      return [restricted, hydraOrigin, ...oidcFormActionOrigins].join(" ")
   } catch {}
   return restricted
 }

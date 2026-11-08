@@ -191,7 +191,6 @@ async def seed(configured: ApplicationSettings, subject: UUID) -> tuple[UUID, UU
         IdentitySubject,
     )
     from inframeld_backend.shared.infrastructure.resources.database import Database
-    from tests.support.access_scenarios import MockAccessScenarios
 
     database = Database(configured.database)
     await database.startup()
@@ -217,13 +216,35 @@ async def seed(configured: ApplicationSettings, subject: UUID) -> tuple[UUID, UU
                 recipient.principal_id.value,
                 recipient.project_id.value,
             )
-        async with database.session() as session, session.begin():
-            await MockAccessScenarios.seed_linked_human(
-                session,
-                VerifiedHumanIdentityDTO(
-                    IdentityAuthority("kratos:account-ui-test"),
-                    IdentitySubject(str(subject)),
-                ),
+        from tests.support.first_administrator_bootstrap_scenarios import (
+            bootstrap_scenario,
+            bootstrap_service,
+        )
+
+        # Only fixture authority uses controlled proof. Browser mutations authenticate normally.
+        scenario = await bootstrap_scenario(
+            database,
+            identity=VerifiedHumanIdentityDTO(
+                IdentityAuthority("kratos:account-ui-test"),
+                IdentitySubject(str(subject)),
+            ),
+            operation="account-fixture-initial-administrator",
+        )
+        async with database.session() as session:
+            result = await bootstrap_service(session, scenario.binding).bootstrap(scenario.command)
+        descriptor = os.open(
+            "/run/account-fixture/issuer.json",
+            os.O_CREAT | os.O_EXCL | os.O_WRONLY,
+            0o600,
+        )
+        with os.fdopen(descriptor, "w") as destination:
+            json.dump(
+                {
+                    "installationId": str(result.installation_id.value),
+                    "organizationId": str(result.organization_id.value),
+                    "principalId": str(result.recipient_id.value),
+                },
+                destination,
             )
     finally:
         await database.shutdown()
@@ -418,6 +439,224 @@ def prepare_navigation(configured: ApplicationSettings) -> None:
         sdk.rest_client.pool_manager.clear()
 
 
+def read_account_results() -> tuple[list[dict[str, object]], UUID]:
+    """Bound the fixed private observations before asynchronous verification."""
+    with Path("/run/account-proof/account-results.jsonl").open("rb") as source:
+        raw = source.read(65_537)
+    if len(raw) > 65_536:
+        raise ValueError("The fixed account observations exceeded their bound.")
+    observations: list[dict[str, object]] = []
+    for line in raw.splitlines():
+        value = json.loads(line, object_pairs_hook=_unique)
+        if not isinstance(value, dict):
+            raise ValueError("Each account observation must be an object.")
+        if value.get("kind") == "invitation":
+            fields = {
+                "kind",
+                "identityId",
+                "invitationId",
+                "organizationId",
+                "principalId",
+                "operationId",
+                "requestKey",
+                "organizationAccessRevision",
+                "projectAccessRevisions",
+                "idempotencyExpiresAt",
+            }
+            if "projectId" in value:
+                fields.update({"projectId", "accessGroupId"})
+        elif value.get("kind") == "unused-invitation":
+            fields = {"kind", "invitationId"}
+        elif value.get("kind") == "recovery":
+            fields = {"kind", "identityId", "principalId", "interruptedSettingsFlowId"}
+        else:
+            raise ValueError("Unknown account observation.")
+        observations.append(_object(value, fields))
+    if len(observations) != 5 or sorted(str(value["kind"]) for value in observations) != [
+        "invitation",
+        "invitation",
+        "recovery",
+        "unused-invitation",
+        "unused-invitation",
+    ]:
+        raise ValueError("The five account outcomes did not complete.")
+    issuer = _object(
+        json.loads(Path("/run/account-fixture/issuer.json").read_bytes()),
+        {"installationId", "organizationId", "principalId"},
+    )
+    return observations, UUID(str(issuer["principalId"]))
+
+
+async def verify_account_results(
+    configured: ApplicationSettings, observations: list[dict[str, object]], issuer_id: UUID
+) -> None:
+    """Check durable effects independently of the browser's UI and original replay."""
+    from datetime import datetime, timedelta
+
+    from inframeld_backend.access.application.enums.identity_recovery_evidence_type import (
+        IdentityRecoveryEvidenceType,
+    )
+    from inframeld_backend.access.domain.enums.identity_recovery_cleanup_state import (
+        IdentityRecoveryCleanupState,
+    )
+    from inframeld_backend.access.infrastructure.rows.access_audit_event_row import (
+        AccessAuditEventRow,
+    )
+    from inframeld_backend.access.infrastructure.rows.group_membership_row import (
+        GroupMembershipRow,
+    )
+    from inframeld_backend.access.infrastructure.rows.human_identity_link_row import (
+        HumanIdentityLinkRow,
+    )
+    from inframeld_backend.access.infrastructure.rows.identity_recovery_admission_row import (
+        IdentityRecoveryAdmissionRow,
+    )
+    from inframeld_backend.access.infrastructure.rows.identity_recovery_cleanup_job_row import (
+        IdentityRecoveryCleanupJobRow,
+    )
+    from inframeld_backend.access.infrastructure.rows.identity_recovery_cleanup_proof_row import (
+        IdentityRecoveryCleanupProofRow,
+    )
+    from inframeld_backend.access.infrastructure.rows.identity_recovery_evidence_receipt_row import (
+        IdentityRecoveryEvidenceReceiptRow,
+    )
+    from inframeld_backend.access.infrastructure.rows.invitation_activation_operation_row import (
+        InvitationActivationOperationRow,
+    )
+    from inframeld_backend.access.infrastructure.rows.invitation_row import (
+        InvitationRow,
+    )
+    from inframeld_backend.access.infrastructure.rows.project_membership_row import (
+        ProjectMembershipRow,
+    )
+    from inframeld_backend.shared.application.enums.operation_reservation_state import (
+        OperationReservationState,
+    )
+    from inframeld_backend.shared.infrastructure.resources.database import Database
+    from sqlalchemy import func, select
+
+    database = Database(configured.database)
+    await database.startup()
+    try:
+        async with database.session() as session:
+            for observation in observations:
+                if observation["kind"] == "recovery":
+                    subject = str(observation["identityId"])
+                    admissions = (
+                        await session.scalars(
+                            select(IdentityRecoveryAdmissionRow).where(
+                                IdentityRecoveryAdmissionRow.authority == "kratos:account-ui-test",
+                                IdentityRecoveryAdmissionRow.subject == subject,
+                            )
+                        )
+                    ).all()
+                    assert len(admissions) == 1
+                    admission = admissions[0]
+                    assert admission.released_at is not None
+                    assert admission.kratos_cleanup_state is IdentityRecoveryCleanupState.CONFIRMED
+                    assert admission.hydra_cleanup_state is IdentityRecoveryCleanupState.CONFIRMED
+                    job = await session.get(IdentityRecoveryCleanupJobRow, admission.operation_id)
+                    assert job is not None
+                    assert job.cli_grants_state is IdentityRecoveryCleanupState.CONFIRMED
+                    assert job.remembered_logins_state is IdentityRecoveryCleanupState.CONFIRMED
+                    proofs = (
+                        await session.scalars(
+                            select(IdentityRecoveryCleanupProofRow).where(
+                                IdentityRecoveryCleanupProofRow.source_operation_id
+                                == admission.operation_id,
+                            )
+                        )
+                    ).all()
+                    assert len(proofs) == 1 and proofs[0].propagation_complete
+                    evidence = (
+                        await session.scalars(
+                            select(IdentityRecoveryEvidenceReceiptRow).where(
+                                IdentityRecoveryEvidenceReceiptRow.operation_id
+                                == admission.operation_id,
+                            )
+                        )
+                    ).all()
+                    saved = [
+                        row
+                        for row in evidence
+                        if row.event_type is IdentityRecoveryEvidenceType.PASSWORD_SETTINGS_SAVED
+                    ]
+                    assert len(saved) == 1
+                    assert str(saved[0].native_flow_id) != observation["interruptedSettingsFlowId"]
+                    link = await session.get(
+                        HumanIdentityLinkRow, ("kratos:account-ui-test", subject)
+                    )
+                    assert link is not None and str(link.principal_id) == observation["principalId"]
+                    continue
+
+                invitation_id = UUID(str(observation["invitationId"]))
+                invitation = await session.get(InvitationRow, invitation_id)
+                assert invitation is not None
+                originals = (
+                    await session.scalars(
+                        select(InvitationActivationOperationRow).where(
+                            InvitationActivationOperationRow.invitation_id == invitation_id,
+                        )
+                    )
+                ).all()
+                if observation["kind"] == "unused-invitation":
+                    assert invitation.consumed_at is None
+                    assert invitation.consumed_by_principal_id is None
+                    assert not originals
+                    continue
+
+                principal_id = UUID(str(observation["principalId"]))
+                assert invitation.consumed_at is not None
+                assert invitation.consumed_by_principal_id == principal_id
+                assert str(invitation.organization_id) == observation["organizationId"]
+                assert len(originals) == 1
+                original = originals[0]
+                assert original.state is OperationReservationState.REPLAYABLE
+                assert original.operation_id == observation["operationId"]
+                assert original.request_key == observation["requestKey"]
+                assert original.subject == observation["identityId"]
+                assert original.principal_id == principal_id
+                assert (
+                    original.organization_access_revision
+                    == observation["organizationAccessRevision"]
+                )
+                assert original.project_access_revisions == observation["projectAccessRevisions"]
+                assert original.expires_at is not None
+                assert original.expires_at == datetime.fromisoformat(
+                    str(observation["idempotencyExpiresAt"])
+                )
+                assert original.completed_at is not None
+                assert original.expires_at - original.completed_at == timedelta(hours=24)
+                audits = await session.scalar(
+                    select(func.count())
+                    .select_from(AccessAuditEventRow)
+                    .where(
+                        AccessAuditEventRow.target_id == invitation_id,
+                        AccessAuditEventRow.event_type == "invitation_activated",
+                        AccessAuditEventRow.actor_principal_id == principal_id,
+                        AccessAuditEventRow.correlation_id == original.operation_id,
+                    )
+                )
+                assert audits == 1
+                link = await session.get(
+                    HumanIdentityLinkRow, ("kratos:account-ui-test", original.subject)
+                )
+                assert link is not None and link.principal_id == principal_id
+                if "projectId" in observation:
+                    project_id = UUID(str(observation["projectId"]))
+                    membership = await session.get(ProjectMembershipRow, (project_id, principal_id))
+                    assert membership is not None
+                    assert membership.assigned_by_principal_id == issuer_id
+                    group = await session.get(
+                        GroupMembershipRow,
+                        (project_id, UUID(str(observation["accessGroupId"])), principal_id),
+                    )
+                    assert group is not None
+                    assert group.assigned_by_principal_id == issuer_id
+    finally:
+        await database.shutdown()
+
+
 def main() -> None:
     configured = settings()
     if sys.argv[1:] == ["migrate"]:
@@ -443,6 +682,13 @@ def main() -> None:
             access_log=False,
             log_level="warning",
         )
+    elif (
+        sys.argv[1:] == ["verify-account-result"]
+        and os.getenv("INFRAMELD_ACCOUNT_PROOF_MODE") != "1"
+    ):
+        observations, issuer_id = read_account_results()
+        asyncio.run(verify_account_results(configured, observations, issuer_id))
+        print("Independent native account effects and original outcomes verified.")
     elif (
         sys.argv[1:] in (["verify-proof-result"], ["verify-denied-result"])
         and os.getenv("INFRAMELD_ACCOUNT_PROOF_MODE") == "1"

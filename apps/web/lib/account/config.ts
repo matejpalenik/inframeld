@@ -3,6 +3,7 @@ export type AccountConfig = {
   hydraOrigin: string
   apiInternalUrl: string
   kratosInternalUrl: string
+  oidcFormActionOrigins: readonly string[]
 }
 
 function endpoint(value: string | undefined, publicEndpoint: boolean): string {
@@ -26,6 +27,32 @@ function endpoint(value: string | undefined, publicEndpoint: boolean): string {
   return url.origin
 }
 
+// This list permits configured native navigation, not OIDC discovery or identity trust.
+function oidcFormActionOrigins(value: string | undefined): string[] {
+  if (value === undefined) return []
+  try {
+    if (new TextEncoder().encode(value).byteLength > 4096) throw new Error()
+    const entries: unknown = JSON.parse(value)
+    if (!Array.isArray(entries) || entries.length > 8) throw new Error()
+    const result: string[] = []
+    for (const entry of entries) {
+      if (typeof entry !== "string") throw new Error()
+      const origin = endpoint(entry, true)
+      if (
+        !/^https:\/\/(?:[a-z0-9.-]+|\[[a-f0-9:]+\])(?::[0-9]+)?$/i.test(
+          origin
+        ) ||
+        result.includes(origin)
+      )
+        throw new Error()
+      result.push(origin)
+    }
+    return result
+  } catch {
+    throw new Error("OIDC form navigation configuration is unavailable.")
+  }
+}
+
 export function accountConfig(
   env: Readonly<Record<string, string | undefined>>
 ): AccountConfig {
@@ -36,6 +63,9 @@ export function accountConfig(
     kratosInternalUrl: endpoint(
       env.INFRAMELD_ACCOUNT_KRATOS_INTERNAL_URL,
       false
+    ),
+    oidcFormActionOrigins: oidcFormActionOrigins(
+      env.INFRAMELD_ACCOUNT_OIDC_FORM_ACTION_ORIGINS
     ),
   }
   if (config.publicOrigin === config.hydraOrigin) {

@@ -33,3 +33,18 @@ https://hydra.account.test:8443 {
   header Referrer-Policy no-referrer
   reverse_proxy hydra:4444
 }
+
+https://login.identity.test:8443 {
+  tls /run/account-tls/server.pem /run/account-tls/server.key
+  header Referrer-Policy no-referrer
+  handle /inframeld/* {
+    reverse_proxy mock-oidc:8080 {
+      header_up Host login.identity.test:8443
+      header_up X-Forwarded-Proto https
+      header_up X-Forwarded-Port 8443
+    }
+  }
+  handle {
+    respond 404
+  }
+}

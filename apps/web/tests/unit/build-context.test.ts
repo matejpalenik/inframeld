@@ -13,6 +13,7 @@ import {
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { test } from "node:test"
+import { runInNewContext } from "node:vm"
 
 const helper = resolve("tests/fixtures/prepare_build_context.py")
 async function exists(path: string) {
@@ -30,7 +31,8 @@ async function file(path: string, content: string) {
 async function run(
   source: string,
   destination: string,
-  recipientProof = false
+  recipientProof = false,
+  invitationGuide = false
 ) {
   const child = spawn(
     "python3",
@@ -39,6 +41,7 @@ async function run(
       source,
       destination,
       ...(recipientProof ? ["--recipient-proof"] : []),
+      ...(invitationGuide ? ["--invitation-guide"] : []),
     ],
     {
       stdio: ["ignore", "pipe", "pipe"],
@@ -64,6 +67,51 @@ async function run(
   })
   return { code, output }
 }
+
+test("the copied literal browser guide is a self-contained IIFE that waits for an explicit decision", async () => {
+  await scenario(async (_source, destination) => {
+    const result = await run(resolve("../.."), destination, false, true)
+    assert.equal(result.code, 0)
+    const bundle = await readFile(
+      join(destination, "apps/web/tests/fixtures/invitation-guide.iife.js"),
+      "utf8"
+    )
+    let prompts = 0
+    let calls = 0
+    runInNewContext(bundle, {
+      Headers,
+      Request,
+      Response,
+      URL,
+      URLSearchParams,
+      AbortController,
+      window: {
+        prompt: (text: string) => {
+          assert.equal(text, "Choose preview, activate or recover")
+          prompts++
+          return null
+        },
+      },
+      fetch: () => {
+        calls++
+        throw new Error("No network before a decision")
+      },
+      console: {
+        error: () => assert.fail("Literal program failed before a decision"),
+      },
+    })
+    assert.equal(prompts, 1)
+    assert.equal(calls, 0)
+    assert.equal(
+      (
+        await lstat(
+          join(destination, "apps/web/tests/fixtures/invitation-guide.iife.js")
+        )
+      ).mode & 0o777,
+      0o644
+    )
+  })
+})
 
 test("recipient-proof context copies current locked Rust sources while excluding host artifacts and secrets", async () => {
   await scenario(async (source, destination) => {

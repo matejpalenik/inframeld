@@ -64,6 +64,7 @@ test("uses an explicit HTTPS account and issuer with private fixed upstreams", (
     hydraOrigin: "https://hydra.account.test:8443",
     apiInternalUrl: "http://backend:8000",
     kratosInternalUrl: "http://kratos:4433",
+    oidcFormActionOrigins: [],
   })
 })
 
