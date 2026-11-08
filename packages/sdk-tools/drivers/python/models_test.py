@@ -97,6 +97,62 @@ def _rejects_native_null() -> bool:
 
 
 class GeneratedModelTests(unittest.TestCase):
+    def test_application_key_issue_preserves_order_omission_and_exact_integers(self) -> None:
+        source: dict[str, JsonValue] = {
+            "allowedAdapters": ["mcp", "http"],
+            "expectedAccessRevision": 2**53 - 1,
+        }
+        model = inframeld_sdk.ApplicationKeyIssueRequest.from_dict(source)
+        self.assertIsNotNone(model)
+        assert model is not None
+        self.assertEqual(body_value(model), source)
+        for invalid in (None, True, 1.5, 0, 2**53):
+            with self.subTest(lifetime=invalid), self.assertRaises(ValueError):
+                inframeld_sdk.ApplicationKeyIssueRequest.from_dict(
+                    source | {"expiresInSeconds": invalid}
+                )
+        for invalid in (True, 2**53):
+            with self.subTest(revision=invalid), self.assertRaises(ValueError):
+                inframeld_sdk.ApplicationKeyIssueRequest.from_dict(
+                    source | {"expectedAccessRevision": invalid}
+                )
+
+    def test_application_key_union_keeps_secret_on_first_delivery_only(self) -> None:
+        source: dict[str, JsonValue] = {
+            "operationId": "key-issue-original",
+            "accessRevision": 8,
+            "idempotencyExpiresAt": "2030-01-01T00:00:00Z",
+            "metadata": {
+                "keyId": "00000000-0000-4000-8000-000000000010",
+                "applicationPrincipalId": "00000000-0000-4000-8000-000000000008",
+                "projectId": "00000000-0000-4000-8000-000000000003",
+                "prefix": "ifm_app_",
+                "allowedAdapters": ["mcp", "http"],
+                "createdAt": "2030-01-01T00:00:00Z",
+                "expiresAt": "2030-04-01T00:00:00Z",
+                "revokedAt": None,
+            },
+        }
+        for secret in (True, False):
+            value = source | {"secretAvailable": secret}
+            if secret:
+                value["key"] = "ifm_app_00000000-0000-4000-8000-000000000010_" + "A" * 43
+            model = inframeld_sdk.ApplicationKeyIssueResponse.from_dict(value)
+            self.assertIsInstance(
+                model.actual_instance,
+                inframeld_sdk.ApplicationKeyFirstDeliveryResponse
+                if secret
+                else inframeld_sdk.ApplicationKeyIssuanceReplayResponse,
+            )
+            self.assertEqual(body_value(model), value)
+        for invalid in (None, 1, "true"):
+            with self.subTest(secret=invalid), self.assertRaises(ValueError):
+                inframeld_sdk.ApplicationKeyIssueResponse.from_dict(
+                    source | {"secretAvailable": invalid}
+                )
+        with self.assertRaises(ValueError):
+            inframeld_sdk.ApplicationKeyIssueResponse.from_dict(source | {"secretAvailable": True})
+
     def test_invitation_issue_preserves_lifetime_omission_and_strict_revision(self) -> None:
         source: dict[str, JsonValue] = {
             "organizationId": "00000000-0000-4000-8000-000000000002",

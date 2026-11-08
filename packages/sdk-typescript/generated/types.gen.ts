@@ -755,6 +755,91 @@ export type ApplicationAccountMetadataResponse = {
 export type ApplicationKeyAdapter = 'http' | 'mcp';
 
 /**
+ * ApplicationKeyFirstDeliveryResponse
+ *
+ * Deliver the new credential only after its original issuance commits.
+ */
+export type ApplicationKeyFirstDeliveryResponse = {
+    /**
+     * Accessrevision
+     */
+    accessRevision: number;
+    /**
+     * Idempotencyexpiresat
+     */
+    idempotencyExpiresAt: string;
+    /**
+     * Key
+     */
+    key: string;
+    metadata: ApplicationKeyMetadataResponse;
+    /**
+     * Operationid
+     */
+    operationId: string;
+    /**
+     * Secretavailable
+     */
+    secretAvailable: true;
+};
+
+/**
+ * ApplicationKeyIssuanceReplayResponse
+ *
+ * Return original safe metadata without a credential field or new issuance.
+ */
+export type ApplicationKeyIssuanceReplayResponse = {
+    /**
+     * Accessrevision
+     */
+    accessRevision: number;
+    /**
+     * Idempotencyexpiresat
+     */
+    idempotencyExpiresAt: string;
+    metadata: ApplicationKeyMetadataResponse;
+    /**
+     * Operationid
+     */
+    operationId: string;
+    /**
+     * Secretavailable
+     */
+    secretAvailable: false;
+};
+
+/**
+ * ApplicationKeyIssueRequest
+ *
+ * Preserve adapter order and omitted lifetime without caller audiences.
+ */
+export type ApplicationKeyIssueRequest = {
+    /**
+     * Allowedadapters
+     */
+    allowedAdapters: Array<ApplicationKeyAdapter>;
+    /**
+     * Expectedaccessrevision
+     */
+    expectedAccessRevision: number;
+    /**
+     * Expiresinseconds
+     */
+    expiresInSeconds?: number;
+};
+
+/**
+ * ApplicationKeyIssueResponse
+ *
+ * Distinguish first credential delivery from credential-free original recovery.
+ */
+export type ApplicationKeyIssueResponse = ({
+    secretAvailable: true;
+} & ApplicationKeyFirstDeliveryResponse) | ({
+    secretAvailable: false;
+} & ApplicationKeyIssuanceReplayResponse);
+
+/**
  * ApplicationKeyMetadataResponse
  */
 export type ApplicationKeyMetadataResponse = {
@@ -5180,6 +5265,78 @@ export type ListApplicationKeysResponses = {
 };
 
 export type ListApplicationKeysResponse = ListApplicationKeysResponses[keyof ListApplicationKeysResponses];
+
+export type IssueApplicationKeyData = {
+    body: ApplicationKeyIssueRequest;
+    headers: {
+        /**
+         * Idempotency-Key
+         */
+        'Idempotency-Key': string;
+    };
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Application Principal Id
+         */
+        application_principal_id: string;
+    };
+    query?: never;
+    url: '/v1/projects/{project_id}/application-accounts/{application_principal_id}/keys';
+};
+
+export type IssueApplicationKeyErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Operation conflicts with current state
+     */
+    409: ProblemDetails;
+    /**
+     * Content Too Large
+     */
+    413: ProblemDetails;
+    /**
+     * Unsupported Media Type
+     */
+    415: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type IssueApplicationKeyError = IssueApplicationKeyErrors[keyof IssueApplicationKeyErrors];
+
+export type IssueApplicationKeyResponses = {
+    /**
+     * Successful Response
+     */
+    201: ApplicationKeyIssueResponse;
+};
+
+export type IssueApplicationKeyResponse = IssueApplicationKeyResponses[keyof IssueApplicationKeyResponses];
 
 export type GetApplicationKeyData = {
     body?: never;

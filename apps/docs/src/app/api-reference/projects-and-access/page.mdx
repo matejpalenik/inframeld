@@ -22,7 +22,7 @@ The declared application-session contract uses `GET /v1/application-session` wit
 
 Verification requires the complete credential's exact trusted installation/audience/adapter binding and current lifecycle facts. Current account and Project eligibility remain separate local checks. The human-session operation above rejects application keys with `401`; this identity check likewise rejects human credentials. Ordinary human-only product actions may instead deny a verified application with `403`.
 
-Invalid, expired, revoked or incorrectly bound credentials receive `401`, verified local ineligibility `403`, and unconfirmed required verification `503`, without human fallback. [The component guide](/guides/authenticate-an-application) records current publication and credential-producer limits. Public issuance is unfinished and its profile mapping is unresolved. This component neither chooses that mapping nor promises a key usable through both HTTP and MCP.
+Invalid, expired, revoked or incorrectly bound credentials receive `401`, verified local ineligibility `403`, and unconfirmed required verification `503`, without human fallback. [The component guide](/guides/authenticate-an-application) records current publication and credential-producer limits. [Explicit issuance](/guides/application-accounts#issue-a-key) pins every selected adapter to its configured trusted profile. HTTP and MCP bindings may differ. The identity component does not imply a mounted MCP server or complete key-management client journey.
 
 ## Read your Organization access
 
@@ -123,6 +123,16 @@ The response contains safe account identity, naming, lifecycle metadata and the 
 <ApiOperation operationId="resolveApplicationAccount" />
 
 Use `GET /v1/projects/{project_id}/application-accounts/resolve?name=...` with one exact Name and the same current account-metadata authority. The result uses `ApplicationAccountMetadataResponse`, identifying the actual Project and application principal. There is no display-name search, fuzzy match, normalization or broad account listing. Missing and hidden accounts retain the safe `404` disclosure boundary.
+
+## Issue an application key
+
+<ApiOperation operationId="issueApplicationKey" />
+
+Require a currently eligible human Project member with exact `issue-application-keys` use authority on the account, use-and-grant authority for every permission it currently holds and management of every group it belongs to. Supply the reviewed Project Access revision, unique selected adapters and one saved original request key. The [browser task](/guides/application-accounts#submit-from-your-existing-human-browser-session) uses the installation's genuine cookie/Origin/CSRF path.
+
+Omitted lifetime uses the configured default (90 days by default), within the configured maximum (365 days by default). An explicit value must be positive whole seconds, within that maximum and the safe-integer/date range. Explicit `null` is invalid. Selected adapters use server-owned profiles, not caller audiences. Only a missing selected profile prevents fresh issuance with `503`. The coordinated limit is two unexpired, unrevoked parent keys, including dual-adapter keys only once, without automatic eviction.
+
+First delivery is `201`, `secretAvailable: true` and a complete `key`. Save it privately. Original replay is also `201`, with `secretAvailable: false` and `key` absent. Its nested metadata, revision and expiry describe the original result, not current usability. Local saving failure does not reverse confirmed issuance; network or decoding uncertainty does not prove it failed. [Exact original-request recovery](/guides/application-accounts#recover-an-uncertain-key-issuance) never automatically creates a replacement or returns plaintext again after completion. Revocation, retirement and mounted MCP delivery retain their separate interfaces and availability.
 
 ## Read application key metadata
 

@@ -261,6 +261,17 @@ export const zApplicationAccountGrantTargetResponse = z.object({
 export const zApplicationKeyAdapter = z.enum(['http', 'mcp']);
 
 /**
+ * ApplicationKeyIssueRequest
+ *
+ * Preserve adapter order and omitted lifetime without caller audiences.
+ */
+export const zApplicationKeyIssueRequest = z.object({
+    allowedAdapters: z.array(zApplicationKeyAdapter).min(1).max(2),
+    expectedAccessRevision: z.int().gte(0).lte(9007199254740991),
+    expiresInSeconds: z.coerce.bigint().gt(BigInt(0)).lte(BigInt(9007199254740991)).optional()
+});
+
+/**
  * ApplicationKeyMetadataResponse
  */
 export const zApplicationKeyMetadataResponse = z.object({
@@ -273,6 +284,43 @@ export const zApplicationKeyMetadataResponse = z.object({
     projectId: z.uuid(),
     revokedAt: z.iso.datetime().nullable()
 });
+
+/**
+ * ApplicationKeyFirstDeliveryResponse
+ *
+ * Deliver the new credential only after its original issuance commits.
+ */
+export const zApplicationKeyFirstDeliveryResponse = z.object({
+    accessRevision: z.int().gte(1).lte(9007199254740991),
+    idempotencyExpiresAt: z.iso.datetime(),
+    key: z.string(),
+    metadata: zApplicationKeyMetadataResponse,
+    operationId: z.string(),
+    secretAvailable: z.literal(true)
+});
+
+/**
+ * ApplicationKeyIssuanceReplayResponse
+ *
+ * Return original safe metadata without a credential field or new issuance.
+ */
+export const zApplicationKeyIssuanceReplayResponse = z.object({
+    accessRevision: z.int().gte(1).lte(9007199254740991),
+    idempotencyExpiresAt: z.iso.datetime(),
+    metadata: zApplicationKeyMetadataResponse,
+    operationId: z.string(),
+    secretAvailable: z.literal(false)
+});
+
+/**
+ * ApplicationKeyIssueResponse
+ *
+ * Distinguish first credential delivery from credential-free original recovery.
+ */
+export const zApplicationKeyIssueResponse = z.discriminatedUnion('secretAvailable', [
+    zApplicationKeyFirstDeliveryResponse,
+    zApplicationKeyIssuanceReplayResponse
+]);
 
 /**
  * CompletedOperationLookupResponse
@@ -3541,6 +3589,72 @@ export const zListApplicationKeys503Representation0Response = zProblemDetails;
  * Successful Response
  */
 export const zListApplicationKeysResponse = zPageResponseApplicationKeyMetadataResponse;
+
+export const zIssueApplicationKeyBody = zApplicationKeyIssueRequest;
+
+export const zIssueApplicationKeyHeaders = z.object({
+    'Idempotency-Key': z.string().min(1).max(128).regex(/.*\S.*/)
+});
+
+export const zIssueApplicationKeyPath = z.object({
+    project_id: z.uuid(),
+    application_principal_id: z.uuid()
+});
+
+/**
+ * Successful Response
+ */
+export const zIssueApplicationKey201Representation0Response = zApplicationKeyIssueResponse;
+
+/**
+ * Invalid authentication request
+ */
+export const zIssueApplicationKey400Representation0Response = zProblemDetails;
+
+/**
+ * Unauthorized
+ */
+export const zIssueApplicationKey401Representation0Response = zProblemDetails;
+
+/**
+ * Access denied
+ */
+export const zIssueApplicationKey403Representation0Response = zProblemDetails;
+
+/**
+ * Resource not found
+ */
+export const zIssueApplicationKey404Representation0Response = zProblemDetails;
+
+/**
+ * Operation conflicts with current state
+ */
+export const zIssueApplicationKey409Representation0Response = zProblemDetails;
+
+/**
+ * Content Too Large
+ */
+export const zIssueApplicationKey413Representation0Response = zProblemDetails;
+
+/**
+ * Unsupported Media Type
+ */
+export const zIssueApplicationKey415Representation0Response = zProblemDetails;
+
+/**
+ * Request validation failed
+ */
+export const zIssueApplicationKey422Representation0Response = zProblemDetails;
+
+/**
+ * Dependency unavailable
+ */
+export const zIssueApplicationKey503Representation0Response = zProblemDetails;
+
+/**
+ * Successful Response
+ */
+export const zIssueApplicationKeyResponse = zApplicationKeyIssueResponse;
 
 export const zGetApplicationKeyPath = z.object({
     project_id: z.uuid(),

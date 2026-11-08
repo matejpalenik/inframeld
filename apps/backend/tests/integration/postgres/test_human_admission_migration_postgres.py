@@ -84,7 +84,7 @@ async def _require_schema(database: Database) -> None:
     """Fail intentionally on the missing requirement before querying any new table."""
     async with database.session() as session:
         current = await session.scalar(select(AlembicVersionRow.version_num))
-    assert current == "0027_invitations", "Required current schema is not installed."
+    assert current == "0028_application_key_issuance", "Required current schema is not installed."
 
 
 async def _admitted(database: Database) -> HumanAdmissionResultDTO:

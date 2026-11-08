@@ -97,13 +97,15 @@ Authorization: Bearer <credential>
 
 The shared application-key verifier must check the key's hash, expiry, revocation and permitted installation/resource, followed by the account's current permission checks. Replacing the key keeps the same application principal.
 
-This is the required shared verifier contract, not a claim that the application-key/MCP path is already implemented. Hydra-backed human CLI access tokens have their own API audience and verifier. The MCP profile does not accept them or Kratos browser cookies by implication.
+The shared application-key verifier and trusted-adapter middleware are implemented. They do not establish a mounted MCP server or a complete MCP client journey. Hydra-backed human CLI access tokens have their own API audience and verifier. The MCP profile does not accept them or Kratos browser cookies by implication.
 
 A key with additional permissions still gets only this adapter's query and receipt tools. Permission to deploy through another API does not create a deployment tool here.
 
 <a id="bind-the-credential-to-this-mcp-resource"></a>
 
 ### Bind the credential to this MCP resource
+
+The current application-key issuance candidate assigns an MCP-enabled key the explicitly configured canonical MCP resource. A dual HTTP/MCP key retains a separate HTTP binding even when that value differs. Verification selects only the binding for the trusted adapter. It does not translate an HTTP audience into MCP authority, duplicate the key or consume another usable-key slot. This issuance extension does not establish delivery of the mounted MCP server.
 
 An MCP-enabled key needs an explicit allowed **resource or audience**, tied to the installation's canonical MCP endpoint. This says where the key may be used.
 

@@ -317,6 +317,7 @@ class PostgresProjectActionFactsReader(ProjectActionFactsReader):
                                     principal_id=access.actor_principal_id,
                                     organization_id=organization_id,
                                     project_id=project_id,
+                                    adapter=profile.adapter,
                                 )
                             )
                         )

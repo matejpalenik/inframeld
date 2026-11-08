@@ -55,7 +55,8 @@ def key_row() -> ApplicationKeyRow:
         project_id=UUID(int=15),
         application_principal_id=ACTOR,
         installation_id=INSTALLED,
-        audience=PROFILE.audience.value,
+        http_audience=PROFILE.audience.value,
+        mcp_audience=None,
         allowed_adapters=["http"],
         verifier=sha256(CREDENTIAL.value.encode()).digest(),
         expires_at=NOW + timedelta(days=1),
@@ -88,13 +89,39 @@ async def test_complete_digest_and_trusted_bindings_produce_only_two_ids() -> No
     assert CREDENTIAL.value not in repr(result)
 
 
+@pytest.mark.parametrize("equal", [False, True])
+async def test_each_trusted_adapter_compares_only_its_own_literal_binding(equal: bool) -> None:
+    mcp_audience = PROFILE.audience if equal else ApplicationKeyAudience("https://mcp.test/mcp")
+    row = replace(key_row(), allowed_adapters=["mcp", "http"], mcp_audience=mcp_audience.value)
+    verifier = verifier_for(row)
+    expected = VerifiedApplicationKeyDTO(ApplicationKeyId(KEY_ID), PrincipalId(ACTOR))
+    assert await verifier.verify(CREDENTIAL, profile=PROFILE) == expected
+    assert (
+        await verifier.verify(
+            CREDENTIAL,
+            profile=ApplicationKeyVerificationProfileDTO(mcp_audience, ApplicationKeyAdapter.MCP),
+        )
+        == expected
+    )
+    if not equal:
+        assert (
+            await verifier.verify(
+                CREDENTIAL,
+                profile=ApplicationKeyVerificationProfileDTO(
+                    PROFILE.audience, ApplicationKeyAdapter.MCP
+                ),
+            )
+            is None
+        )
+
+
 @pytest.mark.parametrize(
     "row",
     [
         None,
         replace(key_row(), verifier=b"X" * 32),
         replace(key_row(), installation_id=UUID(int=99)),
-        replace(key_row(), audience="https://other.test"),
+        replace(key_row(), http_audience="https://other.test"),
         replace(key_row(), allowed_adapters=["mcp"]),
         replace(key_row(), expires_at=NOW),
         replace(key_row(), revoked_at=NOW),

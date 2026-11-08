@@ -2,7 +2,7 @@
 
 Alice issues SupportBot a key and loses the response. The first successful delivery can contain the secret. A safe replay contains metadata only. The key’s public identifier is not proof of validity or current authority.
 
-> **Status:** Safe key metadata GET routes and native/generated-client contracts are implemented. Key format/lifetimes remain accepted design for issuance and authentication. Issue and Revoke POST routes are not implemented by the metadata read capability.
+> **Status:** Safe metadata reads and application-key authentication are implemented. The current #231 feature candidate adds strict issuance HTTP, native OpenAPI and the three generated client interfaces. Generation is not client or whole-feature qualification. Revocation and retirement remain separate deliveries. Metadata reads do not issue credentials.
 
 <a id="application-key-contract"></a>
 
@@ -16,9 +16,19 @@ Store **SHA-256 of the complete canonical key** as the verifier bytes, together 
 
 The default lifetime is **90 days**, with a **365-day maximum**. Both are operator-configurable. Authorized issuance may select a shorter lifetime, and there is no automatic renewal. An operator's configured default must fit its configured maximum. These incoming-key durations do not replace the separate Hydra/Kratos lifetime settings. The safe record fields belong to [the logical key contract](credential-and-recovery-records.md#application-key-record-contract).
 
-Keep the two-usable-key limit across audiences and explicit issue/update-consumers/revoke replacement sequence. Issuance still performs every [current delegation and group-management check](application-keys.md#applications), coordinated with competing scope changes. Display the secret only on the original successful delivery. A lost response yields the safe [show-once retry outcome](application-keys.md#secrets), never plaintext replay. Algorithm, format and lifetime selection are accepted design. Still needs their implementation and behavioral qualification.
+The accepted issuance mapping binds each selected adapter to its explicit server-owned profile. HTTP-only selects the configured HTTP audience, MCP-only selects the canonical MCP resource, and selecting both retains both bindings. The audiences may be equal or different. One key still has one public ID, secret, verifier and place in the two-usable-key limit. Callers supply no audience, and verification compares only the binding for its trusted adapter without aliases or normalization. The current issuance candidate implements these fixed bindings and their storage extension. Final client and feature qualification remain separate from that implementation.
+
+Keep the two-usable-key limit across audiences and explicit issue/update-consumers/revoke replacement sequence. Issuance still performs every [current delegation and group-management check](application-keys.md#applications), coordinated with competing scope changes. Display the secret only on the original successful delivery. A lost response yields the safe [show-once retry outcome](application-keys.md#secrets), never plaintext replay. The issuance service implements this format and configured lifetime selection. Its current generated-client and whole-feature qualification must be established separately.
 
 The public `ifm_app_` prefix contributes no secret entropy and encodes neither installation nor application identity, Project or permissions. `ifm_app_...` is a placeholder, not a usable credential. A prefix alone cannot authenticate anyone, and absence of the prefix does not prove a human OAuth credential. Never send a failed application key to Hydra. Selected Kratos/Hydra human token formats remain unchanged. No enterprise Ory token-format customization is required.
+
+## Implemented issuance boundary
+
+The current candidate registers [the issuance route](../../../../apps/backend/src/inframeld_backend/access/http/routes/application_key_issuance_routes.py) over [ApplicationKeyIssuanceService](../../../../apps/backend/src/inframeld_backend/access/application/services/application_key_issuance_service.py). Current eligible-human Project membership, exact Issue authority, every held-permission delegation and every group-management requirement precede original-result disclosure. Fresh issuance then validates the reviewed revision, selected profiles, lifetime and two-parent-key cap under coordinated current reads.
+
+Key/verifier/bindings, one Project revision advance, required audit and immutable safe original result commit together. Only the original first delivery carries plaintext. A completed exact replay returns HTTP `201` with `secretAvailable: false` and the credential field absent, before fresh profile, lifetime and slot checks. It preserves historical metadata even after later expiry/revocation or configuration changes. It neither rebinds nor renews anything. Known rollback leaves no effects; uncertain commit/response remains unconfirmed without automatic retry or replacement.
+
+[The user task](../../../../apps/docs/src/app/guides/application-accounts/page.mdx#issue-a-key) uses the existing genuine browser-cookie acquisition path. It does not claim a saved human CLI login, metadata CLI, revocation, retirement or mounted MCP journey. [Human qualification #358](https://github.com/matejpalenik/inframeld/issues/358) remains unready and Not run. Required SDK/runtime qualification is engineering acceptance, separate from that deferred human work.
 
 ## Key-management routes
 
@@ -41,7 +51,7 @@ The native `ApplicationKeyMetadataResponse` has exactly the documented safe fiel
 
 ## Typed response alternatives
 
-**Design notation for the unfinished issue/revoke alternatives.** The safe `ApplicationKeyMetadataResponse` is implemented. UUID and datetime denote their JSON string forms. Unknown fields are rejected. The common teaching names distinguish delivery cases without changing the documented `ApplicationKeyIssueResponse` symbol.
+**Illustrative notation, not importable declarations.** Issuance now uses native `ApplicationKeyIssueRequest`, `ApplicationKeyIssueResponse`, `ApplicationKeyFirstDeliveryResponse` and `ApplicationKeyIssuanceReplayResponse`. The common teaching names below explain their wire alternatives. Revocation remains a design contract. UUID and datetime denote JSON string forms, and unknown fields are rejected. Read the native schema and generated models for exact client symbols.
 
 ```python
 from datetime import datetime
@@ -91,6 +101,8 @@ class ApplicationKeyRevocationResponse(TypedDict):
 
 Bind the key to both account and Project in the path. Installation and API-audience bindings come from authoritative server configuration, not a caller-supplied permission set. `allowedAdapters` is a required nonempty unique subset. Omitted lifetime uses the configured default. Revocation accepts only the expected revision. [Access mutation bounds](grant-contracts.md#shared-wire-field-bounds-and-owner-specific-handoffs) still apply.
 
+Fresh issuance requires every selected adapter profile. A missing selected profile returns safe 503 before secret creation, with no partial credential. An unselected missing profile is irrelevant. `expiresInSeconds` accepts positive whole seconds, rejects explicit null, booleans and fractions, and must fit the configured maximum for fresh issuance. Preserve the exact original body, adapter order, omitted lifetime and request key during recovery. Current-authorized completed replay returns its original safe metadata and expiry before fresh profile, lifetime and slot checks. It neither applies today's configuration nor binds another resource.
+
 ## Failures and safe recovery
 
 Issuance requires exact human Issue keys authority, delegation for every current account permission and management of every current account group, rechecked with current account/Project state at commit. The two-usable-key limit is coordinated across audiences. A race cannot silently revoke an old key to free a slot.
@@ -98,6 +110,8 @@ Issuance requires exact human Issue keys authority, delegation for every current
 Metadata list/get needs exact Issue or Revoke keys, without the extra issuance delegation check. Delete account alone is insufficient. It returns no secret or verifier. Listing uses existing bounded pagination and key-UUID order. Revocation needs its independent exact Revoke keys authority and may revoke the last usable key immediately.
 
 First delivery contains the newly created secret. The same original issuance replay omits it and reports `secretAvailable: false`. Never save plaintext in idempotency, audit, trace or logs, and never generate another key because a response was lost. The retained metadata describes the original created credential. A fresh authorized read determines its current expiry/revocation state. A human may explicitly revoke the unusable lost key and admit a separate new issuance.
+
+A known rollback leaves no partial issuance. An uncertain COMMIT acknowledgment does not establish rollback and cannot authorize automatic retry or replacement. Recover the original request under current authority without recovering plaintext. A validated first 201 followed by local secret-storage failure instead confirms issuance with failed local delivery. Neither outcome authorizes automatic reissuance.
 
 <a id="verification-results-and-unresolved-currentness"></a>
 
@@ -107,7 +121,7 @@ First delivery contains the newly created secret. The same original issuance rep
 
 Credential rejection returns `None` before account loading. Recognized required-verification dependency failures raise `DependencyUnavailableError`. Unexpected errors and cancellation propagate. Preserve safe 401 for invalid credentials, 503 for unconfirmed verification dependencies and separate 403 for verified but locally ineligible accounts.
 
-Existing authorizers own later fresh key-state checks through key-ID evidence. The consuming service uses its ordinary Access authorization capability. No extra mandatory credential-guard call is introduced. The accepted [PD-ACCESS-01](decision-key-currentness.md#approved-resolution) selects complete credential plus trusted installation/audience/adapter input, current database expiry checks after coordination waits, and protected-boundary ordering. [PD-ACCESS-02](decision-admitted-work-authority.md#approved-resolution) selects current-principal authority for admitted jobs. These logical contracts do not claim an implemented verifier or worker.
+Existing authorizers own later fresh key-state checks through key-ID evidence. The consuming service uses its ordinary Access authorization capability. No extra mandatory credential-guard call is introduced. The accepted [PD-ACCESS-01](decision-key-currentness.md#approved-resolution) selects complete credential plus trusted installation/audience/adapter input, current database expiry checks after coordination waits, and protected-boundary ordering. [PD-ACCESS-02](decision-admitted-work-authority.md#approved-resolution) selects current-principal authority for admitted jobs. The verifier and current-key facts are implemented under [the owning authentication boundary](application-keys.md#application-key-authentication-boundary). This does not supply an admitted-job worker or mounted MCP server.
 
 ## Sources and limits
 

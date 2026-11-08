@@ -11,10 +11,11 @@ SupportBot has its own permanent identity in the Support Project. A complete app
 The application identity check reports the recognized application and its bound Project. It is useful before trusting that an integration is using the intended identity. A successful check supplies no permission snapshot for another request.
 
 <Note>
-  Public key issuance and a complete supported account-to-key procedure remain
-  unavailable. These examples require an existing compatible application
-  credential. Account creation and safe key metadata reads cannot produce a
-  usable key or retrieve a secret.
+  An eligible human can [issue a key
+  explicitly](/guides/application-accounts#issue-a-key). These checks require
+  the complete key saved privately from first delivery. Account creation and
+  metadata reads do not retrieve a secret. Key-management CLI and complete
+  account-to-key client setup remain separate capabilities.
 </Note>
 
 ## Prepare the account and credential
@@ -23,7 +24,7 @@ Use the permanent `principalId` and `projectId` from authorized [application-acc
 
 The check needs the installation's HTTPS API URL and a complete, actually issued application credential compatible with the operation's trusted binding. Neither the public key prefix nor a key ID is proof of identity. Do not construct a key from an example or a database record.
 
-Credential compatibility is specific to the operation's trusted installation, audience and adapter. A successful check through one adapter does not establish usability through another.
+Credential compatibility is specific to the operation's trusted installation, audience and adapter. Issuance pins each selected adapter to its server-configured profile. Selecting both adapters retains separate bindings, even when their audiences differ. A successful check through one adapter does not establish usability through another or provide a mounted MCP server.
 
 Keep incoming application keys separate from human sign-in credentials and outgoing model-provider secrets. Supply one supported credential family through its documented header. Never put a key in a URL, request body, command-line argument, browser bundle, log or diagnostic capture. Do not combine it with a browser session or fall back to a saved human after failure.
 
@@ -50,7 +51,7 @@ The human identity check remains `GET /v1/session`. An application key is an uns
 
 ## Make one identity request
 
-Set `INFRAMELD_URL` to the trusted installation URL. Supply the existing complete credential as `INFRAMELD_APPLICATION_KEY` through your application's private credential-handling procedure. These input names configure the examples. They do not obtain a credential or complete the missing public issuance/setup procedure.
+Set `INFRAMELD_URL` to the trusted installation URL. Supply the existing complete credential as `INFRAMELD_APPLICATION_KEY` through your application's private credential-handling procedure. These input names configure the examples. Obtain the credential through [authorized first-only issuance](/guides/application-accounts#save-first-delivery-privately), then supply it through your private application credential handling. The examples do not issue or retrieve it.
 
 For an SDK alternative, follow the local source-package setup for [Python](/clients/python), [TypeScript](/clients/typescript) or [Rust](/clients/rust). Use a separate example project for each language. Save the complete Python program as `application_session.py`, the Node TypeScript program as `application-session.ts`, or the Rust program as `src/main.rs` in its Cargo project. Each alternative makes one application-session request, with no automatic retry or human fallback.
 
@@ -245,4 +246,4 @@ A valid replacement credential for the same account preserves the principal. It 
 
 An already admitted job retains its server-owned principal, scope and fixed inputs. Ordinary key expiry, replacement or individual revocation does not automatically cancel that work. The job's owner still checks current account, required permissions and protected inputs at its bounded checkpoints. Suspension, retirement, resource deletion, cancellation or lost required authority can stop later protected work.
 
-Use the owning feature's actual job controls when they are delivered. This identity component does not supply a job runner, a mounted MCP endpoint or a CLI key-login command. Issuance, independent revocation and permanent account retirement remain separate lifecycle operations. The [credential guide](/clients/http#use-an-application-credential) explains the transport boundary without supplying a missing secret producer.
+Use the owning feature's actual job controls when they are delivered. This identity component does not supply a job runner, a mounted MCP endpoint or a CLI key-login command. Issuance, independent revocation and permanent account retirement remain separate lifecycle operations. The [credential guide](/clients/http#use-an-application-credential) explains how to use the issued credential through its transport boundary.

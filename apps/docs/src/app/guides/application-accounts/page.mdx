@@ -1,14 +1,14 @@
 export const pageMetadata = {
   title: "Create and inspect an application account",
   description:
-    "Give an integration a separate Project-bound identity and inspect its safe account and key metadata.",
+    "Give an integration a separate Project-bound identity, issue an expiring key and inspect safe metadata.",
 }
 
 # Create and inspect an application account
 
 Create SupportBot in your Support Project as a separate identity for an integration. The account belongs to that one Project and starts with no action permissions, document-group memberships or keys. Creating it does not copy your human access.
 
-You receive three permissions to administer this specific account. The account's permissions and its incoming credentials remain separate. This guide covers account creation and safe metadata reads. [Application identity authentication](/guides/authenticate-an-application) has its own component contract and credential prerequisites. Creation and these reads issue no key or authentication proof. Public issuance, revocation and account retirement remain separate unfinished operations.
+You receive three permissions to administer this specific account. The account's permissions and its incoming credentials remain separate. This guide covers account creation, explicit key issuance and safe metadata reads. [Application identity authentication](/guides/authenticate-an-application) checks the resulting credential separately. Creation and metadata reads issue no key. Revocation and account retirement remain separate operations without a public procedure here.
 
 Use [exact action-grant administration](/guides/manage-action-grants) to share one account-administration permission with another eligible human in the Project. Those grants control the human's authority over SupportBot. They do not give SupportBot an action permission, create a key or copy any human access. An application account cannot receive account-administration grants or grant authority.
 
@@ -251,11 +251,11 @@ HTTP `201` returns `principalId`, `projectId`, the chosen names and the new Proj
 
 `initialGrants` records three assignments to you, each with `canGrant: true` and an exact `application-account` target for SupportBot:
 
-| Action                       | Meaning                                                                                                         |
-| ---------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `issue-application-keys`     | Administer key issuance for this account when that separate operation is available and its current checks pass. |
-| `revoke-application-keys`    | Administer key revocation for this account when that separate operation is available.                           |
-| `delete-application-account` | Administer retirement of this account when that separate operation is available.                                |
+| Action                       | Meaning                                                                                         |
+| ---------------------------- | ----------------------------------------------------------------------------------------------- |
+| `issue-application-keys`     | Issue a key for this account when all current delegation and group-management checks also pass. |
+| `revoke-application-keys`    | Administer key revocation for this account when that separate operation is available.           |
+| `delete-application-account` | Administer retirement of this account when that separate operation is available.                |
 
 These grants belong to your human identity, not SupportBot. They do not administer other accounts or give the bot access to documents or models. Creation saves the account, required Project membership, three creator grants, audit and original result together. A rejected commit leaves none of those partial creation effects.
 
@@ -312,6 +312,162 @@ EOF_HEADERS
 </CodeGroup>
 
 Resolution returns the same metadata shape. Check the returned `projectId`, `principalId` and `name`. It is an exact lookup under current visibility, not a Project-wide inventory. A missing or hidden account returns a safe `404`. A remembered Name or UUID supplies no authority.
+
+## Issue a key
+
+Alice can issue SupportBot a key without giving it her own identity. Issuance preserves the application's principal and permissions. Someone holding the new key can use SupportBot's full current access, so Alice needs all of these:
+
+- Current eligible-human membership in the account's Project.
+- Permission to use `issue-application-keys` on this exact account.
+- Permission to use and grant every current action permission held by SupportBot, plus management of every group it belongs to.
+
+Being able to read the same documents is insufficient. If another administrator adds SupportBot to a group Alice cannot manage, her Issue permission alone no longer authorizes issuance. The server rechecks the complete current state. An empty newly created account still requires the exact Issue permission, even though it has no received permissions or groups to cover.
+
+Choose `allowedAdapters` as a nonempty unique subset of `http` and `mcp`. The server binds each selected adapter to its configured trusted profile. Selecting both keeps one parent key, secret and usable-key slot, including when the HTTP and MCP audiences differ. You supply no audience. A missing selected profile returns `503` before a secret is created; a missing unselected profile does not prevent issuance. Selecting MCP does not provide a mounted MCP server or client setup.
+
+Omitting `expiresInSeconds` uses the configured default, which is 90 days by default. The configured maximum is 365 days by default. These are operator settings, not fixed duration guarantees. An explicit lifetime must be positive whole seconds within the configured maximum and safe-integer bound, and its expiry must fit a date the server can represent. Explicit `null`, booleans and fractions are invalid. There is no automatic renewal.
+
+An account may have at most two unexpired, unrevoked parent keys across its adapters. A dual-adapter key counts once. A profile change or authentication failure does not free its slot. Expired or revoked history does not count. Issuance never silently revokes or evicts a key to make room, and this operation does not supply the separate revocation workflow.
+
+## Submit from your existing human browser session
+
+Use the installation's configured HTTPS account/API origin, where the account pages, Kratos session route and `/v1` API share an origin. Sign in as Alice through its supported `/login` flow. As in the [human-admission browser setup](/guides/admit-human#use-the-existing-browser-sessions), `/v1/session` identifies the current admitted human. The browser keeps its own cookie. Do not copy it into another client or add an application credential.
+
+Use the permanent Project and application principal IDs from creation or authorized inspection. In the same signed-in browser, read `/v1/projects/{project_id}/my-access` using your actual Project UUID and review its `accessRevision`. For a new issuance, save that revision with the exact account, selected adapters, omitted or explicit lifetime and one unique idempotency key before dispatch. For recovery, use the original saved revision and key instead of refreshing the request from today's state.
+
+Build the source TypeScript SDK through [its existing setup](/clients/typescript#build-and-install-the-package). Save this complete module as `issue-application-key.ts` in your existing browser application's client bundle on the configured account/API origin. Load it in Alice's browser profile. Its prompts take the saved original IDs, revision and key. This example selects HTTP only and omits the lifetime. Keep those choices unchanged when repeating it.
+
+<CodeGroup>
+
+```typescript {{ title: "TypeScript (browser)" }}
+import {
+  createClient,
+  issueApplicationKey,
+  type ApplicationKeyIssueRequest,
+} from "@inframeld/sdk"
+
+async function main(): Promise<void> {
+  const projectId = window.prompt("Saved Project ID")
+  const applicationPrincipalId = window.prompt("Saved application principal ID")
+  const revisionText = window.prompt("Saved original Project Access revision")
+  const idempotencyKey = window.prompt(
+    "Saved original issuance idempotency key"
+  )
+  if (
+    !projectId ||
+    !applicationPrincipalId ||
+    revisionText === null ||
+    idempotencyKey === null
+  )
+    return
+  const revision = Number(revisionText)
+  if (
+    !/^(0|[1-9][0-9]*)$/.test(revisionText) ||
+    !Number.isSafeInteger(revision) ||
+    !idempotencyKey.trim() ||
+    idempotencyKey.length > 128
+  ) {
+    throw new Error("Review the exact saved revision and original request key")
+  }
+  const body: ApplicationKeyIssueRequest = {
+    allowedAdapters: ["http"],
+    expectedAccessRevision: revision,
+  }
+  if (
+    !window.confirm(
+      "Submit this saved HTTP-only issuance request? An explicit retry must keep the original inputs and key."
+    )
+  )
+    return
+  const client = createClient({
+    baseUrl: window.location.origin,
+    credentials: "same-origin",
+    timeoutMs: 5000,
+    responseStyle: "fields",
+    throwOnError: false,
+  })
+  const result = await issueApplicationKey({
+    client,
+    path: {
+      project_id: projectId,
+      application_principal_id: applicationPrincipalId,
+    },
+    headers: {
+      "X-Inframeld-CSRF": "1",
+      "Idempotency-Key": idempotencyKey,
+    },
+    body,
+  })
+  if (result.error !== undefined) {
+    console.error({
+      httpStatus: result.response?.status,
+      failureKind: result.error.kind,
+    })
+    if (result.error.kind === "api") {
+      console.error({
+        code: result.error.body.code,
+        requestId: result.error.body.requestId,
+      })
+    }
+    return
+  }
+  if (result.data === undefined) throw new Error("No usable issuance receipt")
+  const receipt = result.data
+  console.info({
+    httpStatus: result.response?.status,
+    operationId: receipt.operationId,
+    accessRevision: receipt.accessRevision,
+    idempotencyExpiresAt: receipt.idempotencyExpiresAt,
+    metadata: receipt.metadata,
+    secretAvailable: receipt.secretAvailable,
+  })
+  if (receipt.secretAvailable) {
+    try {
+      window.prompt(
+        "First delivery only. Copy this key into your supported private credential store now. This dialog does not save it.",
+        receipt.key
+      )
+    } catch {
+      console.error(
+        "Remote issuance succeeded, but local secret delivery could not be completed"
+      )
+    }
+    console.info(
+      "Private saving is not confirmed by this program. Keep the safe receipt"
+    )
+  } else {
+    console.info(
+      "Original metadata only. The key field is absent and cannot be retrieved"
+    )
+  }
+}
+
+void main().catch(() => {
+  console.error(
+    "No usable result. Preserve the original request and key. Do not create an automatic replacement"
+  )
+})
+```
+
+</CodeGroup>
+
+The browser supplies its actual cookie and Origin; the request adds `X-Inframeld-CSRF: 1`. This is an integration module, not a key-management screen or a CLI login command. cURL, Python, Rust and Node issuance require a separately obtained eligible-human credential. Browser sign-in does not export one, and the generated SDKs do not acquire it. Do not substitute cookie extraction for a missing supported credential producer.
+
+## Save first delivery privately
+
+A successful first delivery is `201` with `secretAvailable: true`, the complete `key`, safe `metadata`, the original operation ID, Project Access revision and retained-result expiry. The example displays the secret in a private dialog for your deliberate copy. It does not save a file, access the clipboard or confirm that your credential store saved it. Some browser contexts may suppress the dialog. Keep the full key out of source, bundles, URLs, logs, screenshots and shared diagnostic output.
+
+A usable first response confirms remote issuance even if local display, copying or saving fails. Preserve its safe receipt. The server cannot retrieve the secret later. An authorized exact replay is still `201`, but has `secretAvailable: false` and the `key` field is absent, not `null`. It cannot repair failed private delivery or mint a replacement.
+
+Use the privately saved HTTP-enabled key with the [application identity check](/guides/authenticate-an-application), in a separate application credential context. Do not combine the key with Alice's browser cookie. That check should identify SupportBot's expected Project and principal, without adding Alice's access.
+
+## Recover an uncertain key issuance
+
+A timeout, cancellation, `503` or unusable response can leave remote issuance unknown. Preserve the original installation, same human, concrete UUID route, complete body, adapter order, omitted lifetime and idempotency key. Do not choose another key, change the revision or refresh the request into a different issuance automatically.
+
+Explicitly repeat only the exact original POST. Current authority is checked again. A completed original returns its captured operation, revision, metadata and retention expiry without another key, audit or revision change. It stays historical even after the credential expires or is revoked, or server profiles and lifetime defaults change. Use the existing authorized key metadata reads for current lifecycle state. A replay neither rebinds the key nor renews retention. If the original did not commit, the same request can still be processed under its original meaning and current fresh checks.
+
+Choosing a replacement after a lost secret is a separate deliberate decision. This issuance operation does not provide revocation or automatically complete that replacement sequence.
 
 ## Inspect safe key metadata
 

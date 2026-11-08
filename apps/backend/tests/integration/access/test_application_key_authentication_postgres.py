@@ -341,7 +341,7 @@ async def test_current_session_waits_for_non_key_update_and_uses_post_wait_datab
             await holder.execute(
                 update(ApplicationKeyRow)
                 .where(ApplicationKeyRow.key_id == seed.credential.key_id.value)
-                .values(audience=PROFILE.audience.value)
+                .values(http_audience=PROFILE.audience.value)
             )
             task = asyncio.create_task(session_reader.read(access=access))
             blocked_pid = None

@@ -18,7 +18,7 @@ from inframeld_backend.access.infrastructure.verifiers.pydantic_discovery_url_ve
 
 
 class ApplicationKeyAuthenticationSettings(BaseModel):
-    """Configure independent exact incoming resources without selecting future issuance policy."""
+    """Supply trusted adapter profiles for exact verification and fresh issuance bindings."""
 
     model_config = ConfigDict(frozen=True, extra="forbid", hide_input_in_errors=True)
     http_audience: str | None = None

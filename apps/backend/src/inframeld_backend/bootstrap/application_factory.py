@@ -10,6 +10,9 @@ from ory_kratos_client.api.identity_api import IdentityApi
 from inframeld_backend.access.application.services.application_account_creation_fingerprint_service import (
     ApplicationAccountCreationFingerprintService,
 )
+from inframeld_backend.access.application.services.application_key_issuance_fingerprint_service import (
+    ApplicationKeyIssuanceFingerprintService,
+)
 from inframeld_backend.access.application.services.human_admission_fingerprint_service import (
     HumanAdmissionFingerprintService,
 )
@@ -67,6 +70,9 @@ from inframeld_backend.access.http.requests.application_account_action_grant_req
 )
 from inframeld_backend.access.http.requests.application_account_creation_request import (
     ApplicationAccountCreationRequest,
+)
+from inframeld_backend.access.http.requests.application_key_issue_request import (
+    ApplicationKeyIssueRequest,
 )
 from inframeld_backend.access.http.requests.human_admission_request import HumanAdmissionRequest
 from inframeld_backend.access.http.requests.invitation_activation_request import (
@@ -134,6 +140,15 @@ from inframeld_backend.access.http.responses.application_account_creation_respon
 from inframeld_backend.access.http.responses.application_account_metadata_response import (
     ApplicationAccountMetadataResponse,
 )
+from inframeld_backend.access.http.responses.application_key_first_delivery_response import (
+    ApplicationKeyFirstDeliveryResponse,
+)
+from inframeld_backend.access.http.responses.application_key_issuance_replay_response import (
+    ApplicationKeyIssuanceReplayResponse,
+)
+from inframeld_backend.access.http.responses.application_key_issue_response import (
+    ApplicationKeyIssueResponse,
+)
 from inframeld_backend.access.http.responses.current_application_session_response import (
     CurrentApplicationSessionResponse,
 )
@@ -182,6 +197,9 @@ from inframeld_backend.access.http.routes.application_account_action_grant_route
 )
 from inframeld_backend.access.http.routes.application_account_routes import (
     create_application_account_router,
+)
+from inframeld_backend.access.http.routes.application_key_issuance_routes import (
+    create_application_key_issuance_router,
 )
 from inframeld_backend.access.http.routes.current_application_session_routes import (
     create_application_session_router,
@@ -253,6 +271,7 @@ from inframeld_backend.bootstrap.application_account_grant_composition import (
     open_application_account_grant_change,
     open_application_account_grant_read,
 )
+from inframeld_backend.bootstrap.application_key_composition import open_application_key_issuance
 from inframeld_backend.bootstrap.application_lifespan import application_lifespan
 from inframeld_backend.bootstrap.application_resources import ApplicationResources
 from inframeld_backend.bootstrap.application_settings import ApplicationSettings, get_settings
@@ -344,6 +363,7 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
         metadata_fingerprints = ProjectMetadataFingerprintService(request_fingerprints)
         creation_fingerprints = ProjectCreationFingerprintService(request_fingerprints)
         account_fingerprints = ApplicationAccountCreationFingerprintService(request_fingerprints)
+        key_issuance_fingerprints = ApplicationKeyIssuanceFingerprintService(request_fingerprints)
         admission_fingerprints = HumanAdmissionFingerprintService(request_fingerprints)
         membership_fingerprints = ProjectMembershipChangeFingerprintService(request_fingerprints)
         invitation_fingerprints = InvitationFingerprintService(request_fingerprints)
@@ -414,6 +434,7 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
                 AccessGroupMembershipRequest,
                 AccessGroupManagerRequest,
                 ApplicationAccountCreationRequest,
+                ApplicationKeyIssueRequest,
                 HumanAdmissionRequest,
                 ProjectCreationRequest,
                 ProjectMembershipRequest,
@@ -441,6 +462,9 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
                 AccessGroupPrincipalsPageResponse,
                 ApplicationAccountCreationResponse,
                 ApplicationAccountMetadataResponse,
+                ApplicationKeyIssueResponse,
+                ApplicationKeyFirstDeliveryResponse,
+                ApplicationKeyIssuanceReplayResponse,
                 MyOrganizationAccessResponse,
                 MyProjectAccessResponse,
                 ProjectActionGrantResponse,
@@ -557,6 +581,21 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
                 product_access,
                 partial(open_application_account_creation, database, account_fingerprints),
                 partial(open_application_account_read, database),
+            )
+        )
+        application.include_router(
+            create_application_key_issuance_router(
+                product_access,
+                partial(
+                    open_application_key_issuance,
+                    database,
+                    key_issuance_fingerprints,
+                    http_profile=http_application_key_profile,
+                    mcp_profile=resolved_settings.application_key_authentication.profile(
+                        ApplicationKeyAdapter.MCP
+                    ),
+                    settings=resolved_settings.application_key_issuance,
+                ),
             )
         )
         application.include_router(

@@ -331,7 +331,7 @@ async def test_key_change_winning_admission_order_leaves_no_reservation_or_job(
                 await holder.execute(
                     update(ApplicationKeyRow)
                     .where(ApplicationKeyRow.key_id == seed.credential.key_id.value)
-                    .values(audience=PROFILE.audience.value)
+                    .values(http_audience=PROFILE.audience.value)
                 )
                 task = asyncio.create_task(_admit(database, access, authority, RequestId(uuid4())))
                 await _wait_for_key_lock(database, task, holder_pid)

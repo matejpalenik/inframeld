@@ -21,6 +21,7 @@ from inframeld_sdk.models.application_account_action_grant_request import (
 from inframeld_sdk.models.application_account_creation_request import (
     ApplicationAccountCreationRequest,
 )
+from inframeld_sdk.models.application_key_issue_request import ApplicationKeyIssueRequest
 from inframeld_sdk.models.grant_target_kind import GrantTargetKind
 from inframeld_sdk.models.human_admission_request import HumanAdmissionRequest
 from inframeld_sdk.models.human_o_auth_consent_request import HumanOAuthConsentRequest
@@ -1201,6 +1202,34 @@ async def delete_access_group_async(clients: Clients, call: Call) -> NativeRespo
     )
 
 
+def issue_application_key_sync(clients: Clients, call: Call) -> NativeResponse:
+    body = ApplicationKeyIssueRequest.from_dict(call.body)
+    if body is None:
+        raise ValueError("Application-key issuance requires a body")
+    return AccessApi(clients.production).issue_application_key_sync_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        application_principal_id=UUID(call.path["application_principal_id"]),
+        idempotency_key=call.headers["Idempotency-Key"],
+        application_key_issue_request=body,
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def issue_application_key_async(clients: Clients, call: Call) -> NativeResponse:
+    body = ApplicationKeyIssueRequest.from_dict(call.body)
+    if body is None:
+        raise ValueError("Application-key issuance requires a body")
+    return await AccessApi(clients.production).issue_application_key_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        application_principal_id=UUID(call.path["application_principal_id"]),
+        idempotency_key=call.headers["Idempotency-Key"],
+        application_key_issue_request=body,
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
 def issue_invitation_sync(clients: Clients, call: Call) -> NativeResponse:
     body = InvitationIssueRequest.from_dict(call.body)
     if body is None:
@@ -1280,6 +1309,9 @@ async def activate_invitation_async(clients: Clients, call: Call) -> NativeRespo
 
 
 BINDINGS: dict[Operation, Binding] = {
+    Operation.ISSUE_APPLICATION_KEY: Binding(
+        issue_application_key_sync, issue_application_key_async
+    ),
     Operation.ISSUE_INVITATION: Binding(issue_invitation_sync, issue_invitation_async),
     Operation.REVOKE_INVITATION: Binding(revoke_invitation_sync, revoke_invitation_async),
     Operation.PREVIEW_INVITATION: Binding(preview_invitation_sync, preview_invitation_async),

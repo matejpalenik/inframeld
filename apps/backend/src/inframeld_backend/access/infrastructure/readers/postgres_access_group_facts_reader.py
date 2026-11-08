@@ -477,6 +477,7 @@ class PostgresAccessGroupFactsReader(
                                 principal_id=access.actor_principal_id,
                                 organization_id=OrganizationId(organization),
                                 project_id=project_id,
+                                adapter=profile.adapter,
                             )
                         )
                     )

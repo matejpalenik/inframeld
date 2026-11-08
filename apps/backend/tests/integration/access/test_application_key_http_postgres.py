@@ -593,7 +593,7 @@ async def test_real_http_group_expiry_uses_database_time_after_ordinary_key_upda
                 await holder.execute(
                     update(ApplicationKeyRow)
                     .where(ApplicationKeyRow.key_id == seed.credential.key_id.value)
-                    .values(audience=AUDIENCE)
+                    .values(http_audience=AUDIENCE)
                 )
                 task = asyncio.create_task(
                     client.get(
