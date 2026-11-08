@@ -212,7 +212,7 @@ For scaffold-first TDD and meaningful documentation, read the [shared testing co
 
 ### Standalone account UI
 
-The separate [standalone account UI profile](../../../apps/web/tests/fixtures/README.md) uses `mise exec -- bash scripts/test-account-ui.sh --login-only`. It owns one disposable project, private CA and application/provider databases. Its expanded recovery/invitation/browser-guide cases remain pending native qualification. The existing runner preserves its phase deadlines and independent finalizer, including an independent database verification inside the same browser phase. Unit/type/build checks do not launch that graph or establish those native outcomes. Keep the combined Rust recipient-proof profile and human account/invitation acceptance separate.
+The separate [standalone account UI profile](../../../apps/web/tests/fixtures/README.md) uses `mise exec -- bash scripts/test-account-ui.sh --login-only`. It owns one disposable project, private CA and application/provider databases. Its local browser cases and independent SQL verification have passed within the [fixture's recorded qualification boundary](../../../apps/web/tests/fixtures/README.md#evidence-boundaries-and-remaining-combined-qualification). The existing runner preserves its phase deadlines and independent finalizer, including an independent database verification inside the same browser phase. Unit/type/build checks do not launch that graph or establish those native outcomes. Keep the combined Rust recipient-proof profile and human account/invitation acceptance separate.
 
 ### Native recovery delivery
 

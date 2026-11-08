@@ -349,6 +349,7 @@ test(
       assert.equal((await session(context))?.identity?.id, switched.subject)
       phase = "invitation-switch-return"
       await page.bringToFront()
+      await page.evaluate(() => window.dispatchEvent(new Event("focus")))
       phase = "invitation-switch-session"
       await page
         .locator("[data-protected-invitation]")

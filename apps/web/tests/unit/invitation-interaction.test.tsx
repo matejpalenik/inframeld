@@ -227,6 +227,7 @@ test("blur hides protected scope and focus changes identity with no automatic wr
       for (let recheck = 0; recheck < 2; recheck++) {
         const previousReads = reads
         await act(async () => window.dispatchEvent(new window.Event("focus")))
+        assert.equal(region.hidden, false)
         assert.equal(reads, previousReads + 1)
         assert.equal(writes, 1)
         assert.match(container.textContent ?? "", new RegExp(other))
