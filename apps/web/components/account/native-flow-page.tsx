@@ -51,6 +51,7 @@ export async function NativeFlowPage({
           flowKind={kind}
           publicOrigin={view.publicOrigin}
           completionMessages={view.completionMessages}
+          verificationState={view.verificationState}
         />
       ) : (
         <Stopped message={view.message} />

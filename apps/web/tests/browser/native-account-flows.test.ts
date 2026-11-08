@@ -379,6 +379,26 @@ test(
       await page.locator('button[name="method"][value="code"]').click()
       phase = "verification-submit-ready"
       await page.waitForLoadState("networkidle")
+      await page
+        .getByRole("status")
+        .getByText("You successfully verified your email address.", {
+          exact: true,
+        })
+        .waitFor()
+      assert.equal(
+        await page
+          .getByRole("link", { name: "Continue", exact: true })
+          .getAttribute("href"),
+        `${origin}/`
+      )
+      assert.equal(
+        await page.getByRole("main").locator('form, [role="alert"]').count(),
+        0
+      )
+      phase = "account-local-state"
+      const stillUnadmitted = await productSession(context)
+      assert.equal(stillUnadmitted.response?.status, 403)
+      assert.equal(stillUnadmitted.data, undefined)
       phase = "verification-session"
       const verified = await session(context)
       phase = "verification-identity"

@@ -1,4 +1,5 @@
 import {
+  instanceOfUiNodeAnchorAttributes,
   instanceOfUiNodeImageAttributes,
   instanceOfUiNodeInputAttributes,
   instanceOfUiNodeTextAttributes,
@@ -120,13 +121,47 @@ export function KratosFlowForm({
   flowId,
   flowKind = "login",
   completionMessages,
+  verificationState,
 }: {
   ui: UiContainer
   publicOrigin: string
   flowId: string
   flowKind?: AccountFlowKind
   completionMessages?: readonly UiText[]
+  verificationState?: "passed_challenge"
 }) {
+  if (flowKind === "verification" && verificationState === "passed_challenge") {
+    let continuation: string | undefined
+    try {
+      const target = checkedProviderUrl(ui.action, publicOrigin, "/")
+      const anchors = ui.nodes.filter((node) => node.type === "a")
+      const anchor = anchors[0]?.attributes
+      if (
+        ui.method.toLowerCase() !== "get" ||
+        new URL(target).search ||
+        anchors.length !== 1 ||
+        anchors[0].group !== "code" ||
+        !anchor ||
+        !instanceOfUiNodeAnchorAttributes(anchor) ||
+        anchor.node_type !== "a" ||
+        anchor.id !== "continue" ||
+        anchor.href !== ui.action ||
+        typeof anchor.title.text !== "string"
+      )
+        throw new Error()
+      continuation = target
+    } catch {
+      // Completion does not authorize a provider-supplied navigation target.
+    }
+    return (
+      <div className="space-y-6">
+        <Messages messages={ui.messages} />
+        <a className={buttonClass} href={continuation ?? "/"}>
+          {continuation ? "Continue" : "Account"}
+        </a>
+      </div>
+    )
+  }
   let action: string
   try {
     action = checkedProviderUrl(

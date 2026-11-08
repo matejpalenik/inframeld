@@ -18,6 +18,7 @@ export type NativeAccountFlowView =
       flowId: string
       publicOrigin: string
       completionMessages?: readonly UiText[]
+      verificationState?: "passed_challenge"
     }
   | { kind: "stopped"; message: string }
 
@@ -53,11 +54,15 @@ export async function loadAccountFlow(
         : kind === "verification"
           ? await readVerificationFlow(config, id, cookie, transport)
           : await readRecoveryFlow(config, id, cookie, transport)
+    const state: unknown = "state" in current ? current.state : undefined
     return {
       kind: "ready",
       ui: current.ui,
       flowId: id,
       publicOrigin: config.publicOrigin,
+      ...(kind === "verification" && state === "passed_challenge"
+        ? { verificationState: "passed_challenge" as const }
+        : {}),
     }
   } catch {
     return {

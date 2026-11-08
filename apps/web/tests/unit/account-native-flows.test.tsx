@@ -50,6 +50,193 @@ function render(
   )
 }
 
+const verificationAnchor = {
+  type: "a",
+  group: "code",
+  attributes: {
+    node_type: "a",
+    id: "continue",
+    href: `${origin}/`,
+    title: { id: 1, text: "Continue", type: "info" },
+  },
+  messages: [],
+  meta: { label: { id: 1, text: "Continue", type: "info" } },
+} satisfies UiNode
+
+const verificationCompletion: UiContainer = {
+  action: `${origin}/`,
+  method: "GET",
+  messages: [
+    {
+      id: 1080001,
+      type: "success",
+      text: "You successfully verified your email address.",
+    },
+  ],
+  nodes: [input("csrf_token", "hidden", "native-csrf"), verificationAnchor],
+}
+
+test("verification completion renders the native success and checked Continue without a form", () => {
+  const dom = new JSDOM(
+    renderToStaticMarkup(
+      <KratosFlowForm
+        ui={verificationCompletion}
+        flowId={id}
+        flowKind="verification"
+        publicOrigin={origin}
+        verificationState="passed_challenge"
+      />
+    )
+  )
+  try {
+    const document = dom.window.document
+    assert.equal(
+      document.querySelector('[role="status"]')?.textContent,
+      "You successfully verified your email address."
+    )
+    const link = document.querySelector<HTMLAnchorElement>("a")!
+    assert.equal(link.textContent, "Continue")
+    assert.equal(link.href, `${origin}/`)
+    assert.equal(
+      document.querySelector('form, input, button, [role="alert"]'),
+      null
+    )
+  } finally {
+    dom.window.close()
+  }
+})
+
+for (const [name, ui] of [
+  ...[
+    ["external", "https://outside.test/"],
+    ["insecure", "http://inframeld.account.test:8443/"],
+    ["script", "javascript:alert(1)"],
+    ["credentials", "https://user@inframeld.account.test:8443/"],
+    ["unsupported-path", `${origin}/settings`],
+    ["query", `${origin}/?return_to=outside`],
+    ["fragment", `${origin}/#outside`],
+  ].map(([name, target]): [string, UiContainer] => [
+    name,
+    {
+      ...verificationCompletion,
+      action: target,
+      nodes: [
+        {
+          ...verificationAnchor,
+          attributes: {
+            ...verificationAnchor.attributes,
+            href: target,
+          },
+        },
+      ],
+    },
+  ]),
+  ["method", { ...verificationCompletion, method: "POST" }],
+  ["missing-anchor", { ...verificationCompletion, nodes: [] }],
+  [
+    "duplicate-anchor",
+    {
+      ...verificationCompletion,
+      nodes: [...verificationCompletion.nodes, verificationAnchor],
+    },
+  ],
+  [
+    "mismatched-anchor",
+    {
+      ...verificationCompletion,
+      nodes: [
+        {
+          ...verificationAnchor,
+          attributes: {
+            ...verificationAnchor.attributes,
+            href: `${origin}/settings`,
+          },
+        },
+      ],
+    },
+  ],
+  [
+    "wrong-anchor-group",
+    {
+      ...verificationCompletion,
+      nodes: [{ ...verificationAnchor, group: "default" }],
+    },
+  ],
+  [
+    "wrong-anchor-id",
+    {
+      ...verificationCompletion,
+      nodes: [
+        {
+          ...verificationAnchor,
+          attributes: {
+            ...verificationAnchor.attributes,
+            id: "other",
+          },
+        },
+      ],
+    },
+  ],
+] satisfies readonly (readonly [string, UiContainer])[]) {
+  test(`verification completion replaces unsafe ${name} continuation with Account navigation`, () => {
+    const html = renderToStaticMarkup(
+      <KratosFlowForm
+        ui={ui}
+        flowId={id}
+        flowKind="verification"
+        publicOrigin={origin}
+        verificationState="passed_challenge"
+      />
+    )
+    const dom = new JSDOM(html)
+    try {
+      const document = dom.window.document
+      assert.equal(
+        document.querySelector('[role="status"]')?.textContent,
+        "You successfully verified your email address."
+      )
+      const link = document.querySelector("a")!
+      assert.equal(link.textContent, "Account")
+      assert.equal(link.getAttribute("href"), "/")
+      assert.equal(
+        document.querySelector('form, input, button, [role="alert"]'),
+        null
+      )
+    } finally {
+      dom.window.close()
+    }
+  })
+}
+
+test("verification completion cannot turn an unfinished verification GET into a form or success", () => {
+  const html = renderToStaticMarkup(
+    <KratosFlowForm
+      ui={verificationCompletion}
+      flowId={id}
+      flowKind="verification"
+      publicOrigin={origin}
+    />
+  )
+  assert.match(html, /could not be verified/)
+  assert.doesNotMatch(html, /successfully verified|Continue|<form/)
+})
+
+for (const kind of ["registration", "recovery", "settings", "login"] as const) {
+  test(`verification completion does not bypass ${kind} form guards`, () => {
+    const html = renderToStaticMarkup(
+      <KratosFlowForm
+        ui={verificationCompletion}
+        flowId={id}
+        flowKind={kind}
+        publicOrigin={origin}
+        verificationState="passed_challenge"
+      />
+    )
+    assert.match(html, /could not be verified/)
+    assert.doesNotMatch(html, /successfully verified|Continue|<form/)
+  })
+}
+
 for (const kind of [
   "registration",
   "verification",

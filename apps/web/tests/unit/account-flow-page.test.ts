@@ -15,6 +15,106 @@ const env = {
   INFRAMELD_ACCOUNT_KRATOS_INTERNAL_URL: "http://kratos:4433",
 }
 
+const verifiedFlow = {
+  id,
+  type: "browser",
+  state: "passed_challenge",
+  ui: {
+    action: `${origin}/`,
+    method: "GET",
+    messages: [
+      {
+        id: 1080001,
+        type: "success",
+        text: "You successfully verified your email address.",
+      },
+    ],
+    nodes: [],
+  },
+}
+
+test("verification completion carries only its checked native passed-challenge state", async () => {
+  const requests: Request[] = []
+  const view = await loadAccountFlow(
+    "verification",
+    env,
+    id,
+    "current-cookie",
+    async (input, init) => {
+      requests.push(new Request(input, init))
+      return Response.json(verifiedFlow)
+    }
+  )
+  assert.equal(view.kind, "ready")
+  if (view.kind !== "ready") throw new Error("Expected verification outcome")
+  assert.equal(view.verificationState, "passed_challenge")
+  assert.equal(view.flowId, id)
+  assert.equal(view.ui.action, verifiedFlow.ui.action)
+  assert.equal(view.ui.method, "GET")
+  assert.deepEqual(view.ui.nodes, [])
+  assert.deepEqual(
+    view.ui.messages?.map(({ id, type, text }) => ({ id, type, text })),
+    verifiedFlow.ui.messages
+  )
+  assert.equal(requests.length, 1)
+  assert.equal(requests[0].headers.get("Cookie"), "current-cookie")
+  assert.equal(requests[0].headers.get("Authorization"), null)
+  assert.equal(requests[0].cache, "no-store")
+  assert.equal(requests[0].redirect, "manual")
+})
+
+for (const state of [
+  undefined,
+  null,
+  "sent_email",
+  "success",
+  "passed_challenge ",
+  true,
+  { passed_challenge: true },
+  ["passed_challenge"],
+]) {
+  test(`verification completion does not trust non-exact state ${JSON.stringify(state)}`, async () => {
+    const view = await loadAccountFlow(
+      "verification",
+      env,
+      id,
+      "current-cookie",
+      async () => Response.json({ ...verifiedFlow, state })
+    )
+    assert.equal(view.kind, "ready")
+    if (view.kind !== "ready") throw new Error("Expected current flow")
+    assert.equal(view.verificationState, undefined)
+  })
+}
+
+for (const kind of ["registration", "recovery"] as const) {
+  test(`verification completion does not reinterpret ${kind} state`, async () => {
+    const view = await loadAccountFlow(
+      kind,
+      env,
+      id,
+      "current-cookie",
+      async () => Response.json(verifiedFlow)
+    )
+    assert.equal(view.kind, "ready")
+    if (view.kind !== "ready") throw new Error("Expected current flow")
+    assert.equal(view.verificationState, undefined)
+  })
+}
+
+for (const override of [{ id: "wrong-flow" }, { type: "api" }]) {
+  test(`verification completion rejects an unbound native flow ${JSON.stringify(override)}`, async () => {
+    const view = await loadAccountFlow(
+      "verification",
+      env,
+      id,
+      "current-cookie",
+      async () => Response.json({ ...verifiedFlow, ...override })
+    )
+    assert.equal(view.kind, "stopped")
+  })
+}
+
 const successorId = "d2fab4f4-ffce-4e5a-ae73-25cbff832765"
 const thirdId = "e3fab4f4-ffce-4e5a-ae73-25cbff832766"
 const identityId = "91fab4f4-ffce-4e5a-ae73-25cbff832767"
