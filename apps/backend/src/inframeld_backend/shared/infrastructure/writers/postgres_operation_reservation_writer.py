@@ -2,7 +2,7 @@
 
 from datetime import datetime, timedelta
 from hmac import compare_digest
-from typing import final, override
+from typing import ClassVar, final, override
 from uuid import uuid4
 
 from sqlalchemy import delete, func, select, update
@@ -31,12 +31,12 @@ from inframeld_backend.shared.infrastructure.rows.idempotency_reservation_row im
     IdempotencyReservationRow,
 )
 
-_COMPLETED_RETENTION = timedelta(hours=24)
-
 
 @final
 class PostgresOperationReservationWriter(OperationReservationWriter):
     """Reserve once without committing the caller's transaction"""
+
+    COMPLETED_ORIGINAL_RETENTION: ClassVar[timedelta] = timedelta(hours=24)
 
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
@@ -50,7 +50,7 @@ class PostgresOperationReservationWriter(OperationReservationWriter):
         expires_at = (
             None
             if replay_kind is OperationReplayKind.ASYNC_JOB
-            else func.clock_timestamp() + _COMPLETED_RETENTION
+            else func.clock_timestamp() + self.COMPLETED_ORIGINAL_RETENTION
         )
 
         statement = (

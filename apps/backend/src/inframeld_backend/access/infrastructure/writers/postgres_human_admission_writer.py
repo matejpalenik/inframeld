@@ -9,8 +9,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from inframeld_backend.access.application.dtos.human_admission_facts_dto import (
     HumanAdmissionFactsDTO,
 )
+from inframeld_backend.access.application.dtos.invitation_activation_binding_dto import (
+    InvitationActivationBindingDTO,
+)
+from inframeld_backend.access.application.dtos.invitation_activation_facts_dto import (
+    InvitationActivationFactsDTO,
+)
+from inframeld_backend.access.application.dtos.invitation_issuer_facts_dto import (
+    InvitationIssuerFactsDTO,
+)
 from inframeld_backend.access.application.protocols.human_admission_writer import (
     HumanAdmissionWriter,
+)
+from inframeld_backend.access.application.protocols.invitation_admission_writer import (
+    InvitationAdmissionWriter,
 )
 from inframeld_backend.access.domain.entities.principal import Principal
 from inframeld_backend.access.domain.enums.organization_action import OrganizationAction
@@ -22,6 +34,9 @@ from inframeld_backend.access.infrastructure.mappers.postgres_human_credential_s
 )
 from inframeld_backend.access.infrastructure.readers.human_credential_state_queries import (
     HumanCredentialStateQueries,
+)
+from inframeld_backend.access.infrastructure.readers.postgres_invitation_binding_reader import (
+    PostgresInvitationBindingReader,
 )
 from inframeld_backend.access.infrastructure.rows.access_audit_event_row import AccessAuditEventRow
 from inframeld_backend.access.infrastructure.rows.human_admission_operation_result_row import (
@@ -50,7 +65,7 @@ from inframeld_backend.shared.infrastructure.rows.idempotency_reservation_row im
 )
 
 
-class PostgresHumanAdmissionWriter(HumanAdmissionWriter):
+class PostgresHumanAdmissionWriter(HumanAdmissionWriter, InvitationAdmissionWriter):
     """Keep each admission's account, audit and immutable outcome in one transaction."""
 
     def __init__(self, session: AsyncSession) -> None:
@@ -80,24 +95,13 @@ class PostgresHumanAdmissionWriter(HumanAdmissionWriter):
         actor_id: PrincipalId,
         operation_id: OperationId,
     ) -> None:
-        """Persist the admission and retained receipt under the original checked reservation."""
+        """Keep ordinary reservation and receipt ownership outside the shared row transition."""
         if not self._session.in_transaction() or not self._session.is_active:
             raise RuntimeError("Admission persistence requires the active caller transaction.")
+        self._require_checked_scope(facts=facts, principal=principal, actor_id=actor_id)
         organization_id = facts.actor.principal.organization_id
         changed = facts.principal is None
-        if (
-            actor_id != facts.actor.principal.id
-            or facts.actor.principal.kind is not PrincipalKind.HUMAN
-            or facts.actor.principal.status is not PrincipalStatus.ACTIVE
-            or principal.organization_id != organization_id
-            or principal.kind is not PrincipalKind.HUMAN
-            or principal.status is not PrincipalStatus.ACTIVE
-            or (facts.principal is not None and principal.id != facts.principal.id)
-            or facts.credential_state.identity != facts.identity
-            or facts.credential_state.installation_id != facts.installation_id
-        ):
-            raise RuntimeError("Admission persistence changed its checked scope.")
-
+        revision = facts.actor.access_revision
         with self._session.no_autoflush:
             reservation = await self._session.scalar(
                 select(IdempotencyReservationRow.operation_id).where(
@@ -118,6 +122,58 @@ class PostgresHumanAdmissionWriter(HumanAdmissionWriter):
             )
             if reservation is None:
                 raise ConflictError("Admission has no matching original reservation.")
+
+        after_revision = await self._apply_checked_admission_transition(
+            facts=facts, principal=principal, actor_id=actor_id, operation_id=operation_id
+        )
+        self._session.add(
+            HumanAdmissionOperationResultRow(
+                operation_id=operation_id.value,
+                installation_id=facts.installation_id.value,
+                authority=facts.identity.authority.value,
+                subject=facts.identity.subject.value,
+                organization_id=organization_id.value,
+                actor_principal_id=actor_id.value,
+                principal_id=principal.id.value,
+                before_revision=revision,
+                access_revision=after_revision,
+                changed=changed,
+                status_code=201 if changed else 200,
+            )
+        )
+        await self._session.flush()
+
+    @staticmethod
+    def _require_checked_scope(
+        *, facts: HumanAdmissionFactsDTO, principal: Principal, actor_id: PrincipalId
+    ) -> None:
+        organization_id = facts.actor.principal.organization_id
+        if (
+            actor_id != facts.actor.principal.id
+            or facts.actor.principal.kind is not PrincipalKind.HUMAN
+            or facts.actor.principal.status is not PrincipalStatus.ACTIVE
+            or principal.organization_id != organization_id
+            or principal.kind is not PrincipalKind.HUMAN
+            or principal.status is not PrincipalStatus.ACTIVE
+            or (facts.principal is not None and principal.id != facts.principal.id)
+            or facts.credential_state.identity != facts.identity
+            or facts.credential_state.installation_id != facts.installation_id
+        ):
+            raise RuntimeError("Admission persistence changed its checked scope.")
+
+    async def _apply_checked_admission_transition(
+        self,
+        *,
+        facts: HumanAdmissionFactsDTO,
+        principal: Principal,
+        actor_id: PrincipalId,
+        operation_id: OperationId,
+    ) -> int:
+        """Persist the single checked principal/link/version/revision and admission audit transition."""
+        self._require_checked_scope(facts=facts, principal=principal, actor_id=actor_id)
+        organization_id = facts.actor.principal.organization_id
+        changed = facts.principal is None
+        with self._session.no_autoflush:
             revision = await self._session.scalar(
                 select(OrganizationRow.access_revision).where(
                     OrganizationRow.id == organization_id.value
@@ -216,21 +272,6 @@ class PostgresHumanAdmissionWriter(HumanAdmissionWriter):
 
         after_revision = revision + int(changed)
         self._session.add(
-            HumanAdmissionOperationResultRow(
-                operation_id=operation_id.value,
-                installation_id=facts.installation_id.value,
-                authority=facts.identity.authority.value,
-                subject=facts.identity.subject.value,
-                organization_id=organization_id.value,
-                actor_principal_id=actor_id.value,
-                principal_id=principal.id.value,
-                before_revision=revision,
-                access_revision=after_revision,
-                changed=changed,
-                status_code=201 if changed else 200,
-            )
-        )
-        self._session.add(
             AccessAuditEventRow(
                 id=uuid4(),
                 organization_id=organization_id.value,
@@ -247,3 +288,44 @@ class PostgresHumanAdmissionWriter(HumanAdmissionWriter):
             )
         )
         await self._session.flush()
+        return after_revision
+
+    @override
+    async def apply_invitation_admission(
+        self,
+        *,
+        binding: InvitationActivationBindingDTO,
+        facts: InvitationActivationFactsDTO,
+        issuer: InvitationIssuerFactsDTO,
+        principal: Principal,
+    ) -> int:
+        try:
+            await PostgresInvitationBindingReader(self._session).require_pending_activation(binding)
+            if (
+                binding.invitation_id != facts.invitation.invitation_id
+                or binding.organization_id != facts.invitation.organization_id
+                or binding.issuer_principal_id != facts.invitation.issuer_principal_id
+                or binding.issuer_principal_id != issuer.organization_access.principal.id
+                or binding.identity != facts.credential_state.identity
+                or binding.installation_id != facts.credential_state.installation_id
+                or binding.principal_id
+                != (facts.principal.id if facts.principal is not None else None)
+                or issuer.organization_access.access_revision != facts.organization_access_revision
+            ):
+                raise RuntimeError("Invitation admission changed its checked activation facts.")
+            admission = HumanAdmissionFactsDTO(
+                installation_id=binding.installation_id,
+                identity=binding.identity,
+                actor=issuer.organization_access,
+                principal=facts.principal,
+                credential_state=facts.credential_state,
+                has_credential_history=facts.has_credential_history,
+            )
+            return await self._apply_checked_admission_transition(
+                facts=admission,
+                principal=principal,
+                actor_id=binding.issuer_principal_id,
+                operation_id=binding.operation_id,
+            )
+        except (TimeoutError, OperationalError, SqlAlchemyTimeoutError):
+            raise DependencyUnavailableError() from None

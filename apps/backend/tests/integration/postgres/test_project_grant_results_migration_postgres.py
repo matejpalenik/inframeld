@@ -138,10 +138,7 @@ async def test_retained_original_receipt_refuses_downgrade_and_keeps_schema_and_
     with database_connection(temporary_postgres_settings) as connection:
         assert inspect(connection).has_table("project_action_grant_operation_results")
     async with database.session() as session:
-        assert (
-            await session.scalar(select(AlembicVersionRow.version_num))
-            == "0026_access_action_grant_results"
-        )
+        assert await session.scalar(select(AlembicVersionRow.version_num)) == "0027_invitations"
         row = await session.get(
             ProjectActionGrantOperationResultRow, original.operation.operation_id.value
         )

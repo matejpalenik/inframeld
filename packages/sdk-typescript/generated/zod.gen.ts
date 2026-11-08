@@ -430,6 +430,292 @@ export const zApplicationAccountCreationResponse = z.object({
 });
 
 /**
+ * InvitationAccessGroupTargetRequest
+ */
+export const zInvitationAccessGroupTargetRequest = z.object({
+    accessGroupId: z.uuid(),
+    kind: z.literal('access-group'),
+    projectId: z.uuid()
+});
+
+/**
+ * InvitationActivationRequest
+ */
+export const zInvitationActivationRequest = z.object({
+    invitationToken: z.string()
+});
+
+/**
+ * InvitationAdmissionOnlyRequest
+ */
+export const zInvitationAdmissionOnlyRequest = z.object({
+    kind: z.literal('admission-only')
+});
+
+/**
+ * InvitationApplicationAccountTargetRequest
+ */
+export const zInvitationApplicationAccountTargetRequest = z.object({
+    applicationPrincipalId: z.uuid(),
+    kind: z.literal('application-account'),
+    projectId: z.uuid()
+});
+
+/**
+ * InvitationCollectionTargetRequest
+ */
+export const zInvitationCollectionTargetRequest = z.object({
+    collectionId: z.uuid(),
+    kind: z.literal('collection')
+});
+
+/**
+ * InvitationDeploymentTargetRequest
+ */
+export const zInvitationDeploymentTargetRequest = z.object({
+    deploymentId: z.uuid(),
+    kind: z.literal('deployment')
+});
+
+/**
+ * InvitationEmbeddingProfileTargetRequest
+ */
+export const zInvitationEmbeddingProfileTargetRequest = z.object({
+    embeddingProfileId: z.uuid(),
+    kind: z.literal('embedding-profile')
+});
+
+/**
+ * InvitationGroupManagerRequest
+ */
+export const zInvitationGroupManagerRequest = z.object({
+    accessGroupId: z.uuid(),
+    kind: z.literal('group-manager'),
+    projectId: z.uuid()
+});
+
+/**
+ * InvitationGroupMembershipRequest
+ */
+export const zInvitationGroupMembershipRequest = z.object({
+    accessGroupId: z.uuid(),
+    kind: z.literal('group-membership'),
+    projectId: z.uuid()
+});
+
+/**
+ * InvitationModelConnectionTargetRequest
+ */
+export const zInvitationModelConnectionTargetRequest = z.object({
+    kind: z.literal('model-connection'),
+    modelConnectionId: z.uuid()
+});
+
+/**
+ * InvitationOrganizationTargetRequest
+ */
+export const zInvitationOrganizationTargetRequest = z.object({
+    kind: z.literal('organization'),
+    organizationId: z.uuid()
+});
+
+/**
+ * InvitationPipelineTargetRequest
+ */
+export const zInvitationPipelineTargetRequest = z.object({
+    kind: z.literal('pipeline'),
+    pipelineId: z.uuid()
+});
+
+/**
+ * InvitationPreviewRequest
+ */
+export const zInvitationPreviewRequest = z.object({
+    invitationToken: z.string()
+});
+
+/**
+ * InvitationProcessingProfileTargetRequest
+ */
+export const zInvitationProcessingProfileTargetRequest = z.object({
+    kind: z.literal('processing-profile'),
+    processingProfileId: z.uuid()
+});
+
+/**
+ * InvitationProjectAccessRevisionRequest
+ */
+export const zInvitationProjectAccessRevisionRequest = z.object({
+    accessRevision: z.int().gte(0).lte(9007199254740991),
+    projectId: z.uuid()
+});
+
+/**
+ * InvitationProjectAccessRevisionResponse
+ */
+export const zInvitationProjectAccessRevisionResponse = z.object({
+    accessRevision: z.int(),
+    projectId: z.uuid()
+});
+
+/**
+ * InvitationActivationResponse
+ */
+export const zInvitationActivationResponse = z.object({
+    idempotencyExpiresAt: z.iso.datetime(),
+    invitationId: z.uuid(),
+    operationId: z.string(),
+    organizationAccessRevision: z.int(),
+    organizationId: z.uuid(),
+    principalId: z.uuid(),
+    projectAccessRevisions: z.array(zInvitationProjectAccessRevisionResponse)
+});
+
+/**
+ * InvitationProjectMembershipRequest
+ */
+export const zInvitationProjectMembershipRequest = z.object({
+    kind: z.literal('project-membership'),
+    projectId: z.uuid()
+});
+
+/**
+ * InvitationProjectTargetRequest
+ */
+export const zInvitationProjectTargetRequest = z.object({
+    kind: z.literal('project'),
+    projectId: z.uuid()
+});
+
+/**
+ * InvitationRevocationRequest
+ */
+export const zInvitationRevocationRequest = z.object({
+    expectedAccessRevision: z.int().gte(0).lte(9007199254740991)
+});
+
+/**
+ * InvitationRevocationResponse
+ */
+export const zInvitationRevocationResponse = z.object({
+    accessRevision: z.int(),
+    idempotencyExpiresAt: z.iso.datetime(),
+    invitationId: z.uuid(),
+    operationId: z.string(),
+    organizationId: z.uuid(),
+    revoked: z.literal(true).optional().default(true)
+});
+
+/**
+ * InvitationSourceTargetRequest
+ */
+export const zInvitationSourceTargetRequest = z.object({
+    kind: z.literal('source'),
+    sourceId: z.uuid()
+});
+
+export const zInvitationTargetRequest = z.discriminatedUnion('kind', [
+    zInvitationOrganizationTargetRequest,
+    zInvitationProjectTargetRequest,
+    zInvitationAccessGroupTargetRequest,
+    zInvitationApplicationAccountTargetRequest,
+    zInvitationPipelineTargetRequest,
+    zInvitationDeploymentTargetRequest,
+    zInvitationCollectionTargetRequest,
+    zInvitationSourceTargetRequest,
+    zInvitationModelConnectionTargetRequest,
+    zInvitationProcessingProfileTargetRequest,
+    zInvitationEmbeddingProfileTargetRequest
+]);
+
+/**
+ * InvitationActionGrantRequest
+ */
+export const zInvitationActionGrantRequest = z.object({
+    actionId: z.string().min(1).max(100),
+    canGrant: z.boolean(),
+    kind: z.literal('action-grant'),
+    target: zInvitationTargetRequest
+});
+
+export const zInvitationAssignmentRequest = z.discriminatedUnion('kind', [
+    zInvitationAdmissionOnlyRequest,
+    zInvitationProjectMembershipRequest,
+    zInvitationGroupMembershipRequest,
+    zInvitationGroupManagerRequest,
+    zInvitationActionGrantRequest
+]);
+
+/**
+ * InvitationFirstDeliveryResponse
+ */
+export const zInvitationFirstDeliveryResponse = z.object({
+    accessRevision: z.int(),
+    assignments: z.array(zInvitationAssignmentRequest),
+    expiresAt: z.iso.datetime(),
+    idempotencyExpiresAt: z.iso.datetime(),
+    invitationId: z.uuid(),
+    invitationToken: z.string(),
+    operationId: z.string(),
+    organizationId: z.uuid(),
+    secretAvailable: z.literal(true)
+});
+
+/**
+ * InvitationIssuanceReplayResponse
+ */
+export const zInvitationIssuanceReplayResponse = z.object({
+    accessRevision: z.int(),
+    assignments: z.array(zInvitationAssignmentRequest),
+    expiresAt: z.iso.datetime(),
+    idempotencyExpiresAt: z.iso.datetime(),
+    invitationId: z.uuid(),
+    operationId: z.string(),
+    organizationId: z.uuid(),
+    secretAvailable: z.literal(false)
+});
+
+/**
+ * InvitationIssueRequest
+ */
+export const zInvitationIssueRequest = z.object({
+    assignments: z.array(zInvitationAssignmentRequest).min(1).max(100),
+    expectedAccessRevision: z.int().gte(0).lte(9007199254740991),
+    expectedProjectAccessRevisions: z.array(zInvitationProjectAccessRevisionRequest).max(100),
+    expiresInSeconds: z.int().gt(0).lte(2592000).optional(),
+    organizationId: z.uuid()
+});
+
+/**
+ * InvitationIssueResponse
+ *
+ * Deliver a secret once or retain only the original safe issuance metadata.
+ */
+export const zInvitationIssueResponse = z.discriminatedUnion('secretAvailable', [
+    zInvitationFirstDeliveryResponse,
+    zInvitationIssuanceReplayResponse
+]);
+
+/**
+ * InvitationScopeResponse
+ */
+export const zInvitationScopeResponse = z.object({
+    displayName: z.string(),
+    target: zInvitationTargetRequest
+});
+
+/**
+ * InvitationPreviewResponse
+ */
+export const zInvitationPreviewResponse = z.object({
+    assignments: z.array(zInvitationAssignmentRequest),
+    expiresAt: z.iso.datetime(),
+    invitationId: z.uuid(),
+    organizationId: z.uuid(),
+    scopes: z.array(zInvitationScopeResponse)
+});
+
+/**
  * JobStatus
  */
 export const zJobStatus = z.enum([
@@ -1273,6 +1559,250 @@ export const zGetDeletionStatus503Representation0Response = zProblemDetails;
  * Successful Response
  */
 export const zGetDeletionStatusResponse = zDeletionStatusResponse;
+
+export const zIssueInvitationBody = zInvitationIssueRequest;
+
+export const zIssueInvitationHeaders = z.object({
+    'Idempotency-Key': z.string().min(1).max(128).regex(/.*\S.*/)
+});
+
+/**
+ * Successful Response
+ */
+export const zIssueInvitation201Representation0Response = zInvitationIssueResponse;
+
+/**
+ * Invalid authentication request
+ */
+export const zIssueInvitation400Representation0Response = zProblemDetails;
+
+/**
+ * Unauthorized
+ */
+export const zIssueInvitation401Representation0Response = zProblemDetails;
+
+/**
+ * Access denied
+ */
+export const zIssueInvitation403Representation0Response = zProblemDetails;
+
+/**
+ * Resource not found
+ */
+export const zIssueInvitation404Representation0Response = zProblemDetails;
+
+/**
+ * Operation conflicts with current state
+ */
+export const zIssueInvitation409Representation0Response = zProblemDetails;
+
+/**
+ * Content Too Large
+ */
+export const zIssueInvitation413Representation0Response = zProblemDetails;
+
+/**
+ * Unsupported Media Type
+ */
+export const zIssueInvitation415Representation0Response = zProblemDetails;
+
+/**
+ * Request validation failed
+ */
+export const zIssueInvitation422Representation0Response = zProblemDetails;
+
+/**
+ * Dependency unavailable
+ */
+export const zIssueInvitation503Representation0Response = zProblemDetails;
+
+/**
+ * Successful Response
+ */
+export const zIssueInvitationResponse = zInvitationIssueResponse;
+
+export const zActivateInvitationBody = zInvitationActivationRequest;
+
+export const zActivateInvitationHeaders = z.object({
+    'Idempotency-Key': z.string().min(1).max(128).regex(/.*\S.*/)
+});
+
+/**
+ * Successful Response
+ */
+export const zActivateInvitation200Representation0Response = zInvitationActivationResponse;
+
+/**
+ * Invalid authentication request
+ */
+export const zActivateInvitation400Representation0Response = zProblemDetails;
+
+/**
+ * Unauthorized
+ */
+export const zActivateInvitation401Representation0Response = zProblemDetails;
+
+/**
+ * Access denied
+ */
+export const zActivateInvitation403Representation0Response = zProblemDetails;
+
+/**
+ * Resource not found
+ */
+export const zActivateInvitation404Representation0Response = zProblemDetails;
+
+/**
+ * Operation conflicts with current state
+ */
+export const zActivateInvitation409Representation0Response = zProblemDetails;
+
+/**
+ * Content Too Large
+ */
+export const zActivateInvitation413Representation0Response = zProblemDetails;
+
+/**
+ * Unsupported Media Type
+ */
+export const zActivateInvitation415Representation0Response = zProblemDetails;
+
+/**
+ * Request validation failed
+ */
+export const zActivateInvitation422Representation0Response = zProblemDetails;
+
+/**
+ * Dependency unavailable
+ */
+export const zActivateInvitation503Representation0Response = zProblemDetails;
+
+/**
+ * Successful Response
+ */
+export const zActivateInvitationResponse = zInvitationActivationResponse;
+
+export const zPreviewInvitationBody = zInvitationPreviewRequest;
+
+/**
+ * Successful Response
+ */
+export const zPreviewInvitation200Representation0Response = zInvitationPreviewResponse;
+
+/**
+ * Invalid authentication request
+ */
+export const zPreviewInvitation400Representation0Response = zProblemDetails;
+
+/**
+ * Unauthorized
+ */
+export const zPreviewInvitation401Representation0Response = zProblemDetails;
+
+/**
+ * Access denied
+ */
+export const zPreviewInvitation403Representation0Response = zProblemDetails;
+
+/**
+ * Resource not found
+ */
+export const zPreviewInvitation404Representation0Response = zProblemDetails;
+
+/**
+ * Operation conflicts with current state
+ */
+export const zPreviewInvitation409Representation0Response = zProblemDetails;
+
+/**
+ * Content Too Large
+ */
+export const zPreviewInvitation413Representation0Response = zProblemDetails;
+
+/**
+ * Unsupported Media Type
+ */
+export const zPreviewInvitation415Representation0Response = zProblemDetails;
+
+/**
+ * Request validation failed
+ */
+export const zPreviewInvitation422Representation0Response = zProblemDetails;
+
+/**
+ * Dependency unavailable
+ */
+export const zPreviewInvitation503Representation0Response = zProblemDetails;
+
+/**
+ * Successful Response
+ */
+export const zPreviewInvitationResponse = zInvitationPreviewResponse;
+
+export const zRevokeInvitationBody = zInvitationRevocationRequest;
+
+export const zRevokeInvitationHeaders = z.object({
+    'Idempotency-Key': z.string().min(1).max(128).regex(/.*\S.*/)
+});
+
+export const zRevokeInvitationPath = z.object({
+    invitation_id: z.uuid()
+});
+
+/**
+ * Successful Response
+ */
+export const zRevokeInvitation200Representation0Response = zInvitationRevocationResponse;
+
+/**
+ * Invalid authentication request
+ */
+export const zRevokeInvitation400Representation0Response = zProblemDetails;
+
+/**
+ * Unauthorized
+ */
+export const zRevokeInvitation401Representation0Response = zProblemDetails;
+
+/**
+ * Access denied
+ */
+export const zRevokeInvitation403Representation0Response = zProblemDetails;
+
+/**
+ * Resource not found
+ */
+export const zRevokeInvitation404Representation0Response = zProblemDetails;
+
+/**
+ * Operation conflicts with current state
+ */
+export const zRevokeInvitation409Representation0Response = zProblemDetails;
+
+/**
+ * Content Too Large
+ */
+export const zRevokeInvitation413Representation0Response = zProblemDetails;
+
+/**
+ * Unsupported Media Type
+ */
+export const zRevokeInvitation415Representation0Response = zProblemDetails;
+
+/**
+ * Request validation failed
+ */
+export const zRevokeInvitation422Representation0Response = zProblemDetails;
+
+/**
+ * Dependency unavailable
+ */
+export const zRevokeInvitation503Representation0Response = zProblemDetails;
+
+/**
+ * Successful Response
+ */
+export const zRevokeInvitationResponse = zInvitationRevocationResponse;
 
 /**
  * Successful Response

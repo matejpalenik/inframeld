@@ -97,10 +97,7 @@ async def test_unsafe_downgrade_preserves_current_schema_and_exact_revision(
     with pytest.raises(RuntimeError, match="previous integer"):
         command.downgrade(_config(temporary_postgres_settings), "0022_project_grant_results")
     async with database.session() as session:
-        assert (
-            await session.scalar(select(AlembicVersionRow.version_num))
-            == "0026_access_action_grant_results"
-        )
+        assert await session.scalar(select(AlembicVersionRow.version_num)) == "0027_invitations"
         assert await session.scalar(select(ProjectRow.access_revision)) == 2**31
 
 

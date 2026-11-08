@@ -1,0 +1,575 @@
+export const pageMetadata = {
+  title: "Invite a person and activate their access",
+  description:
+    "Review exact invitation intent, preview it as the recipient and understand activation and safe recovery.",
+}
+
+# Invite a person and activate their access
+
+Alice invites Bob to the Support Project with explicit membership and action permissions. Bob signs in as himself, previews the intended access and chooses whether to activate it. The invitation records Alice's intent. It does not promise that she will still be allowed to assign that access later.
+
+<Note>
+  The HTTP API and generated clients support invitation issuance, preview,
+  activation and revocation. These examples require existing credentials and the
+  installation's supported account flow. They do not supply account
+  registration, password setup or a complete invitation UI. For admission
+  without invitation assignments, use the [human-admission
+  guide](/guides/admit-human).
+</Note>
+
+## Prepare the people and exact access
+
+Alice needs a current human credential and permission to use `admit-users` on the installation's Organization. She also needs every membership, group-management and exact-action delegation authority required by the intended effects. Managing a group can authorize its document-action assignments, but does not confer authority over another group or arbitrary Project actions.
+
+Use the actual permanent Organization, Project, group and application-account IDs from their supported creation or authorized inspection operations. Read Alice's [Organization access](/guides/create-project#read-your-organization-access) and [Project access](/guides/assign-project-grant#read-your-project-access-and-current-revision) for the reviewed Access revisions. A Project's metadata revision is a different value.
+
+Bob needs his own verified account and browser session at the installation's supported account/API origin. Keep Alice and Bob in separate browser profiles. An invitation is not identity proof, and matching an email address cannot link Bob to another person's account. Recipient preview and activation use Bob's verified browser cookie with the supported Origin and CSRF checks, including `X-Inframeld-CSRF: 1`. They can run before local product admission. Do not extract a cookie into another client or substitute Alice's credential.
+
+Choose explicit effects for Bob:
+
+- Admission only, without memberships or action grants.
+- Membership in an existing Project.
+- Ordinary membership or management of an existing access group.
+- An exact action grant on an actual Organization, Project, access group or application account.
+
+Admission-only intent must stand alone. Other invitations contain 1–100 unique effects. Do not request both grant levels for the same action and target. Group management includes ordinary membership in that group. It never silently supplies Project membership. Each group or Project-scoped action requires Bob's existing eligible Project membership or an explicit membership effect in the same invitation.
+
+For example, inviting Bob to SupportKnowledge while he does not belong to Support requires both Support Project membership and the intended group relationship. A group-only invitation cannot fill that missing prerequisite. [Group membership and management](/guides/manage-access-groups) and [exact grants](/guides/manage-action-grants) explain the separate relationships. An administration grant over SupportBot gives Bob authority over that account, not permissions to the application itself.
+
+Current invitation targets are the actual Organization, Project, access group and application account. The native target union also describes future resource handoffs. A typed Pipeline, Deployment, collection, source, model connection, processing-profile or embedding-profile target does not make its producer or invitation integration available. Use an actual supported target and its current authority.
+
+## Issue the invitation as Alice
+
+The issuance contract is `POST /v1/invitations`, operation `issueInvitation`. Review the exact assignment set, Organization Access revision and one reviewed Access revision for every affected Project. Admission-only or Organization-only intent has no affected Project revision. Omitting `expiresInSeconds` uses the installation's configured default (seven days by default). An explicit lifetime must be a positive whole number of seconds within its configured maximum, which cannot exceed thirty days (`2592000`). Do not send `null`. Retain one original idempotency key with the complete request before dispatch.
+
+The server checks Alice's current authority and all authoritative target bindings again. A stale review or rejected effect creates no partial invitation. A successful `201` identifies the invitation and its expiry. Only the first authorized delivery includes `secretAvailable: true` and the protected `invitationToken`.
+
+Keep that token private and deliver it only through the supported private channel for the intended person. It belongs in the protected preview or activation request body, never a URL, query parameter, log or screenshot. Its presence alone supplies no authenticated identity or admission.
+
+If first delivery is lost, preserve the original request. An authorized exact retry returns the original safe metadata with `secretAvailable: false` and no token. It neither retrieves the secret nor issues another invitation. A separate revocation and new issuance require explicit decisions and their own reviewed requests.
+
+## Send one reviewed issuance request
+
+Use one of the alternatives below. Install the source package through [Python setup](/clients/python#install-from-a-checkout), [TypeScript setup](/clients/typescript#build-and-install-the-package) or [Rust setup](/clients/rust#set-up-an-example-project). The Node example uses Node 26. The file examples use macOS/Linux permissions. They require Alice's actual human bearer token accepted by this installation, not Bob's browser cookie or an application key. [Authentication](/api-reference#authentication) describes that prerequisite. If no such token is available, use the installation's supported browser integration rather than extracting a cookie.
+
+In a private working directory, save this complete `invitation-request.json`, replacing all IDs and revisions with the values Alice reviewed. This example requests Support membership and ordinary membership in SupportKnowledge. It assumes Alice can assign both. Use each affected Project exactly once in `expectedProjectAccessRevisions`. An admission-only or Organization-only request uses an empty list.
+
+<CodeGroup>
+
+```json {{ title: "invitation-request.json" }}
+{
+  "organizationId": "00000000-0000-4000-8000-000000000001",
+  "assignments": [
+    {
+      "kind": "project-membership",
+      "projectId": "00000000-0000-4000-8000-000000000002"
+    },
+    {
+      "kind": "group-membership",
+      "projectId": "00000000-0000-4000-8000-000000000002",
+      "accessGroupId": "00000000-0000-4000-8000-000000000003"
+    }
+  ],
+  "expectedAccessRevision": 7,
+  "expectedProjectAccessRevisions": [
+    {
+      "projectId": "00000000-0000-4000-8000-000000000002",
+      "accessRevision": 12
+    }
+  ]
+}
+```
+
+</CodeGroup>
+
+Set `INFRAMELD_URL`, `INFRAMELD_TOKEN`, `INFRAMELD_INVITATION_REQUEST` (the request file's path) and `INFRAMELD_IDEMPOTENCY_KEY` through your local configuration and secret-handling procedure. Choose the key once and save it with the original request. Never put credentials in command arguments or source files. Set `INFRAMELD_INVITATION_TOKEN_FILE` to a new file in a private directory for first delivery. Do not reuse an existing output file. The SDK examples write only the token there, with mode `0600`, and print safe receipt fields. Protect the containing directory and retain the safe receipt separately.
+
+For cURL, also install `jq` and set `INFRAMELD_INVITATION_RESPONSE_FILE` to a new private response file. Its first-delivery body contains the token, so protect the whole file. Save the cURL alternative as `issue-invitation.sh`, Python as `issue-invitation.py`, TypeScript as `issue-invitation.ts`, or Rust as `src/main.rs` in the corresponding example project. Use the Rust client's existing `Cargo.toml`, which includes `serde_json` and Tokio.
+
+<CodeGroup>
+
+```shell {{ title: "cURL" }}
+#!/bin/sh
+set -eu
+umask 077
+: "${INFRAMELD_URL:?}" "${INFRAMELD_TOKEN:?}"
+: "${INFRAMELD_INVITATION_REQUEST:?}" "${INFRAMELD_IDEMPOTENCY_KEY:?}"
+: "${INFRAMELD_INVITATION_RESPONSE_FILE:?}"
+(set -C; : > "$INFRAMELD_INVITATION_RESPONSE_FILE")
+status=$(curl --silent --show-error --max-time 5 --config - \
+  --output "$INFRAMELD_INVITATION_RESPONSE_FILE" --write-out '%{http_code}' <<EOF
+url = "${INFRAMELD_URL}/v1/invitations"
+request = "POST"
+header = "Authorization: Bearer ${INFRAMELD_TOKEN}"
+header = "Content-Type: application/json"
+header = "Idempotency-Key: ${INFRAMELD_IDEMPOTENCY_KEY}"
+data-binary = "@${INFRAMELD_INVITATION_REQUEST}"
+EOF
+) || {
+  printf '%s\n' 'Unconfirmed response. Keep the original request and key.' >&2
+  exit 1
+}
+printf 'httpStatus=%s\n' "$status"
+if [ "$status" != 201 ]; then
+  jq '{code, requestId}' "$INFRAMELD_INVITATION_RESPONSE_FILE"
+  exit 1
+fi
+jq '{invitationId, operationId, accessRevision, expiresAt,
+     idempotencyExpiresAt, secretAvailable}' \
+  "$INFRAMELD_INVITATION_RESPONSE_FILE"
+```
+
+```python {{ title: "Python" }}
+import asyncio
+import json
+import os
+from pathlib import Path
+
+from inframeld_sdk import ApiClient, Configuration
+from inframeld_sdk.api.access_api import AccessApi
+from inframeld_sdk.exceptions import ApiException
+from inframeld_sdk.models.invitation_first_delivery_response import (
+    InvitationFirstDeliveryResponse,
+)
+from inframeld_sdk.models.invitation_issuance_replay_response import (
+    InvitationIssuanceReplayResponse,
+)
+from inframeld_sdk.models.invitation_issue_request import InvitationIssueRequest
+
+
+async def main() -> None:
+    request = InvitationIssueRequest.from_json(
+        Path(os.environ["INFRAMELD_INVITATION_REQUEST"]).read_text()
+    )
+    if request is None:
+        raise ValueError("Review a complete invitation request")
+    config = Configuration(
+        host=os.environ["INFRAMELD_URL"],
+        access_token=os.environ["INFRAMELD_TOKEN"],
+    )
+    async with ApiClient(config) as client:
+        api = AccessApi(client)
+        try:
+            response = await api.issue_invitation_with_http_info(
+                idempotency_key=os.environ["INFRAMELD_IDEMPOTENCY_KEY"],
+                invitation_issue_request=request,
+            )
+        except ApiException as error:
+            print(json.dumps({
+                "httpStatus": error.status,
+                "requestId": (error.headers or {}).get("x-request-id"),
+            }))
+            raise SystemExit("No usable result. Keep the original request and key")
+        except Exception:
+            raise SystemExit("Unconfirmed response. Keep the original request and key") from None
+
+        receipt = response.data.actual_instance
+        if not isinstance(receipt, (
+            InvitationFirstDeliveryResponse, InvitationIssuanceReplayResponse
+        )):
+            raise SystemExit("No usable receipt. Keep the original request and key")
+        print(json.dumps({
+            "httpStatus": response.status_code,
+            "invitationId": str(receipt.invitation_id),
+            "operationId": receipt.operation_id,
+            "accessRevision": receipt.access_revision,
+            "expiresAt": receipt.expires_at.isoformat(),
+            "idempotencyExpiresAt": receipt.idempotency_expires_at.isoformat(),
+            "secretAvailable": receipt.secret_available,
+        }))
+        if isinstance(receipt, InvitationFirstDeliveryResponse):
+            descriptor = os.open(
+                os.environ["INFRAMELD_INVITATION_TOKEN_FILE"],
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+                0o600,
+            )
+            with os.fdopen(descriptor, "w") as output:
+                output.write(receipt.invitation_token)
+
+
+asyncio.run(main())
+```
+
+```typescript {{ title: "TypeScript (Node)" }}
+import { readFile, writeFile } from "node:fs/promises"
+import {
+  createClient,
+  issueInvitation,
+  type InvitationIssueRequest,
+} from "@inframeld/sdk"
+
+const baseUrl = process.env.INFRAMELD_URL
+const token = process.env.INFRAMELD_TOKEN
+const requestFile = process.env.INFRAMELD_INVITATION_REQUEST
+const key = process.env.INFRAMELD_IDEMPOTENCY_KEY
+const tokenFile = process.env.INFRAMELD_INVITATION_TOKEN_FILE
+if (!baseUrl || !token || !requestFile || !key || !tokenFile) {
+  throw new Error("Supply the saved request, key and private output path")
+}
+const body = JSON.parse(
+  await readFile(requestFile, "utf8")
+) as InvitationIssueRequest
+const client = createClient({
+  baseUrl,
+  timeoutMs: 5000,
+  responseStyle: "fields",
+  throwOnError: false,
+})
+const result = await issueInvitation({
+  client,
+  headers: {
+    Authorization: `Bearer ${token}`,
+    "Idempotency-Key": key,
+  },
+  body,
+})
+if (result.error !== undefined) {
+  console.error({
+    httpStatus: result.response?.status,
+    failureKind: result.error.kind,
+  })
+  if (result.error.kind === "api") {
+    console.error({
+      code: result.error.body.code,
+      requestId: result.error.body.requestId,
+    })
+  }
+  process.exitCode = 1
+} else if (result.data !== undefined) {
+  const receipt = result.data
+  console.info({
+    httpStatus: result.response?.status,
+    invitationId: receipt.invitationId,
+    operationId: receipt.operationId,
+    accessRevision: receipt.accessRevision,
+    expiresAt: receipt.expiresAt,
+    idempotencyExpiresAt: receipt.idempotencyExpiresAt,
+    secretAvailable: receipt.secretAvailable,
+  })
+  if (receipt.secretAvailable) {
+    await writeFile(tokenFile, receipt.invitationToken, {
+      flag: "wx",
+      mode: 0o600,
+    })
+  }
+} else {
+  throw new Error("No usable receipt. Keep the original request and key")
+}
+```
+
+```rust {{ title: "Rust" }}
+use inframeld_sdk::{
+    HttpClient,
+    types::{InvitationIssueRequest, InvitationIssueResponse},
+};
+use std::{env, fs, fs::OpenOptions, io::Write, os::unix::fs::OpenOptionsExt};
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let request: InvitationIssueRequest = serde_json::from_str(
+        &fs::read_to_string(env::var("INFRAMELD_INVITATION_REQUEST")?)?,
+    )?;
+    let key = env::var("INFRAMELD_IDEMPOTENCY_KEY")?;
+    let token = env::var("INFRAMELD_TOKEN")?;
+    let client = HttpClient::new()
+        .with_base_url(env::var("INFRAMELD_URL")?)
+        .with_header("Authorization", format!("Bearer {token}"));
+    let response = match client.issue_invitation(&key, request).await {
+        Ok(response) => response,
+        Err(error) => {
+            if let Some(api) = error.api() {
+                eprintln!("httpStatus={}", api.status);
+            } else {
+                eprintln!("No usable transport or decoded response");
+            }
+            return Err("Keep the original request and key. Do not redispatch automatically".into());
+        }
+    };
+    match response.body {
+        InvitationIssueResponse::InvitationFirstDeliveryResponse(receipt) => {
+            println!(
+                "httpStatus={} invitationId={} operationId={} accessRevision={} expiresAt={} idempotencyExpiresAt={} secretAvailable=true",
+                response.status, receipt.invitation_id, receipt.operation_id,
+                receipt.access_revision, receipt.expires_at, receipt.idempotency_expires_at,
+            );
+            let mut output = OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .mode(0o600)
+                .open(env::var("INFRAMELD_INVITATION_TOKEN_FILE")?)?;
+            output.write_all(receipt.invitation_token.as_bytes())?;
+        }
+        InvitationIssueResponse::InvitationIssuanceReplayResponse(receipt) => {
+            println!(
+                "httpStatus={} invitationId={} operationId={} accessRevision={} expiresAt={} idempotencyExpiresAt={} secretAvailable=false",
+                response.status, receipt.invitation_id, receipt.operation_id,
+                receipt.access_revision, receipt.expires_at, receipt.idempotency_expires_at,
+            );
+        }
+    }
+    Ok(())
+}
+```
+
+</CodeGroup>
+
+Run `sh issue-invitation.sh`, `.venv/bin/python issue-invitation.py`, `node issue-invitation.ts` or `cargo run` from its example directory. The JSON file is the request authority for all four alternatives. The TypeScript annotation describes it, while the server validates its actual contents. These are alternatives, not a sequence of four issuances.
+
+First delivery returns `201` with `secretAvailable: true`. The cURL response file contains the token. The SDK alternatives save it separately. Deliver it only through your supported private channel. If local storage fails after a successful response, preserve the receipt and treat secret delivery as uncertain. Another request cannot recover the token.
+
+To explicitly repeat the original issuance, keep the same identity, request and key. For cURL choose a new response file so you cannot overwrite the only saved token. Replay is still `201`, with the original receipt and expiry, `secretAvailable: false` and the `invitationToken` field absent. The SDK replay branches write no token file. No example automatically retries a write after an error.
+
+## Preview the invitation as Bob
+
+The preview contract is `POST /v1/invitations/preview`, operation `previewInvitation`. Bob supplies the protected token through the supported browser client, with his verified cookie and Origin/CSRF checks. This POST is a read. It needs no idempotency key and creates no reservation, principal, membership, grant or consumption.
+
+Review the intended assignments, authoritative scope labels and `expiresAt`. Labels help Bob recognize the intended resources. Permanent IDs retain their identity. A preview exposes no unrelated account inventory or document content, and it does not guarantee a later activation will succeed.
+
+Preview does not check password setup. Bob can review the invitation before completing that separate prerequisite for a fresh activation.
+
+## Before you activate
+
+**Password setup and the current session's login method are different.** Fresh activation requires confirmation that a password is set up for Bob's same account. A successful OIDC sign-in alone does not establish that prerequisite. Complete password setup through the installation's supported account flow before starting a fresh activation.
+
+If Bob's existing OIDC session remains valid after password setup, he may keep using it. Activation does not require the current session to have used a password. The setup check does not test whether a password can currently sign in or establish a permanent onboarding history.
+
+Recovering an already completed activation is different from activating a new invitation. The same currently verified, eligible Bob may recover the retained original result without requiring a fresh password-setup observation or its availability. Recovery does not grant again or restore permissions removed afterward. Bob's current browser session and local eligibility still matter.
+
+## Activate the reviewed intent
+
+The activation contract is `POST /v1/invitations/activate`, operation `activateInvitation`. Bob explicitly submits the protected token through the supported browser client. Retain the exact original method, route, private request body and idempotency key before dispatch.
+
+For a fresh activation, the server verifies Bob's current identity, confirms password setup and rechecks the unused invitation, current issuer authority and every intended effect. Existing recovery or suspension restrictions remain effective. Activation cannot restore an account or release a recovery block.
+
+Admission, all legitimate assignments, invitation consumption and the original result are saved together. A missing Project membership, lost issuer authority or failed effect rejects the complete activation. The server does not silently apply a permitted subset, widen the intent or consume the invitation partially.
+
+A successful `200` identifies Bob's stable `principalId`, the invitation, Organization and original operation. Its Access revisions describe that committed result. They are not a permission snapshot or proof that today's assignments still match. Use current authorized reads to inspect later state.
+
+## Call from Bob's existing browser session
+
+Build the source TypeScript SDK using [its setup](/clients/typescript#build-and-install-the-package). Save this complete module as `invitation.ts` in your existing browser application's client bundle on the configured HTTPS account/API origin. Load it in Bob's signed-in browser profile. The browser owns the actual cookie and `Origin`. The module supplies only the API's CSRF marker. Do not add an `Authorization` header, a copied `Cookie` header or a spoofed `Origin`.
+
+The module asks for `preview`, `activate` or `recover`. Supply the protected token through the private input, not a URL. Before choosing activation, save one unique idempotency key with the exact token, method and route in your protected original-request context. Enter that saved key when asked. Keep it for recovery. This module does not acquire a session or complete password setup.
+
+<CodeGroup>
+
+```typescript {{ title: "TypeScript (browser)" }}
+import {
+  activateInvitation,
+  createClient,
+  previewInvitation,
+} from "@inframeld/sdk"
+
+async function run(): Promise<void> {
+  const mode = window.prompt("Choose preview, activate or recover")
+  if (mode !== "preview" && mode !== "activate" && mode !== "recover") return
+  const invitationToken = window.prompt("Protected invitation token")
+  if (!invitationToken) return
+  const originalKey =
+    mode === "preview"
+      ? null
+      : window.prompt("Saved original activation idempotency key")
+  if (
+    mode !== "preview" &&
+    (!originalKey?.trim() || originalKey.length > 128)
+  ) {
+    throw new Error("Save one valid original key before activation")
+  }
+  const client = createClient({
+    baseUrl: window.location.origin,
+    credentials: "same-origin",
+    timeoutMs: 5000,
+    responseStyle: "fields",
+    throwOnError: false,
+  })
+  const body = { invitationToken }
+  if (mode !== "recover") {
+    const preview = await previewInvitation({
+      client,
+      headers: { "X-Inframeld-CSRF": "1" },
+      body,
+    })
+    if (preview.error !== undefined) {
+      console.error({
+        httpStatus: preview.response?.status,
+        failureKind: preview.error.kind,
+      })
+      if (preview.error.kind === "api") {
+        console.error({
+          code: preview.error.body.code,
+          requestId: preview.error.body.requestId,
+        })
+      }
+      return
+    }
+    if (preview.data === undefined) throw new Error("No usable preview")
+    console.info(preview.data)
+    if (mode === "preview") return
+    if (
+      !window.confirm(
+        "Activate the invitation whose assignments and expiry you just reviewed?"
+      )
+    )
+      return
+  }
+  if (!originalKey) return
+  const result = await activateInvitation({
+    client,
+    headers: {
+      "X-Inframeld-CSRF": "1",
+      "Idempotency-Key": originalKey,
+    },
+    body,
+  })
+  if (result.error !== undefined) {
+    console.error({
+      httpStatus: result.response?.status,
+      failureKind: result.error.kind,
+    })
+    if (result.error.kind === "api") {
+      console.error({
+        code: result.error.body.code,
+        requestId: result.error.body.requestId,
+      })
+    }
+    return
+  }
+  if (result.data === undefined) throw new Error("No usable activation receipt")
+  console.info({
+    httpStatus: result.response?.status,
+    principalId: result.data.principalId,
+    invitationId: result.data.invitationId,
+    organizationId: result.data.organizationId,
+    operationId: result.data.operationId,
+    organizationAccessRevision: result.data.organizationAccessRevision,
+    projectAccessRevisions: result.data.projectAccessRevisions,
+    idempotencyExpiresAt: result.data.idempotencyExpiresAt,
+  })
+}
+
+void run().catch(() => {
+  console.error(
+    "No usable result. Preserve the original private request and key"
+  )
+})
+```
+
+</CodeGroup>
+
+`preview` makes one read and stops. `activate` previews first, then requires an explicit confirmation before the write. `recover` sends only the exact original activation request. It skips a new preview because a consumed invitation can no longer be previewed as unused. Choose recovery only for your own saved original activation, never to bypass review of a new invitation. Python, Rust and Node bearer credentials do not replace this browser-only recipient identity boundary.
+
+## Revoke unused intent
+
+The revocation contract is `POST /v1/invitations/{invitation_id}/revoke`, operation `revokeInvitation`. It requires the reviewed Organization Access revision and an original idempotency key. The original issuer must still be eligible with `admit-users`, or another eligible human must currently have use-and-grant authority for `admit-users` on that Organization.
+
+A successful `200` prevents new consumption of the invitation. Revocation does not remove assignments from an already completed activation. Removing those assignments is a separate membership or grant change under its own current authority.
+
+Read your current [Organization Access revision](/guides/create-project#read-your-organization-access) before a new revocation. Keep the invitation ID, reviewed revision and a separate revocation key. For exact replay, keep that original revision rather than replacing it with today's value. The following are **context snippets**, not complete programs. Use Alice's configured client from the issuance example, and execute only after explicitly deciding to revoke. They do not depend on retaining the invitation token.
+
+For Python, place the snippet inside the existing `async with ApiClient(config)` block. For TypeScript, reuse `client` and `token` from the Node module. For Rust, place it in `main` after constructing `client`. Set `INFRAMELD_INVITATION_ID`, `INFRAMELD_ORGANIZATION_REVISION` and `INFRAMELD_REVOCATION_KEY` to the saved values.
+
+<CodeGroup>
+
+```shell {{ title: "cURL" }}
+curl --silent --show-error --max-time 5 --config - <<EOF
+url = "${INFRAMELD_URL}/v1/invitations/${INFRAMELD_INVITATION_ID}/revoke"
+request = "POST"
+header = "Authorization: Bearer ${INFRAMELD_TOKEN}"
+header = "Content-Type: application/json"
+header = "Idempotency-Key: ${INFRAMELD_REVOCATION_KEY}"
+data = "{\"expectedAccessRevision\":${INFRAMELD_ORGANIZATION_REVISION}}"
+EOF
+```
+
+```python {{ title: "Python" }}
+from uuid import UUID
+from inframeld_sdk.models.invitation_revocation_request import InvitationRevocationRequest
+
+revoked = await api.revoke_invitation_with_http_info(
+    invitation_id=UUID(os.environ["INFRAMELD_INVITATION_ID"]),
+    idempotency_key=os.environ["INFRAMELD_REVOCATION_KEY"],
+    invitation_revocation_request=InvitationRevocationRequest(
+        expected_access_revision=int(os.environ["INFRAMELD_ORGANIZATION_REVISION"])
+    ),
+)
+print(revoked.status_code, revoked.data.operation_id, revoked.data.idempotency_expires_at)
+```
+
+```typescript {{ title: "TypeScript (Node)" }}
+import { revokeInvitation } from "@inframeld/sdk"
+
+const invitationId = process.env.INFRAMELD_INVITATION_ID
+const revocationKey = process.env.INFRAMELD_REVOCATION_KEY
+const revision = Number(process.env.INFRAMELD_ORGANIZATION_REVISION)
+if (
+  !invitationId ||
+  !revocationKey ||
+  !Number.isSafeInteger(revision) ||
+  revision < 0
+) {
+  throw new Error("Review and save the exact revocation inputs")
+}
+const revoked = await revokeInvitation({
+  client,
+  path: { invitation_id: invitationId },
+  headers: {
+    Authorization: `Bearer ${token}`,
+    "Idempotency-Key": revocationKey,
+  },
+  body: { expectedAccessRevision: revision },
+})
+if (revoked.error !== undefined) {
+  console.error({
+    httpStatus: revoked.response?.status,
+    failureKind: revoked.error.kind,
+  })
+} else if (revoked.data !== undefined) {
+  console.info({
+    operationId: revoked.data.operationId,
+    idempotencyExpiresAt: revoked.data.idempotencyExpiresAt,
+  })
+}
+```
+
+```rust {{ title: "Rust" }}
+use inframeld_sdk::types::InvitationRevocationRequest;
+
+let revoked = client.revoke_invitation(
+    env::var("INFRAMELD_INVITATION_ID")?,
+    env::var("INFRAMELD_REVOCATION_KEY")?,
+    InvitationRevocationRequest {
+        expected_access_revision: env::var("INFRAMELD_ORGANIZATION_REVISION")?.parse()?,
+    },
+).await;
+match revoked {
+    Ok(response) => println!("{} {} {}", response.status, response.body.operation_id, response.body.idempotency_expires_at),
+    Err(error) => eprintln!("No usable revocation result. httpStatus={:?}", error.api().map(|api| api.status)),
+}
+```
+
+</CodeGroup>
+
+Current revocation authority is checked before disclosing an original result. Repeating an exact authorized request preserves its original status, receipt and expiry. A new authorized request for an already revoked invitation is a no-change operation, not permission to undo its former assignments.
+
+## Recover a lost activation response
+
+After a timeout, cancellation or unusable response, keep the exact original request and key. Do not switch identity, refresh the original inputs or choose another key merely to try again. A different identity or key cannot turn a consumed invitation into a second activation.
+
+While the original result remains retained, the same currently verified and eligible recipient can recover it even after invitation expiry or the issuer's departure. Recovery finds the original completed outcome before applying fresh-consumption checks. It does not repeat assignments, restore removed rights or depend on a fresh password-setup observation being available.
+
+An expired browser credential or current local restriction can still prevent disclosure. The original result keeps its captured expiry. A remembered token, operation ID or key is not continuing permission, and an unconfirmed result does not establish that activation failed.
+
+## Handle a rejected or unconfirmed request
+
+Malformed or competing credentials receive `400` before verification. Recipient preview and activation accept a verified cookie, not a human bearer token (`401`). An authenticated application cannot issue or revoke invitations (`403`). JSON validation uses `422`, oversized bodies `413`, and unsupported media `415`. All outcomes are no-store. Use [the native reference](/api-reference/projects-and-access#issue-an-invitation) for declared statuses and exact models.
+
+| Observation                                                                         | Meaning and next action                                                                                                                                        |
+| ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Invalid, expired, revoked or already-used token for a new request                   | Safe `404` reveals no private scope. Do not treat it as a way to inspect another person's invitation or completed activation.                                  |
+| Missing membership, changed issuer authority or other stale/ineligible fresh intent | Safe `409` applies no partial activation. Review the actual current prerequisites before deciding on new work.                                                 |
+| Fresh activation lacks confirmed password setup                                     | Complete the supported setup for the same account. Preview is a separate read; completed-result recovery does not gain this fresh-activation requirement.      |
+| Rejected or expired browser credentials                                             | Reestablish the supported browser session as the intended person. Another person's session cannot recover Bob's outcome.                                       |
+| Required verification or dependencies are unavailable                               | Preserve the original request and treat the outcome as unconfirmed. Unavailability cannot authorize a fresh activation or an automatic replacement invitation. |
+| Response is lost or cannot be decoded                                               | Retain the original identity and request. Neither silence nor an unusable response proves that no effects committed.                                           |
+
+Keep tokens and browser credentials out of diagnostics. Use safe operation or request correlation when available. A readable preview, completed password setup or successful account-page interaction alone is not evidence that invitation activation committed.

@@ -16,6 +16,10 @@ const BINDINGS: &[&str] = &[
     "getCurrentApplicationSession",
     "getMyOrganizationAccess",
     "admitHuman",
+    "issueInvitation",
+    "revokeInvitation",
+    "previewInvitation",
+    "activateInvitation",
     "createProject",
     "createAccessGroup",
     "getAccessGroup",
@@ -125,6 +129,8 @@ async fn main() {
                 | "listApplicationKeys"
                 | "getApplicationKey"
                 | "admitHuman"
+                | "issueInvitation"
+                | "revokeInvitation"
                 | "listProjectMembers"
                 | "listProjectActionGrants"
                 | "listOrganizationActionGrants"
@@ -170,6 +176,9 @@ async fn main() {
                 | "deleteAccessGroup"
                 | "createApplicationAccount"
                 | "admitHuman"
+                | "issueInvitation"
+                | "revokeInvitation"
+                | "activateInvitation"
                 | "addProjectMember"
                 | "removeProjectMember"
                 | "setProjectActionGrant"

@@ -6,7 +6,7 @@ export const pageMetadata = {
 
 # Admit an existing human
 
-Alice can admit Bob to an installation where he already has a Kratos account. Admission links his verified provider identity to a local human principal. It supplies no Project membership, action grants or private starter resources.
+Alice can admit Bob to an installation where he already has a Kratos account. Admission links his verified provider identity to a local human principal. It supplies no Project membership, action grants or private starter resources. To let Bob review and explicitly activate an invitation with membership or action intent, use [Invite a person and activate their access](/guides/manage-invitations). That separate workflow rechecks the issuer's authority and applies its complete permitted assignment set atomically.
 
 This task uses the HTTP API through the generated browser TypeScript SDK. It requires an existing admitted Alice with permission to use `admit-users` on the Organization. Permission to delegate that action is unnecessary. First-administrator bootstrap is a separate operator claim.
 

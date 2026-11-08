@@ -12,6 +12,7 @@ Use an existing Project's permanent ID to inspect or change its metadata. Curren
 ## Choose a task
 
 - [Admit an existing human to the installation](/guides/admit-human).
+- [Invite a person to review and activate explicit access](/guides/manage-invitations).
 - [Create an additional Project with explicit initial permissions](/guides/create-project).
 - [Create and inspect a separate application account](/guides/application-accounts).
 - [Understand an application's identity check and credential prerequisites](/guides/authenticate-an-application).
@@ -30,7 +31,7 @@ Use an existing Project's permanent ID to inspect or change its metadata. Curren
 
 Project names are exact selectors. IDs are permanent. Display names are labels. Read [Projects, people and permissions](/product/projects-and-permissions) for the distinction between sign-in, membership and action grants.
 
-Human admission uses current Organization `admit-users` authority and verifies the requested Kratos identity. It creates no Project membership, grants or starters. It is separate from first-administrator bootstrap and provider account registration.
+Human admission uses current Organization `admit-users` authority and verifies the requested Kratos identity. It creates no Project membership, grants or starters. It is separate from first-administrator bootstrap and provider account registration. [Invitations](/guides/manage-invitations) instead record explicit intent for a person who previews and activates it under their own verified browser session. Fresh activation checks password setup, current issuer authority and every prerequisite together. Completed eligible replay returns the original result without granting again or requiring fresh password evidence.
 
 Membership changes use current Project `manage-project-members` authority. Adding an admitted human gives bare membership. Removal clears only that recipient's received access within the Project and preserves required human responsibilities. Rejoining restores no old grants or group roles. [The guide](/guides/manage-project-members) explains the current inputs, departure guards and original receipts.
 

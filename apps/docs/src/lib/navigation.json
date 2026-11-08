@@ -93,6 +93,10 @@
         "href": "/guides/projects-and-access",
         "children": [
           {
+            "title": "Invite a person and activate their access",
+            "href": "/guides/manage-invitations"
+          },
+          {
             "title": "Manage Organization, group and application grants",
             "href": "/guides/manage-action-grants"
           },

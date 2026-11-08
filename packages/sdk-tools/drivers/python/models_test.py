@@ -97,6 +97,81 @@ def _rejects_native_null() -> bool:
 
 
 class GeneratedModelTests(unittest.TestCase):
+    def test_invitation_issue_preserves_lifetime_omission_and_strict_revision(self) -> None:
+        source: dict[str, JsonValue] = {
+            "organizationId": "00000000-0000-4000-8000-000000000002",
+            "assignments": [{"kind": "admission-only"}],
+            "expectedAccessRevision": 2**53 - 1,
+            "expectedProjectAccessRevisions": [],
+        }
+        model = inframeld_sdk.InvitationIssueRequest.from_dict(source)
+        self.assertIsNotNone(model)
+        assert model is not None
+        self.assertEqual(body_value(model), source)
+        for invalid in (None, True, 1.5, 0, 2592001):
+            with self.subTest(lifetime=invalid), self.assertRaises(ValueError):
+                inframeld_sdk.InvitationIssueRequest.from_dict(
+                    source | {"expiresInSeconds": invalid}
+                )
+        for invalid in (True, 2**53):
+            with self.subTest(revision=invalid), self.assertRaises(ValueError):
+                inframeld_sdk.InvitationIssueRequest.from_dict(
+                    source | {"expectedAccessRevision": invalid}
+                )
+
+    def test_invitation_secret_union_keeps_first_delivery_and_replay_distinct(self) -> None:
+        source: dict[str, JsonValue] = {
+            "invitationId": "00000000-0000-4000-8000-000000000006",
+            "organizationId": "00000000-0000-4000-8000-000000000002",
+            "assignments": [{"kind": "admission-only"}],
+            "accessRevision": 8,
+            "expiresAt": "2030-01-01T00:00:00Z",
+            "idempotencyExpiresAt": "2030-01-01T00:00:00Z",
+            "operationId": "original-issue",
+        }
+        for secret in (True, False):
+            value = source | {"secretAvailable": secret}
+            if secret:
+                value["invitationToken"] = "A" * 43
+            model = inframeld_sdk.InvitationIssueResponse.from_dict(value)
+            self.assertIsInstance(
+                model.actual_instance,
+                inframeld_sdk.InvitationFirstDeliveryResponse
+                if secret
+                else inframeld_sdk.InvitationIssuanceReplayResponse,
+            )
+            self.assertEqual(body_value(model), value)
+        for invalid in (None, 1, "true"):
+            with self.subTest(secret=invalid), self.assertRaises(ValueError):
+                inframeld_sdk.InvitationIssueResponse.from_dict(
+                    source | {"secretAvailable": invalid}
+                )
+        with self.assertRaises(ValueError):
+            inframeld_sdk.InvitationIssueResponse.from_dict(source | {"secretAvailable": True})
+
+    def test_invitation_closed_assignment_rejects_unknown_tag_and_nonboolean_level(self) -> None:
+        for invalid in (
+            {"kind": "unknown"},
+            {"kind": "group-membership"},
+            {
+                "kind": "action-grant",
+                "target": {"kind": "unknown"},
+                "actionId": "query",
+                "canGrant": True,
+            },
+            {
+                "kind": "action-grant",
+                "target": {
+                    "kind": "organization",
+                    "organizationId": "00000000-0000-4000-8000-000000000002",
+                },
+                "actionId": "create-projects",
+                "canGrant": 1,
+            },
+        ):
+            with self.subTest(value=invalid), self.assertRaises(ValueError):
+                inframeld_sdk.InvitationAssignmentRequest.from_dict(invalid)
+
     def test_configuration_keeps_standard_credentials_and_auth_metadata(self) -> None:
         configuration = inframeld_sdk.Configuration(
             access_token="test-only-token",

@@ -4,6 +4,7 @@ from contextlib import ExitStack
 from functools import partial
 
 from fastapi import FastAPI
+from ory_kratos_client.api.frontend_api import FrontendApi
 from ory_kratos_client.api.identity_api import IdentityApi
 
 from inframeld_backend.access.application.services.application_account_creation_fingerprint_service import (
@@ -11,6 +12,9 @@ from inframeld_backend.access.application.services.application_account_creation_
 )
 from inframeld_backend.access.application.services.human_admission_fingerprint_service import (
     HumanAdmissionFingerprintService,
+)
+from inframeld_backend.access.application.services.invitation_fingerprint_service import (
+    InvitationFingerprintService,
 )
 from inframeld_backend.access.application.services.project_creation_fingerprint_service import (
     ProjectCreationFingerprintService,
@@ -33,6 +37,9 @@ from inframeld_backend.access.http.dependencies.csrf_protection_dependency impor
 )
 from inframeld_backend.access.http.dependencies.human_session_dependency import (
     HumanSessionDependency,
+)
+from inframeld_backend.access.http.dependencies.invitation_browser_dependency import (
+    InvitationBrowserDependency,
 )
 from inframeld_backend.access.http.dependencies.product_access_dependency import (
     ProductAccessDependency,
@@ -62,6 +69,16 @@ from inframeld_backend.access.http.requests.application_account_creation_request
     ApplicationAccountCreationRequest,
 )
 from inframeld_backend.access.http.requests.human_admission_request import HumanAdmissionRequest
+from inframeld_backend.access.http.requests.invitation_activation_request import (
+    InvitationActivationRequest,
+)
+from inframeld_backend.access.http.requests.invitation_issue_request import InvitationIssueRequest
+from inframeld_backend.access.http.requests.invitation_preview_request import (
+    InvitationPreviewRequest,
+)
+from inframeld_backend.access.http.requests.invitation_revocation_request import (
+    InvitationRevocationRequest,
+)
 from inframeld_backend.access.http.requests.organization_action_grant_request import (
     OrganizationActionGrantRequest,
 )
@@ -120,6 +137,24 @@ from inframeld_backend.access.http.responses.application_account_metadata_respon
 from inframeld_backend.access.http.responses.current_application_session_response import (
     CurrentApplicationSessionResponse,
 )
+from inframeld_backend.access.http.responses.invitation_activation_response import (
+    InvitationActivationResponse,
+)
+from inframeld_backend.access.http.responses.invitation_first_delivery_response import (
+    InvitationFirstDeliveryResponse,
+)
+from inframeld_backend.access.http.responses.invitation_issuance_replay_response import (
+    InvitationIssuanceReplayResponse,
+)
+from inframeld_backend.access.http.responses.invitation_issue_response import (
+    InvitationIssueResponse,
+)
+from inframeld_backend.access.http.responses.invitation_preview_response import (
+    InvitationPreviewResponse,
+)
+from inframeld_backend.access.http.responses.invitation_revocation_response import (
+    InvitationRevocationResponse,
+)
 from inframeld_backend.access.http.responses.my_organization_access_response import (
     MyOrganizationAccessResponse,
 )
@@ -159,6 +194,7 @@ from inframeld_backend.access.http.routes.human_admission_routes import (
 from inframeld_backend.access.http.routes.human_oauth_consent_routes import (
     create_human_oauth_consent_router,
 )
+from inframeld_backend.access.http.routes.invitation_routes import create_invitation_router
 from inframeld_backend.access.http.routes.my_project_access_routes import (
     create_my_project_access_router,
 )
@@ -195,6 +231,9 @@ from inframeld_backend.access.infrastructure.resources.installation_discovery_re
 from inframeld_backend.access.infrastructure.verifiers.kratos_human_identity_verifier import (
     KratosHumanIdentityVerifier,
 )
+from inframeld_backend.access.infrastructure.verifiers.kratos_invitation_session_verifier import (
+    KratosInvitationSessionVerifier,
+)
 from inframeld_backend.bootstrap.access_composition import create_access_components
 from inframeld_backend.bootstrap.access_group_composition import (
     open_access_group_creation,
@@ -220,6 +259,11 @@ from inframeld_backend.bootstrap.application_settings import ApplicationSettings
 from inframeld_backend.bootstrap.deletion_status_composition import open_deletion_status_lookup
 from inframeld_backend.bootstrap.grant_recipients_composition import open_project_grant_recipients
 from inframeld_backend.bootstrap.human_admission_composition import open_human_admission
+from inframeld_backend.bootstrap.invitation_composition import (
+    open_invitation_activation,
+    open_invitation_administration,
+    open_invitation_preview,
+)
 from inframeld_backend.bootstrap.my_project_access_composition import open_my_project_access
 from inframeld_backend.bootstrap.organization_access_composition import open_my_organization_access
 from inframeld_backend.bootstrap.organization_grant_composition import (
@@ -302,6 +346,7 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
         account_fingerprints = ApplicationAccountCreationFingerprintService(request_fingerprints)
         admission_fingerprints = HumanAdmissionFingerprintService(request_fingerprints)
         membership_fingerprints = ProjectMembershipChangeFingerprintService(request_fingerprints)
+        invitation_fingerprints = InvitationFingerprintService(request_fingerprints)
         admission_authority = (
             resolved_settings.kratos.authority if resolved_settings.kratos is not None else None
         )
@@ -310,6 +355,24 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
                 IdentityApi(access.kratos_admin_client), admission_authority
             )
             if access.kratos_admin_client is not None and admission_authority is not None
+            else None
+        )
+
+        invitation_verifier = (
+            KratosInvitationSessionVerifier(
+                FrontendApi(access.kratos_client),
+                admission_authority,
+                min(
+                    resolved_settings.human_authentication.provider_timeout_seconds,
+                    resolved_settings.human_authentication.total_timeout_seconds,
+                ),
+                identity_client=(
+                    IdentityApi(access.kratos_admin_client)
+                    if access.kratos_admin_client is not None
+                    else None
+                ),
+            )
+            if access.kratos_client is not None and admission_authority is not None
             else None
         )
 
@@ -343,6 +406,10 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
         configure_problem_openapi(
             application,
             validation_models=(
+                InvitationIssueRequest,
+                InvitationRevocationRequest,
+                InvitationPreviewRequest,
+                InvitationActivationRequest,
                 AccessGroupCreationRequest,
                 AccessGroupMembershipRequest,
                 AccessGroupManagerRequest,
@@ -357,6 +424,12 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
                 ApplicationAccountActionGrantRequest,
             ),
             serialization_models=(
+                InvitationIssueResponse,
+                InvitationFirstDeliveryResponse,
+                InvitationIssuanceReplayResponse,
+                InvitationRevocationResponse,
+                InvitationPreviewResponse,
+                InvitationActivationResponse,
                 CurrentApplicationSessionResponse,
                 AccessGroupCreationResponse,
                 AccessGroupMetadataResponse,
@@ -400,6 +473,34 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
             ApplicationKeyAdapter.HTTP
         )
 
+        application.include_router(
+            create_invitation_router(
+                product_access,
+                InvitationBrowserDependency(
+                    invitation_verifier,
+                    CSRFProtectionDependency(resolved_settings.csrf.trusted_origins),
+                ),
+                InvitationBrowserDependency(
+                    invitation_verifier,
+                    CSRFProtectionDependency(resolved_settings.csrf.trusted_origins),
+                    observe_password_completion=True,
+                ),
+                partial(
+                    open_invitation_administration,
+                    database,
+                    invitation_fingerprints,
+                    resolved_settings.invitation,
+                ),
+                partial(
+                    open_invitation_administration,
+                    database,
+                    invitation_fingerprints,
+                    resolved_settings.invitation,
+                ),
+                partial(open_invitation_preview, database),
+                partial(open_invitation_activation, database, invitation_fingerprints),
+            )
+        )
         application.include_router(create_session_router(human_session))
         application.include_router(
             create_application_session_router(

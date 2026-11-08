@@ -209,3 +209,91 @@ void [
   absentSelectorMetadata,
   clearedMetadata,
 ];
+
+import {
+  zInvitationIssueRequest,
+  zInvitationIssueResponse,
+  zInvitationAssignmentRequest,
+} from "../../../sdk-typescript/generated/zod.gen.js";
+import type { InvitationIssueResponse } from "@inframeld/sdk";
+const invitationSource = {
+  organizationId: "00000000-0000-4000-8000-000000000002",
+  assignments: [{ kind: "admission-only" }],
+  expectedAccessRevision: Number.MAX_SAFE_INTEGER,
+  expectedProjectAccessRevisions: [],
+};
+assert.deepEqual(
+  zInvitationIssueRequest.parse(invitationSource),
+  invitationSource,
+);
+for (const lifetime of [null, true, 1.5, 0, 2592001])
+  assert.equal(
+    zInvitationIssueRequest.safeParse({
+      ...invitationSource,
+      expiresInSeconds: lifetime,
+    }).success,
+    false,
+  );
+for (const revision of [true, Number.MAX_SAFE_INTEGER + 1])
+  assert.equal(
+    zInvitationIssueRequest.safeParse({
+      ...invitationSource,
+      expectedAccessRevision: revision,
+    }).success,
+    false,
+  );
+const invitationMetadata = {
+  invitationId: "00000000-0000-4000-8000-000000000006",
+  organizationId: invitationSource.organizationId,
+  assignments: invitationSource.assignments,
+  accessRevision: 8,
+  expiresAt: "2030-01-01T00:00:00Z",
+  idempotencyExpiresAt: "2030-01-01T00:00:00Z",
+  operationId: "original-issue",
+};
+for (const secret of [true, false]) {
+  const value = {
+    ...invitationMetadata,
+    secretAvailable: secret,
+    ...(secret ? { invitationToken: "A".repeat(43) } : {}),
+  };
+  assert.deepEqual(zInvitationIssueResponse.parse(value), value);
+}
+for (const secret of [null, 1, "true", true])
+  assert.equal(
+    zInvitationIssueResponse.safeParse({
+      ...invitationMetadata,
+      secretAvailable: secret,
+    }).success,
+    false,
+  );
+for (const invalid of [
+  { kind: "unknown" },
+  { kind: "group-membership" },
+  {
+    kind: "action-grant",
+    target: { kind: "unknown" },
+    actionId: "query",
+    canGrant: true,
+  },
+  {
+    kind: "action-grant",
+    target: {
+      kind: "organization",
+      organizationId: invitationSource.organizationId,
+    },
+    actionId: "create-projects",
+    canGrant: 1,
+  },
+])
+  assert.equal(zInvitationAssignmentRequest.safeParse(invalid).success, false);
+function inspectInvitationSecret(
+  value: InvitationIssueResponse,
+): string | undefined {
+  if (value.secretAvailable) return value.invitationToken;
+  // @ts-expect-error A retained issuance original has no token field.
+  const impossible = value.invitationToken;
+  void impossible;
+  return undefined;
+}
+void inspectInvitationSecret;

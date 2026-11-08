@@ -24,6 +24,10 @@ from inframeld_sdk.models.application_account_creation_request import (
 from inframeld_sdk.models.grant_target_kind import GrantTargetKind
 from inframeld_sdk.models.human_admission_request import HumanAdmissionRequest
 from inframeld_sdk.models.human_o_auth_consent_request import HumanOAuthConsentRequest
+from inframeld_sdk.models.invitation_activation_request import InvitationActivationRequest
+from inframeld_sdk.models.invitation_issue_request import InvitationIssueRequest
+from inframeld_sdk.models.invitation_preview_request import InvitationPreviewRequest
+from inframeld_sdk.models.invitation_revocation_request import InvitationRevocationRequest
 from inframeld_sdk.models.organization_action_grant_request import OrganizationActionGrantRequest
 from inframeld_sdk.models.original_operation_lookup_request import OriginalOperationLookupRequest
 from inframeld_sdk.models.project_action_grant_request import ProjectActionGrantRequest
@@ -1197,7 +1201,89 @@ async def delete_access_group_async(clients: Clients, call: Call) -> NativeRespo
     )
 
 
+def issue_invitation_sync(clients: Clients, call: Call) -> NativeResponse:
+    body = InvitationIssueRequest.from_dict(call.body)
+    if body is None:
+        raise ValueError("Invitation issuance requires a body")
+    return AccessApi(clients.production).issue_invitation_sync_with_http_info(
+        idempotency_key=call.headers["Idempotency-Key"],
+        invitation_issue_request=body,
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def issue_invitation_async(clients: Clients, call: Call) -> NativeResponse:
+    body = InvitationIssueRequest.from_dict(call.body)
+    if body is None:
+        raise ValueError("Invitation issuance requires a body")
+    return await AccessApi(clients.production).issue_invitation_with_http_info(
+        idempotency_key=call.headers["Idempotency-Key"],
+        invitation_issue_request=body,
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+def revoke_invitation_sync(clients: Clients, call: Call) -> NativeResponse:
+    return AccessApi(clients.production).revoke_invitation_sync_with_http_info(
+        invitation_id=UUID(call.path["invitation_id"]),
+        idempotency_key=call.headers["Idempotency-Key"],
+        invitation_revocation_request=InvitationRevocationRequest.model_validate(call.body),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def revoke_invitation_async(clients: Clients, call: Call) -> NativeResponse:
+    return await AccessApi(clients.production).revoke_invitation_with_http_info(
+        invitation_id=UUID(call.path["invitation_id"]),
+        idempotency_key=call.headers["Idempotency-Key"],
+        invitation_revocation_request=InvitationRevocationRequest.model_validate(call.body),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+def preview_invitation_sync(clients: Clients, call: Call) -> NativeResponse:
+    return AccessApi(clients.production).preview_invitation_sync_with_http_info(
+        invitation_preview_request=InvitationPreviewRequest.model_validate(call.body),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def preview_invitation_async(clients: Clients, call: Call) -> NativeResponse:
+    return await AccessApi(clients.production).preview_invitation_with_http_info(
+        invitation_preview_request=InvitationPreviewRequest.model_validate(call.body),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+def activate_invitation_sync(clients: Clients, call: Call) -> NativeResponse:
+    return AccessApi(clients.production).activate_invitation_sync_with_http_info(
+        idempotency_key=call.headers["Idempotency-Key"],
+        invitation_activation_request=InvitationActivationRequest.model_validate(call.body),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def activate_invitation_async(clients: Clients, call: Call) -> NativeResponse:
+    return await AccessApi(clients.production).activate_invitation_with_http_info(
+        idempotency_key=call.headers["Idempotency-Key"],
+        invitation_activation_request=InvitationActivationRequest.model_validate(call.body),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
 BINDINGS: dict[Operation, Binding] = {
+    Operation.ISSUE_INVITATION: Binding(issue_invitation_sync, issue_invitation_async),
+    Operation.REVOKE_INVITATION: Binding(revoke_invitation_sync, revoke_invitation_async),
+    Operation.PREVIEW_INVITATION: Binding(preview_invitation_sync, preview_invitation_async),
+    Operation.ACTIVATE_INVITATION: Binding(activate_invitation_sync, activate_invitation_async),
     Operation.LIST_ORGANIZATION_ACTION_GRANTS: Binding(
         list_organization_action_grants_sync, list_organization_action_grants_async
     ),

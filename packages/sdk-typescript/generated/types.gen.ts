@@ -1044,6 +1044,559 @@ export type InitialProjectGrantResponse = {
 };
 
 /**
+ * InvitationAccessGroupTargetRequest
+ */
+export type InvitationAccessGroupTargetRequest = {
+    /**
+     * Accessgroupid
+     */
+    accessGroupId: string;
+    /**
+     * Kind
+     */
+    kind: 'access-group';
+    /**
+     * Projectid
+     */
+    projectId: string;
+};
+
+/**
+ * InvitationActionGrantRequest
+ */
+export type InvitationActionGrantRequest = {
+    /**
+     * Actionid
+     */
+    actionId: string;
+    /**
+     * Cangrant
+     */
+    canGrant: boolean;
+    /**
+     * Kind
+     */
+    kind: 'action-grant';
+    target: InvitationTargetRequest;
+};
+
+/**
+ * InvitationActivationRequest
+ */
+export type InvitationActivationRequest = {
+    /**
+     * Invitationtoken
+     */
+    invitationToken: string;
+};
+
+/**
+ * InvitationActivationResponse
+ */
+export type InvitationActivationResponse = {
+    /**
+     * Idempotencyexpiresat
+     */
+    idempotencyExpiresAt: string;
+    /**
+     * Invitationid
+     */
+    invitationId: string;
+    /**
+     * Operationid
+     */
+    operationId: string;
+    /**
+     * Organizationaccessrevision
+     */
+    organizationAccessRevision: number;
+    /**
+     * Organizationid
+     */
+    organizationId: string;
+    /**
+     * Principalid
+     */
+    principalId: string;
+    /**
+     * Projectaccessrevisions
+     */
+    projectAccessRevisions: Array<InvitationProjectAccessRevisionResponse>;
+};
+
+/**
+ * InvitationAdmissionOnlyRequest
+ */
+export type InvitationAdmissionOnlyRequest = {
+    /**
+     * Kind
+     */
+    kind: 'admission-only';
+};
+
+/**
+ * InvitationApplicationAccountTargetRequest
+ */
+export type InvitationApplicationAccountTargetRequest = {
+    /**
+     * Applicationprincipalid
+     */
+    applicationPrincipalId: string;
+    /**
+     * Kind
+     */
+    kind: 'application-account';
+    /**
+     * Projectid
+     */
+    projectId: string;
+};
+
+export type InvitationAssignmentRequest = ({
+    kind: 'admission-only';
+} & InvitationAdmissionOnlyRequest) | ({
+    kind: 'project-membership';
+} & InvitationProjectMembershipRequest) | ({
+    kind: 'group-membership';
+} & InvitationGroupMembershipRequest) | ({
+    kind: 'group-manager';
+} & InvitationGroupManagerRequest) | ({
+    kind: 'action-grant';
+} & InvitationActionGrantRequest);
+
+/**
+ * InvitationCollectionTargetRequest
+ */
+export type InvitationCollectionTargetRequest = {
+    /**
+     * Collectionid
+     */
+    collectionId: string;
+    /**
+     * Kind
+     */
+    kind: 'collection';
+};
+
+/**
+ * InvitationDeploymentTargetRequest
+ */
+export type InvitationDeploymentTargetRequest = {
+    /**
+     * Deploymentid
+     */
+    deploymentId: string;
+    /**
+     * Kind
+     */
+    kind: 'deployment';
+};
+
+/**
+ * InvitationEmbeddingProfileTargetRequest
+ */
+export type InvitationEmbeddingProfileTargetRequest = {
+    /**
+     * Embeddingprofileid
+     */
+    embeddingProfileId: string;
+    /**
+     * Kind
+     */
+    kind: 'embedding-profile';
+};
+
+/**
+ * InvitationFirstDeliveryResponse
+ */
+export type InvitationFirstDeliveryResponse = {
+    /**
+     * Accessrevision
+     */
+    accessRevision: number;
+    /**
+     * Assignments
+     */
+    assignments: Array<InvitationAssignmentRequest>;
+    /**
+     * Expiresat
+     */
+    expiresAt: string;
+    /**
+     * Idempotencyexpiresat
+     */
+    idempotencyExpiresAt: string;
+    /**
+     * Invitationid
+     */
+    invitationId: string;
+    /**
+     * Invitationtoken
+     */
+    invitationToken: string;
+    /**
+     * Operationid
+     */
+    operationId: string;
+    /**
+     * Organizationid
+     */
+    organizationId: string;
+    /**
+     * Secretavailable
+     */
+    secretAvailable: true;
+};
+
+/**
+ * InvitationGroupManagerRequest
+ */
+export type InvitationGroupManagerRequest = {
+    /**
+     * Accessgroupid
+     */
+    accessGroupId: string;
+    /**
+     * Kind
+     */
+    kind: 'group-manager';
+    /**
+     * Projectid
+     */
+    projectId: string;
+};
+
+/**
+ * InvitationGroupMembershipRequest
+ */
+export type InvitationGroupMembershipRequest = {
+    /**
+     * Accessgroupid
+     */
+    accessGroupId: string;
+    /**
+     * Kind
+     */
+    kind: 'group-membership';
+    /**
+     * Projectid
+     */
+    projectId: string;
+};
+
+/**
+ * InvitationIssuanceReplayResponse
+ */
+export type InvitationIssuanceReplayResponse = {
+    /**
+     * Accessrevision
+     */
+    accessRevision: number;
+    /**
+     * Assignments
+     */
+    assignments: Array<InvitationAssignmentRequest>;
+    /**
+     * Expiresat
+     */
+    expiresAt: string;
+    /**
+     * Idempotencyexpiresat
+     */
+    idempotencyExpiresAt: string;
+    /**
+     * Invitationid
+     */
+    invitationId: string;
+    /**
+     * Operationid
+     */
+    operationId: string;
+    /**
+     * Organizationid
+     */
+    organizationId: string;
+    /**
+     * Secretavailable
+     */
+    secretAvailable: false;
+};
+
+/**
+ * InvitationIssueRequest
+ */
+export type InvitationIssueRequest = {
+    /**
+     * Assignments
+     */
+    assignments: Array<InvitationAssignmentRequest>;
+    /**
+     * Expectedaccessrevision
+     */
+    expectedAccessRevision: number;
+    /**
+     * Expectedprojectaccessrevisions
+     */
+    expectedProjectAccessRevisions: Array<InvitationProjectAccessRevisionRequest>;
+    /**
+     * Expiresinseconds
+     */
+    expiresInSeconds?: number;
+    /**
+     * Organizationid
+     */
+    organizationId: string;
+};
+
+/**
+ * InvitationIssueResponse
+ *
+ * Deliver a secret once or retain only the original safe issuance metadata.
+ */
+export type InvitationIssueResponse = ({
+    secretAvailable: true;
+} & InvitationFirstDeliveryResponse) | ({
+    secretAvailable: false;
+} & InvitationIssuanceReplayResponse);
+
+/**
+ * InvitationModelConnectionTargetRequest
+ */
+export type InvitationModelConnectionTargetRequest = {
+    /**
+     * Kind
+     */
+    kind: 'model-connection';
+    /**
+     * Modelconnectionid
+     */
+    modelConnectionId: string;
+};
+
+/**
+ * InvitationOrganizationTargetRequest
+ */
+export type InvitationOrganizationTargetRequest = {
+    /**
+     * Kind
+     */
+    kind: 'organization';
+    /**
+     * Organizationid
+     */
+    organizationId: string;
+};
+
+/**
+ * InvitationPipelineTargetRequest
+ */
+export type InvitationPipelineTargetRequest = {
+    /**
+     * Kind
+     */
+    kind: 'pipeline';
+    /**
+     * Pipelineid
+     */
+    pipelineId: string;
+};
+
+/**
+ * InvitationPreviewRequest
+ */
+export type InvitationPreviewRequest = {
+    /**
+     * Invitationtoken
+     */
+    invitationToken: string;
+};
+
+/**
+ * InvitationPreviewResponse
+ */
+export type InvitationPreviewResponse = {
+    /**
+     * Assignments
+     */
+    assignments: Array<InvitationAssignmentRequest>;
+    /**
+     * Expiresat
+     */
+    expiresAt: string;
+    /**
+     * Invitationid
+     */
+    invitationId: string;
+    /**
+     * Organizationid
+     */
+    organizationId: string;
+    /**
+     * Scopes
+     */
+    scopes: Array<InvitationScopeResponse>;
+};
+
+/**
+ * InvitationProcessingProfileTargetRequest
+ */
+export type InvitationProcessingProfileTargetRequest = {
+    /**
+     * Kind
+     */
+    kind: 'processing-profile';
+    /**
+     * Processingprofileid
+     */
+    processingProfileId: string;
+};
+
+/**
+ * InvitationProjectAccessRevisionRequest
+ */
+export type InvitationProjectAccessRevisionRequest = {
+    /**
+     * Accessrevision
+     */
+    accessRevision: number;
+    /**
+     * Projectid
+     */
+    projectId: string;
+};
+
+/**
+ * InvitationProjectAccessRevisionResponse
+ */
+export type InvitationProjectAccessRevisionResponse = {
+    /**
+     * Accessrevision
+     */
+    accessRevision: number;
+    /**
+     * Projectid
+     */
+    projectId: string;
+};
+
+/**
+ * InvitationProjectMembershipRequest
+ */
+export type InvitationProjectMembershipRequest = {
+    /**
+     * Kind
+     */
+    kind: 'project-membership';
+    /**
+     * Projectid
+     */
+    projectId: string;
+};
+
+/**
+ * InvitationProjectTargetRequest
+ */
+export type InvitationProjectTargetRequest = {
+    /**
+     * Kind
+     */
+    kind: 'project';
+    /**
+     * Projectid
+     */
+    projectId: string;
+};
+
+/**
+ * InvitationRevocationRequest
+ */
+export type InvitationRevocationRequest = {
+    /**
+     * Expectedaccessrevision
+     */
+    expectedAccessRevision: number;
+};
+
+/**
+ * InvitationRevocationResponse
+ */
+export type InvitationRevocationResponse = {
+    /**
+     * Accessrevision
+     */
+    accessRevision: number;
+    /**
+     * Idempotencyexpiresat
+     */
+    idempotencyExpiresAt: string;
+    /**
+     * Invitationid
+     */
+    invitationId: string;
+    /**
+     * Operationid
+     */
+    operationId: string;
+    /**
+     * Organizationid
+     */
+    organizationId: string;
+    /**
+     * Revoked
+     */
+    revoked?: true;
+};
+
+/**
+ * InvitationScopeResponse
+ */
+export type InvitationScopeResponse = {
+    /**
+     * Displayname
+     */
+    displayName: string;
+    target: InvitationTargetRequest;
+};
+
+/**
+ * InvitationSourceTargetRequest
+ */
+export type InvitationSourceTargetRequest = {
+    /**
+     * Kind
+     */
+    kind: 'source';
+    /**
+     * Sourceid
+     */
+    sourceId: string;
+};
+
+export type InvitationTargetRequest = ({
+    kind: 'organization';
+} & InvitationOrganizationTargetRequest) | ({
+    kind: 'project';
+} & InvitationProjectTargetRequest) | ({
+    kind: 'access-group';
+} & InvitationAccessGroupTargetRequest) | ({
+    kind: 'application-account';
+} & InvitationApplicationAccountTargetRequest) | ({
+    kind: 'pipeline';
+} & InvitationPipelineTargetRequest) | ({
+    kind: 'deployment';
+} & InvitationDeploymentTargetRequest) | ({
+    kind: 'collection';
+} & InvitationCollectionTargetRequest) | ({
+    kind: 'source';
+} & InvitationSourceTargetRequest) | ({
+    kind: 'model-connection';
+} & InvitationModelConnectionTargetRequest) | ({
+    kind: 'processing-profile';
+} & InvitationProcessingProfileTargetRequest) | ({
+    kind: 'embedding-profile';
+} & InvitationEmbeddingProfileTargetRequest);
+
+/**
  * JobStatus
  */
 export type JobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'canceled' | 'recovery_required';
@@ -2366,6 +2919,257 @@ export type GetDeletionStatusResponses = {
 };
 
 export type GetDeletionStatusResponse = GetDeletionStatusResponses[keyof GetDeletionStatusResponses];
+
+export type IssueInvitationData = {
+    body: InvitationIssueRequest;
+    headers: {
+        /**
+         * Idempotency-Key
+         */
+        'Idempotency-Key': string;
+    };
+    path?: never;
+    query?: never;
+    url: '/v1/invitations';
+};
+
+export type IssueInvitationErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Operation conflicts with current state
+     */
+    409: ProblemDetails;
+    /**
+     * Content Too Large
+     */
+    413: ProblemDetails;
+    /**
+     * Unsupported Media Type
+     */
+    415: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type IssueInvitationError = IssueInvitationErrors[keyof IssueInvitationErrors];
+
+export type IssueInvitationResponses = {
+    /**
+     * Successful Response
+     */
+    201: InvitationIssueResponse;
+};
+
+export type IssueInvitationResponse = IssueInvitationResponses[keyof IssueInvitationResponses];
+
+export type ActivateInvitationData = {
+    body: InvitationActivationRequest;
+    headers: {
+        /**
+         * Idempotency-Key
+         */
+        'Idempotency-Key': string;
+    };
+    path?: never;
+    query?: never;
+    url: '/v1/invitations/activate';
+};
+
+export type ActivateInvitationErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Operation conflicts with current state
+     */
+    409: ProblemDetails;
+    /**
+     * Content Too Large
+     */
+    413: ProblemDetails;
+    /**
+     * Unsupported Media Type
+     */
+    415: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type ActivateInvitationError = ActivateInvitationErrors[keyof ActivateInvitationErrors];
+
+export type ActivateInvitationResponses = {
+    /**
+     * Successful Response
+     */
+    200: InvitationActivationResponse;
+};
+
+export type ActivateInvitationResponse = ActivateInvitationResponses[keyof ActivateInvitationResponses];
+
+export type PreviewInvitationData = {
+    body: InvitationPreviewRequest;
+    path?: never;
+    query?: never;
+    url: '/v1/invitations/preview';
+};
+
+export type PreviewInvitationErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Operation conflicts with current state
+     */
+    409: ProblemDetails;
+    /**
+     * Content Too Large
+     */
+    413: ProblemDetails;
+    /**
+     * Unsupported Media Type
+     */
+    415: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type PreviewInvitationError = PreviewInvitationErrors[keyof PreviewInvitationErrors];
+
+export type PreviewInvitationResponses = {
+    /**
+     * Successful Response
+     */
+    200: InvitationPreviewResponse;
+};
+
+export type PreviewInvitationResponse = PreviewInvitationResponses[keyof PreviewInvitationResponses];
+
+export type RevokeInvitationData = {
+    body: InvitationRevocationRequest;
+    headers: {
+        /**
+         * Idempotency-Key
+         */
+        'Idempotency-Key': string;
+    };
+    path: {
+        /**
+         * Invitation Id
+         */
+        invitation_id: string;
+    };
+    query?: never;
+    url: '/v1/invitations/{invitation_id}/revoke';
+};
+
+export type RevokeInvitationErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Operation conflicts with current state
+     */
+    409: ProblemDetails;
+    /**
+     * Content Too Large
+     */
+    413: ProblemDetails;
+    /**
+     * Unsupported Media Type
+     */
+    415: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type RevokeInvitationError = RevokeInvitationErrors[keyof RevokeInvitationErrors];
+
+export type RevokeInvitationResponses = {
+    /**
+     * Successful Response
+     */
+    200: InvitationRevocationResponse;
+};
+
+export type RevokeInvitationResponse = RevokeInvitationResponses[keyof RevokeInvitationResponses];
 
 export type GetMyOrganizationAccessData = {
     body?: never;

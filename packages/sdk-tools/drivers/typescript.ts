@@ -34,6 +34,40 @@ const options = (client: Client, call: SdkCall, signal?: AbortSignal) => ({
 // Cast only the validated test-protocol input at the generated API boundary.
 // Request validation remains the generator's qualified policy, not a driver repair.
 const calls = {
+  issueInvitation: (client: Client, call: SdkCall) =>
+    sdk.issueInvitation({
+      ...options(client, call),
+      headers: {
+        ...call.headers,
+        "Idempotency-Key": call.headers["Idempotency-Key"]!,
+      },
+      body: call.body as sdk.IssueInvitationData["body"],
+    }),
+  revokeInvitation: (client: Client, call: SdkCall) =>
+    sdk.revokeInvitation({
+      ...options(client, call),
+      path: call.path as sdk.RevokeInvitationData["path"],
+      headers: {
+        ...call.headers,
+        "Idempotency-Key": call.headers["Idempotency-Key"]!,
+      },
+      body: call.body as sdk.RevokeInvitationData["body"],
+    }),
+  previewInvitation: (client: Client, call: SdkCall) =>
+    sdk.previewInvitation({
+      ...options(client, call),
+      body: call.body as sdk.PreviewInvitationData["body"],
+    }),
+  activateInvitation: (client: Client, call: SdkCall) =>
+    sdk.activateInvitation({
+      ...options(client, call),
+      headers: {
+        ...call.headers,
+        "Idempotency-Key": call.headers["Idempotency-Key"]!,
+      },
+      body: call.body as sdk.ActivateInvitationData["body"],
+    }),
+
   createAccessGroup: (client: Client, call: SdkCall) =>
     sdk.createAccessGroup({
       ...options(client, call),
