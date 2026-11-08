@@ -6,6 +6,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from inframeld_backend.access.application.dtos.access_action_grant_changed_audit_event_dto import (
     AccessActionGrantChangedAuditEventDTO,
 )
+from inframeld_backend.access.application.dtos.invitation_action_grant_intent_dto import (
+    InvitationActionGrantIntentDTO,
+)
+from inframeld_backend.access.application.dtos.invitation_activation_binding_dto import (
+    InvitationActivationBindingDTO,
+)
 from inframeld_backend.access.application.dtos.organization_action_grant_change_result_dto import (
     OrganizationActionGrantChangeResultDTO,
 )
@@ -16,12 +22,18 @@ from inframeld_backend.access.application.dtos.organization_grant_target_dto imp
     OrganizationGrantTargetDTO,
 )
 from inframeld_backend.access.application.protocols.audit_event_writer import AuditEventWriter
+from inframeld_backend.access.application.protocols.invitation_organization_grant_writer import (
+    InvitationOrganizationGrantWriter,
+)
 from inframeld_backend.access.application.protocols.organization_action_grant_writer import (
     OrganizationActionGrantWriter,
 )
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.value_objects.action_grant_state import ActionGrantState
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
+from inframeld_backend.access.infrastructure.readers.postgres_invitation_binding_reader import (
+    PostgresInvitationBindingReader,
+)
 from inframeld_backend.access.infrastructure.rows.organization_action_grant_operation_result_row import (
     OrganizationActionGrantOperationResultRow,
 )
@@ -48,7 +60,9 @@ from inframeld_backend.shared.infrastructure.rows.idempotency_reservation_row im
 )
 
 
-class PostgresOrganizationActionGrantWriter(OrganizationActionGrantWriter):
+class PostgresOrganizationActionGrantWriter(
+    OrganizationActionGrantWriter, InvitationOrganizationGrantWriter
+):
     """Persist only the checked exact transition and original outcome in the caller transaction."""
 
     def __init__(self, session: AsyncSession, audit_event_writer: AuditEventWriter) -> None:
@@ -80,6 +94,24 @@ class PostgresOrganizationActionGrantWriter(OrganizationActionGrantWriter):
             method=HttpMethod.DELETE if after.can_grant is None else HttpMethod.PUT,
             state=OperationReservationState.IN_PROGRESS,
         )
+        await self._apply_checked_change(
+            facts=facts,
+            recipient_principal_id=recipient_principal_id,
+            after=after,
+            operation_id=operation_id,
+        )
+
+    async def _apply_checked_change(
+        self,
+        *,
+        facts: OrganizationGrantManagementFactsDTO,
+        recipient_principal_id: PrincipalId,
+        after: ActionGrantState,
+        operation_id: OperationId,
+    ) -> int:
+        recipient = facts.recipient
+        if recipient is None:
+            raise RuntimeError("Grant persistence lost its checked recipient.")
         scope = (
             OrganizationActionGrantRow.organization_id == facts.organization_id.value,
             OrganizationActionGrantRow.recipient_principal_id == recipient_principal_id.value,
@@ -102,7 +134,7 @@ class PostgresOrganizationActionGrantWriter(OrganizationActionGrantWriter):
         if revision != facts.access_revision:
             raise StaleRevisionError()
         if after == facts.assignment:
-            return
+            return facts.access_revision
 
         advanced = await self._session.scalar(
             update(OrganizationRow)
@@ -158,6 +190,7 @@ class PostgresOrganizationActionGrantWriter(OrganizationActionGrantWriter):
                 operation_id=operation_id,
             )
         )
+        return facts.access_revision + 1
 
     @override
     async def save_result(
@@ -251,3 +284,41 @@ class PostgresOrganizationActionGrantWriter(OrganizationActionGrantWriter):
             or stored.state is not state
         ):
             raise ConflictError("The Organization grant changed its original reservation binding.")
+
+    @override
+    async def apply_invitation_grant(
+        self,
+        *,
+        binding: InvitationActivationBindingDTO,
+        facts: OrganizationGrantManagementFactsDTO,
+        recipient_principal_id: PrincipalId,
+        after: ActionGrantState,
+    ) -> int:
+        self._require_transaction()
+        if after.can_grant is None:
+            raise ConflictError("An invitation grant must name an explicit level.")
+        await PostgresInvitationBindingReader(self._session).require_assignment_binding(
+            binding=binding,
+            principal_id=recipient_principal_id,
+            organization_id=facts.organization_id,
+            issuer_principal_id=facts.actor.id,
+            installation_id=facts.installation_id,
+            intent=InvitationActionGrantIntentDTO(
+                target=OrganizationGrantTargetDTO(organization_id=facts.organization_id),
+                action_id=facts.action_id,
+                can_grant=after.can_grant,
+            ),
+        )
+        recipient = facts.recipient
+        if (
+            recipient is None
+            or recipient.id != recipient_principal_id
+            or recipient.organization_id != facts.organization_id
+        ):
+            raise RuntimeError("Invitation grant persistence changed its checked recipient.")
+        return await self._apply_checked_change(
+            facts=facts,
+            recipient_principal_id=recipient_principal_id,
+            after=after,
+            operation_id=binding.operation_id,
+        )

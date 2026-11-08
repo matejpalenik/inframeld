@@ -1,6 +1,10 @@
 use crate::observation::{Problem, observed};
 use crate::protocol::{Call, Observation, WireValue, headers};
 use inframeld_sdk::client::*;
+use inframeld_sdk::types::{
+    InvitationActivationRequest, InvitationIssueRequest, InvitationPreviewRequest,
+    InvitationRevocationRequest,
+};
 use inframeld_sdk_test_rust::client as fixture;
 use serde_json::Value;
 
@@ -11,6 +15,40 @@ pub async fn observe(
 ) -> Observation {
     let body = request.body.clone().unwrap_or(Value::Null);
     match request.operation.as_str() {
+        "issueInvitation" => observed!(
+            client
+                .issue_invitation(
+                    &request.headers["Idempotency-Key"],
+                    serde_json::from_value::<InvitationIssueRequest>(body).unwrap()
+                )
+                .await
+        ),
+        "revokeInvitation" => observed!(
+            client
+                .revoke_invitation(
+                    request.path.as_ref().unwrap()["invitation_id"]
+                        .as_str()
+                        .unwrap(),
+                    &request.headers["Idempotency-Key"],
+                    serde_json::from_value::<InvitationRevocationRequest>(body).unwrap()
+                )
+                .await
+        ),
+        "previewInvitation" => observed!(
+            client
+                .preview_invitation(
+                    serde_json::from_value::<InvitationPreviewRequest>(body).unwrap()
+                )
+                .await
+        ),
+        "activateInvitation" => observed!(
+            client
+                .activate_invitation(
+                    &request.headers["Idempotency-Key"],
+                    serde_json::from_value::<InvitationActivationRequest>(body).unwrap()
+                )
+                .await
+        ),
         "listOrganizationActionGrants" => observed!(
             client
                 .list_organization_action_grants(

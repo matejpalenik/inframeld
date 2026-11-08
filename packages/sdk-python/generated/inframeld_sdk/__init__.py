@@ -77,6 +77,37 @@ __all__ = [
     "InframeldDiscoveryResponse",
     "InitialApplicationAccountGrantResponse",
     "InitialProjectGrantResponse",
+    "InvitationAccessGroupTargetRequest",
+    "InvitationActionGrantRequest",
+    "InvitationActivationRequest",
+    "InvitationActivationResponse",
+    "InvitationAdmissionOnlyRequest",
+    "InvitationApplicationAccountTargetRequest",
+    "InvitationAssignmentRequest",
+    "InvitationCollectionTargetRequest",
+    "InvitationDeploymentTargetRequest",
+    "InvitationEmbeddingProfileTargetRequest",
+    "InvitationFirstDeliveryResponse",
+    "InvitationGroupManagerRequest",
+    "InvitationGroupMembershipRequest",
+    "InvitationIssuanceReplayResponse",
+    "InvitationIssueRequest",
+    "InvitationIssueResponse",
+    "InvitationModelConnectionTargetRequest",
+    "InvitationOrganizationTargetRequest",
+    "InvitationPipelineTargetRequest",
+    "InvitationPreviewRequest",
+    "InvitationPreviewResponse",
+    "InvitationProcessingProfileTargetRequest",
+    "InvitationProjectAccessRevisionRequest",
+    "InvitationProjectAccessRevisionResponse",
+    "InvitationProjectMembershipRequest",
+    "InvitationProjectTargetRequest",
+    "InvitationRevocationRequest",
+    "InvitationRevocationResponse",
+    "InvitationScopeResponse",
+    "InvitationSourceTargetRequest",
+    "InvitationTargetRequest",
     "JobStatus",
     "Jobreference",
     "KnownJobReferenceResponse",
@@ -197,6 +228,37 @@ from inframeld_sdk.models.in_progress_operation_lookup_response import InProgres
 from inframeld_sdk.models.inframeld_discovery_response import InframeldDiscoveryResponse as InframeldDiscoveryResponse
 from inframeld_sdk.models.initial_application_account_grant_response import InitialApplicationAccountGrantResponse as InitialApplicationAccountGrantResponse
 from inframeld_sdk.models.initial_project_grant_response import InitialProjectGrantResponse as InitialProjectGrantResponse
+from inframeld_sdk.models.invitation_access_group_target_request import InvitationAccessGroupTargetRequest as InvitationAccessGroupTargetRequest
+from inframeld_sdk.models.invitation_action_grant_request import InvitationActionGrantRequest as InvitationActionGrantRequest
+from inframeld_sdk.models.invitation_activation_request import InvitationActivationRequest as InvitationActivationRequest
+from inframeld_sdk.models.invitation_activation_response import InvitationActivationResponse as InvitationActivationResponse
+from inframeld_sdk.models.invitation_admission_only_request import InvitationAdmissionOnlyRequest as InvitationAdmissionOnlyRequest
+from inframeld_sdk.models.invitation_application_account_target_request import InvitationApplicationAccountTargetRequest as InvitationApplicationAccountTargetRequest
+from inframeld_sdk.models.invitation_assignment_request import InvitationAssignmentRequest as InvitationAssignmentRequest
+from inframeld_sdk.models.invitation_collection_target_request import InvitationCollectionTargetRequest as InvitationCollectionTargetRequest
+from inframeld_sdk.models.invitation_deployment_target_request import InvitationDeploymentTargetRequest as InvitationDeploymentTargetRequest
+from inframeld_sdk.models.invitation_embedding_profile_target_request import InvitationEmbeddingProfileTargetRequest as InvitationEmbeddingProfileTargetRequest
+from inframeld_sdk.models.invitation_first_delivery_response import InvitationFirstDeliveryResponse as InvitationFirstDeliveryResponse
+from inframeld_sdk.models.invitation_group_manager_request import InvitationGroupManagerRequest as InvitationGroupManagerRequest
+from inframeld_sdk.models.invitation_group_membership_request import InvitationGroupMembershipRequest as InvitationGroupMembershipRequest
+from inframeld_sdk.models.invitation_issuance_replay_response import InvitationIssuanceReplayResponse as InvitationIssuanceReplayResponse
+from inframeld_sdk.models.invitation_issue_request import InvitationIssueRequest as InvitationIssueRequest
+from inframeld_sdk.models.invitation_issue_response import InvitationIssueResponse as InvitationIssueResponse
+from inframeld_sdk.models.invitation_model_connection_target_request import InvitationModelConnectionTargetRequest as InvitationModelConnectionTargetRequest
+from inframeld_sdk.models.invitation_organization_target_request import InvitationOrganizationTargetRequest as InvitationOrganizationTargetRequest
+from inframeld_sdk.models.invitation_pipeline_target_request import InvitationPipelineTargetRequest as InvitationPipelineTargetRequest
+from inframeld_sdk.models.invitation_preview_request import InvitationPreviewRequest as InvitationPreviewRequest
+from inframeld_sdk.models.invitation_preview_response import InvitationPreviewResponse as InvitationPreviewResponse
+from inframeld_sdk.models.invitation_processing_profile_target_request import InvitationProcessingProfileTargetRequest as InvitationProcessingProfileTargetRequest
+from inframeld_sdk.models.invitation_project_access_revision_request import InvitationProjectAccessRevisionRequest as InvitationProjectAccessRevisionRequest
+from inframeld_sdk.models.invitation_project_access_revision_response import InvitationProjectAccessRevisionResponse as InvitationProjectAccessRevisionResponse
+from inframeld_sdk.models.invitation_project_membership_request import InvitationProjectMembershipRequest as InvitationProjectMembershipRequest
+from inframeld_sdk.models.invitation_project_target_request import InvitationProjectTargetRequest as InvitationProjectTargetRequest
+from inframeld_sdk.models.invitation_revocation_request import InvitationRevocationRequest as InvitationRevocationRequest
+from inframeld_sdk.models.invitation_revocation_response import InvitationRevocationResponse as InvitationRevocationResponse
+from inframeld_sdk.models.invitation_scope_response import InvitationScopeResponse as InvitationScopeResponse
+from inframeld_sdk.models.invitation_source_target_request import InvitationSourceTargetRequest as InvitationSourceTargetRequest
+from inframeld_sdk.models.invitation_target_request import InvitationTargetRequest as InvitationTargetRequest
 from inframeld_sdk.models.job_status import JobStatus as JobStatus
 from inframeld_sdk.models.jobreference import Jobreference as Jobreference
 from inframeld_sdk.models.known_job_reference_response import KnownJobReferenceResponse as KnownJobReferenceResponse

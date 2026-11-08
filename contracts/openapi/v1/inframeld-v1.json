@@ -1612,6 +1612,876 @@
         "title": "InitialProjectGrantResponse",
         "type": "object"
       },
+      "InvitationAccessGroupTargetRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "accessGroupId": {
+            "format": "uuid",
+            "title": "Accessgroupid",
+            "type": "string"
+          },
+          "kind": {
+            "const": "access-group",
+            "title": "Kind",
+            "type": "string"
+          },
+          "projectId": {
+            "format": "uuid",
+            "title": "Projectid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "projectId",
+          "accessGroupId"
+        ],
+        "title": "InvitationAccessGroupTargetRequest",
+        "type": "object"
+      },
+      "InvitationActionGrantRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "actionId": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Actionid",
+            "type": "string"
+          },
+          "canGrant": {
+            "title": "Cangrant",
+            "type": "boolean"
+          },
+          "kind": {
+            "const": "action-grant",
+            "title": "Kind",
+            "type": "string"
+          },
+          "target": {
+            "$ref": "#/components/schemas/InvitationTargetRequest"
+          }
+        },
+        "required": [
+          "kind",
+          "target",
+          "actionId",
+          "canGrant"
+        ],
+        "title": "InvitationActionGrantRequest",
+        "type": "object"
+      },
+      "InvitationActivationRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "invitationToken": {
+            "title": "Invitationtoken",
+            "type": "string"
+          }
+        },
+        "required": [
+          "invitationToken"
+        ],
+        "title": "InvitationActivationRequest",
+        "type": "object"
+      },
+      "InvitationActivationResponse": {
+        "properties": {
+          "idempotencyExpiresAt": {
+            "format": "date-time",
+            "title": "Idempotencyexpiresat",
+            "type": "string"
+          },
+          "invitationId": {
+            "format": "uuid",
+            "title": "Invitationid",
+            "type": "string"
+          },
+          "operationId": {
+            "title": "Operationid",
+            "type": "string"
+          },
+          "organizationAccessRevision": {
+            "title": "Organizationaccessrevision",
+            "type": "integer"
+          },
+          "organizationId": {
+            "format": "uuid",
+            "title": "Organizationid",
+            "type": "string"
+          },
+          "principalId": {
+            "format": "uuid",
+            "title": "Principalid",
+            "type": "string"
+          },
+          "projectAccessRevisions": {
+            "items": {
+              "$ref": "#/components/schemas/InvitationProjectAccessRevisionResponse"
+            },
+            "title": "Projectaccessrevisions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "operationId",
+          "invitationId",
+          "organizationId",
+          "principalId",
+          "organizationAccessRevision",
+          "projectAccessRevisions",
+          "idempotencyExpiresAt"
+        ],
+        "title": "InvitationActivationResponse",
+        "type": "object"
+      },
+      "InvitationAdmissionOnlyRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "admission-only",
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "InvitationAdmissionOnlyRequest",
+        "type": "object"
+      },
+      "InvitationApplicationAccountTargetRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "applicationPrincipalId": {
+            "format": "uuid",
+            "title": "Applicationprincipalid",
+            "type": "string"
+          },
+          "kind": {
+            "const": "application-account",
+            "title": "Kind",
+            "type": "string"
+          },
+          "projectId": {
+            "format": "uuid",
+            "title": "Projectid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "projectId",
+          "applicationPrincipalId"
+        ],
+        "title": "InvitationApplicationAccountTargetRequest",
+        "type": "object"
+      },
+      "InvitationAssignmentRequest": {
+        "discriminator": {
+          "mapping": {
+            "action-grant": "#/components/schemas/InvitationActionGrantRequest",
+            "admission-only": "#/components/schemas/InvitationAdmissionOnlyRequest",
+            "group-manager": "#/components/schemas/InvitationGroupManagerRequest",
+            "group-membership": "#/components/schemas/InvitationGroupMembershipRequest",
+            "project-membership": "#/components/schemas/InvitationProjectMembershipRequest"
+          },
+          "propertyName": "kind"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/InvitationAdmissionOnlyRequest"
+          },
+          {
+            "$ref": "#/components/schemas/InvitationProjectMembershipRequest"
+          },
+          {
+            "$ref": "#/components/schemas/InvitationGroupMembershipRequest"
+          },
+          {
+            "$ref": "#/components/schemas/InvitationGroupManagerRequest"
+          },
+          {
+            "$ref": "#/components/schemas/InvitationActionGrantRequest"
+          }
+        ]
+      },
+      "InvitationCollectionTargetRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "collectionId": {
+            "format": "uuid",
+            "title": "Collectionid",
+            "type": "string"
+          },
+          "kind": {
+            "const": "collection",
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "collectionId"
+        ],
+        "title": "InvitationCollectionTargetRequest",
+        "type": "object"
+      },
+      "InvitationDeploymentTargetRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "deploymentId": {
+            "format": "uuid",
+            "title": "Deploymentid",
+            "type": "string"
+          },
+          "kind": {
+            "const": "deployment",
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "deploymentId"
+        ],
+        "title": "InvitationDeploymentTargetRequest",
+        "type": "object"
+      },
+      "InvitationEmbeddingProfileTargetRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "embeddingProfileId": {
+            "format": "uuid",
+            "title": "Embeddingprofileid",
+            "type": "string"
+          },
+          "kind": {
+            "const": "embedding-profile",
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "embeddingProfileId"
+        ],
+        "title": "InvitationEmbeddingProfileTargetRequest",
+        "type": "object"
+      },
+      "InvitationFirstDeliveryResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "accessRevision": {
+            "title": "Accessrevision",
+            "type": "integer"
+          },
+          "assignments": {
+            "items": {
+              "$ref": "#/components/schemas/InvitationAssignmentRequest"
+            },
+            "title": "Assignments",
+            "type": "array"
+          },
+          "expiresAt": {
+            "format": "date-time",
+            "title": "Expiresat",
+            "type": "string"
+          },
+          "idempotencyExpiresAt": {
+            "format": "date-time",
+            "title": "Idempotencyexpiresat",
+            "type": "string"
+          },
+          "invitationId": {
+            "format": "uuid",
+            "title": "Invitationid",
+            "type": "string"
+          },
+          "invitationToken": {
+            "title": "Invitationtoken",
+            "type": "string"
+          },
+          "operationId": {
+            "title": "Operationid",
+            "type": "string"
+          },
+          "organizationId": {
+            "format": "uuid",
+            "title": "Organizationid",
+            "type": "string"
+          },
+          "secretAvailable": {
+            "const": true,
+            "title": "Secretavailable",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "operationId",
+          "idempotencyExpiresAt",
+          "invitationId",
+          "organizationId",
+          "assignments",
+          "expiresAt",
+          "accessRevision",
+          "secretAvailable",
+          "invitationToken"
+        ],
+        "title": "InvitationFirstDeliveryResponse",
+        "type": "object"
+      },
+      "InvitationGroupManagerRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "accessGroupId": {
+            "format": "uuid",
+            "title": "Accessgroupid",
+            "type": "string"
+          },
+          "kind": {
+            "const": "group-manager",
+            "title": "Kind",
+            "type": "string"
+          },
+          "projectId": {
+            "format": "uuid",
+            "title": "Projectid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "projectId",
+          "accessGroupId"
+        ],
+        "title": "InvitationGroupManagerRequest",
+        "type": "object"
+      },
+      "InvitationGroupMembershipRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "accessGroupId": {
+            "format": "uuid",
+            "title": "Accessgroupid",
+            "type": "string"
+          },
+          "kind": {
+            "const": "group-membership",
+            "title": "Kind",
+            "type": "string"
+          },
+          "projectId": {
+            "format": "uuid",
+            "title": "Projectid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "projectId",
+          "accessGroupId"
+        ],
+        "title": "InvitationGroupMembershipRequest",
+        "type": "object"
+      },
+      "InvitationIssuanceReplayResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "accessRevision": {
+            "title": "Accessrevision",
+            "type": "integer"
+          },
+          "assignments": {
+            "items": {
+              "$ref": "#/components/schemas/InvitationAssignmentRequest"
+            },
+            "title": "Assignments",
+            "type": "array"
+          },
+          "expiresAt": {
+            "format": "date-time",
+            "title": "Expiresat",
+            "type": "string"
+          },
+          "idempotencyExpiresAt": {
+            "format": "date-time",
+            "title": "Idempotencyexpiresat",
+            "type": "string"
+          },
+          "invitationId": {
+            "format": "uuid",
+            "title": "Invitationid",
+            "type": "string"
+          },
+          "operationId": {
+            "title": "Operationid",
+            "type": "string"
+          },
+          "organizationId": {
+            "format": "uuid",
+            "title": "Organizationid",
+            "type": "string"
+          },
+          "secretAvailable": {
+            "const": false,
+            "title": "Secretavailable",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "operationId",
+          "idempotencyExpiresAt",
+          "invitationId",
+          "organizationId",
+          "assignments",
+          "expiresAt",
+          "accessRevision",
+          "secretAvailable"
+        ],
+        "title": "InvitationIssuanceReplayResponse",
+        "type": "object"
+      },
+      "InvitationIssueRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "assignments": {
+            "items": {
+              "$ref": "#/components/schemas/InvitationAssignmentRequest"
+            },
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Assignments",
+            "type": "array"
+          },
+          "expectedAccessRevision": {
+            "format": "int64",
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "title": "Expectedaccessrevision",
+            "type": "integer"
+          },
+          "expectedProjectAccessRevisions": {
+            "items": {
+              "$ref": "#/components/schemas/InvitationProjectAccessRevisionRequest"
+            },
+            "maxItems": 100,
+            "title": "Expectedprojectaccessrevisions",
+            "type": "array"
+          },
+          "expiresInSeconds": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 2592000,
+            "title": "Expiresinseconds",
+            "type": "integer"
+          },
+          "organizationId": {
+            "format": "uuid",
+            "title": "Organizationid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "organizationId",
+          "assignments",
+          "expectedAccessRevision",
+          "expectedProjectAccessRevisions"
+        ],
+        "title": "InvitationIssueRequest",
+        "type": "object"
+      },
+      "InvitationIssueResponse": {
+        "description": "Deliver a secret once or retain only the original safe issuance metadata.",
+        "discriminator": {
+          "mapping": {
+            "False": "#/components/schemas/InvitationIssuanceReplayResponse",
+            "True": "#/components/schemas/InvitationFirstDeliveryResponse"
+          },
+          "propertyName": "secretAvailable"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/InvitationFirstDeliveryResponse"
+          },
+          {
+            "$ref": "#/components/schemas/InvitationIssuanceReplayResponse"
+          }
+        ],
+        "title": "InvitationIssueResponse"
+      },
+      "InvitationModelConnectionTargetRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "model-connection",
+            "title": "Kind",
+            "type": "string"
+          },
+          "modelConnectionId": {
+            "format": "uuid",
+            "title": "Modelconnectionid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "modelConnectionId"
+        ],
+        "title": "InvitationModelConnectionTargetRequest",
+        "type": "object"
+      },
+      "InvitationOrganizationTargetRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "organization",
+            "title": "Kind",
+            "type": "string"
+          },
+          "organizationId": {
+            "format": "uuid",
+            "title": "Organizationid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "organizationId"
+        ],
+        "title": "InvitationOrganizationTargetRequest",
+        "type": "object"
+      },
+      "InvitationPipelineTargetRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "pipeline",
+            "title": "Kind",
+            "type": "string"
+          },
+          "pipelineId": {
+            "format": "uuid",
+            "title": "Pipelineid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "pipelineId"
+        ],
+        "title": "InvitationPipelineTargetRequest",
+        "type": "object"
+      },
+      "InvitationPreviewRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "invitationToken": {
+            "title": "Invitationtoken",
+            "type": "string"
+          }
+        },
+        "required": [
+          "invitationToken"
+        ],
+        "title": "InvitationPreviewRequest",
+        "type": "object"
+      },
+      "InvitationPreviewResponse": {
+        "properties": {
+          "assignments": {
+            "items": {
+              "$ref": "#/components/schemas/InvitationAssignmentRequest"
+            },
+            "title": "Assignments",
+            "type": "array"
+          },
+          "expiresAt": {
+            "format": "date-time",
+            "title": "Expiresat",
+            "type": "string"
+          },
+          "invitationId": {
+            "format": "uuid",
+            "title": "Invitationid",
+            "type": "string"
+          },
+          "organizationId": {
+            "format": "uuid",
+            "title": "Organizationid",
+            "type": "string"
+          },
+          "scopes": {
+            "items": {
+              "$ref": "#/components/schemas/InvitationScopeResponse"
+            },
+            "title": "Scopes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "invitationId",
+          "organizationId",
+          "assignments",
+          "expiresAt",
+          "scopes"
+        ],
+        "title": "InvitationPreviewResponse",
+        "type": "object"
+      },
+      "InvitationProcessingProfileTargetRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "processing-profile",
+            "title": "Kind",
+            "type": "string"
+          },
+          "processingProfileId": {
+            "format": "uuid",
+            "title": "Processingprofileid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "processingProfileId"
+        ],
+        "title": "InvitationProcessingProfileTargetRequest",
+        "type": "object"
+      },
+      "InvitationProjectAccessRevisionRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "accessRevision": {
+            "format": "int64",
+            "maximum": 9007199254740991.0,
+            "minimum": 0.0,
+            "title": "Accessrevision",
+            "type": "integer"
+          },
+          "projectId": {
+            "format": "uuid",
+            "title": "Projectid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId",
+          "accessRevision"
+        ],
+        "title": "InvitationProjectAccessRevisionRequest",
+        "type": "object"
+      },
+      "InvitationProjectAccessRevisionResponse": {
+        "properties": {
+          "accessRevision": {
+            "title": "Accessrevision",
+            "type": "integer"
+          },
+          "projectId": {
+            "format": "uuid",
+            "title": "Projectid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId",
+          "accessRevision"
+        ],
+        "title": "InvitationProjectAccessRevisionResponse",
+        "type": "object"
+      },
+      "InvitationProjectMembershipRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "project-membership",
+            "title": "Kind",
+            "type": "string"
+          },
+          "projectId": {
+            "format": "uuid",
+            "title": "Projectid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "projectId"
+        ],
+        "title": "InvitationProjectMembershipRequest",
+        "type": "object"
+      },
+      "InvitationProjectTargetRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "project",
+            "title": "Kind",
+            "type": "string"
+          },
+          "projectId": {
+            "format": "uuid",
+            "title": "Projectid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "projectId"
+        ],
+        "title": "InvitationProjectTargetRequest",
+        "type": "object"
+      },
+      "InvitationRevocationRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "expectedAccessRevision": {
+            "format": "int64",
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "title": "Expectedaccessrevision",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "expectedAccessRevision"
+        ],
+        "title": "InvitationRevocationRequest",
+        "type": "object"
+      },
+      "InvitationRevocationResponse": {
+        "properties": {
+          "accessRevision": {
+            "title": "Accessrevision",
+            "type": "integer"
+          },
+          "idempotencyExpiresAt": {
+            "format": "date-time",
+            "title": "Idempotencyexpiresat",
+            "type": "string"
+          },
+          "invitationId": {
+            "format": "uuid",
+            "title": "Invitationid",
+            "type": "string"
+          },
+          "operationId": {
+            "title": "Operationid",
+            "type": "string"
+          },
+          "organizationId": {
+            "format": "uuid",
+            "title": "Organizationid",
+            "type": "string"
+          },
+          "revoked": {
+            "const": true,
+            "default": true,
+            "title": "Revoked",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "operationId",
+          "idempotencyExpiresAt",
+          "invitationId",
+          "organizationId",
+          "accessRevision"
+        ],
+        "title": "InvitationRevocationResponse",
+        "type": "object"
+      },
+      "InvitationScopeResponse": {
+        "properties": {
+          "displayName": {
+            "title": "Displayname",
+            "type": "string"
+          },
+          "target": {
+            "$ref": "#/components/schemas/InvitationTargetRequest"
+          }
+        },
+        "required": [
+          "target",
+          "displayName"
+        ],
+        "title": "InvitationScopeResponse",
+        "type": "object"
+      },
+      "InvitationSourceTargetRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "source",
+            "title": "Kind",
+            "type": "string"
+          },
+          "sourceId": {
+            "format": "uuid",
+            "title": "Sourceid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "sourceId"
+        ],
+        "title": "InvitationSourceTargetRequest",
+        "type": "object"
+      },
+      "InvitationTargetRequest": {
+        "discriminator": {
+          "mapping": {
+            "access-group": "#/components/schemas/InvitationAccessGroupTargetRequest",
+            "application-account": "#/components/schemas/InvitationApplicationAccountTargetRequest",
+            "collection": "#/components/schemas/InvitationCollectionTargetRequest",
+            "deployment": "#/components/schemas/InvitationDeploymentTargetRequest",
+            "embedding-profile": "#/components/schemas/InvitationEmbeddingProfileTargetRequest",
+            "model-connection": "#/components/schemas/InvitationModelConnectionTargetRequest",
+            "organization": "#/components/schemas/InvitationOrganizationTargetRequest",
+            "pipeline": "#/components/schemas/InvitationPipelineTargetRequest",
+            "processing-profile": "#/components/schemas/InvitationProcessingProfileTargetRequest",
+            "project": "#/components/schemas/InvitationProjectTargetRequest",
+            "source": "#/components/schemas/InvitationSourceTargetRequest"
+          },
+          "propertyName": "kind"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/InvitationOrganizationTargetRequest"
+          },
+          {
+            "$ref": "#/components/schemas/InvitationProjectTargetRequest"
+          },
+          {
+            "$ref": "#/components/schemas/InvitationAccessGroupTargetRequest"
+          },
+          {
+            "$ref": "#/components/schemas/InvitationApplicationAccountTargetRequest"
+          },
+          {
+            "$ref": "#/components/schemas/InvitationPipelineTargetRequest"
+          },
+          {
+            "$ref": "#/components/schemas/InvitationDeploymentTargetRequest"
+          },
+          {
+            "$ref": "#/components/schemas/InvitationCollectionTargetRequest"
+          },
+          {
+            "$ref": "#/components/schemas/InvitationSourceTargetRequest"
+          },
+          {
+            "$ref": "#/components/schemas/InvitationModelConnectionTargetRequest"
+          },
+          {
+            "$ref": "#/components/schemas/InvitationProcessingProfileTargetRequest"
+          },
+          {
+            "$ref": "#/components/schemas/InvitationEmbeddingProfileTargetRequest"
+          }
+        ]
+      },
       "JobStatus": {
         "enum": [
           "queued",
@@ -3751,6 +4621,632 @@
         "summary": "Lookup",
         "tags": [
           "operations"
+        ]
+      }
+    },
+    "/v1/invitations": {
+      "post": {
+        "operationId": "issueInvitation",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": ".*\\S.*",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InvitationIssueRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvitationIssueResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Invalid authentication request",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Trusted Bearer challenge when applicable.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Unauthorized",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Trusted Bearer challenge when applicable.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Access denied"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Resource not found"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Operation conflicts with current state"
+          },
+          "413": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Content Too Large"
+          },
+          "415": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Unsupported Media Type"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Dependency unavailable"
+          }
+        },
+        "security": [
+          {
+            "KratosSession": []
+          },
+          {
+            "ProductBearer": []
+          }
+        ],
+        "summary": "Issue",
+        "tags": [
+          "access"
+        ]
+      }
+    },
+    "/v1/invitations/activate": {
+      "post": {
+        "operationId": "activateInvitation",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": ".*\\S.*",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InvitationActivationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvitationActivationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Invalid authentication request",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Trusted Bearer challenge when applicable.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Unauthorized",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Trusted Bearer challenge when applicable.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Access denied"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Resource not found"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Operation conflicts with current state"
+          },
+          "413": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Content Too Large"
+          },
+          "415": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Unsupported Media Type"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Dependency unavailable"
+          }
+        },
+        "security": [
+          {
+            "KratosSession": []
+          }
+        ],
+        "summary": "Activate",
+        "tags": [
+          "access"
+        ]
+      }
+    },
+    "/v1/invitations/preview": {
+      "post": {
+        "operationId": "previewInvitation",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InvitationPreviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvitationPreviewResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Invalid authentication request",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Trusted Bearer challenge when applicable.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Unauthorized",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Trusted Bearer challenge when applicable.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Access denied"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Resource not found"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Operation conflicts with current state"
+          },
+          "413": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Content Too Large"
+          },
+          "415": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Unsupported Media Type"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Dependency unavailable"
+          }
+        },
+        "security": [
+          {
+            "KratosSession": []
+          }
+        ],
+        "summary": "Preview",
+        "tags": [
+          "access"
+        ]
+      }
+    },
+    "/v1/invitations/{invitation_id}/revoke": {
+      "post": {
+        "operationId": "revokeInvitation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "invitation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Invitation Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": ".*\\S.*",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InvitationRevocationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvitationRevocationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Invalid authentication request",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Trusted Bearer challenge when applicable.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Unauthorized",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Trusted Bearer challenge when applicable.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Access denied"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Resource not found"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Operation conflicts with current state"
+          },
+          "413": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Content Too Large"
+          },
+          "415": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Unsupported Media Type"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Dependency unavailable"
+          }
+        },
+        "security": [
+          {
+            "KratosSession": []
+          },
+          {
+            "ProductBearer": []
+          }
+        ],
+        "summary": "Revoke",
+        "tags": [
+          "access"
         ]
       }
     },

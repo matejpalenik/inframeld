@@ -48,6 +48,14 @@ from inframeld_sdk.models.human_admission_response import HumanAdmissionResponse
 from inframeld_sdk.models.human_o_auth_consent_decision_response import HumanOAuthConsentDecisionResponse
 from inframeld_sdk.models.human_o_auth_consent_details_response import HumanOAuthConsentDetailsResponse
 from inframeld_sdk.models.human_o_auth_consent_request import HumanOAuthConsentRequest
+from inframeld_sdk.models.invitation_activation_request import InvitationActivationRequest
+from inframeld_sdk.models.invitation_activation_response import InvitationActivationResponse
+from inframeld_sdk.models.invitation_issue_request import InvitationIssueRequest
+from inframeld_sdk.models.invitation_issue_response import InvitationIssueResponse
+from inframeld_sdk.models.invitation_preview_request import InvitationPreviewRequest
+from inframeld_sdk.models.invitation_preview_response import InvitationPreviewResponse
+from inframeld_sdk.models.invitation_revocation_request import InvitationRevocationRequest
+from inframeld_sdk.models.invitation_revocation_response import InvitationRevocationResponse
 from inframeld_sdk.models.my_organization_access_response import MyOrganizationAccessResponse
 from inframeld_sdk.models.my_project_access_response import MyProjectAccessResponse
 from inframeld_sdk.models.organization_action_grant_removal_response import OrganizationActionGrantRemovalResponse
@@ -92,6 +100,548 @@ class AccessApi:
         if api_client is None:
             api_client = ApiClient.get_default()
         self.api_client = api_client
+
+
+    @validate_call
+    async def activate_invitation(
+        self,
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        invitation_activation_request: InvitationActivationRequest,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> Union[response_models.InvitationActivationResponse, ]:
+        """Activate
+
+
+        :param idempotency_key: (required)
+        :type idempotency_key: str
+        :param invitation_activation_request: (required)
+        :type invitation_activation_request: InvitationActivationRequest
+        :param _request_timeout: timeout setting for this request. If one
+                                 number provided, it will be total request
+                                 timeout. It can also be a pair (tuple) of
+                                 (connection, read) timeouts.
+        :type _request_timeout: int, tuple(int, int), optional
+        :param _request_auth: set to override the auth_settings for an a single
+                              request; this effectively ignores the
+                              authentication in the spec for a single request.
+        :type _request_auth: dict, optional
+        :param _content_type: force content-type for the request.
+        :type _content_type: str, Optional
+        :param _headers: set to override the headers for a single
+                         request; this effectively ignores the headers
+                         in the spec for a single request.
+        :type _headers: dict, optional
+        :param _host_index: set to override the host_index for a single
+                            request; this effectively ignores the host_index
+                            in the spec for a single request.
+        :type _host_index: int, optional
+        :return: Returns the result object.
+        """ # noqa: E501
+
+        _param = self._activate_invitation_serialize(
+            idempotency_key=idempotency_key,
+            invitation_activation_request=invitation_activation_request,
+            _request_auth=_request_auth,
+            _content_type=_content_type,
+            _headers=_headers,
+            _host_index=_host_index
+        )
+
+        _response_types_map: Dict[str, Dict[str, Optional[str]]] = {
+            '200': {
+                
+                'application/json': "InvitationActivationResponse",
+                
+            },
+            '400': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '401': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '403': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '404': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '409': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '413': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '415': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '422': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '503': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+        }
+        response_data = await self.api_client.call_api(
+            *_param,
+            _request_timeout=_request_timeout
+        )
+        await response_data.read()
+        return self.api_client.response_deserialize(
+            response_data=response_data,
+            response_types_map=_response_types_map,
+        ).data
+
+
+    @validate_call
+    async def activate_invitation_with_http_info(
+        self,
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        invitation_activation_request: InvitationActivationRequest,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> ApiResponse[Union[response_models.InvitationActivationResponse, ]]:
+        """Activate
+
+
+        :param idempotency_key: (required)
+        :type idempotency_key: str
+        :param invitation_activation_request: (required)
+        :type invitation_activation_request: InvitationActivationRequest
+        :param _request_timeout: timeout setting for this request. If one
+                                 number provided, it will be total request
+                                 timeout. It can also be a pair (tuple) of
+                                 (connection, read) timeouts.
+        :type _request_timeout: int, tuple(int, int), optional
+        :param _request_auth: set to override the auth_settings for an a single
+                              request; this effectively ignores the
+                              authentication in the spec for a single request.
+        :type _request_auth: dict, optional
+        :param _content_type: force content-type for the request.
+        :type _content_type: str, Optional
+        :param _headers: set to override the headers for a single
+                         request; this effectively ignores the headers
+                         in the spec for a single request.
+        :type _headers: dict, optional
+        :param _host_index: set to override the host_index for a single
+                            request; this effectively ignores the host_index
+                            in the spec for a single request.
+        :type _host_index: int, optional
+        :return: Returns the result object.
+        """ # noqa: E501
+
+        _param = self._activate_invitation_serialize(
+            idempotency_key=idempotency_key,
+            invitation_activation_request=invitation_activation_request,
+            _request_auth=_request_auth,
+            _content_type=_content_type,
+            _headers=_headers,
+            _host_index=_host_index
+        )
+
+        _response_types_map: Dict[str, Dict[str, Optional[str]]] = {
+            '200': {
+                
+                'application/json': "InvitationActivationResponse",
+                
+            },
+            '400': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '401': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '403': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '404': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '409': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '413': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '415': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '422': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '503': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+        }
+        response_data = await self.api_client.call_api(
+            *_param,
+            _request_timeout=_request_timeout
+        )
+        await response_data.read()
+        return self.api_client.response_deserialize(
+            response_data=response_data,
+            response_types_map=_response_types_map,
+        )
+
+
+    @validate_call
+    async def activate_invitation_without_preload_content(
+        self,
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        invitation_activation_request: InvitationActivationRequest,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> RESTResponseType:
+        """Activate
+
+
+        :param idempotency_key: (required)
+        :type idempotency_key: str
+        :param invitation_activation_request: (required)
+        :type invitation_activation_request: InvitationActivationRequest
+        :param _request_timeout: timeout setting for this request. If one
+                                 number provided, it will be total request
+                                 timeout. It can also be a pair (tuple) of
+                                 (connection, read) timeouts.
+        :type _request_timeout: int, tuple(int, int), optional
+        :param _request_auth: set to override the auth_settings for an a single
+                              request; this effectively ignores the
+                              authentication in the spec for a single request.
+        :type _request_auth: dict, optional
+        :param _content_type: force content-type for the request.
+        :type _content_type: str, Optional
+        :param _headers: set to override the headers for a single
+                         request; this effectively ignores the headers
+                         in the spec for a single request.
+        :type _headers: dict, optional
+        :param _host_index: set to override the host_index for a single
+                            request; this effectively ignores the host_index
+                            in the spec for a single request.
+        :type _host_index: int, optional
+        :return: Returns the result object.
+        """ # noqa: E501
+
+        _param = self._activate_invitation_serialize(
+            idempotency_key=idempotency_key,
+            invitation_activation_request=invitation_activation_request,
+            _request_auth=_request_auth,
+            _content_type=_content_type,
+            _headers=_headers,
+            _host_index=_host_index
+        )
+
+        _response_types_map: Dict[str, Dict[str, Optional[str]]] = {
+            '200': {
+                
+                'application/json': "InvitationActivationResponse",
+                
+            },
+            '400': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '401': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '403': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '404': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '409': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '413': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '415': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '422': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '503': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+        }
+        response_data = await self.api_client.call_api(
+            *_param,
+            _request_timeout=_request_timeout
+        )
+        return response_data.response
+
+
+    @validate_call
+    def activate_invitation_sync(
+        self,
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        invitation_activation_request: InvitationActivationRequest,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> Union[response_models.InvitationActivationResponse, ]:
+        """Activate (synchronous)
+
+        Synchronous variant of :meth:`activate_invitation`. It calls the asynchronous
+        method and blocks until it completes.
+        """ # noqa: E501
+        return run_sync(
+            self.activate_invitation(
+                idempotency_key=idempotency_key,
+                invitation_activation_request=invitation_activation_request,
+                _request_timeout=_request_timeout,
+                _request_auth=_request_auth,
+                _content_type=_content_type,
+                _headers=_headers,
+                _host_index=_host_index,
+            )
+        )
+
+
+    @validate_call
+    def activate_invitation_sync_with_http_info(
+        self,
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        invitation_activation_request: InvitationActivationRequest,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> ApiResponse[Union[response_models.InvitationActivationResponse, ]]:
+        """Activate (synchronous)
+
+        Synchronous variant of :meth:`activate_invitation_with_http_info`. It calls the
+        asynchronous method and blocks until it completes.
+        """ # noqa: E501
+        return run_sync(
+            self.activate_invitation_with_http_info(
+                idempotency_key=idempotency_key,
+                invitation_activation_request=invitation_activation_request,
+                _request_timeout=_request_timeout,
+                _request_auth=_request_auth,
+                _content_type=_content_type,
+                _headers=_headers,
+                _host_index=_host_index,
+            )
+        )
+
+
+    @validate_call
+    def activate_invitation_sync_without_preload_content(
+        self,
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        invitation_activation_request: InvitationActivationRequest,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> RESTResponseType:
+        """Activate (synchronous)
+
+        Synchronous variant of :meth:`activate_invitation_without_preload_content`. It calls
+        the asynchronous method and blocks until it completes.
+        """ # noqa: E501
+        return run_sync(
+            self.activate_invitation_without_preload_content(
+                idempotency_key=idempotency_key,
+                invitation_activation_request=invitation_activation_request,
+                _request_timeout=_request_timeout,
+                _request_auth=_request_auth,
+                _content_type=_content_type,
+                _headers=_headers,
+                _host_index=_host_index,
+            )
+        )
+
+
+    def _activate_invitation_serialize(
+        self,
+        idempotency_key,
+        invitation_activation_request,
+        _request_auth,
+        _content_type,
+        _headers,
+        _host_index,
+    ) -> RequestSerialized:
+
+        _host = None
+
+        _collection_formats: Dict[str, str] = {
+        }
+
+        _path_params: Dict[str, str] = {}
+        _query_params: List[Tuple[str, str]] = []
+        _header_params: Dict[str, Optional[str]] = _headers or {}
+        _form_params: List[Tuple[str, str]] = []
+        _files: Dict[
+            str, Union[str, bytes, List[str], List[bytes], List[Tuple[str, bytes]]]
+        ] = {}
+        _body_params: Optional[bytes] = None
+
+        # process the path parameters
+        # process the query parameters
+        # process the header parameters
+        if idempotency_key is not None:
+            _header_params['Idempotency-Key'] = idempotency_key
+        # process the form parameters
+        # process the body parameter
+        if invitation_activation_request is not None:
+            _body_params = invitation_activation_request
+
+
+        # set the HTTP header `Accept`
+        if not any(name.lower() == 'accept' for name in _header_params):
+            _header_params['Accept'] = self.api_client.select_header_accept(
+                [
+                    'application/json', 
+                    'application/problem+json'
+                ]
+            )
+
+        # set the HTTP header `Content-Type`
+        if _content_type:
+            _header_params['Content-Type'] = _content_type
+        else:
+            _default_content_type = (
+                self.api_client.select_header_content_type(
+                    [
+                        'application/json'
+                    ]
+                )
+            )
+            if _default_content_type is not None:
+                _header_params['Content-Type'] = _default_content_type
+
+        # authentication setting
+        _auth_settings: List[str] = [
+            'KratosSession'
+        ]
+
+        return self.api_client.param_serialize(
+            method='POST',
+            resource_path='/v1/invitations/activate',
+            path_params=_path_params,
+            query_params=_query_params,
+            header_params=_header_params,
+            body=_body_params,
+            post_params=_form_params,
+            files=_files,
+            auth_settings=_auth_settings,
+            collection_formats=_collection_formats,
+            _host=_host,
+            _request_auth=_request_auth
+        )
+
+
 
 
     @validate_call
@@ -9435,6 +9985,549 @@ class AccessApi:
 
 
     @validate_call
+    async def issue_invitation(
+        self,
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        invitation_issue_request: InvitationIssueRequest,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> Union[response_models.InvitationIssueResponse, ]:
+        """Issue
+
+
+        :param idempotency_key: (required)
+        :type idempotency_key: str
+        :param invitation_issue_request: (required)
+        :type invitation_issue_request: InvitationIssueRequest
+        :param _request_timeout: timeout setting for this request. If one
+                                 number provided, it will be total request
+                                 timeout. It can also be a pair (tuple) of
+                                 (connection, read) timeouts.
+        :type _request_timeout: int, tuple(int, int), optional
+        :param _request_auth: set to override the auth_settings for an a single
+                              request; this effectively ignores the
+                              authentication in the spec for a single request.
+        :type _request_auth: dict, optional
+        :param _content_type: force content-type for the request.
+        :type _content_type: str, Optional
+        :param _headers: set to override the headers for a single
+                         request; this effectively ignores the headers
+                         in the spec for a single request.
+        :type _headers: dict, optional
+        :param _host_index: set to override the host_index for a single
+                            request; this effectively ignores the host_index
+                            in the spec for a single request.
+        :type _host_index: int, optional
+        :return: Returns the result object.
+        """ # noqa: E501
+
+        _param = self._issue_invitation_serialize(
+            idempotency_key=idempotency_key,
+            invitation_issue_request=invitation_issue_request,
+            _request_auth=_request_auth,
+            _content_type=_content_type,
+            _headers=_headers,
+            _host_index=_host_index
+        )
+
+        _response_types_map: Dict[str, Dict[str, Optional[str]]] = {
+            '201': {
+                
+                'application/json': "InvitationIssueResponse",
+                
+            },
+            '400': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '401': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '403': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '404': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '409': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '413': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '415': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '422': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '503': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+        }
+        response_data = await self.api_client.call_api(
+            *_param,
+            _request_timeout=_request_timeout
+        )
+        await response_data.read()
+        return self.api_client.response_deserialize(
+            response_data=response_data,
+            response_types_map=_response_types_map,
+        ).data
+
+
+    @validate_call
+    async def issue_invitation_with_http_info(
+        self,
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        invitation_issue_request: InvitationIssueRequest,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> ApiResponse[Union[response_models.InvitationIssueResponse, ]]:
+        """Issue
+
+
+        :param idempotency_key: (required)
+        :type idempotency_key: str
+        :param invitation_issue_request: (required)
+        :type invitation_issue_request: InvitationIssueRequest
+        :param _request_timeout: timeout setting for this request. If one
+                                 number provided, it will be total request
+                                 timeout. It can also be a pair (tuple) of
+                                 (connection, read) timeouts.
+        :type _request_timeout: int, tuple(int, int), optional
+        :param _request_auth: set to override the auth_settings for an a single
+                              request; this effectively ignores the
+                              authentication in the spec for a single request.
+        :type _request_auth: dict, optional
+        :param _content_type: force content-type for the request.
+        :type _content_type: str, Optional
+        :param _headers: set to override the headers for a single
+                         request; this effectively ignores the headers
+                         in the spec for a single request.
+        :type _headers: dict, optional
+        :param _host_index: set to override the host_index for a single
+                            request; this effectively ignores the host_index
+                            in the spec for a single request.
+        :type _host_index: int, optional
+        :return: Returns the result object.
+        """ # noqa: E501
+
+        _param = self._issue_invitation_serialize(
+            idempotency_key=idempotency_key,
+            invitation_issue_request=invitation_issue_request,
+            _request_auth=_request_auth,
+            _content_type=_content_type,
+            _headers=_headers,
+            _host_index=_host_index
+        )
+
+        _response_types_map: Dict[str, Dict[str, Optional[str]]] = {
+            '201': {
+                
+                'application/json': "InvitationIssueResponse",
+                
+            },
+            '400': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '401': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '403': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '404': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '409': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '413': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '415': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '422': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '503': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+        }
+        response_data = await self.api_client.call_api(
+            *_param,
+            _request_timeout=_request_timeout
+        )
+        await response_data.read()
+        return self.api_client.response_deserialize(
+            response_data=response_data,
+            response_types_map=_response_types_map,
+        )
+
+
+    @validate_call
+    async def issue_invitation_without_preload_content(
+        self,
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        invitation_issue_request: InvitationIssueRequest,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> RESTResponseType:
+        """Issue
+
+
+        :param idempotency_key: (required)
+        :type idempotency_key: str
+        :param invitation_issue_request: (required)
+        :type invitation_issue_request: InvitationIssueRequest
+        :param _request_timeout: timeout setting for this request. If one
+                                 number provided, it will be total request
+                                 timeout. It can also be a pair (tuple) of
+                                 (connection, read) timeouts.
+        :type _request_timeout: int, tuple(int, int), optional
+        :param _request_auth: set to override the auth_settings for an a single
+                              request; this effectively ignores the
+                              authentication in the spec for a single request.
+        :type _request_auth: dict, optional
+        :param _content_type: force content-type for the request.
+        :type _content_type: str, Optional
+        :param _headers: set to override the headers for a single
+                         request; this effectively ignores the headers
+                         in the spec for a single request.
+        :type _headers: dict, optional
+        :param _host_index: set to override the host_index for a single
+                            request; this effectively ignores the host_index
+                            in the spec for a single request.
+        :type _host_index: int, optional
+        :return: Returns the result object.
+        """ # noqa: E501
+
+        _param = self._issue_invitation_serialize(
+            idempotency_key=idempotency_key,
+            invitation_issue_request=invitation_issue_request,
+            _request_auth=_request_auth,
+            _content_type=_content_type,
+            _headers=_headers,
+            _host_index=_host_index
+        )
+
+        _response_types_map: Dict[str, Dict[str, Optional[str]]] = {
+            '201': {
+                
+                'application/json': "InvitationIssueResponse",
+                
+            },
+            '400': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '401': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '403': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '404': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '409': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '413': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '415': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '422': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '503': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+        }
+        response_data = await self.api_client.call_api(
+            *_param,
+            _request_timeout=_request_timeout
+        )
+        return response_data.response
+
+
+    @validate_call
+    def issue_invitation_sync(
+        self,
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        invitation_issue_request: InvitationIssueRequest,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> Union[response_models.InvitationIssueResponse, ]:
+        """Issue (synchronous)
+
+        Synchronous variant of :meth:`issue_invitation`. It calls the asynchronous
+        method and blocks until it completes.
+        """ # noqa: E501
+        return run_sync(
+            self.issue_invitation(
+                idempotency_key=idempotency_key,
+                invitation_issue_request=invitation_issue_request,
+                _request_timeout=_request_timeout,
+                _request_auth=_request_auth,
+                _content_type=_content_type,
+                _headers=_headers,
+                _host_index=_host_index,
+            )
+        )
+
+
+    @validate_call
+    def issue_invitation_sync_with_http_info(
+        self,
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        invitation_issue_request: InvitationIssueRequest,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> ApiResponse[Union[response_models.InvitationIssueResponse, ]]:
+        """Issue (synchronous)
+
+        Synchronous variant of :meth:`issue_invitation_with_http_info`. It calls the
+        asynchronous method and blocks until it completes.
+        """ # noqa: E501
+        return run_sync(
+            self.issue_invitation_with_http_info(
+                idempotency_key=idempotency_key,
+                invitation_issue_request=invitation_issue_request,
+                _request_timeout=_request_timeout,
+                _request_auth=_request_auth,
+                _content_type=_content_type,
+                _headers=_headers,
+                _host_index=_host_index,
+            )
+        )
+
+
+    @validate_call
+    def issue_invitation_sync_without_preload_content(
+        self,
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        invitation_issue_request: InvitationIssueRequest,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> RESTResponseType:
+        """Issue (synchronous)
+
+        Synchronous variant of :meth:`issue_invitation_without_preload_content`. It calls
+        the asynchronous method and blocks until it completes.
+        """ # noqa: E501
+        return run_sync(
+            self.issue_invitation_without_preload_content(
+                idempotency_key=idempotency_key,
+                invitation_issue_request=invitation_issue_request,
+                _request_timeout=_request_timeout,
+                _request_auth=_request_auth,
+                _content_type=_content_type,
+                _headers=_headers,
+                _host_index=_host_index,
+            )
+        )
+
+
+    def _issue_invitation_serialize(
+        self,
+        idempotency_key,
+        invitation_issue_request,
+        _request_auth,
+        _content_type,
+        _headers,
+        _host_index,
+    ) -> RequestSerialized:
+
+        _host = None
+
+        _collection_formats: Dict[str, str] = {
+        }
+
+        _path_params: Dict[str, str] = {}
+        _query_params: List[Tuple[str, str]] = []
+        _header_params: Dict[str, Optional[str]] = _headers or {}
+        _form_params: List[Tuple[str, str]] = []
+        _files: Dict[
+            str, Union[str, bytes, List[str], List[bytes], List[Tuple[str, bytes]]]
+        ] = {}
+        _body_params: Optional[bytes] = None
+
+        # process the path parameters
+        # process the query parameters
+        # process the header parameters
+        if idempotency_key is not None:
+            _header_params['Idempotency-Key'] = idempotency_key
+        # process the form parameters
+        # process the body parameter
+        if invitation_issue_request is not None:
+            _body_params = invitation_issue_request
+
+
+        # set the HTTP header `Accept`
+        if not any(name.lower() == 'accept' for name in _header_params):
+            _header_params['Accept'] = self.api_client.select_header_accept(
+                [
+                    'application/json', 
+                    'application/problem+json'
+                ]
+            )
+
+        # set the HTTP header `Content-Type`
+        if _content_type:
+            _header_params['Content-Type'] = _content_type
+        else:
+            _default_content_type = (
+                self.api_client.select_header_content_type(
+                    [
+                        'application/json'
+                    ]
+                )
+            )
+            if _default_content_type is not None:
+                _header_params['Content-Type'] = _default_content_type
+
+        # authentication setting
+        _auth_settings: List[str] = [
+            'KratosSession', 
+            'ProductBearer'
+        ]
+
+        return self.api_client.param_serialize(
+            method='POST',
+            resource_path='/v1/invitations',
+            path_params=_path_params,
+            query_params=_query_params,
+            header_params=_header_params,
+            body=_body_params,
+            post_params=_form_params,
+            files=_files,
+            auth_settings=_auth_settings,
+            collection_formats=_collection_formats,
+            _host=_host,
+            _request_auth=_request_auth
+        )
+
+
+
+
+    @validate_call
     async def list_access_group_action_grants(
         self,
         project_id: UUID,
@@ -14365,6 +15458,527 @@ class AccessApi:
         return self.api_client.param_serialize(
             method='GET',
             resource_path='/v1/projects/{project_id}/members',
+            path_params=_path_params,
+            query_params=_query_params,
+            header_params=_header_params,
+            body=_body_params,
+            post_params=_form_params,
+            files=_files,
+            auth_settings=_auth_settings,
+            collection_formats=_collection_formats,
+            _host=_host,
+            _request_auth=_request_auth
+        )
+
+
+
+
+    @validate_call
+    async def preview_invitation(
+        self,
+        invitation_preview_request: InvitationPreviewRequest,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> Union[response_models.InvitationPreviewResponse, ]:
+        """Preview
+
+
+        :param invitation_preview_request: (required)
+        :type invitation_preview_request: InvitationPreviewRequest
+        :param _request_timeout: timeout setting for this request. If one
+                                 number provided, it will be total request
+                                 timeout. It can also be a pair (tuple) of
+                                 (connection, read) timeouts.
+        :type _request_timeout: int, tuple(int, int), optional
+        :param _request_auth: set to override the auth_settings for an a single
+                              request; this effectively ignores the
+                              authentication in the spec for a single request.
+        :type _request_auth: dict, optional
+        :param _content_type: force content-type for the request.
+        :type _content_type: str, Optional
+        :param _headers: set to override the headers for a single
+                         request; this effectively ignores the headers
+                         in the spec for a single request.
+        :type _headers: dict, optional
+        :param _host_index: set to override the host_index for a single
+                            request; this effectively ignores the host_index
+                            in the spec for a single request.
+        :type _host_index: int, optional
+        :return: Returns the result object.
+        """ # noqa: E501
+
+        _param = self._preview_invitation_serialize(
+            invitation_preview_request=invitation_preview_request,
+            _request_auth=_request_auth,
+            _content_type=_content_type,
+            _headers=_headers,
+            _host_index=_host_index
+        )
+
+        _response_types_map: Dict[str, Dict[str, Optional[str]]] = {
+            '200': {
+                
+                'application/json': "InvitationPreviewResponse",
+                
+            },
+            '400': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '401': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '403': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '404': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '409': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '413': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '415': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '422': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '503': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+        }
+        response_data = await self.api_client.call_api(
+            *_param,
+            _request_timeout=_request_timeout
+        )
+        await response_data.read()
+        return self.api_client.response_deserialize(
+            response_data=response_data,
+            response_types_map=_response_types_map,
+        ).data
+
+
+    @validate_call
+    async def preview_invitation_with_http_info(
+        self,
+        invitation_preview_request: InvitationPreviewRequest,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> ApiResponse[Union[response_models.InvitationPreviewResponse, ]]:
+        """Preview
+
+
+        :param invitation_preview_request: (required)
+        :type invitation_preview_request: InvitationPreviewRequest
+        :param _request_timeout: timeout setting for this request. If one
+                                 number provided, it will be total request
+                                 timeout. It can also be a pair (tuple) of
+                                 (connection, read) timeouts.
+        :type _request_timeout: int, tuple(int, int), optional
+        :param _request_auth: set to override the auth_settings for an a single
+                              request; this effectively ignores the
+                              authentication in the spec for a single request.
+        :type _request_auth: dict, optional
+        :param _content_type: force content-type for the request.
+        :type _content_type: str, Optional
+        :param _headers: set to override the headers for a single
+                         request; this effectively ignores the headers
+                         in the spec for a single request.
+        :type _headers: dict, optional
+        :param _host_index: set to override the host_index for a single
+                            request; this effectively ignores the host_index
+                            in the spec for a single request.
+        :type _host_index: int, optional
+        :return: Returns the result object.
+        """ # noqa: E501
+
+        _param = self._preview_invitation_serialize(
+            invitation_preview_request=invitation_preview_request,
+            _request_auth=_request_auth,
+            _content_type=_content_type,
+            _headers=_headers,
+            _host_index=_host_index
+        )
+
+        _response_types_map: Dict[str, Dict[str, Optional[str]]] = {
+            '200': {
+                
+                'application/json': "InvitationPreviewResponse",
+                
+            },
+            '400': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '401': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '403': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '404': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '409': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '413': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '415': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '422': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '503': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+        }
+        response_data = await self.api_client.call_api(
+            *_param,
+            _request_timeout=_request_timeout
+        )
+        await response_data.read()
+        return self.api_client.response_deserialize(
+            response_data=response_data,
+            response_types_map=_response_types_map,
+        )
+
+
+    @validate_call
+    async def preview_invitation_without_preload_content(
+        self,
+        invitation_preview_request: InvitationPreviewRequest,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> RESTResponseType:
+        """Preview
+
+
+        :param invitation_preview_request: (required)
+        :type invitation_preview_request: InvitationPreviewRequest
+        :param _request_timeout: timeout setting for this request. If one
+                                 number provided, it will be total request
+                                 timeout. It can also be a pair (tuple) of
+                                 (connection, read) timeouts.
+        :type _request_timeout: int, tuple(int, int), optional
+        :param _request_auth: set to override the auth_settings for an a single
+                              request; this effectively ignores the
+                              authentication in the spec for a single request.
+        :type _request_auth: dict, optional
+        :param _content_type: force content-type for the request.
+        :type _content_type: str, Optional
+        :param _headers: set to override the headers for a single
+                         request; this effectively ignores the headers
+                         in the spec for a single request.
+        :type _headers: dict, optional
+        :param _host_index: set to override the host_index for a single
+                            request; this effectively ignores the host_index
+                            in the spec for a single request.
+        :type _host_index: int, optional
+        :return: Returns the result object.
+        """ # noqa: E501
+
+        _param = self._preview_invitation_serialize(
+            invitation_preview_request=invitation_preview_request,
+            _request_auth=_request_auth,
+            _content_type=_content_type,
+            _headers=_headers,
+            _host_index=_host_index
+        )
+
+        _response_types_map: Dict[str, Dict[str, Optional[str]]] = {
+            '200': {
+                
+                'application/json': "InvitationPreviewResponse",
+                
+            },
+            '400': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '401': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '403': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '404': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '409': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '413': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '415': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '422': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '503': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+        }
+        response_data = await self.api_client.call_api(
+            *_param,
+            _request_timeout=_request_timeout
+        )
+        return response_data.response
+
+
+    @validate_call
+    def preview_invitation_sync(
+        self,
+        invitation_preview_request: InvitationPreviewRequest,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> Union[response_models.InvitationPreviewResponse, ]:
+        """Preview (synchronous)
+
+        Synchronous variant of :meth:`preview_invitation`. It calls the asynchronous
+        method and blocks until it completes.
+        """ # noqa: E501
+        return run_sync(
+            self.preview_invitation(
+                invitation_preview_request=invitation_preview_request,
+                _request_timeout=_request_timeout,
+                _request_auth=_request_auth,
+                _content_type=_content_type,
+                _headers=_headers,
+                _host_index=_host_index,
+            )
+        )
+
+
+    @validate_call
+    def preview_invitation_sync_with_http_info(
+        self,
+        invitation_preview_request: InvitationPreviewRequest,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> ApiResponse[Union[response_models.InvitationPreviewResponse, ]]:
+        """Preview (synchronous)
+
+        Synchronous variant of :meth:`preview_invitation_with_http_info`. It calls the
+        asynchronous method and blocks until it completes.
+        """ # noqa: E501
+        return run_sync(
+            self.preview_invitation_with_http_info(
+                invitation_preview_request=invitation_preview_request,
+                _request_timeout=_request_timeout,
+                _request_auth=_request_auth,
+                _content_type=_content_type,
+                _headers=_headers,
+                _host_index=_host_index,
+            )
+        )
+
+
+    @validate_call
+    def preview_invitation_sync_without_preload_content(
+        self,
+        invitation_preview_request: InvitationPreviewRequest,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> RESTResponseType:
+        """Preview (synchronous)
+
+        Synchronous variant of :meth:`preview_invitation_without_preload_content`. It calls
+        the asynchronous method and blocks until it completes.
+        """ # noqa: E501
+        return run_sync(
+            self.preview_invitation_without_preload_content(
+                invitation_preview_request=invitation_preview_request,
+                _request_timeout=_request_timeout,
+                _request_auth=_request_auth,
+                _content_type=_content_type,
+                _headers=_headers,
+                _host_index=_host_index,
+            )
+        )
+
+
+    def _preview_invitation_serialize(
+        self,
+        invitation_preview_request,
+        _request_auth,
+        _content_type,
+        _headers,
+        _host_index,
+    ) -> RequestSerialized:
+
+        _host = None
+
+        _collection_formats: Dict[str, str] = {
+        }
+
+        _path_params: Dict[str, str] = {}
+        _query_params: List[Tuple[str, str]] = []
+        _header_params: Dict[str, Optional[str]] = _headers or {}
+        _form_params: List[Tuple[str, str]] = []
+        _files: Dict[
+            str, Union[str, bytes, List[str], List[bytes], List[Tuple[str, bytes]]]
+        ] = {}
+        _body_params: Optional[bytes] = None
+
+        # process the path parameters
+        # process the query parameters
+        # process the header parameters
+        # process the form parameters
+        # process the body parameter
+        if invitation_preview_request is not None:
+            _body_params = invitation_preview_request
+
+
+        # set the HTTP header `Accept`
+        if not any(name.lower() == 'accept' for name in _header_params):
+            _header_params['Accept'] = self.api_client.select_header_accept(
+                [
+                    'application/json', 
+                    'application/problem+json'
+                ]
+            )
+
+        # set the HTTP header `Content-Type`
+        if _content_type:
+            _header_params['Content-Type'] = _content_type
+        else:
+            _default_content_type = (
+                self.api_client.select_header_content_type(
+                    [
+                        'application/json'
+                    ]
+                )
+            )
+            if _default_content_type is not None:
+                _header_params['Content-Type'] = _default_content_type
+
+        # authentication setting
+        _auth_settings: List[str] = [
+            'KratosSession'
+        ]
+
+        return self.api_client.param_serialize(
+            method='POST',
+            resource_path='/v1/invitations/preview',
             path_params=_path_params,
             query_params=_query_params,
             header_params=_header_params,
@@ -19824,6 +21438,570 @@ class AccessApi:
         return self.api_client.param_serialize(
             method='GET',
             resource_path='/v1/projects/by-name/{name}',
+            path_params=_path_params,
+            query_params=_query_params,
+            header_params=_header_params,
+            body=_body_params,
+            post_params=_form_params,
+            files=_files,
+            auth_settings=_auth_settings,
+            collection_formats=_collection_formats,
+            _host=_host,
+            _request_auth=_request_auth
+        )
+
+
+
+
+    @validate_call
+    async def revoke_invitation(
+        self,
+        invitation_id: UUID,
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        invitation_revocation_request: InvitationRevocationRequest,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> Union[response_models.InvitationRevocationResponse, ]:
+        """Revoke
+
+
+        :param invitation_id: (required)
+        :type invitation_id: UUID
+        :param idempotency_key: (required)
+        :type idempotency_key: str
+        :param invitation_revocation_request: (required)
+        :type invitation_revocation_request: InvitationRevocationRequest
+        :param _request_timeout: timeout setting for this request. If one
+                                 number provided, it will be total request
+                                 timeout. It can also be a pair (tuple) of
+                                 (connection, read) timeouts.
+        :type _request_timeout: int, tuple(int, int), optional
+        :param _request_auth: set to override the auth_settings for an a single
+                              request; this effectively ignores the
+                              authentication in the spec for a single request.
+        :type _request_auth: dict, optional
+        :param _content_type: force content-type for the request.
+        :type _content_type: str, Optional
+        :param _headers: set to override the headers for a single
+                         request; this effectively ignores the headers
+                         in the spec for a single request.
+        :type _headers: dict, optional
+        :param _host_index: set to override the host_index for a single
+                            request; this effectively ignores the host_index
+                            in the spec for a single request.
+        :type _host_index: int, optional
+        :return: Returns the result object.
+        """ # noqa: E501
+
+        _param = self._revoke_invitation_serialize(
+            invitation_id=invitation_id,
+            idempotency_key=idempotency_key,
+            invitation_revocation_request=invitation_revocation_request,
+            _request_auth=_request_auth,
+            _content_type=_content_type,
+            _headers=_headers,
+            _host_index=_host_index
+        )
+
+        _response_types_map: Dict[str, Dict[str, Optional[str]]] = {
+            '200': {
+                
+                'application/json': "InvitationRevocationResponse",
+                
+            },
+            '400': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '401': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '403': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '404': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '409': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '413': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '415': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '422': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '503': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+        }
+        response_data = await self.api_client.call_api(
+            *_param,
+            _request_timeout=_request_timeout
+        )
+        await response_data.read()
+        return self.api_client.response_deserialize(
+            response_data=response_data,
+            response_types_map=_response_types_map,
+        ).data
+
+
+    @validate_call
+    async def revoke_invitation_with_http_info(
+        self,
+        invitation_id: UUID,
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        invitation_revocation_request: InvitationRevocationRequest,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> ApiResponse[Union[response_models.InvitationRevocationResponse, ]]:
+        """Revoke
+
+
+        :param invitation_id: (required)
+        :type invitation_id: UUID
+        :param idempotency_key: (required)
+        :type idempotency_key: str
+        :param invitation_revocation_request: (required)
+        :type invitation_revocation_request: InvitationRevocationRequest
+        :param _request_timeout: timeout setting for this request. If one
+                                 number provided, it will be total request
+                                 timeout. It can also be a pair (tuple) of
+                                 (connection, read) timeouts.
+        :type _request_timeout: int, tuple(int, int), optional
+        :param _request_auth: set to override the auth_settings for an a single
+                              request; this effectively ignores the
+                              authentication in the spec for a single request.
+        :type _request_auth: dict, optional
+        :param _content_type: force content-type for the request.
+        :type _content_type: str, Optional
+        :param _headers: set to override the headers for a single
+                         request; this effectively ignores the headers
+                         in the spec for a single request.
+        :type _headers: dict, optional
+        :param _host_index: set to override the host_index for a single
+                            request; this effectively ignores the host_index
+                            in the spec for a single request.
+        :type _host_index: int, optional
+        :return: Returns the result object.
+        """ # noqa: E501
+
+        _param = self._revoke_invitation_serialize(
+            invitation_id=invitation_id,
+            idempotency_key=idempotency_key,
+            invitation_revocation_request=invitation_revocation_request,
+            _request_auth=_request_auth,
+            _content_type=_content_type,
+            _headers=_headers,
+            _host_index=_host_index
+        )
+
+        _response_types_map: Dict[str, Dict[str, Optional[str]]] = {
+            '200': {
+                
+                'application/json': "InvitationRevocationResponse",
+                
+            },
+            '400': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '401': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '403': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '404': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '409': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '413': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '415': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '422': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '503': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+        }
+        response_data = await self.api_client.call_api(
+            *_param,
+            _request_timeout=_request_timeout
+        )
+        await response_data.read()
+        return self.api_client.response_deserialize(
+            response_data=response_data,
+            response_types_map=_response_types_map,
+        )
+
+
+    @validate_call
+    async def revoke_invitation_without_preload_content(
+        self,
+        invitation_id: UUID,
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        invitation_revocation_request: InvitationRevocationRequest,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> RESTResponseType:
+        """Revoke
+
+
+        :param invitation_id: (required)
+        :type invitation_id: UUID
+        :param idempotency_key: (required)
+        :type idempotency_key: str
+        :param invitation_revocation_request: (required)
+        :type invitation_revocation_request: InvitationRevocationRequest
+        :param _request_timeout: timeout setting for this request. If one
+                                 number provided, it will be total request
+                                 timeout. It can also be a pair (tuple) of
+                                 (connection, read) timeouts.
+        :type _request_timeout: int, tuple(int, int), optional
+        :param _request_auth: set to override the auth_settings for an a single
+                              request; this effectively ignores the
+                              authentication in the spec for a single request.
+        :type _request_auth: dict, optional
+        :param _content_type: force content-type for the request.
+        :type _content_type: str, Optional
+        :param _headers: set to override the headers for a single
+                         request; this effectively ignores the headers
+                         in the spec for a single request.
+        :type _headers: dict, optional
+        :param _host_index: set to override the host_index for a single
+                            request; this effectively ignores the host_index
+                            in the spec for a single request.
+        :type _host_index: int, optional
+        :return: Returns the result object.
+        """ # noqa: E501
+
+        _param = self._revoke_invitation_serialize(
+            invitation_id=invitation_id,
+            idempotency_key=idempotency_key,
+            invitation_revocation_request=invitation_revocation_request,
+            _request_auth=_request_auth,
+            _content_type=_content_type,
+            _headers=_headers,
+            _host_index=_host_index
+        )
+
+        _response_types_map: Dict[str, Dict[str, Optional[str]]] = {
+            '200': {
+                
+                'application/json': "InvitationRevocationResponse",
+                
+            },
+            '400': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '401': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '403': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '404': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '409': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '413': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '415': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '422': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '503': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+        }
+        response_data = await self.api_client.call_api(
+            *_param,
+            _request_timeout=_request_timeout
+        )
+        return response_data.response
+
+
+    @validate_call
+    def revoke_invitation_sync(
+        self,
+        invitation_id: UUID,
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        invitation_revocation_request: InvitationRevocationRequest,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> Union[response_models.InvitationRevocationResponse, ]:
+        """Revoke (synchronous)
+
+        Synchronous variant of :meth:`revoke_invitation`. It calls the asynchronous
+        method and blocks until it completes.
+        """ # noqa: E501
+        return run_sync(
+            self.revoke_invitation(
+                invitation_id=invitation_id,
+                idempotency_key=idempotency_key,
+                invitation_revocation_request=invitation_revocation_request,
+                _request_timeout=_request_timeout,
+                _request_auth=_request_auth,
+                _content_type=_content_type,
+                _headers=_headers,
+                _host_index=_host_index,
+            )
+        )
+
+
+    @validate_call
+    def revoke_invitation_sync_with_http_info(
+        self,
+        invitation_id: UUID,
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        invitation_revocation_request: InvitationRevocationRequest,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> ApiResponse[Union[response_models.InvitationRevocationResponse, ]]:
+        """Revoke (synchronous)
+
+        Synchronous variant of :meth:`revoke_invitation_with_http_info`. It calls the
+        asynchronous method and blocks until it completes.
+        """ # noqa: E501
+        return run_sync(
+            self.revoke_invitation_with_http_info(
+                invitation_id=invitation_id,
+                idempotency_key=idempotency_key,
+                invitation_revocation_request=invitation_revocation_request,
+                _request_timeout=_request_timeout,
+                _request_auth=_request_auth,
+                _content_type=_content_type,
+                _headers=_headers,
+                _host_index=_host_index,
+            )
+        )
+
+
+    @validate_call
+    def revoke_invitation_sync_without_preload_content(
+        self,
+        invitation_id: UUID,
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        invitation_revocation_request: InvitationRevocationRequest,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> RESTResponseType:
+        """Revoke (synchronous)
+
+        Synchronous variant of :meth:`revoke_invitation_without_preload_content`. It calls
+        the asynchronous method and blocks until it completes.
+        """ # noqa: E501
+        return run_sync(
+            self.revoke_invitation_without_preload_content(
+                invitation_id=invitation_id,
+                idempotency_key=idempotency_key,
+                invitation_revocation_request=invitation_revocation_request,
+                _request_timeout=_request_timeout,
+                _request_auth=_request_auth,
+                _content_type=_content_type,
+                _headers=_headers,
+                _host_index=_host_index,
+            )
+        )
+
+
+    def _revoke_invitation_serialize(
+        self,
+        invitation_id,
+        idempotency_key,
+        invitation_revocation_request,
+        _request_auth,
+        _content_type,
+        _headers,
+        _host_index,
+    ) -> RequestSerialized:
+
+        _host = None
+
+        _collection_formats: Dict[str, str] = {
+        }
+
+        _path_params: Dict[str, str] = {}
+        _query_params: List[Tuple[str, str]] = []
+        _header_params: Dict[str, Optional[str]] = _headers or {}
+        _form_params: List[Tuple[str, str]] = []
+        _files: Dict[
+            str, Union[str, bytes, List[str], List[bytes], List[Tuple[str, bytes]]]
+        ] = {}
+        _body_params: Optional[bytes] = None
+
+        # process the path parameters
+        if invitation_id is not None:
+            _path_params['invitation_id'] = invitation_id
+        # process the query parameters
+        # process the header parameters
+        if idempotency_key is not None:
+            _header_params['Idempotency-Key'] = idempotency_key
+        # process the form parameters
+        # process the body parameter
+        if invitation_revocation_request is not None:
+            _body_params = invitation_revocation_request
+
+
+        # set the HTTP header `Accept`
+        if not any(name.lower() == 'accept' for name in _header_params):
+            _header_params['Accept'] = self.api_client.select_header_accept(
+                [
+                    'application/json', 
+                    'application/problem+json'
+                ]
+            )
+
+        # set the HTTP header `Content-Type`
+        if _content_type:
+            _header_params['Content-Type'] = _content_type
+        else:
+            _default_content_type = (
+                self.api_client.select_header_content_type(
+                    [
+                        'application/json'
+                    ]
+                )
+            )
+            if _default_content_type is not None:
+                _header_params['Content-Type'] = _default_content_type
+
+        # authentication setting
+        _auth_settings: List[str] = [
+            'KratosSession', 
+            'ProductBearer'
+        ]
+
+        return self.api_client.param_serialize(
+            method='POST',
+            resource_path='/v1/invitations/{invitation_id}/revoke',
             path_params=_path_params,
             query_params=_query_params,
             header_params=_header_params,

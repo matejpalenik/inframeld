@@ -1,6 +1,77 @@
 #[cfg(test)]
 mod tests {
     #[test]
+    fn invitation_issue_preserves_optional_lifetime_and_exact_revision_representation() {
+        use inframeld_sdk::types::InvitationIssueRequest;
+        let source = serde_json::json!({
+            "organizationId": "00000000-0000-4000-8000-000000000002",
+            "assignments": [{"kind": "admission-only"}],
+            "expectedAccessRevision": 9_007_199_254_740_991_i64,
+            "expectedProjectAccessRevisions": []
+        });
+        let model: InvitationIssueRequest = serde_json::from_value(source.clone()).unwrap();
+        assert_eq!(serde_json::to_value(model).unwrap(), source);
+        for invalid in [
+            serde_json::Value::Null,
+            serde_json::json!(true),
+            serde_json::json!(1.5),
+        ] {
+            let mut value = source.clone();
+            value["expiresInSeconds"] = invalid;
+            assert!(serde_json::from_value::<InvitationIssueRequest>(value).is_err());
+        }
+        let mut boolean_revision = source;
+        boolean_revision["expectedAccessRevision"] = serde_json::json!(true);
+        assert!(serde_json::from_value::<InvitationIssueRequest>(boolean_revision).is_err());
+    }
+
+    #[test]
+    fn invitation_secret_union_requires_true_with_token_or_false_without_token() {
+        use inframeld_sdk::types::InvitationIssueResponse;
+        let source = serde_json::json!({
+            "invitationId": "00000000-0000-4000-8000-000000000006",
+            "organizationId": "00000000-0000-4000-8000-000000000002",
+            "assignments": [{"kind": "admission-only"}], "accessRevision": 8,
+            "expiresAt": "2030-01-01T00:00:00Z",
+            "idempotencyExpiresAt": "2030-01-01T00:00:00Z", "operationId": "original-issue"
+        });
+        for secret in [true, false] {
+            let mut value = source.clone();
+            value["secretAvailable"] = serde_json::json!(secret);
+            if secret {
+                value["invitationToken"] = serde_json::json!("A".repeat(43));
+            }
+            let model: InvitationIssueResponse = serde_json::from_value(value.clone()).unwrap();
+            assert_eq!(serde_json::to_value(model).unwrap(), value);
+        }
+        for invalid in [
+            serde_json::Value::Null,
+            serde_json::json!(1),
+            serde_json::json!("true"),
+        ] {
+            let mut value = source.clone();
+            value["secretAvailable"] = invalid;
+            assert!(serde_json::from_value::<InvitationIssueResponse>(value).is_err());
+        }
+        let mut missing_token = source;
+        missing_token["secretAvailable"] = serde_json::json!(true);
+        assert!(serde_json::from_value::<InvitationIssueResponse>(missing_token).is_err());
+    }
+
+    #[test]
+    fn invitation_assignments_reject_unknown_tag_missing_scope_and_wrong_level_type() {
+        use inframeld_sdk::types::InvitationAssignmentRequest;
+        for invalid in [
+            serde_json::json!({"kind":"unknown"}),
+            serde_json::json!({"kind":"group-membership"}),
+            serde_json::json!({"kind":"action-grant","target":{"kind":"unknown"},"actionId":"query","canGrant":true}),
+            serde_json::json!({"kind":"action-grant","target":{"kind":"organization","organizationId":"00000000-0000-4000-8000-000000000002"},"actionId":"create-projects","canGrant":1}),
+        ] {
+            assert!(serde_json::from_value::<InvitationAssignmentRequest>(invalid).is_err());
+        }
+    }
+
+    #[test]
     fn revision_models_round_trip_json_safe_maximum_without_narrowing_the_storage_type() {
         use inframeld_sdk::types::{
             HumanAdmissionRequest, MyOrganizationAccessResponse, ProjectCreationRequest,

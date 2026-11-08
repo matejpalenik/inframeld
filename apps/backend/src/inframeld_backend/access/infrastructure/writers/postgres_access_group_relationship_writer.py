@@ -12,13 +12,31 @@ from inframeld_backend.access.application.commands.change_access_group_relations
 from inframeld_backend.access.application.dtos.access_group_change_facts_dto import (
     AccessGroupChangeFactsDTO,
 )
+from inframeld_backend.access.application.dtos.invitation_activation_binding_dto import (
+    InvitationActivationBindingDTO,
+)
+from inframeld_backend.access.application.dtos.invitation_group_manager_intent_dto import (
+    InvitationGroupManagerIntentDTO,
+)
+from inframeld_backend.access.application.dtos.invitation_group_membership_intent_dto import (
+    InvitationGroupMembershipIntentDTO,
+)
+from inframeld_backend.access.application.enums.access_group_change_kind import (
+    AccessGroupChangeKind,
+)
 from inframeld_backend.access.application.protocols.access_group_relationship_writer import (
     AccessGroupRelationshipWriter,
+)
+from inframeld_backend.access.application.protocols.invitation_group_relationship_writer import (
+    InvitationGroupRelationshipWriter,
 )
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.enums.project_status import ProjectStatus
 from inframeld_backend.access.domain.value_objects.access_group_relationships import (
     AccessGroupRelationships,
+)
+from inframeld_backend.access.infrastructure.readers.postgres_invitation_binding_reader import (
+    PostgresInvitationBindingReader,
 )
 from inframeld_backend.access.infrastructure.rows.access_audit_event_row import AccessAuditEventRow
 from inframeld_backend.access.infrastructure.rows.access_group_relationship_result_row import (
@@ -42,7 +60,9 @@ from inframeld_backend.shared.infrastructure.rows.idempotency_reservation_row im
 )
 
 
-class PostgresAccessGroupRelationshipWriter(AccessGroupRelationshipWriter):
+class PostgresAccessGroupRelationshipWriter(
+    AccessGroupRelationshipWriter, InvitationGroupRelationshipWriter
+):
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
@@ -108,6 +128,58 @@ class PostgresAccessGroupRelationshipWriter(AccessGroupRelationshipWriter):
             is None
         ):
             raise ConflictError("The group transition has no matching original reservation.")
+        revision = facts.access_revision
+        await self._apply_checked_relationship_transition(facts, command, operation_id, after)
+        before = facts.relationships
+        changed = before != after
+        self._session.add(
+            AccessGroupRelationshipResultRow(
+                operation_id=operation_id.value,
+                organization_id=facts.organization_id.value,
+                project_id=project,
+                group_id=group,
+                actor_principal_id=actor.id.value,
+                principal_id=principal,
+                change_kind=kind.value,
+                before_revision=revision,
+                access_revision=revision + int(changed),
+                before_member=before.member,
+                before_manager=before.manager,
+                member=after.member,
+                manager=after.manager,
+                changed=changed,
+                status_code=kind.success_status(changed=changed),
+            )
+        )
+        await self._session.flush()
+
+    async def _apply_checked_relationship_transition(
+        self,
+        facts: AccessGroupChangeFactsDTO,
+        command: ChangeAccessGroupRelationshipCommand,
+        operation_id: OperationId,
+        after: AccessGroupRelationships,
+    ) -> int:
+        if not self._session.in_transaction() or not self._session.is_active:
+            raise RuntimeError("Group persistence requires an active caller transaction.")
+        actor, recipient, kind = facts.action.principal, facts.recipient, command.change_kind
+        if (
+            facts.group_id != command.group_id
+            or facts.project_id != command.project_id
+            or recipient is None
+            or recipient.id != command.principal_id
+            or recipient.organization_id != facts.organization_id
+            or actor.organization_id != facts.organization_id
+            or actor.kind is not PrincipalKind.HUMAN
+        ):
+            raise RuntimeError("Group persistence changed its checked actor or recipient scope.")
+        if after.manager and recipient.kind is not PrincipalKind.HUMAN:
+            raise ConflictError("Application principals cannot manage access groups.")
+        project, group, principal = (
+            command.project_id.value,
+            command.group_id.value,
+            command.principal_id.value,
+        )
         revision = await self._session.scalar(
             select(ProjectRow.access_revision).where(
                 ProjectRow.id == project,
@@ -184,25 +256,6 @@ class PostgresAccessGroupRelationshipWriter(AccessGroupRelationshipWriter):
             if advanced != revision + 1:
                 raise StaleRevisionError()
         self._session.add(
-            AccessGroupRelationshipResultRow(
-                operation_id=operation_id.value,
-                organization_id=facts.organization_id.value,
-                project_id=project,
-                group_id=group,
-                actor_principal_id=actor.id.value,
-                principal_id=principal,
-                change_kind=kind.value,
-                before_revision=revision,
-                access_revision=revision + int(changed),
-                before_member=before.member,
-                before_manager=before.manager,
-                member=after.member,
-                manager=after.manager,
-                changed=changed,
-                status_code=kind.success_status(changed=changed),
-            )
-        )
-        self._session.add(
             AccessAuditEventRow(
                 id=uuid4(),
                 organization_id=facts.organization_id.value,
@@ -230,3 +283,38 @@ class PostgresAccessGroupRelationshipWriter(AccessGroupRelationshipWriter):
             )
         )
         await self._session.flush()
+
+        return revision + int(changed)
+
+    @override
+    async def apply_invitation_relationship(
+        self,
+        *,
+        binding: InvitationActivationBindingDTO,
+        facts: AccessGroupChangeFactsDTO,
+        command: ChangeAccessGroupRelationshipCommand,
+        after: AccessGroupRelationships,
+    ) -> int:
+        if command.change_kind is AccessGroupChangeKind.ADD_MEMBER:
+            intent = InvitationGroupMembershipIntentDTO(
+                project_id=command.project_id, access_group_id=command.group_id
+            )
+        elif command.change_kind is AccessGroupChangeKind.APPOINT_MANAGER:
+            intent = InvitationGroupManagerIntentDTO(
+                project_id=command.project_id, access_group_id=command.group_id
+            )
+        else:
+            raise ConflictError("An invitation cannot remove group relationships.")
+        await PostgresInvitationBindingReader(self._session).require_assignment_binding(
+            binding=binding,
+            principal_id=command.principal_id,
+            organization_id=facts.organization_id,
+            issuer_principal_id=facts.action.principal.id,
+            intent=intent,
+        )
+        try:
+            return await self._apply_checked_relationship_transition(
+                facts, command, binding.operation_id, after
+            )
+        except (OperationalError, SqlAlchemyTimeoutError):
+            raise DependencyUnavailableError() from None

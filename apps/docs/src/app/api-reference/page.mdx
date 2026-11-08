@@ -11,7 +11,7 @@ The public Inframeld API uses JSON over HTTP. Remote installations use their ope
 ## Find an operation
 
 - [Discovery and health](/api-reference/discovery-and-health).
-- [Projects and access](/api-reference/projects-and-access), including current session and account-site consent.
+- [Projects and access](/api-reference/projects-and-access), including current sessions, invitations and account-site consent.
 - [Operations, results and errors](/api-reference/operations).
 - [Request and response models](/api-reference/models).
 
@@ -22,6 +22,8 @@ Document, search, Pipeline, evaluation and release API entries describe availabi
 The health and resource-metadata discovery operations are public within their configured availability. Protected operations require one supported credential family and current scope/action authority. Authentication identifies the actor, while the operation checks what that actor may do now.
 
 For human bearer requests, use an actual Inframeld human access token accepted by that installation. Set `INFRAMELD_TOKEN` through your local secret-handling procedure. The browser account site maintains a Kratos session cookie. Browser writes also follow the installation's CSRF/Origin contract. SDK construction does not sign you in or create a credential.
+
+[Invitation preview and activation](/guides/manage-invitations#call-from-bobs-existing-browser-session) accept a verified browser cookie before local product admission, with the actual configured Origin and `X-Inframeld-CSRF: 1`. They accept no human bearer substitute. The token goes in the protected JSON body, never a URL. Preview is a read without password observation or an idempotency key. Activation uses a saved original key. Only fresh activation requires confirmed password setup, not a password-authenticated current login. Issuance and revocation instead require current admitted-human authority.
 
 Application credentials identify their own account and bound Project. [Application authentication](/guides/authenticate-an-application) explains complete-key verification, exact trusted bindings, current local eligibility and the separate application-session contract. The human session check rejects application keys, and the application identity check rejects human credentials. Ordinary product operations can authenticate a verified application and still deny human-only administration with `403`.
 

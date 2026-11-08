@@ -110,3 +110,45 @@ test("wrong protocol, profile, identity, contradictory success and driver errors
     /operation missing/,
   );
 });
+
+test("invitation envelopes preserve preview key absence and each write's exact key", () => {
+  const body = { invitationToken: "A".repeat(43) };
+  const calls = [
+    {
+      id: "issue",
+      operation: "issueInvitation",
+      headers: { "Idempotency-Key": "issue-original" },
+      body: {
+        organizationId: "00000000-0000-4000-8000-000000000002",
+        expectedAccessRevision: 7,
+        assignments: [{ kind: "admission-only" }],
+        expectedProjectAccessRevisions: [],
+      },
+      timeout: 100,
+    },
+    {
+      id: "revoke",
+      operation: "revokeInvitation",
+      path: { invitation_id: "00000000-0000-4000-8000-000000000006" },
+      headers: { "Idempotency-Key": "revoke-original" },
+      body: { expectedAccessRevision: 7 },
+      timeout: 100,
+    },
+    {
+      id: "preview",
+      operation: "previewInvitation",
+      headers: {},
+      body,
+      timeout: 100,
+    },
+    {
+      id: "activate",
+      operation: "activateInvitation",
+      headers: { "Idempotency-Key": "activate-original" },
+      body,
+      timeout: 100,
+    },
+  ];
+  const input = { ...request, calls };
+  assert.deepEqual(driverRequestSchema.parse(input), input);
+});

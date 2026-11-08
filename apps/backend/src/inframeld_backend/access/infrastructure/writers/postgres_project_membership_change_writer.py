@@ -6,11 +6,20 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy.exc import TimeoutError as SqlAlchemyTimeoutError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from inframeld_backend.access.application.dtos.invitation_activation_binding_dto import (
+    InvitationActivationBindingDTO,
+)
+from inframeld_backend.access.application.dtos.invitation_project_membership_intent_dto import (
+    InvitationProjectMembershipIntentDTO,
+)
 from inframeld_backend.access.application.dtos.project_membership_change_facts_dto import (
     ProjectMembershipChangeFactsDTO,
 )
 from inframeld_backend.access.application.enums.project_membership_change_kind import (
     ProjectMembershipChangeKind,
+)
+from inframeld_backend.access.application.protocols.invitation_project_membership_writer import (
+    InvitationProjectMembershipWriter,
 )
 from inframeld_backend.access.application.protocols.project_membership_change_writer import (
     ProjectMembershipChangeWriter,
@@ -19,6 +28,9 @@ from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.enums.project_action import ProjectAction
 from inframeld_backend.access.domain.enums.project_status import ProjectStatus
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
+from inframeld_backend.access.infrastructure.readers.postgres_invitation_binding_reader import (
+    PostgresInvitationBindingReader,
+)
 from inframeld_backend.access.infrastructure.rows.access_audit_event_row import AccessAuditEventRow
 from inframeld_backend.access.infrastructure.rows.application_action_grant_row import (
     ApplicationActionGrantRow,
@@ -49,7 +61,9 @@ from inframeld_backend.shared.infrastructure.rows.idempotency_reservation_row im
 )
 
 
-class PostgresProjectMembershipChangeWriter(ProjectMembershipChangeWriter):
+class PostgresProjectMembershipChangeWriter(
+    ProjectMembershipChangeWriter, InvitationProjectMembershipWriter
+):
     """Persist one checked recipient's lifecycle and original receipt atomically."""
 
     def __init__(self, session: AsyncSession) -> None:
@@ -120,6 +134,59 @@ class PostgresProjectMembershipChangeWriter(ProjectMembershipChangeWriter):
             )
             if reservation is None:
                 raise ConflictError("Membership change has no matching original reservation.")
+        after = await self._apply_checked_membership_transition(
+            facts, principal_id, change_kind, operation_id
+        )
+        revision = facts.access_revision
+        changed = after != revision
+        self._session.add(
+            ProjectMembershipOperationResultRow(
+                operation_id=operation_id.value,
+                installation_id=facts.installation_id.value,
+                organization_id=organization,
+                project_id=project,
+                actor_principal_id=actor.id.value,
+                principal_id=recipient,
+                change_kind=change_kind.value,
+                before_revision=revision,
+                access_revision=after,
+                changed=changed,
+                status_code=change_kind.success_status(changed=changed),
+            )
+        )
+        await self._session.flush()
+
+    async def _apply_checked_membership_transition(
+        self,
+        facts: ProjectMembershipChangeFactsDTO,
+        principal_id: PrincipalId,
+        change_kind: ProjectMembershipChangeKind,
+        operation_id: OperationId,
+    ) -> int:
+        """Persist membership, revision, receipt and audit changes in the caller transaction.
+
+        Recheck the original reservation and locked scope before mutation.
+        """
+        if not self._session.in_transaction() or not self._session.is_active:
+            raise RuntimeError("Membership persistence requires the active caller transaction.")
+        actor = facts.action.principal
+        if (
+            facts.recipient is None
+            or facts.recipient.id != principal_id
+            or facts.recipient.organization_id != facts.organization_id
+            or facts.recipient.kind is not PrincipalKind.HUMAN
+            or actor.organization_id != facts.organization_id
+            or actor.kind is not PrincipalKind.HUMAN
+        ):
+            raise RuntimeError(
+                "Membership persistence changed its checked recipient or actor scope."
+            )
+        project, organization, recipient = (
+            facts.project_id.value,
+            facts.organization_id.value,
+            principal_id.value,
+        )
+        with self._session.no_autoflush:
             revision = await self._session.scalar(
                 select(ProjectRow.access_revision).where(
                     ProjectRow.id == project,
@@ -220,21 +287,6 @@ class PostgresProjectMembershipChangeWriter(ProjectMembershipChangeWriter):
 
         after = revision + int(changed)
         self._session.add(
-            ProjectMembershipOperationResultRow(
-                operation_id=operation_id.value,
-                installation_id=facts.installation_id.value,
-                organization_id=organization,
-                project_id=project,
-                actor_principal_id=actor.id.value,
-                principal_id=recipient,
-                change_kind=change_kind.value,
-                before_revision=revision,
-                access_revision=after,
-                changed=changed,
-                status_code=change_kind.success_status(changed=changed),
-            )
-        )
-        self._session.add(
             AccessAuditEventRow(
                 id=uuid4(),
                 organization_id=organization,
@@ -264,3 +316,28 @@ class PostgresProjectMembershipChangeWriter(ProjectMembershipChangeWriter):
             )
         )
         await self._session.flush()
+
+        return after
+
+    @override
+    async def apply_invitation_membership(
+        self,
+        *,
+        binding: InvitationActivationBindingDTO,
+        facts: ProjectMembershipChangeFactsDTO,
+        principal_id: PrincipalId,
+    ) -> int:
+        await PostgresInvitationBindingReader(self._session).require_assignment_binding(
+            binding=binding,
+            principal_id=principal_id,
+            organization_id=facts.organization_id,
+            issuer_principal_id=facts.action.principal.id,
+            installation_id=facts.installation_id,
+            intent=InvitationProjectMembershipIntentDTO(project_id=facts.project_id),
+        )
+        try:
+            return await self._apply_checked_membership_transition(
+                facts, principal_id, ProjectMembershipChangeKind.ADD, binding.operation_id
+            )
+        except (OperationalError, SqlAlchemyTimeoutError):
+            raise DependencyUnavailableError() from None

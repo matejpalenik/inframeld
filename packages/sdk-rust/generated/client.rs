@@ -360,6 +360,19 @@ fn __pct_encode_path_segment(s: &str) -> String {
     }
     out
 }
+///Typed error responses for `activateInvitation`. One variant per declared non-2xx response.
+#[derive(Debug, Clone)]
+pub enum ActivateInvitationApiError {
+    Status400(ProblemDetails),
+    Status401(ProblemDetails),
+    Status403(ProblemDetails),
+    Status404(ProblemDetails),
+    Status409(ProblemDetails),
+    Status413(ProblemDetails),
+    Status415(ProblemDetails),
+    Status422(ProblemDetails),
+    Status503(ProblemDetails),
+}
 ///Typed error responses for `addAccessGroupMember`. One variant per declared non-2xx response.
 #[derive(Debug, Clone)]
 pub enum AddAccessGroupMemberApiError {
@@ -590,6 +603,19 @@ pub enum InspectHumanOAuthConsentApiError {
     Status422(ProblemDetails),
     Status503(ProblemDetails),
 }
+///Typed error responses for `issueInvitation`. One variant per declared non-2xx response.
+#[derive(Debug, Clone)]
+pub enum IssueInvitationApiError {
+    Status400(ProblemDetails),
+    Status401(ProblemDetails),
+    Status403(ProblemDetails),
+    Status404(ProblemDetails),
+    Status409(ProblemDetails),
+    Status413(ProblemDetails),
+    Status415(ProblemDetails),
+    Status422(ProblemDetails),
+    Status503(ProblemDetails),
+}
 ///Typed error responses for `listAccessGroupActionGrants`. One variant per declared non-2xx response.
 #[derive(Debug, Clone)]
 pub enum ListAccessGroupActionGrantsApiError {
@@ -693,6 +719,19 @@ pub enum LookupOriginalOperationApiError {
     Status401(ProblemDetails),
     Status403(ProblemDetails),
     Status404(ProblemDetails),
+    Status413(ProblemDetails),
+    Status415(ProblemDetails),
+    Status422(ProblemDetails),
+    Status503(ProblemDetails),
+}
+///Typed error responses for `previewInvitation`. One variant per declared non-2xx response.
+#[derive(Debug, Clone)]
+pub enum PreviewInvitationApiError {
+    Status400(ProblemDetails),
+    Status401(ProblemDetails),
+    Status403(ProblemDetails),
+    Status404(ProblemDetails),
+    Status409(ProblemDetails),
     Status413(ProblemDetails),
     Status415(ProblemDetails),
     Status422(ProblemDetails),
@@ -805,6 +844,19 @@ pub enum ResolveProjectNameApiError {
     Status403(ProblemDetails),
     Status404(ProblemDetails),
     Status409(ProblemDetails),
+    Status422(ProblemDetails),
+    Status503(ProblemDetails),
+}
+///Typed error responses for `revokeInvitation`. One variant per declared non-2xx response.
+#[derive(Debug, Clone)]
+pub enum RevokeInvitationApiError {
+    Status400(ProblemDetails),
+    Status401(ProblemDetails),
+    Status403(ProblemDetails),
+    Status404(ProblemDetails),
+    Status409(ProblemDetails),
+    Status413(ProblemDetails),
+    Status415(ProblemDetails),
     Status422(ProblemDetails),
     Status503(ProblemDetails),
 }
@@ -954,6 +1006,299 @@ fn __json_response_representation(
         .ok_or_else(|| format!("Unexpected response Content-Type {supplied}"))
 }
 impl HttpClient {
+    /// Activate
+    ///
+    /// `POST /v1/invitations/activate`
+    pub async fn activate_invitation(
+        &self,
+        idempotency_key: impl AsRef<str>,
+        request: InvitationActivationRequest,
+    ) -> Result<
+        self::response::ApiResponse<InvitationActivationResponse>,
+        ApiOpError<ActivateInvitationApiError>,
+    > {
+        let request_url = format!("{}{}", self.base_url, "/v1/invitations/activate");
+        let mut req = self.http_client.post(request_url);
+        req = req
+            .body(serde_json::to_vec(&request).map_err(HttpError::serialization_error)?)
+            .header("content-type", "application/json");
+        req = req.header("Idempotency-Key", idempotency_key.as_ref());
+        if let Some(api_key) = &self.api_key {
+            req = req.bearer_auth(api_key);
+        }
+        for (name, value) in &self.custom_headers {
+            if !name.eq_ignore_ascii_case("accept") {
+                req = req.header(name, value);
+            }
+        }
+        req = req.header(reqwest::header::ACCEPT, "application/json");
+        let response = req.send().await?;
+        let status = response.status();
+        let status_code = status.as_u16();
+        let headers = response.headers().clone();
+        let body_bytes = __read_bounded_response_body(
+                response,
+                self.max_response_body_bytes,
+            )
+            .await?;
+        let raw_body = body_bytes;
+        let body_text = String::from_utf8_lossy(&raw_body).into_owned();
+        if false || status_code == 200u16 {
+            match __json_response_representation(&headers, &["application/json"])
+                .and_then(|_| {
+                    serde_json::from_slice(&raw_body).map_err(|error| error.to_string())
+                })
+            {
+                Ok(body) => {
+                    Ok(self::response::ApiResponse {
+                        status: status_code,
+                        headers,
+                        body: body,
+                    })
+                }
+                Err(error) => {
+                    Err(
+                        ApiOpError::Api(ApiError {
+                            status: status_code,
+                            headers,
+                            body: body_text,
+                            raw_body,
+                            typed: None,
+                            parse_error: Some(
+                                format!(
+                                    "failed to deserialize 2xx response body: {}", error
+                                ),
+                            ),
+                        }),
+                    )
+                }
+            }
+        } else if status.is_success() {
+            Err(
+                ApiOpError::Api(ApiError {
+                    status: status_code,
+                    headers,
+                    body: body_text,
+                    raw_body,
+                    typed: None,
+                    parse_error: Some(
+                        format!(
+                            "unexpected successful status {}; generated return type selects `{}`",
+                            status_code, "200",
+                        ),
+                    ),
+                }),
+            )
+        } else {
+            let typed: Option<ActivateInvitationApiError>;
+            let parse_error: Option<String>;
+            if false {
+                typed = None;
+                parse_error = if raw_body.is_empty() {
+                    None
+                } else {
+                    Some("Unexpected body for a bodyless response".into())
+                };
+            } else {
+                match status_code {
+                    400u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(ActivateInvitationApiError::Status400(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    401u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(ActivateInvitationApiError::Status401(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    403u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(ActivateInvitationApiError::Status403(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    404u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(ActivateInvitationApiError::Status404(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    409u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(ActivateInvitationApiError::Status409(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    413u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(ActivateInvitationApiError::Status413(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    415u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(ActivateInvitationApiError::Status415(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    422u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(ActivateInvitationApiError::Status422(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    503u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(ActivateInvitationApiError::Status503(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    _ => {
+                        typed = None;
+                        parse_error = None;
+                    }
+                }
+            }
+            Err(
+                ApiOpError::Api(ApiError {
+                    status: status_code,
+                    headers,
+                    body: body_text,
+                    raw_body,
+                    typed,
+                    parse_error,
+                }),
+            )
+        }
+    }
     /// Add Member
     ///
     /// `PUT /v1/projects/{project_id}/access-groups/{access_group_id}/members/{principal_id}`
@@ -6503,6 +6848,299 @@ impl HttpClient {
             )
         }
     }
+    /// Issue
+    ///
+    /// `POST /v1/invitations`
+    pub async fn issue_invitation(
+        &self,
+        idempotency_key: impl AsRef<str>,
+        request: InvitationIssueRequest,
+    ) -> Result<
+        self::response::ApiResponse<InvitationIssueResponse>,
+        ApiOpError<IssueInvitationApiError>,
+    > {
+        let request_url = format!("{}{}", self.base_url, "/v1/invitations");
+        let mut req = self.http_client.post(request_url);
+        req = req
+            .body(serde_json::to_vec(&request).map_err(HttpError::serialization_error)?)
+            .header("content-type", "application/json");
+        req = req.header("Idempotency-Key", idempotency_key.as_ref());
+        if let Some(api_key) = &self.api_key {
+            req = req.bearer_auth(api_key);
+        }
+        for (name, value) in &self.custom_headers {
+            if !name.eq_ignore_ascii_case("accept") {
+                req = req.header(name, value);
+            }
+        }
+        req = req.header(reqwest::header::ACCEPT, "application/json");
+        let response = req.send().await?;
+        let status = response.status();
+        let status_code = status.as_u16();
+        let headers = response.headers().clone();
+        let body_bytes = __read_bounded_response_body(
+                response,
+                self.max_response_body_bytes,
+            )
+            .await?;
+        let raw_body = body_bytes;
+        let body_text = String::from_utf8_lossy(&raw_body).into_owned();
+        if false || status_code == 201u16 {
+            match __json_response_representation(&headers, &["application/json"])
+                .and_then(|_| {
+                    serde_json::from_slice(&raw_body).map_err(|error| error.to_string())
+                })
+            {
+                Ok(body) => {
+                    Ok(self::response::ApiResponse {
+                        status: status_code,
+                        headers,
+                        body: body,
+                    })
+                }
+                Err(error) => {
+                    Err(
+                        ApiOpError::Api(ApiError {
+                            status: status_code,
+                            headers,
+                            body: body_text,
+                            raw_body,
+                            typed: None,
+                            parse_error: Some(
+                                format!(
+                                    "failed to deserialize 2xx response body: {}", error
+                                ),
+                            ),
+                        }),
+                    )
+                }
+            }
+        } else if status.is_success() {
+            Err(
+                ApiOpError::Api(ApiError {
+                    status: status_code,
+                    headers,
+                    body: body_text,
+                    raw_body,
+                    typed: None,
+                    parse_error: Some(
+                        format!(
+                            "unexpected successful status {}; generated return type selects `{}`",
+                            status_code, "201",
+                        ),
+                    ),
+                }),
+            )
+        } else {
+            let typed: Option<IssueInvitationApiError>;
+            let parse_error: Option<String>;
+            if false {
+                typed = None;
+                parse_error = if raw_body.is_empty() {
+                    None
+                } else {
+                    Some("Unexpected body for a bodyless response".into())
+                };
+            } else {
+                match status_code {
+                    400u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(IssueInvitationApiError::Status400(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    401u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(IssueInvitationApiError::Status401(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    403u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(IssueInvitationApiError::Status403(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    404u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(IssueInvitationApiError::Status404(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    409u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(IssueInvitationApiError::Status409(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    413u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(IssueInvitationApiError::Status413(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    415u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(IssueInvitationApiError::Status415(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    422u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(IssueInvitationApiError::Status422(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    503u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(IssueInvitationApiError::Status503(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    _ => {
+                        typed = None;
+                        parse_error = None;
+                    }
+                }
+            }
+            Err(
+                ApiOpError::Api(ApiError {
+                    status: status_code,
+                    headers,
+                    body: body_text,
+                    raw_body,
+                    typed,
+                    parse_error,
+                }),
+            )
+        }
+    }
     /// Grants
     ///
     /// `GET /v1/projects/{project_id}/access-groups/{access_group_id}/grants`
@@ -9155,6 +9793,297 @@ impl HttpClient {
                         {
                             Ok(v) => {
                                 typed = Some(LookupOriginalOperationApiError::Status503(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    _ => {
+                        typed = None;
+                        parse_error = None;
+                    }
+                }
+            }
+            Err(
+                ApiOpError::Api(ApiError {
+                    status: status_code,
+                    headers,
+                    body: body_text,
+                    raw_body,
+                    typed,
+                    parse_error,
+                }),
+            )
+        }
+    }
+    /// Preview
+    ///
+    /// `POST /v1/invitations/preview`
+    pub async fn preview_invitation(
+        &self,
+        request: InvitationPreviewRequest,
+    ) -> Result<
+        self::response::ApiResponse<InvitationPreviewResponse>,
+        ApiOpError<PreviewInvitationApiError>,
+    > {
+        let request_url = format!("{}{}", self.base_url, "/v1/invitations/preview");
+        let mut req = self.http_client.post(request_url);
+        req = req
+            .body(serde_json::to_vec(&request).map_err(HttpError::serialization_error)?)
+            .header("content-type", "application/json");
+        if let Some(api_key) = &self.api_key {
+            req = req.bearer_auth(api_key);
+        }
+        for (name, value) in &self.custom_headers {
+            if !name.eq_ignore_ascii_case("accept") {
+                req = req.header(name, value);
+            }
+        }
+        req = req.header(reqwest::header::ACCEPT, "application/json");
+        let response = req.send().await?;
+        let status = response.status();
+        let status_code = status.as_u16();
+        let headers = response.headers().clone();
+        let body_bytes = __read_bounded_response_body(
+                response,
+                self.max_response_body_bytes,
+            )
+            .await?;
+        let raw_body = body_bytes;
+        let body_text = String::from_utf8_lossy(&raw_body).into_owned();
+        if false || status_code == 200u16 {
+            match __json_response_representation(&headers, &["application/json"])
+                .and_then(|_| {
+                    serde_json::from_slice(&raw_body).map_err(|error| error.to_string())
+                })
+            {
+                Ok(body) => {
+                    Ok(self::response::ApiResponse {
+                        status: status_code,
+                        headers,
+                        body: body,
+                    })
+                }
+                Err(error) => {
+                    Err(
+                        ApiOpError::Api(ApiError {
+                            status: status_code,
+                            headers,
+                            body: body_text,
+                            raw_body,
+                            typed: None,
+                            parse_error: Some(
+                                format!(
+                                    "failed to deserialize 2xx response body: {}", error
+                                ),
+                            ),
+                        }),
+                    )
+                }
+            }
+        } else if status.is_success() {
+            Err(
+                ApiOpError::Api(ApiError {
+                    status: status_code,
+                    headers,
+                    body: body_text,
+                    raw_body,
+                    typed: None,
+                    parse_error: Some(
+                        format!(
+                            "unexpected successful status {}; generated return type selects `{}`",
+                            status_code, "200",
+                        ),
+                    ),
+                }),
+            )
+        } else {
+            let typed: Option<PreviewInvitationApiError>;
+            let parse_error: Option<String>;
+            if false {
+                typed = None;
+                parse_error = if raw_body.is_empty() {
+                    None
+                } else {
+                    Some("Unexpected body for a bodyless response".into())
+                };
+            } else {
+                match status_code {
+                    400u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(PreviewInvitationApiError::Status400(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    401u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(PreviewInvitationApiError::Status401(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    403u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(PreviewInvitationApiError::Status403(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    404u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(PreviewInvitationApiError::Status404(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    409u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(PreviewInvitationApiError::Status409(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    413u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(PreviewInvitationApiError::Status413(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    415u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(PreviewInvitationApiError::Status415(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    422u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(PreviewInvitationApiError::Status422(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    503u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(PreviewInvitationApiError::Status503(v));
                                 parse_error = None;
                             }
                             Err(e) => {
@@ -11897,6 +12826,303 @@ impl HttpClient {
                         {
                             Ok(v) => {
                                 typed = Some(ResolveProjectNameApiError::Status503(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    _ => {
+                        typed = None;
+                        parse_error = None;
+                    }
+                }
+            }
+            Err(
+                ApiOpError::Api(ApiError {
+                    status: status_code,
+                    headers,
+                    body: body_text,
+                    raw_body,
+                    typed,
+                    parse_error,
+                }),
+            )
+        }
+    }
+    /// Revoke
+    ///
+    /// `POST /v1/invitations/{invitation_id}/revoke`
+    pub async fn revoke_invitation(
+        &self,
+        invitation_id: impl AsRef<str>,
+        idempotency_key: impl AsRef<str>,
+        request: InvitationRevocationRequest,
+    ) -> Result<
+        self::response::ApiResponse<InvitationRevocationResponse>,
+        ApiOpError<RevokeInvitationApiError>,
+    > {
+        let request_url = format!(
+            "{}{}", self.base_url, format!("/v1/invitations/{}/revoke",
+            __pct_encode_path_segment(invitation_id.as_ref()))
+        );
+        let mut req = self.http_client.post(request_url);
+        req = req
+            .body(serde_json::to_vec(&request).map_err(HttpError::serialization_error)?)
+            .header("content-type", "application/json");
+        req = req.header("Idempotency-Key", idempotency_key.as_ref());
+        if let Some(api_key) = &self.api_key {
+            req = req.bearer_auth(api_key);
+        }
+        for (name, value) in &self.custom_headers {
+            if !name.eq_ignore_ascii_case("accept") {
+                req = req.header(name, value);
+            }
+        }
+        req = req.header(reqwest::header::ACCEPT, "application/json");
+        let response = req.send().await?;
+        let status = response.status();
+        let status_code = status.as_u16();
+        let headers = response.headers().clone();
+        let body_bytes = __read_bounded_response_body(
+                response,
+                self.max_response_body_bytes,
+            )
+            .await?;
+        let raw_body = body_bytes;
+        let body_text = String::from_utf8_lossy(&raw_body).into_owned();
+        if false || status_code == 200u16 {
+            match __json_response_representation(&headers, &["application/json"])
+                .and_then(|_| {
+                    serde_json::from_slice(&raw_body).map_err(|error| error.to_string())
+                })
+            {
+                Ok(body) => {
+                    Ok(self::response::ApiResponse {
+                        status: status_code,
+                        headers,
+                        body: body,
+                    })
+                }
+                Err(error) => {
+                    Err(
+                        ApiOpError::Api(ApiError {
+                            status: status_code,
+                            headers,
+                            body: body_text,
+                            raw_body,
+                            typed: None,
+                            parse_error: Some(
+                                format!(
+                                    "failed to deserialize 2xx response body: {}", error
+                                ),
+                            ),
+                        }),
+                    )
+                }
+            }
+        } else if status.is_success() {
+            Err(
+                ApiOpError::Api(ApiError {
+                    status: status_code,
+                    headers,
+                    body: body_text,
+                    raw_body,
+                    typed: None,
+                    parse_error: Some(
+                        format!(
+                            "unexpected successful status {}; generated return type selects `{}`",
+                            status_code, "200",
+                        ),
+                    ),
+                }),
+            )
+        } else {
+            let typed: Option<RevokeInvitationApiError>;
+            let parse_error: Option<String>;
+            if false {
+                typed = None;
+                parse_error = if raw_body.is_empty() {
+                    None
+                } else {
+                    Some("Unexpected body for a bodyless response".into())
+                };
+            } else {
+                match status_code {
+                    400u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(RevokeInvitationApiError::Status400(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    401u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(RevokeInvitationApiError::Status401(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    403u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(RevokeInvitationApiError::Status403(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    404u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(RevokeInvitationApiError::Status404(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    409u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(RevokeInvitationApiError::Status409(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    413u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(RevokeInvitationApiError::Status413(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    415u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(RevokeInvitationApiError::Status415(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    422u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(RevokeInvitationApiError::Status422(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    503u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(RevokeInvitationApiError::Status503(v));
                                 parse_error = None;
                             }
                             Err(e) => {

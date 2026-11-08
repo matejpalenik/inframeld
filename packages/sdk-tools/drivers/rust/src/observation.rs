@@ -25,6 +25,58 @@ macro_rules! problems {
     };
 }
 problems!(
+    IssueInvitationApiError,
+    IssueInvitationApiError::Status400,
+    IssueInvitationApiError::Status401,
+    IssueInvitationApiError::Status403,
+    IssueInvitationApiError::Status404,
+    IssueInvitationApiError::Status409,
+    IssueInvitationApiError::Status413,
+    IssueInvitationApiError::Status415,
+    IssueInvitationApiError::Status422,
+    IssueInvitationApiError::Status503
+);
+
+problems!(
+    RevokeInvitationApiError,
+    RevokeInvitationApiError::Status400,
+    RevokeInvitationApiError::Status401,
+    RevokeInvitationApiError::Status403,
+    RevokeInvitationApiError::Status404,
+    RevokeInvitationApiError::Status409,
+    RevokeInvitationApiError::Status413,
+    RevokeInvitationApiError::Status415,
+    RevokeInvitationApiError::Status422,
+    RevokeInvitationApiError::Status503
+);
+
+problems!(
+    PreviewInvitationApiError,
+    PreviewInvitationApiError::Status400,
+    PreviewInvitationApiError::Status401,
+    PreviewInvitationApiError::Status403,
+    PreviewInvitationApiError::Status404,
+    PreviewInvitationApiError::Status409,
+    PreviewInvitationApiError::Status413,
+    PreviewInvitationApiError::Status415,
+    PreviewInvitationApiError::Status422,
+    PreviewInvitationApiError::Status503
+);
+
+problems!(
+    ActivateInvitationApiError,
+    ActivateInvitationApiError::Status400,
+    ActivateInvitationApiError::Status401,
+    ActivateInvitationApiError::Status403,
+    ActivateInvitationApiError::Status404,
+    ActivateInvitationApiError::Status409,
+    ActivateInvitationApiError::Status413,
+    ActivateInvitationApiError::Status415,
+    ActivateInvitationApiError::Status422,
+    ActivateInvitationApiError::Status503
+);
+
+problems!(
     GetCurrentSessionApiError,
     GetCurrentSessionApiError::Status400,
     GetCurrentSessionApiError::Status401,

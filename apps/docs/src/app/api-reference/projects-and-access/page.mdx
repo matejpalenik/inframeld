@@ -1,7 +1,7 @@
 export const pageMetadata = {
   title: "Projects and access",
   description:
-    "Inspect access, manage Projects and application accounts, admit humans, and review consent.",
+    "Inspect access, manage Projects and application accounts, admit or invite humans, and review consent.",
 }
 
 # Projects and access
@@ -29,6 +29,34 @@ Invalid, expired, revoked or incorrectly bound credentials receive `401`, verifi
 <ApiOperation operationId="getMyOrganizationAccess" />
 
 Read the actual admitted human's own Organization ID, principal ID, current Access revision and stored Organization grants. An eligible human without Organization grants receives `grants: []`. There is no principal selector, installation inventory or permission snapshot for a later action. [Create an additional Project](/guides/create-project#read-your-organization-access) explains how to use this read before creation.
+
+## Issue an invitation
+
+<ApiOperation operationId="issueInvitation" />
+
+Record explicit invitation intent using current human `admit-users` authority on the Organization and all authority needed for every intended effect. Supply the reviewed Organization Access revision and each affected Project revision exactly once. Omission uses the installation's configured default (seven days by default). An explicit lifetime must be within its configured maximum, with a thirty-day hard ceiling. The [invitation guide](/guides/manage-invitations#send-one-reviewed-issuance-request) gives equivalent cURL and generated-client examples.
+
+Both first delivery and authorized original replay return `201`. First delivery has `secretAvailable: true` and a private `invitationToken`. Replay has `secretAvailable: false` and the token field is absent, never `null` or retrievable. Preserve the exact original request and key after uncertainty. A new request cannot recover the secret.
+
+## Preview an invitation
+
+<ApiOperation operationId="previewInvitation" />
+
+Use the intended recipient's verified browser cookie, actual Origin and CSRF marker before local admission. This POST read needs no idempotency key. It returns intended assignments, expiry and only authoritative deduplicated scope labels, bounded to 201 items. It performs no password observation, reservation, admission, assignments or consumption. Preview success does not promise later activation.
+
+## Activate an invitation
+
+<ApiOperation operationId="activateInvitation" />
+
+Use the same recipient browser identity boundary, protected token body and one saved original idempotency key. Fresh activation requires confirmed password setup, current issuer authority and every assignment prerequisite. Admission, all assignments, consumption and the original result commit together. A valid OIDC session may remain usable after password setup. Current login need not use a password.
+
+A `200` identifies the stable recipient principal and original operation with committed Organization and Project Access revisions. Same-recipient completed replay still checks current identity and local eligibility. It returns the retained original result without requiring fresh password-setup evidence or availability of that observation, without regranting and without renewing retention. See [safe activation recovery](/guides/manage-invitations#recover-a-lost-activation-response). Invalid, expired, revoked or used tokens for new requests use safe `404`, while stale or ineligible fresh intent uses `409`.
+
+## Revoke an invitation
+
+<ApiOperation operationId="revokeInvitation" />
+
+Supply the reviewed Organization Access revision and a separate saved revocation key. The currently eligible original issuer needs `admit-users`, or another currently eligible human needs exact use-and-grant authority for that action on the same Organization. `200` with `revoked: true` prevents new consumption. It removes no assignments from a completed activation. Current authority still gates original replay, which preserves the captured result and expiry.
 
 ## Read Organization action grants
 

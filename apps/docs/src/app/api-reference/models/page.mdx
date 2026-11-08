@@ -325,6 +325,246 @@ One original use-and-grant assignment to the human creator on the new applicatio
 
 <ApiSchema name="InitialProjectGrantResponse" />
 
+<a id="InvitationAccessGroupTargetRequest" />
+
+## InvitationAccessGroupTargetRequest
+
+An exact current Access-owned target. IDs and owning scope must match authoritative state.
+
+<ApiSchema name="InvitationAccessGroupTargetRequest" />
+
+<a id="InvitationActionGrantRequest" />
+
+## InvitationActionGrantRequest
+
+<ApiSchema name="InvitationActionGrantRequest" />
+
+<a id="InvitationActivationRequest" />
+
+## InvitationActivationRequest
+
+The protected token body. Current browser identity and the original key come from the request context, not caller-selected principal fields.
+
+<ApiSchema name="InvitationActivationRequest" />
+
+<a id="InvitationActivationResponse" />
+
+## InvitationActivationResponse
+
+The original atomic activation receipt. Revisions and stable principal describe that result, not current permissions. Replay never grants again or renews the captured expiry.
+
+<ApiSchema name="InvitationActivationResponse" />
+
+<a id="InvitationAdmissionOnlyRequest" />
+
+## InvitationAdmissionOnlyRequest
+
+<ApiSchema name="InvitationAdmissionOnlyRequest" />
+
+<a id="InvitationApplicationAccountTargetRequest" />
+
+## InvitationApplicationAccountTargetRequest
+
+An exact current Access-owned target. IDs and owning scope must match authoritative state.
+
+<ApiSchema name="InvitationApplicationAccountTargetRequest" />
+
+<a id="InvitationAssignmentRequest" />
+
+## InvitationAssignmentRequest
+
+Closed assignment variants. Admission-only stands alone. Other unique effects retain their membership, management or exact-grant meaning.
+
+<ApiSchema name="InvitationAssignmentRequest" />
+
+<a id="InvitationCollectionTargetRequest" />
+
+## InvitationCollectionTargetRequest
+
+Use the exact typed target identity. A future resource variant does not supply a currently available producer or invitation integration.
+
+<ApiSchema name="InvitationCollectionTargetRequest" />
+
+<a id="InvitationDeploymentTargetRequest" />
+
+## InvitationDeploymentTargetRequest
+
+Use the exact typed target identity. A future resource variant does not supply a currently available producer or invitation integration.
+
+<ApiSchema name="InvitationDeploymentTargetRequest" />
+
+<a id="InvitationEmbeddingProfileTargetRequest" />
+
+## InvitationEmbeddingProfileTargetRequest
+
+Use the exact typed target identity. A future resource variant does not supply a currently available producer or invitation integration.
+
+<ApiSchema name="InvitationEmbeddingProfileTargetRequest" />
+
+<a id="InvitationFirstDeliveryResponse" />
+
+## InvitationFirstDeliveryResponse
+
+First delivery contains the private token and `secretAvailable: true`. Keep it out of public output and diagnostics.
+
+<ApiSchema name="InvitationFirstDeliveryResponse" />
+
+<a id="InvitationGroupManagerRequest" />
+
+## InvitationGroupManagerRequest
+
+Management includes ordinary membership in this group. It does not imply Project membership.
+
+<ApiSchema name="InvitationGroupManagerRequest" />
+
+<a id="InvitationGroupMembershipRequest" />
+
+## InvitationGroupMembershipRequest
+
+<ApiSchema name="InvitationGroupMembershipRequest" />
+
+<a id="InvitationIssuanceReplayResponse" />
+
+## InvitationIssuanceReplayResponse
+
+Original safe issuance metadata with `secretAvailable: false` and no token property. It cannot retrieve or mint a secret.
+
+<ApiSchema name="InvitationIssuanceReplayResponse" />
+
+<a id="InvitationIssueRequest" />
+
+## InvitationIssueRequest
+
+The reviewed Organization revision, exact unique affected Project revisions and explicit assignment intent. Optional lifetime is omitted for the default, never supplied as `null`.
+
+<ApiSchema name="InvitationIssueRequest" />
+
+<a id="InvitationIssueResponse" />
+
+## InvitationIssueResponse
+
+A boolean-discriminated first-delivery or replay union. The replay alternative forbids the token field.
+
+<ApiSchema name="InvitationIssueResponse" />
+
+<a id="InvitationModelConnectionTargetRequest" />
+
+## InvitationModelConnectionTargetRequest
+
+Use the exact typed target identity. A future resource variant does not supply a currently available producer or invitation integration.
+
+<ApiSchema name="InvitationModelConnectionTargetRequest" />
+
+<a id="InvitationOrganizationTargetRequest" />
+
+## InvitationOrganizationTargetRequest
+
+An exact current Access-owned target. IDs and owning scope must match authoritative state.
+
+<ApiSchema name="InvitationOrganizationTargetRequest" />
+
+<a id="InvitationPipelineTargetRequest" />
+
+## InvitationPipelineTargetRequest
+
+Use the exact typed target identity. A future resource variant does not supply a currently available producer or invitation integration.
+
+<ApiSchema name="InvitationPipelineTargetRequest" />
+
+<a id="InvitationPreviewRequest" />
+
+## InvitationPreviewRequest
+
+The protected token body for a browser-authenticated read, with no idempotency key.
+
+<ApiSchema name="InvitationPreviewRequest" />
+
+<a id="InvitationPreviewResponse" />
+
+## InvitationPreviewResponse
+
+Intended effects, expiry and authoritative scope labels. Preview performs no password observation or access change.
+
+<ApiSchema name="InvitationPreviewResponse" />
+
+<a id="InvitationProcessingProfileTargetRequest" />
+
+## InvitationProcessingProfileTargetRequest
+
+Use the exact typed target identity. A future resource variant does not supply a currently available producer or invitation integration.
+
+<ApiSchema name="InvitationProcessingProfileTargetRequest" />
+
+<a id="InvitationProjectAccessRevisionRequest" />
+
+## InvitationProjectAccessRevisionRequest
+
+One exact affected Project and its reviewed Access revision. Each affected Project appears exactly once.
+
+<ApiSchema name="InvitationProjectAccessRevisionRequest" />
+
+<a id="InvitationProjectAccessRevisionResponse" />
+
+## InvitationProjectAccessRevisionResponse
+
+An affected Project and the committed revision from the original activation.
+
+<ApiSchema name="InvitationProjectAccessRevisionResponse" />
+
+<a id="InvitationProjectMembershipRequest" />
+
+## InvitationProjectMembershipRequest
+
+<ApiSchema name="InvitationProjectMembershipRequest" />
+
+<a id="InvitationProjectTargetRequest" />
+
+## InvitationProjectTargetRequest
+
+An exact current Access-owned target. IDs and owning scope must match authoritative state.
+
+<ApiSchema name="InvitationProjectTargetRequest" />
+
+<a id="InvitationRevocationRequest" />
+
+## InvitationRevocationRequest
+
+The reviewed Organization Access revision. The route identifies the invitation, and the header retains its original revocation key.
+
+<ApiSchema name="InvitationRevocationRequest" />
+
+<a id="InvitationRevocationResponse" />
+
+## InvitationRevocationResponse
+
+Original revocation receipt with `revoked: true`. It prevents new consumption without undoing completed assignments.
+
+<ApiSchema name="InvitationRevocationResponse" />
+
+<a id="InvitationScopeResponse" />
+
+## InvitationScopeResponse
+
+An intended target with its authoritative display label, not an unrelated resource inventory.
+
+<ApiSchema name="InvitationScopeResponse" />
+
+<a id="InvitationSourceTargetRequest" />
+
+## InvitationSourceTargetRequest
+
+Use the exact typed target identity. A future resource variant does not supply a currently available producer or invitation integration.
+
+<ApiSchema name="InvitationSourceTargetRequest" />
+
+<a id="InvitationTargetRequest" />
+
+## InvitationTargetRequest
+
+Closed target representations. Only actual Access-owned Organization, Project, group and application-account producers currently support invitation effects. Other variants describe future integrations, not available resources.
+
+<ApiSchema name="InvitationTargetRequest" />
+
 <a id="JobStatus" />
 
 ## JobStatus

@@ -307,6 +307,9 @@ from inframeld_backend.access.http.dependencies.csrf_protection_dependency impor
 from inframeld_backend.access.http.dependencies.human_session_dependency import (
     HumanSessionDependency,
 )
+from inframeld_backend.access.http.dependencies.invitation_browser_dependency import (
+    InvitationBrowserDependency,
+)
 from inframeld_backend.access.http.dependencies.product_access_dependency import (
     ProductAccessDependency,
 )
@@ -334,6 +337,7 @@ from inframeld_backend.access.http.routes.human_admission_routes import (
 from inframeld_backend.access.http.routes.human_oauth_consent_routes import (
     create_human_oauth_consent_router,
 )
+from inframeld_backend.access.http.routes.invitation_routes import create_invitation_router
 from inframeld_backend.access.http.routes.my_project_access_routes import (
     create_my_project_access_router,
 )
@@ -429,6 +433,7 @@ from tests.support.mock_sdk_access_groups import MockSDKAccessGroups
 from tests.support.mock_sdk_application_accounts import MockSDKApplicationAccounts
 from tests.support.mock_sdk_application_authenticator import MockSDKApplicationAuthenticator
 from tests.support.mock_sdk_application_session_reader import MockSDKApplicationSessionReader
+from tests.support.mock_sdk_invitations import MockSDKInvitations
 from tests.support.openapi_schema_fixture import create_schema_fixture_app
 
 
@@ -1081,6 +1086,11 @@ class MockSDKHumanAdmitter(HumanAdmitter):
                 datetime(2030, 1, 1, tzinfo=UTC),
             ),
         )
+
+
+@asynccontextmanager
+async def _open_invitations() -> AsyncGenerator[MockSDKInvitations]:
+    yield MockSDKInvitations(IDENTITY)
 
 
 @asynccontextmanager
@@ -1797,6 +1807,18 @@ def create_sdk_conformance_app(browser_origin: str | None = None) -> FastAPI:
     )
     application.include_router(
         create_project_grant_recipients_router(authenticate, _open_grant_recipients)
+    )
+    invitations = MockSDKInvitations(IDENTITY)
+    application.include_router(
+        create_invitation_router(
+            authenticate,
+            InvitationBrowserDependency(invitations, csrf),
+            InvitationBrowserDependency(invitations, csrf, observe_password_completion=True),
+            _open_invitations,
+            _open_invitations,
+            _open_invitations,
+            _open_invitations,
+        )
     )
     application.include_router(create_human_admission_router(authenticate, _open_human_admitter))
     application.include_router(

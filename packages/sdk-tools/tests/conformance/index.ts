@@ -23,3 +23,5 @@ import "./application-accounts.ts";
 import "./access-groups.ts";
 
 import "./access-action-grants.ts";
+
+import "./invitations.ts";

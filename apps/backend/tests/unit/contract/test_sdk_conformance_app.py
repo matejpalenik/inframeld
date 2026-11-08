@@ -1436,3 +1436,76 @@ def test_new_grant_lookup_fixture_preserves_original_scope_guard_and_operation(
         "classification": "safe_result",
         "idempotencyExpiresAt": "2030-01-01T00:00:00Z",
     }
+
+
+@pytest.mark.parametrize(
+    "route,body,key,status,secret",
+    [
+        (
+            "/v1/invitations",
+            {
+                "organizationId": "00000000-0000-4000-8000-000000000002",
+                "assignments": [{"kind": "admission-only"}],
+                "expectedAccessRevision": 7,
+                "expectedProjectAccessRevisions": [],
+            },
+            "sdk-invitation-first",
+            201,
+            True,
+        ),
+        (
+            "/v1/invitations",
+            {
+                "organizationId": "00000000-0000-4000-8000-000000000002",
+                "assignments": [{"kind": "admission-only"}],
+                "expectedAccessRevision": 7,
+                "expectedProjectAccessRevisions": [],
+            },
+            "sdk-invitation-replay",
+            201,
+            False,
+        ),
+        (
+            "/v1/invitations/00000000-0000-4000-8000-000000000006/revoke",
+            {"expectedAccessRevision": 7},
+            "sdk-revoke",
+            200,
+            None,
+        ),
+        ("/v1/invitations/preview", {"invitationToken": "A" * 43}, None, 200, None),
+        ("/v1/invitations/activate", {"invitationToken": "A" * 43}, "sdk-activate", 200, None),
+    ],
+)
+def test_invitation_fixture_presents_registered_outcomes_and_independent_wire_evidence(
+    route: str, body: dict[str, object], key: str | None, status: int, secret: bool | None
+) -> None:
+    headers = {
+        "Cookie": "ory_kratos_session=sdk-cookie",
+        "Origin": "https://account.test",
+        "X-Inframeld-CSRF": "1",
+        "X-SDK-Test": "invitation-call",
+    }
+    if key is not None:
+        headers["Idempotency-Key"] = key
+    with TestClient(create_sdk_conformance_app(), raise_server_exceptions=False) as client:
+        client.post(
+            "/sdk-control/cases/invitation-fixture",
+            json={"calls": {"invitation-call": {"kind": "none"}}},
+        )
+        response = client.post(route, json=body, headers=headers)
+        seen = client.get("/sdk-control/cases/invitation-fixture").json()
+    assert response.status_code == status
+    assert response.headers["cache-control"] == "no-store"
+    assert response.json()["invitationId"] == "00000000-0000-4000-8000-000000000006"
+    if secret is not None:
+        assert response.json()["secretAvailable"] is secret
+        assert ("invitationToken" in response.json()) is secret
+    witness = seen["observations"]["invitation-call"]
+    assert seen["counts"] == {"invitation-call": 1}
+    assert (witness["method"], witness["path"], witness["query"], witness["jsonBody"]) == (
+        "POST",
+        route,
+        "",
+        body,
+    )
+    assert witness["headers"].get("idempotency-key") == key

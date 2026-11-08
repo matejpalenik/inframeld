@@ -2,7 +2,7 @@
 
 Alice invites Bob into Support. These design contracts describe the exact requested intent and safe responses. Read the invitation workflow for why issuance, preview, new activation and completed replay have different checks.
 
-> **Status:** Documented version 1 transport draft with accepted behavior. These are not implemented Pydantic models or generated OpenAPI operations.
+> **Status:** Implemented for the Access-owned invitation lifecycle. Pydantic models, native OpenAPI and generated application clients define the delivered representations. The design blocks below explain the contract without defining importable modules.
 
 <a id="invitations-and-key-routes"></a>
 
@@ -200,8 +200,20 @@ Before local admission, bind the activation reservation to the independently ver
 
 Find original completed activation before treating consumed state as a fresh request. Replay requires the same currently verified recipient, eligible local state and authority to read the safe outcome. A different key or identity cannot consume again. New-consumption expiry, unused state and current issuer assignment authority are not reapplied as if an original completed operation were new. Replay cannot switch recipient, recreate removed rights or bypass an expired/revoked credential. Revocation of an invitation does not undo completed assignments.
 
+<a id="password-completion-observation"></a>
+
+### Password-completion observation
+
+**Accepted under [ADR-0130](../../../../docs/adr/ADR-0130-observe-private-kratos-password-verifiers-for-invitations.md) on 2026-11-07. The three configured real-Kratos verifier cases are qualified. Invitation activation, registered HTTP operations and generated-client interfaces implement this boundary.** The invitation-specific verifier may call the configured private official `IdentityApi.get_identity` with only `include_credential=['password']` for the UUID established by the current Kratos cookie. It must confirm the exact active identity and reduce the response inside one synchronous confidential boundary. All provider work shares the original monotonic verification budget and precedes SQL.
+
+The exposed application fact is current stored nonempty password-verifier presence. Missing/empty state is false, a nonempty stored string is true, and unavailable or malformed evidence cannot authorize fresh activation. A migration-hook flag alone is not a stored verifier. Do not infer completion from the credential slot, identifiers, version, timestamps or current-session AMR. Do not claim current password usability or permanent onboarding history.
+
+No returned SDK identity, configuration or hash may enter application results, persistence, audit, logs, exceptions or captures. Refuse enabled SDK/wire debugging before I/O without toggling global settings. Known failures retain safe classification. Unexpected `Exception` failures within the confidential call/parse/reduce block emit only the existing bounded type/frame diagnostic, then raise a fixed safe 500 after leaving the catch with no raw cause/context. Cancellation and other `BaseException` outcomes propagate. Python memory zeroization is not promised.
+
+Preview performs no password observation. Completed current-eligible recipient replay does not require this fresh fact or its availability and does not regrant. A bounded observation may have been prepared before SQL. Only the fresh branch requires true after original-result lookup. Ordinary human identity verification still does not request credential configuration.
+
 ## Sources and unresolved portions
 
 [The human workflow](admission-and-invitations.md), [initial-grant catalogue](actions-and-initial-grants.md), [target variants](grant-target-contract.md) and [grant transport bounds](grant-contracts.md) own their respective details. [ADR-0062](../../../../docs/adr/ADR-0062-activate-invitations-under-current-issuer-authority.md) records the accepted invitation boundary.
 
-[PD-ACCESS-04](decision-recovery-first-admission.md) is resolved by [ADR-0082](../../../../docs/adr/ADR-0082-coordinate-first-admission-and-recovery-by-identity.md). Implement new activation against [the accepted coordination workflow](identity-admission-coordination.md). The shared lock is implemented for recovery and initialization. These draft shapes still do not implement invitation activation, the account UI or trusted provider integration, or establish complete concurrent-activation evidence.
+[PD-ACCESS-04](decision-recovery-first-admission.md) is resolved by [ADR-0082](../../../../docs/adr/ADR-0082-coordinate-first-admission-and-recovery-by-identity.md). New activation uses [the accepted coordination workflow](identity-admission-coordination.md), with the shared identity turn implemented for recovery, initialization and activation. The Access-owned lifecycle includes atomic admission and assignments, registered HTTP operations and generated application clients. Resource-specific integrations still require their own real facts and qualified transitions. The account UI, CLI and starter-resource setup remain separate work, and the invitation human walkthrough remains unperformed under [#357](https://github.com/matejpalenik/inframeld/issues/357).

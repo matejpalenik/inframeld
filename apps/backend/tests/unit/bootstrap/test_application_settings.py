@@ -437,3 +437,59 @@ def test_invalid_application_timeout_environment_is_rejected(
         "application_key_authentication",
         "total_timeout_seconds",
     )
+
+
+def test_invitation_defaults_load_without_identity_provider_configuration(
+    bearer_configuration_environment: None,
+) -> None:
+    settings = _load_bearer_settings()
+    assert settings.kratos is None and settings.hydra is None
+    assert settings.invitation is not None
+    assert settings.invitation.default_lifetime_seconds == 7 * 24 * 60 * 60
+    assert settings.invitation.maximum_lifetime_seconds == 30 * 24 * 60 * 60
+
+
+def test_invitation_operator_lifetimes_load_from_nested_numeric_environment(
+    bearer_configuration_environment: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("INFRAMELD_INVITATION__DEFAULT_LIFETIME_SECONDS", "3600")
+    monkeypatch.setenv("INFRAMELD_INVITATION__MAXIMUM_LIFETIME_SECONDS", "86400")
+    invitation = _load_bearer_settings().invitation
+    assert invitation is not None
+    assert invitation.default_lifetime_seconds == 3600
+    assert invitation.maximum_lifetime_seconds == 86400
+    with pytest.raises(ValidationError):
+        invitation.default_lifetime_seconds = 7200
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("DEFAULT_LIFETIME_SECONDS", "0"),
+        ("DEFAULT_LIFETIME_SECONDS", "1.5"),
+        ("DEFAULT_LIFETIME_SECONDS", "true"),
+        ("DEFAULT_LIFETIME_SECONDS", "2592001"),
+        ("MAXIMUM_LIFETIME_SECONDS", "0"),
+        ("MAXIMUM_LIFETIME_SECONDS", "2592001"),
+        ("UNKNOWN_FIELD", "private-value"),
+    ],
+)
+def test_invalid_nested_invitation_configuration_is_rejected(
+    bearer_configuration_environment: None,
+    monkeypatch: pytest.MonkeyPatch,
+    field: str,
+    value: str,
+) -> None:
+    monkeypatch.setenv("INFRAMELD_INVITATION__" + field, value)
+    with pytest.raises(ValidationError) as error:
+        _load_bearer_settings()
+    assert all("input" not in item for item in error.value.errors(include_input=False))
+
+
+def test_invitation_default_cannot_exceed_operator_maximum(
+    bearer_configuration_environment: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("INFRAMELD_INVITATION__DEFAULT_LIFETIME_SECONDS", "86401")
+    monkeypatch.setenv("INFRAMELD_INVITATION__MAXIMUM_LIFETIME_SECONDS", "86400")
+    with pytest.raises(ValidationError):
+        _load_bearer_settings()

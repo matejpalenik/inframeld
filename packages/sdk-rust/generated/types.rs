@@ -2029,6 +2029,4501 @@ impl AsRef<str> for OrganizationAction {
     }
 }
 #[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct InvitationPreviewResponse {
+    pub assignments: Vec<InvitationAssignmentRequest>,
+    #[serde(rename = "expiresAt")]
+    pub expires_at: chrono::DateTime<chrono::Utc>,
+    #[serde(rename = "invitationId")]
+    pub invitation_id: uuid::Uuid,
+    #[serde(rename = "organizationId")]
+    pub organization_id: uuid::Uuid,
+    pub scopes: Vec<InvitationScopeResponse>,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct InvitationScopeResponse {
+    #[serde(rename = "displayName")]
+    pub display_name: String,
+    pub target: InvitationTargetRequest,
+}
+///Deliver a secret once or retain only the original safe issuance metadata.
+#[derive(Debug, Clone)]
+pub enum InvitationIssueResponse {
+    InvitationFirstDeliveryResponse(InvitationFirstDeliveryResponse),
+    InvitationIssuanceReplayResponse(InvitationIssuanceReplayResponse),
+}
+impl Serialize for InvitationIssueResponse {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::InvitationFirstDeliveryResponse(value) => {
+                serde::Serialize::serialize(value, serializer)
+            }
+            Self::InvitationIssuanceReplayResponse(value) => {
+                serde::Serialize::serialize(value, serializer)
+            }
+        }
+    }
+}
+impl<'de> Deserialize<'de> for InvitationIssueResponse {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        fn exact_json_integer(number: &serde_json::Number) -> Option<i128> {
+            number.as_i64().map(i128::from).or_else(|| number.as_u64().map(i128::from))
+        }
+        fn json_numbers_have_same_value(
+            encoded: &serde_json::Number,
+            input: &serde_json::Number,
+        ) -> bool {
+            match (exact_json_integer(encoded), exact_json_integer(input)) {
+                (Some(encoded), Some(input)) => encoded == input,
+                (Some(encoded), None) => {
+                    input
+                        .as_f64()
+                        .is_some_and(|input| {
+                            input.is_finite() && input.fract() == 0.0
+                                && input as i128 == encoded
+                        })
+                }
+                (None, Some(input)) => {
+                    encoded
+                        .as_f64()
+                        .is_some_and(|encoded| {
+                            encoded.is_finite() && encoded.fract() == 0.0
+                                && encoded as i128 == input
+                        })
+                }
+                (None, None) => encoded.as_f64() == input.as_f64(),
+            }
+        }
+        /// `nulls_may_be_absent` also accepts an input `null` that the
+        /// branch omits, as a skipped `None` does. Extra encoded
+        /// keys are allowed only by the pre-existing anyOf match.
+        fn preserves_complete_json_input(
+            encoded: &serde_json::Value,
+            input: &serde_json::Value,
+            nulls_may_be_absent: bool,
+            encoded_keys_may_be_extra: bool,
+        ) -> bool {
+            match (encoded, input) {
+                (
+                    serde_json::Value::Object(encoded),
+                    serde_json::Value::Object(input),
+                ) => {
+                    (encoded_keys_may_be_extra
+                        || encoded.keys().all(|key| input.contains_key(key)))
+                        && input
+                            .iter()
+                            .all(|(key, value)| match encoded.get(key) {
+                                Some(encoded_value) => {
+                                    preserves_complete_json_input(
+                                        encoded_value,
+                                        value,
+                                        nulls_may_be_absent,
+                                        encoded_keys_may_be_extra,
+                                    )
+                                }
+                                None => nulls_may_be_absent && value.is_null(),
+                            })
+                }
+                (serde_json::Value::Array(encoded), serde_json::Value::Array(input)) => {
+                    encoded.len() == input.len()
+                        && encoded
+                            .iter()
+                            .zip(input)
+                            .all(|(encoded, input)| {
+                                preserves_complete_json_input(
+                                    encoded,
+                                    input,
+                                    nulls_may_be_absent,
+                                    encoded_keys_may_be_extra,
+                                )
+                            })
+                }
+                (
+                    serde_json::Value::Number(encoded),
+                    serde_json::Value::Number(input),
+                ) => json_numbers_have_same_value(encoded, input),
+                _ => encoded == input,
+            }
+        }
+        let input = <serde_json::Value as Deserialize>::deserialize(deserializer)?;
+        let mut matched = None;
+        let mut equivalent = None;
+        let mut equivalent_matches = 0usize;
+        if input
+            .as_object()
+            .is_some_and(|object| {
+                true
+                    && object
+                        .get("secretAvailable")
+                        .is_some_and(|value| {
+                            value.is_null()
+                                || matches!(value.to_string().as_str(), "true")
+                        })
+            })
+        {
+            if let Ok(candidate) = serde_json::from_value::<
+                InvitationFirstDeliveryResponse,
+            >(input.clone()) {
+                match serde_json::to_value(&candidate) {
+                    Ok(encoded) if encoded == input => {
+                        if matched.is_some() {
+                            return Err(
+                                serde::de::Error::custom(
+                                    concat!(
+                                        "ambiguous oneOf value for ",
+                                        stringify!(InvitationIssueResponse),
+                                        ": more than one branch preserved the complete input",
+                                    ),
+                                ),
+                            );
+                        }
+                        matched = Some(Self::InvitationFirstDeliveryResponse(candidate));
+                    }
+                    Ok(
+                        encoded,
+                    ) if preserves_complete_json_input(
+                        &encoded,
+                        &input,
+                        true,
+                        false,
+                    ) => {
+                        equivalent_matches += 1;
+                        equivalent
+                            .get_or_insert(
+                                Self::InvitationFirstDeliveryResponse(candidate),
+                            );
+                    }
+                    _ => {}
+                }
+            }
+        }
+        if input
+            .as_object()
+            .is_some_and(|object| {
+                true
+                    && object
+                        .get("secretAvailable")
+                        .is_some_and(|value| {
+                            value.is_null()
+                                || matches!(value.to_string().as_str(), "false")
+                        })
+            })
+        {
+            if let Ok(candidate) = serde_json::from_value::<
+                InvitationIssuanceReplayResponse,
+            >(input.clone()) {
+                match serde_json::to_value(&candidate) {
+                    Ok(encoded) if encoded == input => {
+                        if matched.is_some() {
+                            return Err(
+                                serde::de::Error::custom(
+                                    concat!(
+                                        "ambiguous oneOf value for ",
+                                        stringify!(InvitationIssueResponse),
+                                        ": more than one branch preserved the complete input",
+                                    ),
+                                ),
+                            );
+                        }
+                        matched = Some(
+                            Self::InvitationIssuanceReplayResponse(candidate),
+                        );
+                    }
+                    Ok(
+                        encoded,
+                    ) if preserves_complete_json_input(
+                        &encoded,
+                        &input,
+                        true,
+                        false,
+                    ) => {
+                        equivalent_matches += 1;
+                        equivalent
+                            .get_or_insert(
+                                Self::InvitationIssuanceReplayResponse(candidate),
+                            );
+                    }
+                    _ => {}
+                }
+            }
+        }
+        if let Some(matched) = matched {
+            return Ok(matched);
+        }
+        if equivalent_matches > 1 {
+            return Err(
+                serde::de::Error::custom(
+                    concat!(
+                        "ambiguous oneOf value for ",
+                        stringify!(InvitationIssueResponse),
+                        ": more than one branch preserved an equivalent input",
+                    ),
+                ),
+            );
+        }
+        equivalent
+            .ok_or_else(|| serde::de::Error::custom(
+                concat!(
+                    "no oneOf branch for ", stringify!(InvitationIssueResponse),
+                    " preserved the complete input",
+                ),
+            ))
+    }
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct InvitationIssueRequest {
+    ///Constraint: minItems=1, maxItems=100
+    pub assignments: Vec<InvitationAssignmentRequest>,
+    ///Constraint: minimum=0, maximum=9007199254740991
+    #[serde(rename = "expectedAccessRevision")]
+    pub expected_access_revision: i64,
+    ///Constraint: maxItems=100
+    #[serde(rename = "expectedProjectAccessRevisions")]
+    pub expected_project_access_revisions: Vec<InvitationProjectAccessRevisionRequest>,
+    ///Constraint: maximum=2592000, exclusiveMinimum=0
+    #[serde(
+        rename = "expiresInSeconds",
+        skip_serializing_if = "Option::is_none",
+        default,
+        deserialize_with = "presence_serde::optional_nonnull"
+    )]
+    pub expires_in_seconds: Option<i64>,
+    #[serde(rename = "organizationId")]
+    pub organization_id: uuid::Uuid,
+}
+impl InvitationIssueRequest {
+    /// Construct this request with every required wire field.
+    pub fn new(
+        assignments: Vec<InvitationAssignmentRequest>,
+        expected_access_revision: i64,
+        expected_project_access_revisions: Vec<InvitationProjectAccessRevisionRequest>,
+        organization_id: uuid::Uuid,
+    ) -> Self {
+        Self {
+            assignments,
+            expected_access_revision,
+            expected_project_access_revisions,
+            organization_id,
+            expires_in_seconds: None,
+        }
+    }
+    /// Start a dependency-free builder with every required wire field.
+    pub fn builder(
+        assignments: Vec<InvitationAssignmentRequest>,
+        expected_access_revision: i64,
+        expected_project_access_revisions: Vec<InvitationProjectAccessRevisionRequest>,
+        organization_id: uuid::Uuid,
+    ) -> InvitationIssueRequestBuilder {
+        InvitationIssueRequestBuilder::new(
+            assignments,
+            expected_access_revision,
+            expected_project_access_revisions,
+            organization_id,
+        )
+    }
+}
+/// Dependency-free builder for [`#struct_name`].
+#[derive(Debug, Clone)]
+#[must_use]
+pub struct InvitationIssueRequestBuilder {
+    value: InvitationIssueRequest,
+}
+impl InvitationIssueRequestBuilder {
+    /// Start a builder with every required wire field.
+    pub fn new(
+        assignments: Vec<InvitationAssignmentRequest>,
+        expected_access_revision: i64,
+        expected_project_access_revisions: Vec<InvitationProjectAccessRevisionRequest>,
+        organization_id: uuid::Uuid,
+    ) -> Self {
+        Self {
+            value: InvitationIssueRequest::new(
+                assignments,
+                expected_access_revision,
+                expected_project_access_revisions,
+                organization_id,
+            ),
+        }
+    }
+    #[doc = concat!("Set the optional `", "expiresInSeconds", "` request field.")]
+    #[must_use]
+    pub fn expires_in_seconds(mut self, expires_in_seconds: i64) -> Self {
+        self.value.expires_in_seconds = Some(expires_in_seconds);
+        self
+    }
+    /// Finish building the request model.
+    pub fn build(self) -> InvitationIssueRequest {
+        self.value
+    }
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct InvitationProjectAccessRevisionRequest {
+    ///Constraint: minimum=0, maximum=9007199254740991
+    #[serde(rename = "accessRevision")]
+    pub access_revision: i64,
+    #[serde(rename = "projectId")]
+    pub project_id: uuid::Uuid,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct InvitationIssuanceReplayResponse {
+    #[serde(rename = "accessRevision")]
+    pub access_revision: i64,
+    pub assignments: Vec<InvitationAssignmentRequest>,
+    #[serde(rename = "expiresAt")]
+    pub expires_at: chrono::DateTime<chrono::Utc>,
+    #[serde(rename = "idempotencyExpiresAt")]
+    pub idempotency_expires_at: chrono::DateTime<chrono::Utc>,
+    #[serde(rename = "invitationId")]
+    pub invitation_id: uuid::Uuid,
+    #[serde(rename = "operationId")]
+    pub operation_id: String,
+    #[serde(rename = "organizationId")]
+    pub organization_id: uuid::Uuid,
+    #[serde(rename = "secretAvailable")]
+    pub secret_available: BooleanConstant<false>,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct InvitationFirstDeliveryResponse {
+    #[serde(rename = "accessRevision")]
+    pub access_revision: i64,
+    pub assignments: Vec<InvitationAssignmentRequest>,
+    #[serde(rename = "expiresAt")]
+    pub expires_at: chrono::DateTime<chrono::Utc>,
+    #[serde(rename = "idempotencyExpiresAt")]
+    pub idempotency_expires_at: chrono::DateTime<chrono::Utc>,
+    #[serde(rename = "invitationId")]
+    pub invitation_id: uuid::Uuid,
+    #[serde(rename = "invitationToken")]
+    pub invitation_token: String,
+    #[serde(rename = "operationId")]
+    pub operation_id: String,
+    #[serde(rename = "organizationId")]
+    pub organization_id: uuid::Uuid,
+    #[serde(rename = "secretAvailable")]
+    pub secret_available: BooleanConstant<true>,
+}
+#[derive(Debug, Clone)]
+pub enum InvitationAssignmentRequest {
+    InvitationAdmissionOnlyRequest(InvitationAdmissionOnlyRequest),
+    InvitationProjectMembershipRequest(InvitationProjectMembershipRequest),
+    InvitationGroupMembershipRequest(InvitationGroupMembershipRequest),
+    InvitationGroupManagerRequest(InvitationGroupManagerRequest),
+    InvitationActionGrantRequest(InvitationActionGrantRequest),
+}
+impl serde::Serialize for InvitationAssignmentRequest {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::InvitationAdmissionOnlyRequest(payload) => {
+                let mut value = serde_json::to_value(payload)
+                    .map_err(serde::ser::Error::custom)?;
+                let object = value
+                    .as_object_mut()
+                    .ok_or_else(|| {
+                        serde::ser::Error::custom(
+                            concat!(
+                                "discriminated union variant `",
+                                stringify!(InvitationAdmissionOnlyRequest),
+                                "` did not serialize as an object",
+                            ),
+                        )
+                    })?;
+                match object.get("kind") {
+                    Some(
+                        serde_json::Value::String(tag),
+                    ) if matches!(tag.as_str(), "admission-only") => {}
+                    Some(serde_json::Value::String(tag)) => {
+                        return Err(
+                            serde::ser::Error::custom(
+                                format!(
+                                    "discriminator `{}` value `{tag}` is not valid for variant `{}`",
+                                    "kind", stringify!(InvitationAdmissionOnlyRequest),
+                                ),
+                            ),
+                        );
+                    }
+                    Some(_) => {
+                        return Err(
+                            serde::ser::Error::custom(
+                                concat!(
+                                    "discriminator `", "kind",
+                                    "` did not serialize as a string",
+                                ),
+                            ),
+                        );
+                    }
+                    None => {
+                        object
+                            .insert(
+                                "kind".to_string(),
+                                serde_json::Value::String("admission-only".to_string()),
+                            );
+                    }
+                }
+                value.serialize(serializer)
+            }
+            Self::InvitationProjectMembershipRequest(payload) => {
+                let mut value = serde_json::to_value(payload)
+                    .map_err(serde::ser::Error::custom)?;
+                let object = value
+                    .as_object_mut()
+                    .ok_or_else(|| {
+                        serde::ser::Error::custom(
+                            concat!(
+                                "discriminated union variant `",
+                                stringify!(InvitationProjectMembershipRequest),
+                                "` did not serialize as an object",
+                            ),
+                        )
+                    })?;
+                match object.get("kind") {
+                    Some(
+                        serde_json::Value::String(tag),
+                    ) if matches!(tag.as_str(), "project-membership") => {}
+                    Some(serde_json::Value::String(tag)) => {
+                        return Err(
+                            serde::ser::Error::custom(
+                                format!(
+                                    "discriminator `{}` value `{tag}` is not valid for variant `{}`",
+                                    "kind", stringify!(InvitationProjectMembershipRequest),
+                                ),
+                            ),
+                        );
+                    }
+                    Some(_) => {
+                        return Err(
+                            serde::ser::Error::custom(
+                                concat!(
+                                    "discriminator `", "kind",
+                                    "` did not serialize as a string",
+                                ),
+                            ),
+                        );
+                    }
+                    None => {
+                        object
+                            .insert(
+                                "kind".to_string(),
+                                serde_json::Value::String("project-membership".to_string()),
+                            );
+                    }
+                }
+                value.serialize(serializer)
+            }
+            Self::InvitationGroupMembershipRequest(payload) => {
+                let mut value = serde_json::to_value(payload)
+                    .map_err(serde::ser::Error::custom)?;
+                let object = value
+                    .as_object_mut()
+                    .ok_or_else(|| {
+                        serde::ser::Error::custom(
+                            concat!(
+                                "discriminated union variant `",
+                                stringify!(InvitationGroupMembershipRequest),
+                                "` did not serialize as an object",
+                            ),
+                        )
+                    })?;
+                match object.get("kind") {
+                    Some(
+                        serde_json::Value::String(tag),
+                    ) if matches!(tag.as_str(), "group-membership") => {}
+                    Some(serde_json::Value::String(tag)) => {
+                        return Err(
+                            serde::ser::Error::custom(
+                                format!(
+                                    "discriminator `{}` value `{tag}` is not valid for variant `{}`",
+                                    "kind", stringify!(InvitationGroupMembershipRequest),
+                                ),
+                            ),
+                        );
+                    }
+                    Some(_) => {
+                        return Err(
+                            serde::ser::Error::custom(
+                                concat!(
+                                    "discriminator `", "kind",
+                                    "` did not serialize as a string",
+                                ),
+                            ),
+                        );
+                    }
+                    None => {
+                        object
+                            .insert(
+                                "kind".to_string(),
+                                serde_json::Value::String("group-membership".to_string()),
+                            );
+                    }
+                }
+                value.serialize(serializer)
+            }
+            Self::InvitationGroupManagerRequest(payload) => {
+                let mut value = serde_json::to_value(payload)
+                    .map_err(serde::ser::Error::custom)?;
+                let object = value
+                    .as_object_mut()
+                    .ok_or_else(|| {
+                        serde::ser::Error::custom(
+                            concat!(
+                                "discriminated union variant `",
+                                stringify!(InvitationGroupManagerRequest),
+                                "` did not serialize as an object",
+                            ),
+                        )
+                    })?;
+                match object.get("kind") {
+                    Some(
+                        serde_json::Value::String(tag),
+                    ) if matches!(tag.as_str(), "group-manager") => {}
+                    Some(serde_json::Value::String(tag)) => {
+                        return Err(
+                            serde::ser::Error::custom(
+                                format!(
+                                    "discriminator `{}` value `{tag}` is not valid for variant `{}`",
+                                    "kind", stringify!(InvitationGroupManagerRequest),
+                                ),
+                            ),
+                        );
+                    }
+                    Some(_) => {
+                        return Err(
+                            serde::ser::Error::custom(
+                                concat!(
+                                    "discriminator `", "kind",
+                                    "` did not serialize as a string",
+                                ),
+                            ),
+                        );
+                    }
+                    None => {
+                        object
+                            .insert(
+                                "kind".to_string(),
+                                serde_json::Value::String("group-manager".to_string()),
+                            );
+                    }
+                }
+                value.serialize(serializer)
+            }
+            Self::InvitationActionGrantRequest(payload) => {
+                let mut value = serde_json::to_value(payload)
+                    .map_err(serde::ser::Error::custom)?;
+                let object = value
+                    .as_object_mut()
+                    .ok_or_else(|| {
+                        serde::ser::Error::custom(
+                            concat!(
+                                "discriminated union variant `",
+                                stringify!(InvitationActionGrantRequest),
+                                "` did not serialize as an object",
+                            ),
+                        )
+                    })?;
+                match object.get("kind") {
+                    Some(
+                        serde_json::Value::String(tag),
+                    ) if matches!(tag.as_str(), "action-grant") => {}
+                    Some(serde_json::Value::String(tag)) => {
+                        return Err(
+                            serde::ser::Error::custom(
+                                format!(
+                                    "discriminator `{}` value `{tag}` is not valid for variant `{}`",
+                                    "kind", stringify!(InvitationActionGrantRequest),
+                                ),
+                            ),
+                        );
+                    }
+                    Some(_) => {
+                        return Err(
+                            serde::ser::Error::custom(
+                                concat!(
+                                    "discriminator `", "kind",
+                                    "` did not serialize as a string",
+                                ),
+                            ),
+                        );
+                    }
+                    None => {
+                        object
+                            .insert(
+                                "kind".to_string(),
+                                serde_json::Value::String("action-grant".to_string()),
+                            );
+                    }
+                }
+                value.serialize(serializer)
+            }
+        }
+    }
+}
+impl<'de> serde::Deserialize<'de> for InvitationAssignmentRequest {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = serde_json::Value::deserialize(deserializer)?;
+        let discriminator = match value.get("kind") {
+            Some(serde_json::Value::String(discriminator)) => {
+                Some(discriminator.as_str())
+            }
+            Some(_) => {
+                return Err(
+                    serde::de::Error::custom(
+                        concat!("non-string discriminator `", "kind", "`",),
+                    ),
+                );
+            }
+            None => None,
+        };
+        match discriminator {
+            Some(discriminator) => {
+                match discriminator {
+                    "admission-only" => {
+                        let primary_error = match serde_json::from_value::<
+                            InvitationAdmissionOnlyRequest,
+                        >(value.clone()) {
+                            Ok(payload) => {
+                                return Ok(Self::InvitationAdmissionOnlyRequest(payload));
+                            }
+                            Err(error) => error,
+                        };
+                        let mut structural_match: Option<(Self, &'static str)> = None;
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationProjectMembershipRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "admission-only", first_name,
+                                            stringify!(InvitationProjectMembershipRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationProjectMembershipRequest(payload),
+                                stringify!(InvitationProjectMembershipRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationGroupMembershipRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "admission-only", first_name,
+                                            stringify!(InvitationGroupMembershipRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationGroupMembershipRequest(payload),
+                                stringify!(InvitationGroupMembershipRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationGroupManagerRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "admission-only", first_name,
+                                            stringify!(InvitationGroupManagerRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationGroupManagerRequest(payload),
+                                stringify!(InvitationGroupManagerRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationActionGrantRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "admission-only", first_name,
+                                            stringify!(InvitationActionGrantRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationActionGrantRequest(payload),
+                                stringify!(InvitationActionGrantRequest),
+                            ));
+                        }
+                        match structural_match {
+                            Some((payload, _)) => Ok(payload),
+                            None => Err(serde::de::Error::custom(primary_error)),
+                        }
+                    }
+                    "project-membership" => {
+                        let primary_error = match serde_json::from_value::<
+                            InvitationProjectMembershipRequest,
+                        >(value.clone()) {
+                            Ok(payload) => {
+                                return Ok(Self::InvitationProjectMembershipRequest(payload));
+                            }
+                            Err(error) => error,
+                        };
+                        let mut structural_match: Option<(Self, &'static str)> = None;
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationAdmissionOnlyRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "project-membership", first_name,
+                                            stringify!(InvitationAdmissionOnlyRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationAdmissionOnlyRequest(payload),
+                                stringify!(InvitationAdmissionOnlyRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationGroupMembershipRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "project-membership", first_name,
+                                            stringify!(InvitationGroupMembershipRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationGroupMembershipRequest(payload),
+                                stringify!(InvitationGroupMembershipRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationGroupManagerRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "project-membership", first_name,
+                                            stringify!(InvitationGroupManagerRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationGroupManagerRequest(payload),
+                                stringify!(InvitationGroupManagerRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationActionGrantRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "project-membership", first_name,
+                                            stringify!(InvitationActionGrantRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationActionGrantRequest(payload),
+                                stringify!(InvitationActionGrantRequest),
+                            ));
+                        }
+                        match structural_match {
+                            Some((payload, _)) => Ok(payload),
+                            None => Err(serde::de::Error::custom(primary_error)),
+                        }
+                    }
+                    "group-membership" => {
+                        let primary_error = match serde_json::from_value::<
+                            InvitationGroupMembershipRequest,
+                        >(value.clone()) {
+                            Ok(payload) => {
+                                return Ok(Self::InvitationGroupMembershipRequest(payload));
+                            }
+                            Err(error) => error,
+                        };
+                        let mut structural_match: Option<(Self, &'static str)> = None;
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationAdmissionOnlyRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "group-membership", first_name,
+                                            stringify!(InvitationAdmissionOnlyRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationAdmissionOnlyRequest(payload),
+                                stringify!(InvitationAdmissionOnlyRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationProjectMembershipRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "group-membership", first_name,
+                                            stringify!(InvitationProjectMembershipRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationProjectMembershipRequest(payload),
+                                stringify!(InvitationProjectMembershipRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationGroupManagerRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "group-membership", first_name,
+                                            stringify!(InvitationGroupManagerRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationGroupManagerRequest(payload),
+                                stringify!(InvitationGroupManagerRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationActionGrantRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "group-membership", first_name,
+                                            stringify!(InvitationActionGrantRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationActionGrantRequest(payload),
+                                stringify!(InvitationActionGrantRequest),
+                            ));
+                        }
+                        match structural_match {
+                            Some((payload, _)) => Ok(payload),
+                            None => Err(serde::de::Error::custom(primary_error)),
+                        }
+                    }
+                    "group-manager" => {
+                        let primary_error = match serde_json::from_value::<
+                            InvitationGroupManagerRequest,
+                        >(value.clone()) {
+                            Ok(payload) => {
+                                return Ok(Self::InvitationGroupManagerRequest(payload));
+                            }
+                            Err(error) => error,
+                        };
+                        let mut structural_match: Option<(Self, &'static str)> = None;
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationAdmissionOnlyRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "group-manager", first_name,
+                                            stringify!(InvitationAdmissionOnlyRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationAdmissionOnlyRequest(payload),
+                                stringify!(InvitationAdmissionOnlyRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationProjectMembershipRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "group-manager", first_name,
+                                            stringify!(InvitationProjectMembershipRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationProjectMembershipRequest(payload),
+                                stringify!(InvitationProjectMembershipRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationGroupMembershipRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "group-manager", first_name,
+                                            stringify!(InvitationGroupMembershipRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationGroupMembershipRequest(payload),
+                                stringify!(InvitationGroupMembershipRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationActionGrantRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "group-manager", first_name,
+                                            stringify!(InvitationActionGrantRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationActionGrantRequest(payload),
+                                stringify!(InvitationActionGrantRequest),
+                            ));
+                        }
+                        match structural_match {
+                            Some((payload, _)) => Ok(payload),
+                            None => Err(serde::de::Error::custom(primary_error)),
+                        }
+                    }
+                    "action-grant" => {
+                        let primary_error = match serde_json::from_value::<
+                            InvitationActionGrantRequest,
+                        >(value.clone()) {
+                            Ok(payload) => {
+                                return Ok(Self::InvitationActionGrantRequest(payload));
+                            }
+                            Err(error) => error,
+                        };
+                        let mut structural_match: Option<(Self, &'static str)> = None;
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationAdmissionOnlyRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "action-grant", first_name,
+                                            stringify!(InvitationAdmissionOnlyRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationAdmissionOnlyRequest(payload),
+                                stringify!(InvitationAdmissionOnlyRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationProjectMembershipRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "action-grant", first_name,
+                                            stringify!(InvitationProjectMembershipRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationProjectMembershipRequest(payload),
+                                stringify!(InvitationProjectMembershipRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationGroupMembershipRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "action-grant", first_name,
+                                            stringify!(InvitationGroupMembershipRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationGroupMembershipRequest(payload),
+                                stringify!(InvitationGroupMembershipRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationGroupManagerRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "action-grant", first_name,
+                                            stringify!(InvitationGroupManagerRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationGroupManagerRequest(payload),
+                                stringify!(InvitationGroupManagerRequest),
+                            ));
+                        }
+                        match structural_match {
+                            Some((payload, _)) => Ok(payload),
+                            None => Err(serde::de::Error::custom(primary_error)),
+                        }
+                    }
+                    other => {
+                        Err(
+                            serde::de::Error::custom(
+                                format!(
+                                    "unknown discriminator value `{other}` for `{}`", "kind",
+                                ),
+                            ),
+                        )
+                    }
+                }
+            }
+            None => {
+                Err(
+                    serde::de::Error::custom(
+                        concat!("missing string discriminator `", "kind", "`",),
+                    ),
+                )
+            }
+        }
+    }
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct InvitationProjectMembershipRequest {
+    pub kind: InvitationProjectMembershipRequestKind,
+    #[serde(rename = "projectId")]
+    pub project_id: uuid::Uuid,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum InvitationProjectMembershipRequestKind {
+    #[default]
+    #[serde(rename = "project-membership")]
+    ProjectMembership,
+}
+impl InvitationProjectMembershipRequestKind {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::ProjectMembership => "project-membership",
+        }
+    }
+}
+impl ::std::fmt::Display for InvitationProjectMembershipRequestKind {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for InvitationProjectMembershipRequestKind {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct InvitationGroupMembershipRequest {
+    #[serde(rename = "accessGroupId")]
+    pub access_group_id: uuid::Uuid,
+    pub kind: InvitationGroupMembershipRequestKind,
+    #[serde(rename = "projectId")]
+    pub project_id: uuid::Uuid,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum InvitationGroupMembershipRequestKind {
+    #[default]
+    #[serde(rename = "group-membership")]
+    GroupMembership,
+}
+impl InvitationGroupMembershipRequestKind {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::GroupMembership => "group-membership",
+        }
+    }
+}
+impl ::std::fmt::Display for InvitationGroupMembershipRequestKind {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for InvitationGroupMembershipRequestKind {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct InvitationGroupManagerRequest {
+    #[serde(rename = "accessGroupId")]
+    pub access_group_id: uuid::Uuid,
+    pub kind: InvitationGroupManagerRequestKind,
+    #[serde(rename = "projectId")]
+    pub project_id: uuid::Uuid,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum InvitationGroupManagerRequestKind {
+    #[default]
+    #[serde(rename = "group-manager")]
+    GroupManager,
+}
+impl InvitationGroupManagerRequestKind {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::GroupManager => "group-manager",
+        }
+    }
+}
+impl ::std::fmt::Display for InvitationGroupManagerRequestKind {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for InvitationGroupManagerRequestKind {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct InvitationAdmissionOnlyRequest {
+    pub kind: InvitationAdmissionOnlyRequestKind,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum InvitationAdmissionOnlyRequestKind {
+    #[default]
+    #[serde(rename = "admission-only")]
+    AdmissionOnly,
+}
+impl InvitationAdmissionOnlyRequestKind {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::AdmissionOnly => "admission-only",
+        }
+    }
+}
+impl ::std::fmt::Display for InvitationAdmissionOnlyRequestKind {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for InvitationAdmissionOnlyRequestKind {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct InvitationActivationResponse {
+    #[serde(rename = "idempotencyExpiresAt")]
+    pub idempotency_expires_at: chrono::DateTime<chrono::Utc>,
+    #[serde(rename = "invitationId")]
+    pub invitation_id: uuid::Uuid,
+    #[serde(rename = "operationId")]
+    pub operation_id: String,
+    #[serde(rename = "organizationAccessRevision")]
+    pub organization_access_revision: i64,
+    #[serde(rename = "organizationId")]
+    pub organization_id: uuid::Uuid,
+    #[serde(rename = "principalId")]
+    pub principal_id: uuid::Uuid,
+    #[serde(rename = "projectAccessRevisions")]
+    pub project_access_revisions: Vec<InvitationProjectAccessRevisionResponse>,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct InvitationProjectAccessRevisionResponse {
+    #[serde(rename = "accessRevision")]
+    pub access_revision: i64,
+    #[serde(rename = "projectId")]
+    pub project_id: uuid::Uuid,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct InvitationActionGrantRequest {
+    ///Constraint: minLength=1, maxLength=100
+    #[serde(rename = "actionId")]
+    pub action_id: String,
+    #[serde(rename = "canGrant")]
+    pub can_grant: bool,
+    pub kind: InvitationActionGrantRequestKind,
+    pub target: InvitationTargetRequest,
+}
+#[derive(Debug, Clone)]
+pub enum InvitationTargetRequest {
+    InvitationOrganizationTargetRequest(InvitationOrganizationTargetRequest),
+    InvitationProjectTargetRequest(InvitationProjectTargetRequest),
+    InvitationAccessGroupTargetRequest(InvitationAccessGroupTargetRequest),
+    InvitationApplicationAccountTargetRequest(InvitationApplicationAccountTargetRequest),
+    InvitationPipelineTargetRequest(InvitationPipelineTargetRequest),
+    InvitationDeploymentTargetRequest(InvitationDeploymentTargetRequest),
+    InvitationCollectionTargetRequest(InvitationCollectionTargetRequest),
+    InvitationSourceTargetRequest(InvitationSourceTargetRequest),
+    InvitationModelConnectionTargetRequest(InvitationModelConnectionTargetRequest),
+    InvitationProcessingProfileTargetRequest(InvitationProcessingProfileTargetRequest),
+    InvitationEmbeddingProfileTargetRequest(InvitationEmbeddingProfileTargetRequest),
+}
+impl serde::Serialize for InvitationTargetRequest {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::InvitationOrganizationTargetRequest(payload) => {
+                let mut value = serde_json::to_value(payload)
+                    .map_err(serde::ser::Error::custom)?;
+                let object = value
+                    .as_object_mut()
+                    .ok_or_else(|| {
+                        serde::ser::Error::custom(
+                            concat!(
+                                "discriminated union variant `",
+                                stringify!(InvitationOrganizationTargetRequest),
+                                "` did not serialize as an object",
+                            ),
+                        )
+                    })?;
+                match object.get("kind") {
+                    Some(
+                        serde_json::Value::String(tag),
+                    ) if matches!(tag.as_str(), "organization") => {}
+                    Some(serde_json::Value::String(tag)) => {
+                        return Err(
+                            serde::ser::Error::custom(
+                                format!(
+                                    "discriminator `{}` value `{tag}` is not valid for variant `{}`",
+                                    "kind", stringify!(InvitationOrganizationTargetRequest),
+                                ),
+                            ),
+                        );
+                    }
+                    Some(_) => {
+                        return Err(
+                            serde::ser::Error::custom(
+                                concat!(
+                                    "discriminator `", "kind",
+                                    "` did not serialize as a string",
+                                ),
+                            ),
+                        );
+                    }
+                    None => {
+                        object
+                            .insert(
+                                "kind".to_string(),
+                                serde_json::Value::String("organization".to_string()),
+                            );
+                    }
+                }
+                value.serialize(serializer)
+            }
+            Self::InvitationProjectTargetRequest(payload) => {
+                let mut value = serde_json::to_value(payload)
+                    .map_err(serde::ser::Error::custom)?;
+                let object = value
+                    .as_object_mut()
+                    .ok_or_else(|| {
+                        serde::ser::Error::custom(
+                            concat!(
+                                "discriminated union variant `",
+                                stringify!(InvitationProjectTargetRequest),
+                                "` did not serialize as an object",
+                            ),
+                        )
+                    })?;
+                match object.get("kind") {
+                    Some(
+                        serde_json::Value::String(tag),
+                    ) if matches!(tag.as_str(), "project") => {}
+                    Some(serde_json::Value::String(tag)) => {
+                        return Err(
+                            serde::ser::Error::custom(
+                                format!(
+                                    "discriminator `{}` value `{tag}` is not valid for variant `{}`",
+                                    "kind", stringify!(InvitationProjectTargetRequest),
+                                ),
+                            ),
+                        );
+                    }
+                    Some(_) => {
+                        return Err(
+                            serde::ser::Error::custom(
+                                concat!(
+                                    "discriminator `", "kind",
+                                    "` did not serialize as a string",
+                                ),
+                            ),
+                        );
+                    }
+                    None => {
+                        object
+                            .insert(
+                                "kind".to_string(),
+                                serde_json::Value::String("project".to_string()),
+                            );
+                    }
+                }
+                value.serialize(serializer)
+            }
+            Self::InvitationAccessGroupTargetRequest(payload) => {
+                let mut value = serde_json::to_value(payload)
+                    .map_err(serde::ser::Error::custom)?;
+                let object = value
+                    .as_object_mut()
+                    .ok_or_else(|| {
+                        serde::ser::Error::custom(
+                            concat!(
+                                "discriminated union variant `",
+                                stringify!(InvitationAccessGroupTargetRequest),
+                                "` did not serialize as an object",
+                            ),
+                        )
+                    })?;
+                match object.get("kind") {
+                    Some(
+                        serde_json::Value::String(tag),
+                    ) if matches!(tag.as_str(), "access-group") => {}
+                    Some(serde_json::Value::String(tag)) => {
+                        return Err(
+                            serde::ser::Error::custom(
+                                format!(
+                                    "discriminator `{}` value `{tag}` is not valid for variant `{}`",
+                                    "kind", stringify!(InvitationAccessGroupTargetRequest),
+                                ),
+                            ),
+                        );
+                    }
+                    Some(_) => {
+                        return Err(
+                            serde::ser::Error::custom(
+                                concat!(
+                                    "discriminator `", "kind",
+                                    "` did not serialize as a string",
+                                ),
+                            ),
+                        );
+                    }
+                    None => {
+                        object
+                            .insert(
+                                "kind".to_string(),
+                                serde_json::Value::String("access-group".to_string()),
+                            );
+                    }
+                }
+                value.serialize(serializer)
+            }
+            Self::InvitationApplicationAccountTargetRequest(payload) => {
+                let mut value = serde_json::to_value(payload)
+                    .map_err(serde::ser::Error::custom)?;
+                let object = value
+                    .as_object_mut()
+                    .ok_or_else(|| {
+                        serde::ser::Error::custom(
+                            concat!(
+                                "discriminated union variant `",
+                                stringify!(InvitationApplicationAccountTargetRequest),
+                                "` did not serialize as an object",
+                            ),
+                        )
+                    })?;
+                match object.get("kind") {
+                    Some(
+                        serde_json::Value::String(tag),
+                    ) if matches!(tag.as_str(), "application-account") => {}
+                    Some(serde_json::Value::String(tag)) => {
+                        return Err(
+                            serde::ser::Error::custom(
+                                format!(
+                                    "discriminator `{}` value `{tag}` is not valid for variant `{}`",
+                                    "kind",
+                                    stringify!(InvitationApplicationAccountTargetRequest),
+                                ),
+                            ),
+                        );
+                    }
+                    Some(_) => {
+                        return Err(
+                            serde::ser::Error::custom(
+                                concat!(
+                                    "discriminator `", "kind",
+                                    "` did not serialize as a string",
+                                ),
+                            ),
+                        );
+                    }
+                    None => {
+                        object
+                            .insert(
+                                "kind".to_string(),
+                                serde_json::Value::String("application-account".to_string()),
+                            );
+                    }
+                }
+                value.serialize(serializer)
+            }
+            Self::InvitationPipelineTargetRequest(payload) => {
+                let mut value = serde_json::to_value(payload)
+                    .map_err(serde::ser::Error::custom)?;
+                let object = value
+                    .as_object_mut()
+                    .ok_or_else(|| {
+                        serde::ser::Error::custom(
+                            concat!(
+                                "discriminated union variant `",
+                                stringify!(InvitationPipelineTargetRequest),
+                                "` did not serialize as an object",
+                            ),
+                        )
+                    })?;
+                match object.get("kind") {
+                    Some(
+                        serde_json::Value::String(tag),
+                    ) if matches!(tag.as_str(), "pipeline") => {}
+                    Some(serde_json::Value::String(tag)) => {
+                        return Err(
+                            serde::ser::Error::custom(
+                                format!(
+                                    "discriminator `{}` value `{tag}` is not valid for variant `{}`",
+                                    "kind", stringify!(InvitationPipelineTargetRequest),
+                                ),
+                            ),
+                        );
+                    }
+                    Some(_) => {
+                        return Err(
+                            serde::ser::Error::custom(
+                                concat!(
+                                    "discriminator `", "kind",
+                                    "` did not serialize as a string",
+                                ),
+                            ),
+                        );
+                    }
+                    None => {
+                        object
+                            .insert(
+                                "kind".to_string(),
+                                serde_json::Value::String("pipeline".to_string()),
+                            );
+                    }
+                }
+                value.serialize(serializer)
+            }
+            Self::InvitationDeploymentTargetRequest(payload) => {
+                let mut value = serde_json::to_value(payload)
+                    .map_err(serde::ser::Error::custom)?;
+                let object = value
+                    .as_object_mut()
+                    .ok_or_else(|| {
+                        serde::ser::Error::custom(
+                            concat!(
+                                "discriminated union variant `",
+                                stringify!(InvitationDeploymentTargetRequest),
+                                "` did not serialize as an object",
+                            ),
+                        )
+                    })?;
+                match object.get("kind") {
+                    Some(
+                        serde_json::Value::String(tag),
+                    ) if matches!(tag.as_str(), "deployment") => {}
+                    Some(serde_json::Value::String(tag)) => {
+                        return Err(
+                            serde::ser::Error::custom(
+                                format!(
+                                    "discriminator `{}` value `{tag}` is not valid for variant `{}`",
+                                    "kind", stringify!(InvitationDeploymentTargetRequest),
+                                ),
+                            ),
+                        );
+                    }
+                    Some(_) => {
+                        return Err(
+                            serde::ser::Error::custom(
+                                concat!(
+                                    "discriminator `", "kind",
+                                    "` did not serialize as a string",
+                                ),
+                            ),
+                        );
+                    }
+                    None => {
+                        object
+                            .insert(
+                                "kind".to_string(),
+                                serde_json::Value::String("deployment".to_string()),
+                            );
+                    }
+                }
+                value.serialize(serializer)
+            }
+            Self::InvitationCollectionTargetRequest(payload) => {
+                let mut value = serde_json::to_value(payload)
+                    .map_err(serde::ser::Error::custom)?;
+                let object = value
+                    .as_object_mut()
+                    .ok_or_else(|| {
+                        serde::ser::Error::custom(
+                            concat!(
+                                "discriminated union variant `",
+                                stringify!(InvitationCollectionTargetRequest),
+                                "` did not serialize as an object",
+                            ),
+                        )
+                    })?;
+                match object.get("kind") {
+                    Some(
+                        serde_json::Value::String(tag),
+                    ) if matches!(tag.as_str(), "collection") => {}
+                    Some(serde_json::Value::String(tag)) => {
+                        return Err(
+                            serde::ser::Error::custom(
+                                format!(
+                                    "discriminator `{}` value `{tag}` is not valid for variant `{}`",
+                                    "kind", stringify!(InvitationCollectionTargetRequest),
+                                ),
+                            ),
+                        );
+                    }
+                    Some(_) => {
+                        return Err(
+                            serde::ser::Error::custom(
+                                concat!(
+                                    "discriminator `", "kind",
+                                    "` did not serialize as a string",
+                                ),
+                            ),
+                        );
+                    }
+                    None => {
+                        object
+                            .insert(
+                                "kind".to_string(),
+                                serde_json::Value::String("collection".to_string()),
+                            );
+                    }
+                }
+                value.serialize(serializer)
+            }
+            Self::InvitationSourceTargetRequest(payload) => {
+                let mut value = serde_json::to_value(payload)
+                    .map_err(serde::ser::Error::custom)?;
+                let object = value
+                    .as_object_mut()
+                    .ok_or_else(|| {
+                        serde::ser::Error::custom(
+                            concat!(
+                                "discriminated union variant `",
+                                stringify!(InvitationSourceTargetRequest),
+                                "` did not serialize as an object",
+                            ),
+                        )
+                    })?;
+                match object.get("kind") {
+                    Some(
+                        serde_json::Value::String(tag),
+                    ) if matches!(tag.as_str(), "source") => {}
+                    Some(serde_json::Value::String(tag)) => {
+                        return Err(
+                            serde::ser::Error::custom(
+                                format!(
+                                    "discriminator `{}` value `{tag}` is not valid for variant `{}`",
+                                    "kind", stringify!(InvitationSourceTargetRequest),
+                                ),
+                            ),
+                        );
+                    }
+                    Some(_) => {
+                        return Err(
+                            serde::ser::Error::custom(
+                                concat!(
+                                    "discriminator `", "kind",
+                                    "` did not serialize as a string",
+                                ),
+                            ),
+                        );
+                    }
+                    None => {
+                        object
+                            .insert(
+                                "kind".to_string(),
+                                serde_json::Value::String("source".to_string()),
+                            );
+                    }
+                }
+                value.serialize(serializer)
+            }
+            Self::InvitationModelConnectionTargetRequest(payload) => {
+                let mut value = serde_json::to_value(payload)
+                    .map_err(serde::ser::Error::custom)?;
+                let object = value
+                    .as_object_mut()
+                    .ok_or_else(|| {
+                        serde::ser::Error::custom(
+                            concat!(
+                                "discriminated union variant `",
+                                stringify!(InvitationModelConnectionTargetRequest),
+                                "` did not serialize as an object",
+                            ),
+                        )
+                    })?;
+                match object.get("kind") {
+                    Some(
+                        serde_json::Value::String(tag),
+                    ) if matches!(tag.as_str(), "model-connection") => {}
+                    Some(serde_json::Value::String(tag)) => {
+                        return Err(
+                            serde::ser::Error::custom(
+                                format!(
+                                    "discriminator `{}` value `{tag}` is not valid for variant `{}`",
+                                    "kind", stringify!(InvitationModelConnectionTargetRequest),
+                                ),
+                            ),
+                        );
+                    }
+                    Some(_) => {
+                        return Err(
+                            serde::ser::Error::custom(
+                                concat!(
+                                    "discriminator `", "kind",
+                                    "` did not serialize as a string",
+                                ),
+                            ),
+                        );
+                    }
+                    None => {
+                        object
+                            .insert(
+                                "kind".to_string(),
+                                serde_json::Value::String("model-connection".to_string()),
+                            );
+                    }
+                }
+                value.serialize(serializer)
+            }
+            Self::InvitationProcessingProfileTargetRequest(payload) => {
+                let mut value = serde_json::to_value(payload)
+                    .map_err(serde::ser::Error::custom)?;
+                let object = value
+                    .as_object_mut()
+                    .ok_or_else(|| {
+                        serde::ser::Error::custom(
+                            concat!(
+                                "discriminated union variant `",
+                                stringify!(InvitationProcessingProfileTargetRequest),
+                                "` did not serialize as an object",
+                            ),
+                        )
+                    })?;
+                match object.get("kind") {
+                    Some(
+                        serde_json::Value::String(tag),
+                    ) if matches!(tag.as_str(), "processing-profile") => {}
+                    Some(serde_json::Value::String(tag)) => {
+                        return Err(
+                            serde::ser::Error::custom(
+                                format!(
+                                    "discriminator `{}` value `{tag}` is not valid for variant `{}`",
+                                    "kind",
+                                    stringify!(InvitationProcessingProfileTargetRequest),
+                                ),
+                            ),
+                        );
+                    }
+                    Some(_) => {
+                        return Err(
+                            serde::ser::Error::custom(
+                                concat!(
+                                    "discriminator `", "kind",
+                                    "` did not serialize as a string",
+                                ),
+                            ),
+                        );
+                    }
+                    None => {
+                        object
+                            .insert(
+                                "kind".to_string(),
+                                serde_json::Value::String("processing-profile".to_string()),
+                            );
+                    }
+                }
+                value.serialize(serializer)
+            }
+            Self::InvitationEmbeddingProfileTargetRequest(payload) => {
+                let mut value = serde_json::to_value(payload)
+                    .map_err(serde::ser::Error::custom)?;
+                let object = value
+                    .as_object_mut()
+                    .ok_or_else(|| {
+                        serde::ser::Error::custom(
+                            concat!(
+                                "discriminated union variant `",
+                                stringify!(InvitationEmbeddingProfileTargetRequest),
+                                "` did not serialize as an object",
+                            ),
+                        )
+                    })?;
+                match object.get("kind") {
+                    Some(
+                        serde_json::Value::String(tag),
+                    ) if matches!(tag.as_str(), "embedding-profile") => {}
+                    Some(serde_json::Value::String(tag)) => {
+                        return Err(
+                            serde::ser::Error::custom(
+                                format!(
+                                    "discriminator `{}` value `{tag}` is not valid for variant `{}`",
+                                    "kind", stringify!(InvitationEmbeddingProfileTargetRequest),
+                                ),
+                            ),
+                        );
+                    }
+                    Some(_) => {
+                        return Err(
+                            serde::ser::Error::custom(
+                                concat!(
+                                    "discriminator `", "kind",
+                                    "` did not serialize as a string",
+                                ),
+                            ),
+                        );
+                    }
+                    None => {
+                        object
+                            .insert(
+                                "kind".to_string(),
+                                serde_json::Value::String("embedding-profile".to_string()),
+                            );
+                    }
+                }
+                value.serialize(serializer)
+            }
+        }
+    }
+}
+impl<'de> serde::Deserialize<'de> for InvitationTargetRequest {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = serde_json::Value::deserialize(deserializer)?;
+        let discriminator = match value.get("kind") {
+            Some(serde_json::Value::String(discriminator)) => {
+                Some(discriminator.as_str())
+            }
+            Some(_) => {
+                return Err(
+                    serde::de::Error::custom(
+                        concat!("non-string discriminator `", "kind", "`",),
+                    ),
+                );
+            }
+            None => None,
+        };
+        match discriminator {
+            Some(discriminator) => {
+                match discriminator {
+                    "organization" => {
+                        let primary_error = match serde_json::from_value::<
+                            InvitationOrganizationTargetRequest,
+                        >(value.clone()) {
+                            Ok(payload) => {
+                                return Ok(
+                                    Self::InvitationOrganizationTargetRequest(payload),
+                                );
+                            }
+                            Err(error) => error,
+                        };
+                        let mut structural_match: Option<(Self, &'static str)> = None;
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationProjectTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "organization", first_name,
+                                            stringify!(InvitationProjectTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationProjectTargetRequest(payload),
+                                stringify!(InvitationProjectTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationAccessGroupTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "organization", first_name,
+                                            stringify!(InvitationAccessGroupTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationAccessGroupTargetRequest(payload),
+                                stringify!(InvitationAccessGroupTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationApplicationAccountTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "organization", first_name,
+                                            stringify!(InvitationApplicationAccountTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationApplicationAccountTargetRequest(payload),
+                                stringify!(InvitationApplicationAccountTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationPipelineTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "organization", first_name,
+                                            stringify!(InvitationPipelineTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationPipelineTargetRequest(payload),
+                                stringify!(InvitationPipelineTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationDeploymentTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "organization", first_name,
+                                            stringify!(InvitationDeploymentTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationDeploymentTargetRequest(payload),
+                                stringify!(InvitationDeploymentTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationCollectionTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "organization", first_name,
+                                            stringify!(InvitationCollectionTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationCollectionTargetRequest(payload),
+                                stringify!(InvitationCollectionTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationSourceTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "organization", first_name,
+                                            stringify!(InvitationSourceTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationSourceTargetRequest(payload),
+                                stringify!(InvitationSourceTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationModelConnectionTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "organization", first_name,
+                                            stringify!(InvitationModelConnectionTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationModelConnectionTargetRequest(payload),
+                                stringify!(InvitationModelConnectionTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationProcessingProfileTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "organization", first_name,
+                                            stringify!(InvitationProcessingProfileTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationProcessingProfileTargetRequest(payload),
+                                stringify!(InvitationProcessingProfileTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationEmbeddingProfileTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "organization", first_name,
+                                            stringify!(InvitationEmbeddingProfileTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationEmbeddingProfileTargetRequest(payload),
+                                stringify!(InvitationEmbeddingProfileTargetRequest),
+                            ));
+                        }
+                        match structural_match {
+                            Some((payload, _)) => Ok(payload),
+                            None => Err(serde::de::Error::custom(primary_error)),
+                        }
+                    }
+                    "project" => {
+                        let primary_error = match serde_json::from_value::<
+                            InvitationProjectTargetRequest,
+                        >(value.clone()) {
+                            Ok(payload) => {
+                                return Ok(Self::InvitationProjectTargetRequest(payload));
+                            }
+                            Err(error) => error,
+                        };
+                        let mut structural_match: Option<(Self, &'static str)> = None;
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationOrganizationTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "project", first_name,
+                                            stringify!(InvitationOrganizationTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationOrganizationTargetRequest(payload),
+                                stringify!(InvitationOrganizationTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationAccessGroupTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "project", first_name,
+                                            stringify!(InvitationAccessGroupTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationAccessGroupTargetRequest(payload),
+                                stringify!(InvitationAccessGroupTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationApplicationAccountTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "project", first_name,
+                                            stringify!(InvitationApplicationAccountTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationApplicationAccountTargetRequest(payload),
+                                stringify!(InvitationApplicationAccountTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationPipelineTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "project", first_name,
+                                            stringify!(InvitationPipelineTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationPipelineTargetRequest(payload),
+                                stringify!(InvitationPipelineTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationDeploymentTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "project", first_name,
+                                            stringify!(InvitationDeploymentTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationDeploymentTargetRequest(payload),
+                                stringify!(InvitationDeploymentTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationCollectionTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "project", first_name,
+                                            stringify!(InvitationCollectionTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationCollectionTargetRequest(payload),
+                                stringify!(InvitationCollectionTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationSourceTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "project", first_name,
+                                            stringify!(InvitationSourceTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationSourceTargetRequest(payload),
+                                stringify!(InvitationSourceTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationModelConnectionTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "project", first_name,
+                                            stringify!(InvitationModelConnectionTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationModelConnectionTargetRequest(payload),
+                                stringify!(InvitationModelConnectionTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationProcessingProfileTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "project", first_name,
+                                            stringify!(InvitationProcessingProfileTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationProcessingProfileTargetRequest(payload),
+                                stringify!(InvitationProcessingProfileTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationEmbeddingProfileTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "project", first_name,
+                                            stringify!(InvitationEmbeddingProfileTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationEmbeddingProfileTargetRequest(payload),
+                                stringify!(InvitationEmbeddingProfileTargetRequest),
+                            ));
+                        }
+                        match structural_match {
+                            Some((payload, _)) => Ok(payload),
+                            None => Err(serde::de::Error::custom(primary_error)),
+                        }
+                    }
+                    "access-group" => {
+                        let primary_error = match serde_json::from_value::<
+                            InvitationAccessGroupTargetRequest,
+                        >(value.clone()) {
+                            Ok(payload) => {
+                                return Ok(Self::InvitationAccessGroupTargetRequest(payload));
+                            }
+                            Err(error) => error,
+                        };
+                        let mut structural_match: Option<(Self, &'static str)> = None;
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationOrganizationTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "access-group", first_name,
+                                            stringify!(InvitationOrganizationTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationOrganizationTargetRequest(payload),
+                                stringify!(InvitationOrganizationTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationProjectTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "access-group", first_name,
+                                            stringify!(InvitationProjectTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationProjectTargetRequest(payload),
+                                stringify!(InvitationProjectTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationApplicationAccountTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "access-group", first_name,
+                                            stringify!(InvitationApplicationAccountTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationApplicationAccountTargetRequest(payload),
+                                stringify!(InvitationApplicationAccountTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationPipelineTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "access-group", first_name,
+                                            stringify!(InvitationPipelineTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationPipelineTargetRequest(payload),
+                                stringify!(InvitationPipelineTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationDeploymentTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "access-group", first_name,
+                                            stringify!(InvitationDeploymentTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationDeploymentTargetRequest(payload),
+                                stringify!(InvitationDeploymentTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationCollectionTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "access-group", first_name,
+                                            stringify!(InvitationCollectionTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationCollectionTargetRequest(payload),
+                                stringify!(InvitationCollectionTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationSourceTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "access-group", first_name,
+                                            stringify!(InvitationSourceTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationSourceTargetRequest(payload),
+                                stringify!(InvitationSourceTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationModelConnectionTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "access-group", first_name,
+                                            stringify!(InvitationModelConnectionTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationModelConnectionTargetRequest(payload),
+                                stringify!(InvitationModelConnectionTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationProcessingProfileTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "access-group", first_name,
+                                            stringify!(InvitationProcessingProfileTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationProcessingProfileTargetRequest(payload),
+                                stringify!(InvitationProcessingProfileTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationEmbeddingProfileTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "access-group", first_name,
+                                            stringify!(InvitationEmbeddingProfileTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationEmbeddingProfileTargetRequest(payload),
+                                stringify!(InvitationEmbeddingProfileTargetRequest),
+                            ));
+                        }
+                        match structural_match {
+                            Some((payload, _)) => Ok(payload),
+                            None => Err(serde::de::Error::custom(primary_error)),
+                        }
+                    }
+                    "application-account" => {
+                        let primary_error = match serde_json::from_value::<
+                            InvitationApplicationAccountTargetRequest,
+                        >(value.clone()) {
+                            Ok(payload) => {
+                                return Ok(
+                                    Self::InvitationApplicationAccountTargetRequest(payload),
+                                );
+                            }
+                            Err(error) => error,
+                        };
+                        let mut structural_match: Option<(Self, &'static str)> = None;
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationOrganizationTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "application-account", first_name,
+                                            stringify!(InvitationOrganizationTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationOrganizationTargetRequest(payload),
+                                stringify!(InvitationOrganizationTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationProjectTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "application-account", first_name,
+                                            stringify!(InvitationProjectTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationProjectTargetRequest(payload),
+                                stringify!(InvitationProjectTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationAccessGroupTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "application-account", first_name,
+                                            stringify!(InvitationAccessGroupTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationAccessGroupTargetRequest(payload),
+                                stringify!(InvitationAccessGroupTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationPipelineTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "application-account", first_name,
+                                            stringify!(InvitationPipelineTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationPipelineTargetRequest(payload),
+                                stringify!(InvitationPipelineTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationDeploymentTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "application-account", first_name,
+                                            stringify!(InvitationDeploymentTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationDeploymentTargetRequest(payload),
+                                stringify!(InvitationDeploymentTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationCollectionTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "application-account", first_name,
+                                            stringify!(InvitationCollectionTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationCollectionTargetRequest(payload),
+                                stringify!(InvitationCollectionTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationSourceTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "application-account", first_name,
+                                            stringify!(InvitationSourceTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationSourceTargetRequest(payload),
+                                stringify!(InvitationSourceTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationModelConnectionTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "application-account", first_name,
+                                            stringify!(InvitationModelConnectionTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationModelConnectionTargetRequest(payload),
+                                stringify!(InvitationModelConnectionTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationProcessingProfileTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "application-account", first_name,
+                                            stringify!(InvitationProcessingProfileTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationProcessingProfileTargetRequest(payload),
+                                stringify!(InvitationProcessingProfileTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationEmbeddingProfileTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "application-account", first_name,
+                                            stringify!(InvitationEmbeddingProfileTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationEmbeddingProfileTargetRequest(payload),
+                                stringify!(InvitationEmbeddingProfileTargetRequest),
+                            ));
+                        }
+                        match structural_match {
+                            Some((payload, _)) => Ok(payload),
+                            None => Err(serde::de::Error::custom(primary_error)),
+                        }
+                    }
+                    "pipeline" => {
+                        let primary_error = match serde_json::from_value::<
+                            InvitationPipelineTargetRequest,
+                        >(value.clone()) {
+                            Ok(payload) => {
+                                return Ok(Self::InvitationPipelineTargetRequest(payload));
+                            }
+                            Err(error) => error,
+                        };
+                        let mut structural_match: Option<(Self, &'static str)> = None;
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationOrganizationTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "pipeline", first_name,
+                                            stringify!(InvitationOrganizationTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationOrganizationTargetRequest(payload),
+                                stringify!(InvitationOrganizationTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationProjectTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "pipeline", first_name,
+                                            stringify!(InvitationProjectTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationProjectTargetRequest(payload),
+                                stringify!(InvitationProjectTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationAccessGroupTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "pipeline", first_name,
+                                            stringify!(InvitationAccessGroupTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationAccessGroupTargetRequest(payload),
+                                stringify!(InvitationAccessGroupTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationApplicationAccountTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "pipeline", first_name,
+                                            stringify!(InvitationApplicationAccountTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationApplicationAccountTargetRequest(payload),
+                                stringify!(InvitationApplicationAccountTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationDeploymentTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "pipeline", first_name,
+                                            stringify!(InvitationDeploymentTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationDeploymentTargetRequest(payload),
+                                stringify!(InvitationDeploymentTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationCollectionTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "pipeline", first_name,
+                                            stringify!(InvitationCollectionTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationCollectionTargetRequest(payload),
+                                stringify!(InvitationCollectionTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationSourceTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "pipeline", first_name,
+                                            stringify!(InvitationSourceTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationSourceTargetRequest(payload),
+                                stringify!(InvitationSourceTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationModelConnectionTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "pipeline", first_name,
+                                            stringify!(InvitationModelConnectionTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationModelConnectionTargetRequest(payload),
+                                stringify!(InvitationModelConnectionTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationProcessingProfileTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "pipeline", first_name,
+                                            stringify!(InvitationProcessingProfileTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationProcessingProfileTargetRequest(payload),
+                                stringify!(InvitationProcessingProfileTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationEmbeddingProfileTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "pipeline", first_name,
+                                            stringify!(InvitationEmbeddingProfileTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationEmbeddingProfileTargetRequest(payload),
+                                stringify!(InvitationEmbeddingProfileTargetRequest),
+                            ));
+                        }
+                        match structural_match {
+                            Some((payload, _)) => Ok(payload),
+                            None => Err(serde::de::Error::custom(primary_error)),
+                        }
+                    }
+                    "deployment" => {
+                        let primary_error = match serde_json::from_value::<
+                            InvitationDeploymentTargetRequest,
+                        >(value.clone()) {
+                            Ok(payload) => {
+                                return Ok(Self::InvitationDeploymentTargetRequest(payload));
+                            }
+                            Err(error) => error,
+                        };
+                        let mut structural_match: Option<(Self, &'static str)> = None;
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationOrganizationTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "deployment", first_name,
+                                            stringify!(InvitationOrganizationTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationOrganizationTargetRequest(payload),
+                                stringify!(InvitationOrganizationTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationProjectTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "deployment", first_name,
+                                            stringify!(InvitationProjectTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationProjectTargetRequest(payload),
+                                stringify!(InvitationProjectTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationAccessGroupTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "deployment", first_name,
+                                            stringify!(InvitationAccessGroupTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationAccessGroupTargetRequest(payload),
+                                stringify!(InvitationAccessGroupTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationApplicationAccountTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "deployment", first_name,
+                                            stringify!(InvitationApplicationAccountTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationApplicationAccountTargetRequest(payload),
+                                stringify!(InvitationApplicationAccountTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationPipelineTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "deployment", first_name,
+                                            stringify!(InvitationPipelineTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationPipelineTargetRequest(payload),
+                                stringify!(InvitationPipelineTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationCollectionTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "deployment", first_name,
+                                            stringify!(InvitationCollectionTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationCollectionTargetRequest(payload),
+                                stringify!(InvitationCollectionTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationSourceTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "deployment", first_name,
+                                            stringify!(InvitationSourceTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationSourceTargetRequest(payload),
+                                stringify!(InvitationSourceTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationModelConnectionTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "deployment", first_name,
+                                            stringify!(InvitationModelConnectionTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationModelConnectionTargetRequest(payload),
+                                stringify!(InvitationModelConnectionTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationProcessingProfileTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "deployment", first_name,
+                                            stringify!(InvitationProcessingProfileTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationProcessingProfileTargetRequest(payload),
+                                stringify!(InvitationProcessingProfileTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationEmbeddingProfileTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "deployment", first_name,
+                                            stringify!(InvitationEmbeddingProfileTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationEmbeddingProfileTargetRequest(payload),
+                                stringify!(InvitationEmbeddingProfileTargetRequest),
+                            ));
+                        }
+                        match structural_match {
+                            Some((payload, _)) => Ok(payload),
+                            None => Err(serde::de::Error::custom(primary_error)),
+                        }
+                    }
+                    "collection" => {
+                        let primary_error = match serde_json::from_value::<
+                            InvitationCollectionTargetRequest,
+                        >(value.clone()) {
+                            Ok(payload) => {
+                                return Ok(Self::InvitationCollectionTargetRequest(payload));
+                            }
+                            Err(error) => error,
+                        };
+                        let mut structural_match: Option<(Self, &'static str)> = None;
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationOrganizationTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "collection", first_name,
+                                            stringify!(InvitationOrganizationTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationOrganizationTargetRequest(payload),
+                                stringify!(InvitationOrganizationTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationProjectTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "collection", first_name,
+                                            stringify!(InvitationProjectTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationProjectTargetRequest(payload),
+                                stringify!(InvitationProjectTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationAccessGroupTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "collection", first_name,
+                                            stringify!(InvitationAccessGroupTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationAccessGroupTargetRequest(payload),
+                                stringify!(InvitationAccessGroupTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationApplicationAccountTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "collection", first_name,
+                                            stringify!(InvitationApplicationAccountTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationApplicationAccountTargetRequest(payload),
+                                stringify!(InvitationApplicationAccountTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationPipelineTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "collection", first_name,
+                                            stringify!(InvitationPipelineTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationPipelineTargetRequest(payload),
+                                stringify!(InvitationPipelineTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationDeploymentTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "collection", first_name,
+                                            stringify!(InvitationDeploymentTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationDeploymentTargetRequest(payload),
+                                stringify!(InvitationDeploymentTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationSourceTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "collection", first_name,
+                                            stringify!(InvitationSourceTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationSourceTargetRequest(payload),
+                                stringify!(InvitationSourceTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationModelConnectionTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "collection", first_name,
+                                            stringify!(InvitationModelConnectionTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationModelConnectionTargetRequest(payload),
+                                stringify!(InvitationModelConnectionTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationProcessingProfileTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "collection", first_name,
+                                            stringify!(InvitationProcessingProfileTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationProcessingProfileTargetRequest(payload),
+                                stringify!(InvitationProcessingProfileTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationEmbeddingProfileTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "collection", first_name,
+                                            stringify!(InvitationEmbeddingProfileTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationEmbeddingProfileTargetRequest(payload),
+                                stringify!(InvitationEmbeddingProfileTargetRequest),
+                            ));
+                        }
+                        match structural_match {
+                            Some((payload, _)) => Ok(payload),
+                            None => Err(serde::de::Error::custom(primary_error)),
+                        }
+                    }
+                    "source" => {
+                        let primary_error = match serde_json::from_value::<
+                            InvitationSourceTargetRequest,
+                        >(value.clone()) {
+                            Ok(payload) => {
+                                return Ok(Self::InvitationSourceTargetRequest(payload));
+                            }
+                            Err(error) => error,
+                        };
+                        let mut structural_match: Option<(Self, &'static str)> = None;
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationOrganizationTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "source", first_name,
+                                            stringify!(InvitationOrganizationTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationOrganizationTargetRequest(payload),
+                                stringify!(InvitationOrganizationTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationProjectTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "source", first_name,
+                                            stringify!(InvitationProjectTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationProjectTargetRequest(payload),
+                                stringify!(InvitationProjectTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationAccessGroupTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "source", first_name,
+                                            stringify!(InvitationAccessGroupTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationAccessGroupTargetRequest(payload),
+                                stringify!(InvitationAccessGroupTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationApplicationAccountTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "source", first_name,
+                                            stringify!(InvitationApplicationAccountTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationApplicationAccountTargetRequest(payload),
+                                stringify!(InvitationApplicationAccountTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationPipelineTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "source", first_name,
+                                            stringify!(InvitationPipelineTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationPipelineTargetRequest(payload),
+                                stringify!(InvitationPipelineTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationDeploymentTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "source", first_name,
+                                            stringify!(InvitationDeploymentTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationDeploymentTargetRequest(payload),
+                                stringify!(InvitationDeploymentTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationCollectionTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "source", first_name,
+                                            stringify!(InvitationCollectionTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationCollectionTargetRequest(payload),
+                                stringify!(InvitationCollectionTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationModelConnectionTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "source", first_name,
+                                            stringify!(InvitationModelConnectionTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationModelConnectionTargetRequest(payload),
+                                stringify!(InvitationModelConnectionTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationProcessingProfileTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "source", first_name,
+                                            stringify!(InvitationProcessingProfileTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationProcessingProfileTargetRequest(payload),
+                                stringify!(InvitationProcessingProfileTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationEmbeddingProfileTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "source", first_name,
+                                            stringify!(InvitationEmbeddingProfileTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationEmbeddingProfileTargetRequest(payload),
+                                stringify!(InvitationEmbeddingProfileTargetRequest),
+                            ));
+                        }
+                        match structural_match {
+                            Some((payload, _)) => Ok(payload),
+                            None => Err(serde::de::Error::custom(primary_error)),
+                        }
+                    }
+                    "model-connection" => {
+                        let primary_error = match serde_json::from_value::<
+                            InvitationModelConnectionTargetRequest,
+                        >(value.clone()) {
+                            Ok(payload) => {
+                                return Ok(
+                                    Self::InvitationModelConnectionTargetRequest(payload),
+                                );
+                            }
+                            Err(error) => error,
+                        };
+                        let mut structural_match: Option<(Self, &'static str)> = None;
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationOrganizationTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "model-connection", first_name,
+                                            stringify!(InvitationOrganizationTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationOrganizationTargetRequest(payload),
+                                stringify!(InvitationOrganizationTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationProjectTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "model-connection", first_name,
+                                            stringify!(InvitationProjectTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationProjectTargetRequest(payload),
+                                stringify!(InvitationProjectTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationAccessGroupTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "model-connection", first_name,
+                                            stringify!(InvitationAccessGroupTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationAccessGroupTargetRequest(payload),
+                                stringify!(InvitationAccessGroupTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationApplicationAccountTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "model-connection", first_name,
+                                            stringify!(InvitationApplicationAccountTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationApplicationAccountTargetRequest(payload),
+                                stringify!(InvitationApplicationAccountTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationPipelineTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "model-connection", first_name,
+                                            stringify!(InvitationPipelineTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationPipelineTargetRequest(payload),
+                                stringify!(InvitationPipelineTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationDeploymentTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "model-connection", first_name,
+                                            stringify!(InvitationDeploymentTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationDeploymentTargetRequest(payload),
+                                stringify!(InvitationDeploymentTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationCollectionTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "model-connection", first_name,
+                                            stringify!(InvitationCollectionTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationCollectionTargetRequest(payload),
+                                stringify!(InvitationCollectionTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationSourceTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "model-connection", first_name,
+                                            stringify!(InvitationSourceTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationSourceTargetRequest(payload),
+                                stringify!(InvitationSourceTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationProcessingProfileTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "model-connection", first_name,
+                                            stringify!(InvitationProcessingProfileTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationProcessingProfileTargetRequest(payload),
+                                stringify!(InvitationProcessingProfileTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationEmbeddingProfileTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "model-connection", first_name,
+                                            stringify!(InvitationEmbeddingProfileTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationEmbeddingProfileTargetRequest(payload),
+                                stringify!(InvitationEmbeddingProfileTargetRequest),
+                            ));
+                        }
+                        match structural_match {
+                            Some((payload, _)) => Ok(payload),
+                            None => Err(serde::de::Error::custom(primary_error)),
+                        }
+                    }
+                    "processing-profile" => {
+                        let primary_error = match serde_json::from_value::<
+                            InvitationProcessingProfileTargetRequest,
+                        >(value.clone()) {
+                            Ok(payload) => {
+                                return Ok(
+                                    Self::InvitationProcessingProfileTargetRequest(payload),
+                                );
+                            }
+                            Err(error) => error,
+                        };
+                        let mut structural_match: Option<(Self, &'static str)> = None;
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationOrganizationTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "processing-profile", first_name,
+                                            stringify!(InvitationOrganizationTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationOrganizationTargetRequest(payload),
+                                stringify!(InvitationOrganizationTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationProjectTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "processing-profile", first_name,
+                                            stringify!(InvitationProjectTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationProjectTargetRequest(payload),
+                                stringify!(InvitationProjectTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationAccessGroupTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "processing-profile", first_name,
+                                            stringify!(InvitationAccessGroupTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationAccessGroupTargetRequest(payload),
+                                stringify!(InvitationAccessGroupTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationApplicationAccountTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "processing-profile", first_name,
+                                            stringify!(InvitationApplicationAccountTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationApplicationAccountTargetRequest(payload),
+                                stringify!(InvitationApplicationAccountTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationPipelineTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "processing-profile", first_name,
+                                            stringify!(InvitationPipelineTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationPipelineTargetRequest(payload),
+                                stringify!(InvitationPipelineTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationDeploymentTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "processing-profile", first_name,
+                                            stringify!(InvitationDeploymentTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationDeploymentTargetRequest(payload),
+                                stringify!(InvitationDeploymentTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationCollectionTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "processing-profile", first_name,
+                                            stringify!(InvitationCollectionTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationCollectionTargetRequest(payload),
+                                stringify!(InvitationCollectionTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationSourceTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "processing-profile", first_name,
+                                            stringify!(InvitationSourceTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationSourceTargetRequest(payload),
+                                stringify!(InvitationSourceTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationModelConnectionTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "processing-profile", first_name,
+                                            stringify!(InvitationModelConnectionTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationModelConnectionTargetRequest(payload),
+                                stringify!(InvitationModelConnectionTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationEmbeddingProfileTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "processing-profile", first_name,
+                                            stringify!(InvitationEmbeddingProfileTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationEmbeddingProfileTargetRequest(payload),
+                                stringify!(InvitationEmbeddingProfileTargetRequest),
+                            ));
+                        }
+                        match structural_match {
+                            Some((payload, _)) => Ok(payload),
+                            None => Err(serde::de::Error::custom(primary_error)),
+                        }
+                    }
+                    "embedding-profile" => {
+                        let primary_error = match serde_json::from_value::<
+                            InvitationEmbeddingProfileTargetRequest,
+                        >(value.clone()) {
+                            Ok(payload) => {
+                                return Ok(
+                                    Self::InvitationEmbeddingProfileTargetRequest(payload),
+                                );
+                            }
+                            Err(error) => error,
+                        };
+                        let mut structural_match: Option<(Self, &'static str)> = None;
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationOrganizationTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "embedding-profile", first_name,
+                                            stringify!(InvitationOrganizationTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationOrganizationTargetRequest(payload),
+                                stringify!(InvitationOrganizationTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationProjectTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "embedding-profile", first_name,
+                                            stringify!(InvitationProjectTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationProjectTargetRequest(payload),
+                                stringify!(InvitationProjectTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationAccessGroupTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "embedding-profile", first_name,
+                                            stringify!(InvitationAccessGroupTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationAccessGroupTargetRequest(payload),
+                                stringify!(InvitationAccessGroupTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationApplicationAccountTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "embedding-profile", first_name,
+                                            stringify!(InvitationApplicationAccountTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationApplicationAccountTargetRequest(payload),
+                                stringify!(InvitationApplicationAccountTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationPipelineTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "embedding-profile", first_name,
+                                            stringify!(InvitationPipelineTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationPipelineTargetRequest(payload),
+                                stringify!(InvitationPipelineTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationDeploymentTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "embedding-profile", first_name,
+                                            stringify!(InvitationDeploymentTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationDeploymentTargetRequest(payload),
+                                stringify!(InvitationDeploymentTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationCollectionTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "embedding-profile", first_name,
+                                            stringify!(InvitationCollectionTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationCollectionTargetRequest(payload),
+                                stringify!(InvitationCollectionTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationSourceTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "embedding-profile", first_name,
+                                            stringify!(InvitationSourceTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationSourceTargetRequest(payload),
+                                stringify!(InvitationSourceTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationModelConnectionTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "embedding-profile", first_name,
+                                            stringify!(InvitationModelConnectionTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationModelConnectionTargetRequest(payload),
+                                stringify!(InvitationModelConnectionTargetRequest),
+                            ));
+                        }
+                        if let Ok(payload) = serde_json::from_value::<
+                            InvitationProcessingProfileTargetRequest,
+                        >(value.clone()) {
+                            if let Some((_, first_name)) = &structural_match {
+                                return Err(
+                                    serde::de::Error::custom(
+                                        format!(
+                                            "discriminator `{}` value `{}` did not fit its mapped branch and structurally matched both `{}` and `{}`",
+                                            "kind", "embedding-profile", first_name,
+                                            stringify!(InvitationProcessingProfileTargetRequest),
+                                        ),
+                                    ),
+                                );
+                            }
+                            structural_match = Some((
+                                Self::InvitationProcessingProfileTargetRequest(payload),
+                                stringify!(InvitationProcessingProfileTargetRequest),
+                            ));
+                        }
+                        match structural_match {
+                            Some((payload, _)) => Ok(payload),
+                            None => Err(serde::de::Error::custom(primary_error)),
+                        }
+                    }
+                    other => {
+                        Err(
+                            serde::de::Error::custom(
+                                format!(
+                                    "unknown discriminator value `{other}` for `{}`", "kind",
+                                ),
+                            ),
+                        )
+                    }
+                }
+            }
+            None => {
+                Err(
+                    serde::de::Error::custom(
+                        concat!("missing string discriminator `", "kind", "`",),
+                    ),
+                )
+            }
+        }
+    }
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct InvitationSourceTargetRequest {
+    pub kind: InvitationSourceTargetRequestKind,
+    #[serde(rename = "sourceId")]
+    pub source_id: uuid::Uuid,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum InvitationSourceTargetRequestKind {
+    #[default]
+    #[serde(rename = "source")]
+    Source,
+}
+impl InvitationSourceTargetRequestKind {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Source => "source",
+        }
+    }
+}
+impl ::std::fmt::Display for InvitationSourceTargetRequestKind {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for InvitationSourceTargetRequestKind {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct InvitationProjectTargetRequest {
+    pub kind: InvitationProjectTargetRequestKind,
+    #[serde(rename = "projectId")]
+    pub project_id: uuid::Uuid,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum InvitationProjectTargetRequestKind {
+    #[default]
+    #[serde(rename = "project")]
+    Project,
+}
+impl InvitationProjectTargetRequestKind {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Project => "project",
+        }
+    }
+}
+impl ::std::fmt::Display for InvitationProjectTargetRequestKind {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for InvitationProjectTargetRequestKind {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct InvitationProcessingProfileTargetRequest {
+    pub kind: InvitationProcessingProfileTargetRequestKind,
+    #[serde(rename = "processingProfileId")]
+    pub processing_profile_id: uuid::Uuid,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum InvitationProcessingProfileTargetRequestKind {
+    #[default]
+    #[serde(rename = "processing-profile")]
+    ProcessingProfile,
+}
+impl InvitationProcessingProfileTargetRequestKind {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::ProcessingProfile => "processing-profile",
+        }
+    }
+}
+impl ::std::fmt::Display for InvitationProcessingProfileTargetRequestKind {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for InvitationProcessingProfileTargetRequestKind {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct InvitationPipelineTargetRequest {
+    pub kind: InvitationPipelineTargetRequestKind,
+    #[serde(rename = "pipelineId")]
+    pub pipeline_id: uuid::Uuid,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum InvitationPipelineTargetRequestKind {
+    #[default]
+    #[serde(rename = "pipeline")]
+    Pipeline,
+}
+impl InvitationPipelineTargetRequestKind {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Pipeline => "pipeline",
+        }
+    }
+}
+impl ::std::fmt::Display for InvitationPipelineTargetRequestKind {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for InvitationPipelineTargetRequestKind {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct InvitationOrganizationTargetRequest {
+    pub kind: InvitationOrganizationTargetRequestKind,
+    #[serde(rename = "organizationId")]
+    pub organization_id: uuid::Uuid,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum InvitationOrganizationTargetRequestKind {
+    #[default]
+    #[serde(rename = "organization")]
+    Organization,
+}
+impl InvitationOrganizationTargetRequestKind {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Organization => "organization",
+        }
+    }
+}
+impl ::std::fmt::Display for InvitationOrganizationTargetRequestKind {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for InvitationOrganizationTargetRequestKind {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct InvitationModelConnectionTargetRequest {
+    pub kind: InvitationModelConnectionTargetRequestKind,
+    #[serde(rename = "modelConnectionId")]
+    pub model_connection_id: uuid::Uuid,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum InvitationModelConnectionTargetRequestKind {
+    #[default]
+    #[serde(rename = "model-connection")]
+    ModelConnection,
+}
+impl InvitationModelConnectionTargetRequestKind {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::ModelConnection => "model-connection",
+        }
+    }
+}
+impl ::std::fmt::Display for InvitationModelConnectionTargetRequestKind {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for InvitationModelConnectionTargetRequestKind {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct InvitationEmbeddingProfileTargetRequest {
+    #[serde(rename = "embeddingProfileId")]
+    pub embedding_profile_id: uuid::Uuid,
+    pub kind: InvitationEmbeddingProfileTargetRequestKind,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum InvitationEmbeddingProfileTargetRequestKind {
+    #[default]
+    #[serde(rename = "embedding-profile")]
+    EmbeddingProfile,
+}
+impl InvitationEmbeddingProfileTargetRequestKind {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::EmbeddingProfile => "embedding-profile",
+        }
+    }
+}
+impl ::std::fmt::Display for InvitationEmbeddingProfileTargetRequestKind {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for InvitationEmbeddingProfileTargetRequestKind {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct InvitationDeploymentTargetRequest {
+    #[serde(rename = "deploymentId")]
+    pub deployment_id: uuid::Uuid,
+    pub kind: InvitationDeploymentTargetRequestKind,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum InvitationDeploymentTargetRequestKind {
+    #[default]
+    #[serde(rename = "deployment")]
+    Deployment,
+}
+impl InvitationDeploymentTargetRequestKind {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Deployment => "deployment",
+        }
+    }
+}
+impl ::std::fmt::Display for InvitationDeploymentTargetRequestKind {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for InvitationDeploymentTargetRequestKind {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct InvitationCollectionTargetRequest {
+    #[serde(rename = "collectionId")]
+    pub collection_id: uuid::Uuid,
+    pub kind: InvitationCollectionTargetRequestKind,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum InvitationCollectionTargetRequestKind {
+    #[default]
+    #[serde(rename = "collection")]
+    Collection,
+}
+impl InvitationCollectionTargetRequestKind {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Collection => "collection",
+        }
+    }
+}
+impl ::std::fmt::Display for InvitationCollectionTargetRequestKind {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for InvitationCollectionTargetRequestKind {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct InvitationApplicationAccountTargetRequest {
+    #[serde(rename = "applicationPrincipalId")]
+    pub application_principal_id: uuid::Uuid,
+    pub kind: InvitationApplicationAccountTargetRequestKind,
+    #[serde(rename = "projectId")]
+    pub project_id: uuid::Uuid,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum InvitationApplicationAccountTargetRequestKind {
+    #[default]
+    #[serde(rename = "application-account")]
+    ApplicationAccount,
+}
+impl InvitationApplicationAccountTargetRequestKind {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::ApplicationAccount => "application-account",
+        }
+    }
+}
+impl ::std::fmt::Display for InvitationApplicationAccountTargetRequestKind {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for InvitationApplicationAccountTargetRequestKind {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum InvitationActionGrantRequestKind {
+    #[default]
+    #[serde(rename = "action-grant")]
+    ActionGrant,
+}
+impl InvitationActionGrantRequestKind {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::ActionGrant => "action-grant",
+        }
+    }
+}
+impl ::std::fmt::Display for InvitationActionGrantRequestKind {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for InvitationActionGrantRequestKind {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct InvitationAccessGroupTargetRequest {
+    #[serde(rename = "accessGroupId")]
+    pub access_group_id: uuid::Uuid,
+    pub kind: InvitationAccessGroupTargetRequestKind,
+    #[serde(rename = "projectId")]
+    pub project_id: uuid::Uuid,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum InvitationAccessGroupTargetRequestKind {
+    #[default]
+    #[serde(rename = "access-group")]
+    AccessGroup,
+}
+impl InvitationAccessGroupTargetRequestKind {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::AccessGroup => "access-group",
+        }
+    }
+}
+impl ::std::fmt::Display for InvitationAccessGroupTargetRequestKind {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for InvitationAccessGroupTargetRequestKind {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct InitialProjectGrantResponse {
     #[serde(rename = "actionId")]
     pub action_id: ProjectAction,
@@ -3488,6 +7983,41 @@ pub struct HumanAdmissionResponse {
 pub struct HumanOAuthConsentDecisionResponse {
     #[serde(rename = "redirectTo")]
     pub redirect_to: String,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct InvitationActivationRequest {
+    #[serde(rename = "invitationToken")]
+    pub invitation_token: String,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct InvitationPreviewRequest {
+    #[serde(rename = "invitationToken")]
+    pub invitation_token: String,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct InvitationRevocationRequest {
+    ///Constraint: minimum=0, maximum=9007199254740991
+    #[serde(rename = "expectedAccessRevision")]
+    pub expected_access_revision: i64,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct InvitationRevocationResponse {
+    #[serde(rename = "accessRevision")]
+    pub access_revision: i64,
+    #[serde(rename = "idempotencyExpiresAt")]
+    pub idempotency_expires_at: chrono::DateTime<chrono::Utc>,
+    #[serde(rename = "invitationId")]
+    pub invitation_id: uuid::Uuid,
+    #[serde(rename = "operationId")]
+    pub operation_id: String,
+    #[serde(rename = "organizationId")]
+    pub organization_id: uuid::Uuid,
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        default,
+        deserialize_with = "presence_serde::optional_nonnull"
+    )]
+    pub revoked: Option<BooleanConstant<true>>,
 }
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct OrganizationActionGrantRemovalResponse {

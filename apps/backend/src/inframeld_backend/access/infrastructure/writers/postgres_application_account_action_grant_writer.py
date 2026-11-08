@@ -15,12 +15,24 @@ from inframeld_backend.access.application.dtos.application_account_grant_managem
 from inframeld_backend.access.application.dtos.application_account_grant_target_dto import (
     ApplicationAccountGrantTargetDTO,
 )
+from inframeld_backend.access.application.dtos.invitation_action_grant_intent_dto import (
+    InvitationActionGrantIntentDTO,
+)
+from inframeld_backend.access.application.dtos.invitation_activation_binding_dto import (
+    InvitationActivationBindingDTO,
+)
 from inframeld_backend.access.application.protocols.application_account_action_grant_writer import (
     ApplicationAccountActionGrantWriter,
 )
 from inframeld_backend.access.application.protocols.audit_event_writer import AuditEventWriter
+from inframeld_backend.access.application.protocols.invitation_application_grant_writer import (
+    InvitationApplicationGrantWriter,
+)
 from inframeld_backend.access.domain.value_objects.action_grant_state import ActionGrantState
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
+from inframeld_backend.access.infrastructure.readers.postgres_invitation_binding_reader import (
+    PostgresInvitationBindingReader,
+)
 from inframeld_backend.access.infrastructure.rows.application_action_grant_operation_result_row import (
     ApplicationActionGrantOperationResultRow,
 )
@@ -47,7 +59,9 @@ from inframeld_backend.shared.infrastructure.rows.idempotency_reservation_row im
 )
 
 
-class PostgresApplicationAccountActionGrantWriter(ApplicationAccountActionGrantWriter):
+class PostgresApplicationAccountActionGrantWriter(
+    ApplicationAccountActionGrantWriter, InvitationApplicationGrantWriter
+):
     """Persist only the checked exact transition and original outcome in the caller transaction."""
 
     def __init__(self, session: AsyncSession, audit_event_writer: AuditEventWriter) -> None:
@@ -80,6 +94,24 @@ class PostgresApplicationAccountActionGrantWriter(ApplicationAccountActionGrantW
             method=HttpMethod.DELETE if after.can_grant is None else HttpMethod.PUT,
             state=OperationReservationState.IN_PROGRESS,
         )
+        await self._apply_checked_change(
+            facts=facts,
+            recipient_principal_id=recipient_principal_id,
+            after=after,
+            operation_id=operation_id,
+        )
+
+    async def _apply_checked_change(
+        self,
+        *,
+        facts: ApplicationAccountGrantManagementFactsDTO,
+        recipient_principal_id: PrincipalId,
+        after: ActionGrantState,
+        operation_id: OperationId,
+    ) -> int:
+        recipient = facts.recipient
+        if recipient is None:
+            raise RuntimeError("Grant persistence lost its checked recipient.")
         scope = (
             ApplicationActionGrantRow.project_id == facts.project_id.value,
             ApplicationActionGrantRow.application_principal_id
@@ -102,7 +134,7 @@ class PostgresApplicationAccountActionGrantWriter(ApplicationAccountActionGrantW
         if revision != facts.access_revision:
             raise StaleRevisionError()
         if after == facts.assignment:
-            return
+            return facts.access_revision
 
         advanced = await self._session.scalar(
             update(ProjectRow)
@@ -165,6 +197,7 @@ class PostgresApplicationAccountActionGrantWriter(ApplicationAccountActionGrantW
                 operation_id=operation_id,
             )
         )
+        return facts.access_revision + 1
 
     @override
     async def save_result(
@@ -262,3 +295,44 @@ class PostgresApplicationAccountActionGrantWriter(ApplicationAccountActionGrantW
             raise ConflictError(
                 "The ApplicationAccount grant changed its original reservation binding."
             )
+
+    @override
+    async def apply_invitation_grant(
+        self,
+        *,
+        binding: InvitationActivationBindingDTO,
+        facts: ApplicationAccountGrantManagementFactsDTO,
+        recipient_principal_id: PrincipalId,
+        after: ActionGrantState,
+    ) -> int:
+        self._require_transaction()
+        if after.can_grant is None:
+            raise ConflictError("An invitation grant must name an explicit level.")
+        await PostgresInvitationBindingReader(self._session).require_assignment_binding(
+            binding=binding,
+            principal_id=recipient_principal_id,
+            organization_id=facts.organization_id,
+            issuer_principal_id=facts.actor.principal.id,
+            installation_id=facts.installation_id,
+            intent=InvitationActionGrantIntentDTO(
+                target=ApplicationAccountGrantTargetDTO(
+                    project_id=facts.project_id,
+                    application_principal_id=facts.application_principal_id,
+                ),
+                action_id=facts.action_id,
+                can_grant=after.can_grant,
+            ),
+        )
+        recipient = facts.recipient
+        if (
+            recipient is None
+            or recipient.id != recipient_principal_id
+            or recipient.organization_id != facts.organization_id
+        ):
+            raise RuntimeError("Invitation grant persistence changed its checked recipient.")
+        return await self._apply_checked_change(
+            facts=facts,
+            recipient_principal_id=recipient_principal_id,
+            after=after,
+            operation_id=binding.operation_id,
+        )

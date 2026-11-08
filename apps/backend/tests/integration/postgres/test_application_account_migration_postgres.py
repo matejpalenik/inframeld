@@ -149,10 +149,7 @@ async def test_retained_account_outcome_prevents_destructive_downgrade(
     with pytest.raises(RuntimeError, match="Retained application"):
         command.downgrade(_config(temporary_postgres_settings), "0023_safe_numeric_revisions")
     async with database.session() as session:
-        assert (
-            await session.scalar(select(AlembicVersionRow.version_num))
-            == "0026_access_action_grant_results"
-        )
+        assert await session.scalar(select(AlembicVersionRow.version_num)) == "0027_invitations"
         assert (
             await session.get(
                 ApplicationAccountCreationResultRow, created.operation.operation_id.value
