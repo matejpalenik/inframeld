@@ -64,6 +64,8 @@ __all__ = [
     "ApplicationKeyIssueRequest",
     "ApplicationKeyIssueResponse",
     "ApplicationKeyMetadataResponse",
+    "ApplicationKeyRevocationRequest",
+    "ApplicationKeyRevocationResponse",
     "CompletedOperationLookupResponse",
     "CurrentApplicationSessionResponse",
     "CurrentSessionResponse",
@@ -219,6 +221,8 @@ from inframeld_sdk.models.application_key_issuance_replay_response import Applic
 from inframeld_sdk.models.application_key_issue_request import ApplicationKeyIssueRequest as ApplicationKeyIssueRequest
 from inframeld_sdk.models.application_key_issue_response import ApplicationKeyIssueResponse as ApplicationKeyIssueResponse
 from inframeld_sdk.models.application_key_metadata_response import ApplicationKeyMetadataResponse as ApplicationKeyMetadataResponse
+from inframeld_sdk.models.application_key_revocation_request import ApplicationKeyRevocationRequest as ApplicationKeyRevocationRequest
+from inframeld_sdk.models.application_key_revocation_response import ApplicationKeyRevocationResponse as ApplicationKeyRevocationResponse
 from inframeld_sdk.models.completed_operation_lookup_response import CompletedOperationLookupResponse as CompletedOperationLookupResponse
 from inframeld_sdk.models.current_application_session_response import CurrentApplicationSessionResponse as CurrentApplicationSessionResponse
 from inframeld_sdk.models.current_session_response import CurrentSessionResponse as CurrentSessionResponse

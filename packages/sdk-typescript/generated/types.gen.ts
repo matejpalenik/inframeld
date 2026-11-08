@@ -878,6 +878,37 @@ export type ApplicationKeyMetadataResponse = {
 };
 
 /**
+ * ApplicationKeyRevocationRequest
+ */
+export type ApplicationKeyRevocationRequest = {
+    /**
+     * Expectedaccessrevision
+     */
+    expectedAccessRevision: number;
+};
+
+/**
+ * ApplicationKeyRevocationResponse
+ *
+ * Return the original safe receipt for a revocation or an already-revoked no-op.
+ */
+export type ApplicationKeyRevocationResponse = {
+    /**
+     * Accessrevision
+     */
+    accessRevision: number;
+    /**
+     * Idempotencyexpiresat
+     */
+    idempotencyExpiresAt: string;
+    metadata: ApplicationKeyMetadataResponse;
+    /**
+     * Operationid
+     */
+    operationId: string;
+};
+
+/**
  * CompletedOperationLookupResponse
  *
  * Expose safe synchronous outcome metadata without replaying content.
@@ -5399,6 +5430,82 @@ export type GetApplicationKeyResponses = {
 };
 
 export type GetApplicationKeyResponse = GetApplicationKeyResponses[keyof GetApplicationKeyResponses];
+
+export type RevokeApplicationKeyData = {
+    body: ApplicationKeyRevocationRequest;
+    headers: {
+        /**
+         * Idempotency-Key
+         */
+        'Idempotency-Key': string;
+    };
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Application Principal Id
+         */
+        application_principal_id: string;
+        /**
+         * Key Id
+         */
+        key_id: string;
+    };
+    query?: never;
+    url: '/v1/projects/{project_id}/application-accounts/{application_principal_id}/keys/{key_id}/revoke';
+};
+
+export type RevokeApplicationKeyErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Operation conflicts with current state
+     */
+    409: ProblemDetails;
+    /**
+     * Content Too Large
+     */
+    413: ProblemDetails;
+    /**
+     * Unsupported Media Type
+     */
+    415: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type RevokeApplicationKeyError = RevokeApplicationKeyErrors[keyof RevokeApplicationKeyErrors];
+
+export type RevokeApplicationKeyResponses = {
+    /**
+     * Successful Response
+     */
+    200: ApplicationKeyRevocationResponse;
+};
+
+export type RevokeApplicationKeyResponse = RevokeApplicationKeyResponses[keyof RevokeApplicationKeyResponses];
 
 export type ListProjectGrantRecipientsData = {
     body?: never;

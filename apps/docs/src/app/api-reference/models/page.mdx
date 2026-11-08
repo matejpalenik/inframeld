@@ -249,6 +249,22 @@ Safe retained key identity, scope and lifecycle metadata. It contains no secret 
 
 <ApiSchema name="ApplicationKeyMetadataResponse" />
 
+<a id="ApplicationKeyRevocationRequest" />
+
+## ApplicationKeyRevocationRequest
+
+Contains only the reviewed Project `expectedAccessRevision`, a strict nonnegative safe integer. The route binds the Project, application account and public key ID. Keep the original request key separately in `Idempotency-Key`.
+
+<ApiSchema name="ApplicationKeyRevocationRequest" />
+
+<a id="ApplicationKeyRevocationResponse" />
+
+## ApplicationKeyRevocationResponse
+
+Safe historical metadata, captured Project Access revision, operation ID and retained-result expiry for HTTP `200`. Exact replay preserves that original result. A fresh already-revoked no-op retains the existing revocation time without another revision advance or revocation audit. There is no key secret or verifier. [The guide](/guides/application-accounts#revoke-one-application-key) separates current metadata, original recovery and admitted work.
+
+<ApiSchema name="ApplicationKeyRevocationResponse" />
+
 <a id="CompletedOperationLookupResponse" />
 
 ## CompletedOperationLookupResponse
