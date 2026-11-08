@@ -36,6 +36,7 @@ const BINDINGS: &[&str] = &[
     "resolveApplicationAccount",
     "listApplicationKeys",
     "getApplicationKey",
+    "issueApplicationKey",
     "listProjectMembers",
     "listProjectActionGrants",
     "listOrganizationActionGrants",
@@ -128,6 +129,7 @@ async fn main() {
                 | "resolveApplicationAccount"
                 | "listApplicationKeys"
                 | "getApplicationKey"
+                | "issueApplicationKey"
                 | "admitHuman"
                 | "issueInvitation"
                 | "revokeInvitation"
@@ -175,6 +177,7 @@ async fn main() {
                 | "removeAccessGroupManager"
                 | "deleteAccessGroup"
                 | "createApplicationAccount"
+                | "issueApplicationKey"
                 | "admitHuman"
                 | "issueInvitation"
                 | "revokeInvitation"

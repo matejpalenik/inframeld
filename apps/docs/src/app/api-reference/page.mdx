@@ -29,7 +29,7 @@ Application credentials identify their own account and bound Project. [Applicati
 
 Malformed or competing credential families fail before verification. Invalid, expired, revoked or incorrectly bound application credentials receive `401`; verified local ineligibility receives `403`; required verification uncertainty receives `503`. No application-key failure falls back to Hydra or a human account. A successful identity response is not a permission snapshot.
 
-This preview has no supported public application-key issuance procedure or complete saved CLI-login procedure. Issuance's mapping to trusted profiles remains unresolved. Use the access path actually supported by the selected installation and client, without constructing credentials. Start with [health](/clients/http#make-your-first-request) when no protected credential is available.
+An eligible human can [issue an application key](/guides/application-accounts#issue-a-key) through the API with current issuance authority. Each selected adapter receives its server-configured binding. The browser integration uses a genuine signed-in human cookie; it does not acquire a terminal bearer token or complete saved CLI login. Use the supported credential path for your selected installation and client. Start with [health](/clients/http#make-your-first-request) when none is available.
 
 ## Requests and responses
 

@@ -19,6 +19,7 @@ from inframeld_backend.access.application.protocols.application_key_verifier imp
 from inframeld_backend.access.application.value_objects.application_key_credential import (
     ApplicationKeyCredential,
 )
+from inframeld_backend.access.domain.enums.application_key_adapter import ApplicationKeyAdapter
 from inframeld_backend.access.domain.policies.application_key_credential_policy import (
     ApplicationKeyCredentialPolicy,
 )
@@ -71,7 +72,12 @@ class PostgresApplicationKeyVerifier(ApplicationKeyVerifier):
                 matches = (
                     compare_digest(key.verifier, sha256(credential.value.encode("ascii")).digest())
                     and key.installation_id == installation
-                    and key.audience == profile.audience.value
+                    and (
+                        key.http_audience
+                        if profile.adapter is ApplicationKeyAdapter.HTTP
+                        else key.mcp_audience
+                    )
+                    == profile.audience.value
                     and profile.adapter.value in key.allowed_adapters
                 )
                 if not ApplicationKeyCredentialPolicy.is_current(

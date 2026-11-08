@@ -73,7 +73,10 @@ async def test_0016_upgrade_and_empty_outcome_roundtrip_preserve_admission_and_l
         command.downgrade(config, "0016_first_administrator")
         run_migrations(temporary_postgres_settings)
         async with database.session() as session:
-            assert await session.scalar(select(AlembicVersionRow.version_num)) == "0027_invitations"
+            assert (
+                await session.scalar(select(AlembicVersionRow.version_num))
+                == "0028_application_key_issuance"
+            )
             receipt = await session.get(
                 FirstAdministratorBootstrapReceiptRow, seed.binding.installation_id.value
             )
@@ -122,7 +125,10 @@ async def test_retained_creation_outcome_refuses_downgrade_without_losing_replay
     with pytest.raises(RuntimeError, match="Retained Project creation outcomes"):
         command.downgrade(_configuration(temporary_postgres_settings), "0016_first_administrator")
     async with database.session() as session:
-        assert await session.scalar(select(AlembicVersionRow.version_num)) == "0027_invitations"
+        assert (
+            await session.scalar(select(AlembicVersionRow.version_num))
+            == "0028_application_key_issuance"
+        )
         receipt = await session.get(
             ProjectCreationOperationResultRow, first.operation.operation_id.value
         )

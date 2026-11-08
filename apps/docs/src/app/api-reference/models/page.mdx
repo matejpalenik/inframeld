@@ -209,6 +209,38 @@ Safe account metadata returned by both permanent-ID inspection and exact-Name re
 
 <ApiSchema name="ApplicationKeyAdapter" />
 
+<a id="ApplicationKeyFirstDeliveryResponse" />
+
+## ApplicationKeyFirstDeliveryResponse
+
+The original successful delivery includes the complete private `key` and `secretAvailable: true`. Nested metadata and receipt fields are safe, but the full response must remain private.
+
+<ApiSchema name="ApplicationKeyFirstDeliveryResponse" />
+
+<a id="ApplicationKeyIssuanceReplayResponse" />
+
+## ApplicationKeyIssuanceReplayResponse
+
+Historical original issuance metadata with `secretAvailable: false`. The `key` property is absent and forbidden, not nullable or retrievable. Current key metadata remains a separate read.
+
+<ApiSchema name="ApplicationKeyIssuanceReplayResponse" />
+
+<a id="ApplicationKeyIssueRequest" />
+
+## ApplicationKeyIssueRequest
+
+Select unique HTTP/MCP adapters and the reviewed Project Access revision. Omit lifetime for the configured default or supply positive whole seconds within the configured maximum. Explicit null and caller-supplied audiences are invalid.
+
+<ApiSchema name="ApplicationKeyIssueRequest" />
+
+<a id="ApplicationKeyIssueResponse" />
+
+## ApplicationKeyIssueResponse
+
+Boolean-discriminated first-delivery and replay alternatives. Both use HTTP `201`. A replay preserves the original receipt and does not issue, renew or rebind a key.
+
+<ApiSchema name="ApplicationKeyIssueResponse" />
+
 <a id="ApplicationKeyMetadataResponse" />
 
 ## ApplicationKeyMetadataResponse

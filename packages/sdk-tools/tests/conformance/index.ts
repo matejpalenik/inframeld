@@ -19,6 +19,7 @@ import "./project-membership.ts";
 import "./human-admission.ts";
 
 import "./application-accounts.ts";
+import "./application-key-issuance.ts";
 
 import "./access-groups.ts";
 

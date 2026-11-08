@@ -11,6 +11,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from inframeld_backend.access.infrastructure.settings.application_key_authentication_settings import (
     ApplicationKeyAuthenticationSettings,
 )
+from inframeld_backend.access.infrastructure.settings.application_key_issuance_settings import (
+    ApplicationKeyIssuanceSettings,
+)
 from inframeld_backend.access.infrastructure.settings.csrf_settings import CSRFSettings
 from inframeld_backend.access.infrastructure.settings.discovery_settings import DiscoverySettings
 from inframeld_backend.access.infrastructure.settings.human_authentication_settings import (
@@ -58,6 +61,9 @@ class ApplicationSettings(BaseSettings):
     )
     application_key_authentication: ApplicationKeyAuthenticationSettings = Field(
         default_factory=ApplicationKeyAuthenticationSettings
+    )
+    application_key_issuance: ApplicationKeyIssuanceSettings = Field(
+        default_factory=ApplicationKeyIssuanceSettings
     )
     deletion_status_retention: DeletionStatusRetentionSettings = Field(
         default_factory=DeletionStatusRetentionSettings

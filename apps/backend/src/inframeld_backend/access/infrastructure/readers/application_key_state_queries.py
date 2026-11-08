@@ -3,6 +3,7 @@ from uuid import UUID
 
 from sqlalchemy import ColumnElement, DateTime, Nullable, Select, and_, exists, func, select
 
+from inframeld_backend.access.domain.enums.application_key_adapter import ApplicationKeyAdapter
 from inframeld_backend.access.domain.enums.project_status import ProjectStatus
 from inframeld_backend.access.domain.value_objects.application_key_id import ApplicationKeyId
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
@@ -78,6 +79,7 @@ class ApplicationKeyStateQueries:
         principal_id: PrincipalId,
         organization_id: OrganizationId,
         project_id: ProjectId,
+        adapter: ApplicationKeyAdapter,
     ) -> Select[
         tuple[
             UUID,
@@ -109,7 +111,9 @@ class ApplicationKeyStateQueries:
                 Nullable(ApplicationKeyRow.organization_id),
                 Nullable(ApplicationKeyRow.project_id),
                 Nullable(ApplicationKeyRow.installation_id),
-                Nullable(ApplicationKeyRow.audience),
+                ApplicationKeyRow.http_audience
+                if adapter is ApplicationKeyAdapter.HTTP
+                else ApplicationKeyRow.mcp_audience,
                 Nullable(ApplicationKeyRow.allowed_adapters),
                 Nullable(ApplicationKeyRow.expires_at),
                 ApplicationKeyRow.revoked_at,

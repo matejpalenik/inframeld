@@ -25,6 +25,18 @@ macro_rules! problems {
     };
 }
 problems!(
+    IssueApplicationKeyApiError,
+    IssueApplicationKeyApiError::Status400,
+    IssueApplicationKeyApiError::Status401,
+    IssueApplicationKeyApiError::Status403,
+    IssueApplicationKeyApiError::Status404,
+    IssueApplicationKeyApiError::Status409,
+    IssueApplicationKeyApiError::Status413,
+    IssueApplicationKeyApiError::Status415,
+    IssueApplicationKeyApiError::Status422,
+    IssueApplicationKeyApiError::Status503
+);
+problems!(
     IssueInvitationApiError,
     IssueInvitationApiError::Status400,
     IssueInvitationApiError::Status401,

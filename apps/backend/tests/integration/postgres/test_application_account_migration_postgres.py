@@ -149,7 +149,10 @@ async def test_retained_account_outcome_prevents_destructive_downgrade(
     with pytest.raises(RuntimeError, match="Retained application"):
         command.downgrade(_config(temporary_postgres_settings), "0023_safe_numeric_revisions")
     async with database.session() as session:
-        assert await session.scalar(select(AlembicVersionRow.version_num)) == "0027_invitations"
+        assert (
+            await session.scalar(select(AlembicVersionRow.version_num))
+            == "0028_application_key_issuance"
+        )
         assert (
             await session.get(
                 ApplicationAccountCreationResultRow, created.operation.operation_id.value
@@ -184,7 +187,8 @@ async def test_key_storage_rejects_unsafe_record_shapes_and_wrong_project(
         project_id=project.project_id.value,
         application_principal_id=account.principal_id.value,
         installation_id=installed.value,
-        audience="https://api.test",
+        http_audience="https://api.test",
+        mcp_audience=None,
         allowed_adapters=["http"],
         verifier=b"V" * 32,
         expires_at=datetime.now(UTC) + timedelta(days=90),
@@ -203,7 +207,7 @@ async def test_key_storage_rejects_unsafe_record_shapes_and_wrong_project(
     elif invalid == "expiry":
         row.expires_at = datetime.now(UTC) - timedelta(days=1)
     else:
-        row.audience = " "
+        row.http_audience = " "
     with pytest.raises(IntegrityError):
         async with database.session() as session, session.begin():
             session.add(row)

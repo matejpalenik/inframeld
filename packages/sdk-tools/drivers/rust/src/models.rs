@@ -1,6 +1,67 @@
 #[cfg(test)]
 mod tests {
     #[test]
+    fn application_key_issue_preserves_adapter_order_and_lifetime_omission() {
+        use inframeld_sdk::types::ApplicationKeyIssueRequest;
+        let source = serde_json::json!({
+            "allowedAdapters": ["mcp", "http"],
+            "expectedAccessRevision": 9_007_199_254_740_991_i64
+        });
+        let model: ApplicationKeyIssueRequest = serde_json::from_value(source.clone()).unwrap();
+        assert_eq!(serde_json::to_value(model).unwrap(), source);
+        for invalid in [
+            serde_json::Value::Null,
+            serde_json::json!(true),
+            serde_json::json!(1.5),
+        ] {
+            let mut value = source.clone();
+            value["expiresInSeconds"] = invalid;
+            assert!(serde_json::from_value::<ApplicationKeyIssueRequest>(value).is_err());
+        }
+    }
+
+    #[test]
+    fn application_key_secret_union_requires_true_with_key_or_false_without_key() {
+        use inframeld_sdk::types::ApplicationKeyIssueResponse;
+        let source = serde_json::json!({
+            "operationId": "key-issue-original", "accessRevision": 8,
+            "idempotencyExpiresAt": "2030-01-01T00:00:00Z",
+            "metadata": {
+                "keyId": "00000000-0000-4000-8000-000000000010",
+                "applicationPrincipalId": "00000000-0000-4000-8000-000000000008",
+                "projectId": "00000000-0000-4000-8000-000000000003",
+                "prefix": "ifm_app_", "allowedAdapters": ["mcp", "http"],
+                "createdAt": "2030-01-01T00:00:00Z", "expiresAt": "2030-04-01T00:00:00Z",
+                "revokedAt": null
+            }
+        });
+        for secret in [true, false] {
+            let mut value = source.clone();
+            value["secretAvailable"] = serde_json::json!(secret);
+            if secret {
+                value["key"] = serde_json::json!(format!(
+                    "ifm_app_00000000-0000-4000-8000-000000000010_{}",
+                    "A".repeat(43)
+                ));
+            }
+            let model: ApplicationKeyIssueResponse = serde_json::from_value(value.clone()).unwrap();
+            assert_eq!(serde_json::to_value(model).unwrap(), value);
+        }
+        for invalid in [
+            serde_json::Value::Null,
+            serde_json::json!(1),
+            serde_json::json!("true"),
+        ] {
+            let mut value = source.clone();
+            value["secretAvailable"] = invalid;
+            assert!(serde_json::from_value::<ApplicationKeyIssueResponse>(value).is_err());
+        }
+        let mut missing_key = source;
+        missing_key["secretAvailable"] = serde_json::json!(true);
+        assert!(serde_json::from_value::<ApplicationKeyIssueResponse>(missing_key).is_err());
+    }
+
+    #[test]
     fn invitation_issue_preserves_optional_lifetime_and_exact_revision_representation() {
         use inframeld_sdk::types::InvitationIssueRequest;
         let source = serde_json::json!({

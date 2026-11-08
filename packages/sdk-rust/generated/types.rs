@@ -7236,6 +7236,340 @@ impl AsRef<str> for CompletedOperationLookupResponseClassification {
         self.as_str()
     }
 }
+///Distinguish first credential delivery from credential-free original recovery.
+#[derive(Debug, Clone)]
+pub enum ApplicationKeyIssueResponse {
+    ApplicationKeyFirstDeliveryResponse(ApplicationKeyFirstDeliveryResponse),
+    ApplicationKeyIssuanceReplayResponse(ApplicationKeyIssuanceReplayResponse),
+}
+impl Serialize for ApplicationKeyIssueResponse {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Self::ApplicationKeyFirstDeliveryResponse(value) => {
+                serde::Serialize::serialize(value, serializer)
+            }
+            Self::ApplicationKeyIssuanceReplayResponse(value) => {
+                serde::Serialize::serialize(value, serializer)
+            }
+        }
+    }
+}
+impl<'de> Deserialize<'de> for ApplicationKeyIssueResponse {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        fn exact_json_integer(number: &serde_json::Number) -> Option<i128> {
+            number.as_i64().map(i128::from).or_else(|| number.as_u64().map(i128::from))
+        }
+        fn json_numbers_have_same_value(
+            encoded: &serde_json::Number,
+            input: &serde_json::Number,
+        ) -> bool {
+            match (exact_json_integer(encoded), exact_json_integer(input)) {
+                (Some(encoded), Some(input)) => encoded == input,
+                (Some(encoded), None) => {
+                    input
+                        .as_f64()
+                        .is_some_and(|input| {
+                            input.is_finite() && input.fract() == 0.0
+                                && input as i128 == encoded
+                        })
+                }
+                (None, Some(input)) => {
+                    encoded
+                        .as_f64()
+                        .is_some_and(|encoded| {
+                            encoded.is_finite() && encoded.fract() == 0.0
+                                && encoded as i128 == input
+                        })
+                }
+                (None, None) => encoded.as_f64() == input.as_f64(),
+            }
+        }
+        /// `nulls_may_be_absent` also accepts an input `null` that the
+        /// branch omits, as a skipped `None` does. Extra encoded
+        /// keys are allowed only by the pre-existing anyOf match.
+        fn preserves_complete_json_input(
+            encoded: &serde_json::Value,
+            input: &serde_json::Value,
+            nulls_may_be_absent: bool,
+            encoded_keys_may_be_extra: bool,
+        ) -> bool {
+            match (encoded, input) {
+                (
+                    serde_json::Value::Object(encoded),
+                    serde_json::Value::Object(input),
+                ) => {
+                    (encoded_keys_may_be_extra
+                        || encoded.keys().all(|key| input.contains_key(key)))
+                        && input
+                            .iter()
+                            .all(|(key, value)| match encoded.get(key) {
+                                Some(encoded_value) => {
+                                    preserves_complete_json_input(
+                                        encoded_value,
+                                        value,
+                                        nulls_may_be_absent,
+                                        encoded_keys_may_be_extra,
+                                    )
+                                }
+                                None => nulls_may_be_absent && value.is_null(),
+                            })
+                }
+                (serde_json::Value::Array(encoded), serde_json::Value::Array(input)) => {
+                    encoded.len() == input.len()
+                        && encoded
+                            .iter()
+                            .zip(input)
+                            .all(|(encoded, input)| {
+                                preserves_complete_json_input(
+                                    encoded,
+                                    input,
+                                    nulls_may_be_absent,
+                                    encoded_keys_may_be_extra,
+                                )
+                            })
+                }
+                (
+                    serde_json::Value::Number(encoded),
+                    serde_json::Value::Number(input),
+                ) => json_numbers_have_same_value(encoded, input),
+                _ => encoded == input,
+            }
+        }
+        let input = <serde_json::Value as Deserialize>::deserialize(deserializer)?;
+        let mut matched = None;
+        let mut equivalent = None;
+        let mut equivalent_matches = 0usize;
+        if input
+            .as_object()
+            .is_some_and(|object| {
+                true
+                    && object
+                        .get("secretAvailable")
+                        .is_some_and(|value| {
+                            value.is_null()
+                                || matches!(value.to_string().as_str(), "true")
+                        })
+            })
+        {
+            if let Ok(candidate) = serde_json::from_value::<
+                ApplicationKeyFirstDeliveryResponse,
+            >(input.clone()) {
+                match serde_json::to_value(&candidate) {
+                    Ok(encoded) if encoded == input => {
+                        if matched.is_some() {
+                            return Err(
+                                serde::de::Error::custom(
+                                    concat!(
+                                        "ambiguous oneOf value for ",
+                                        stringify!(ApplicationKeyIssueResponse),
+                                        ": more than one branch preserved the complete input",
+                                    ),
+                                ),
+                            );
+                        }
+                        matched = Some(
+                            Self::ApplicationKeyFirstDeliveryResponse(candidate),
+                        );
+                    }
+                    Ok(
+                        encoded,
+                    ) if preserves_complete_json_input(
+                        &encoded,
+                        &input,
+                        true,
+                        false,
+                    ) => {
+                        equivalent_matches += 1;
+                        equivalent
+                            .get_or_insert(
+                                Self::ApplicationKeyFirstDeliveryResponse(candidate),
+                            );
+                    }
+                    _ => {}
+                }
+            }
+        }
+        if input
+            .as_object()
+            .is_some_and(|object| {
+                true
+                    && object
+                        .get("secretAvailable")
+                        .is_some_and(|value| {
+                            value.is_null()
+                                || matches!(value.to_string().as_str(), "false")
+                        })
+            })
+        {
+            if let Ok(candidate) = serde_json::from_value::<
+                ApplicationKeyIssuanceReplayResponse,
+            >(input.clone()) {
+                match serde_json::to_value(&candidate) {
+                    Ok(encoded) if encoded == input => {
+                        if matched.is_some() {
+                            return Err(
+                                serde::de::Error::custom(
+                                    concat!(
+                                        "ambiguous oneOf value for ",
+                                        stringify!(ApplicationKeyIssueResponse),
+                                        ": more than one branch preserved the complete input",
+                                    ),
+                                ),
+                            );
+                        }
+                        matched = Some(
+                            Self::ApplicationKeyIssuanceReplayResponse(candidate),
+                        );
+                    }
+                    Ok(
+                        encoded,
+                    ) if preserves_complete_json_input(
+                        &encoded,
+                        &input,
+                        true,
+                        false,
+                    ) => {
+                        equivalent_matches += 1;
+                        equivalent
+                            .get_or_insert(
+                                Self::ApplicationKeyIssuanceReplayResponse(candidate),
+                            );
+                    }
+                    _ => {}
+                }
+            }
+        }
+        if let Some(matched) = matched {
+            return Ok(matched);
+        }
+        if equivalent_matches > 1 {
+            return Err(
+                serde::de::Error::custom(
+                    concat!(
+                        "ambiguous oneOf value for ",
+                        stringify!(ApplicationKeyIssueResponse),
+                        ": more than one branch preserved an equivalent input",
+                    ),
+                ),
+            );
+        }
+        equivalent
+            .ok_or_else(|| serde::de::Error::custom(
+                concat!(
+                    "no oneOf branch for ", stringify!(ApplicationKeyIssueResponse),
+                    " preserved the complete input",
+                ),
+            ))
+    }
+}
+///Preserve adapter order and omitted lifetime without caller audiences.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ApplicationKeyIssueRequest {
+    ///Constraint: minItems=1, maxItems=2, uniqueItems=true
+    #[serde(rename = "allowedAdapters")]
+    pub allowed_adapters: Vec<ApplicationKeyAdapter>,
+    ///Constraint: minimum=0, maximum=9007199254740991
+    #[serde(rename = "expectedAccessRevision")]
+    pub expected_access_revision: i64,
+    ///Constraint: maximum=9007199254740991, exclusiveMinimum=0
+    #[serde(
+        rename = "expiresInSeconds",
+        skip_serializing_if = "Option::is_none",
+        default,
+        deserialize_with = "presence_serde::optional_nonnull"
+    )]
+    pub expires_in_seconds: Option<i64>,
+}
+impl ApplicationKeyIssueRequest {
+    /// Construct this request with every required wire field.
+    pub fn new(
+        allowed_adapters: Vec<ApplicationKeyAdapter>,
+        expected_access_revision: i64,
+    ) -> Self {
+        Self {
+            allowed_adapters,
+            expected_access_revision,
+            expires_in_seconds: None,
+        }
+    }
+    /// Start a dependency-free builder with every required wire field.
+    pub fn builder(
+        allowed_adapters: Vec<ApplicationKeyAdapter>,
+        expected_access_revision: i64,
+    ) -> ApplicationKeyIssueRequestBuilder {
+        ApplicationKeyIssueRequestBuilder::new(
+            allowed_adapters,
+            expected_access_revision,
+        )
+    }
+}
+/// Dependency-free builder for [`#struct_name`].
+#[derive(Debug, Clone)]
+#[must_use]
+pub struct ApplicationKeyIssueRequestBuilder {
+    value: ApplicationKeyIssueRequest,
+}
+impl ApplicationKeyIssueRequestBuilder {
+    /// Start a builder with every required wire field.
+    pub fn new(
+        allowed_adapters: Vec<ApplicationKeyAdapter>,
+        expected_access_revision: i64,
+    ) -> Self {
+        Self {
+            value: ApplicationKeyIssueRequest::new(
+                allowed_adapters,
+                expected_access_revision,
+            ),
+        }
+    }
+    #[doc = concat!("Set the optional `", "expiresInSeconds", "` request field.")]
+    #[must_use]
+    pub fn expires_in_seconds(mut self, expires_in_seconds: i64) -> Self {
+        self.value.expires_in_seconds = Some(expires_in_seconds);
+        self
+    }
+    /// Finish building the request model.
+    pub fn build(self) -> ApplicationKeyIssueRequest {
+        self.value
+    }
+}
+///Return original safe metadata without a credential field or new issuance.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct ApplicationKeyIssuanceReplayResponse {
+    ///Constraint: minimum=1, maximum=9007199254740991
+    #[serde(rename = "accessRevision")]
+    pub access_revision: i64,
+    #[serde(rename = "idempotencyExpiresAt")]
+    pub idempotency_expires_at: chrono::DateTime<chrono::Utc>,
+    pub metadata: ApplicationKeyMetadataResponse,
+    #[serde(rename = "operationId")]
+    pub operation_id: String,
+    #[serde(rename = "secretAvailable")]
+    pub secret_available: BooleanConstant<false>,
+}
+///Deliver the new credential only after its original issuance commits.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct ApplicationKeyFirstDeliveryResponse {
+    ///Constraint: minimum=1, maximum=9007199254740991
+    #[serde(rename = "accessRevision")]
+    pub access_revision: i64,
+    #[serde(rename = "idempotencyExpiresAt")]
+    pub idempotency_expires_at: chrono::DateTime<chrono::Utc>,
+    pub key: String,
+    pub metadata: ApplicationKeyMetadataResponse,
+    #[serde(rename = "operationId")]
+    pub operation_id: String,
+    #[serde(rename = "secretAvailable")]
+    pub secret_available: BooleanConstant<true>,
+}
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ApplicationKeyMetadataResponse {
     ///Constraint: minItems=1, maxItems=2
