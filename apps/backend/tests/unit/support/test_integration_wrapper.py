@@ -75,7 +75,7 @@ class ProbeRunner(namespace["IntegrationRunner"]):
         with (root / "ownership").open("a") as output:
             output.write(json.dumps(event) + "\n")
 configuration = json.loads((root / "fixture.json").read_text())
-raise SystemExit(ProbeRunner(root, normal_work_seconds=configuration.get("normal_seconds"), cleanup_work_seconds=0.2, term_seconds=0.2, kill_seconds=0.2).run(sys.argv[2:]))
+raise SystemExit(ProbeRunner(root, normal_work_seconds=configuration.get("normal_seconds"), cleanup_work_seconds=configuration.get("cleanup_seconds", 0.2), term_seconds=0.2, kill_seconds=0.2).run(sys.argv[2:]))
 """
 
 
@@ -500,6 +500,7 @@ def test_normal_work_has_one_deadline_before_independent_cleanup(
             "startup_sleep": startup_sleep,
             "test_sleep": test_sleep,
             "normal_seconds": normal_seconds,
+            "cleanup_seconds": 1.0,
         },
     ) as probe:
         status, _, errors = probe.finish()
