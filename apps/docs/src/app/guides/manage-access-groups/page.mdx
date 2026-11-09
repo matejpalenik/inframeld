@@ -16,6 +16,8 @@ To assign `add-documents`, `update-documents` or `delete-documents` on this grou
 
 You need an existing Project, its permanent ID and a current human credential accepted by the installation. To create a group, you must be an eligible admitted human Project member with permission to use `create-access-groups`. Either grant level permits creation. Later administration requires current management of the particular group.
 
+If no eligible manager remains, first consider recovery of the legitimate account. Otherwise, involve the installation's verified host operator and review [scoped operator repair](https://github.com/matejpalenik/inframeld/blob/main/.agents/skills/inframeld-access-models/references/host-maintenance.md#access-owned-authority-repair). That separate protected workflow can establish an eligible Project member's ordinary membership and management of this exact group. An ordinary group request or an old receipt cannot supply host authority.
+
 Use the `projectId` from Project creation or an authorized [exact-Name resolution](/guides/name-and-rename-project#resolve-the-name-and-keep-the-id). [Read your own Project access](/guides/assign-project-grant#read-your-project-access-and-current-revision) to review the required creation permission and current Project `accessRevision`. The server checks current authority again when saving each change.
 
 Set up the installation URL and an existing human bearer token through [HTTP setup](/clients/http#call-protected-operations). Browser sign-in alone does not put a bearer token in your terminal. Use the local source-package setup for a [Python](/clients/python), [TypeScript](/clients/typescript) or [Rust](/clients/rust) alternative. Group administration has no delivered CLI command in this preview.

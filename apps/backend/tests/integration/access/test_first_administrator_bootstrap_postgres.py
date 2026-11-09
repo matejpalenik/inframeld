@@ -38,11 +38,11 @@ from inframeld_backend.access.application.enums.identity_recovery_event_kind imp
 from inframeld_backend.access.application.errors.first_administrator_bootstrap_error import (
     FirstAdministratorBootstrapError,
 )
-from inframeld_backend.access.application.errors.project_metadata_maintenance_error import (
-    ProjectMetadataMaintenanceError,
-)
 from inframeld_backend.access.application.errors.recovery_maintenance_error import (
     RecoveryMaintenanceError,
+)
+from inframeld_backend.access.application.errors.stranded_authority_maintenance_error import (
+    StrandedAuthorityMaintenanceError,
 )
 from inframeld_backend.access.domain.enums.identity_recovery_cleanup_state import (
     IdentityRecoveryCleanupState,
@@ -60,8 +60,8 @@ from inframeld_backend.access.infrastructure.readers.postgres_human_credential_s
 from inframeld_backend.access.infrastructure.readers.postgres_identity_recovery_cleanup_resume_facts_reader import (
     PostgresIdentityRecoveryCleanupResumeFactsReader,
 )
-from inframeld_backend.access.infrastructure.readers.postgres_project_metadata_repair_facts_reader import (
-    PostgresProjectMetadataRepairFactsReader,
+from inframeld_backend.access.infrastructure.readers.postgres_stranded_authority_repair_facts_reader import (
+    PostgresStrandedAuthorityRepairFactsReader,
 )
 from inframeld_backend.access.infrastructure.resources.postgres_identity_coordinator import (
     PostgresIdentityCoordinator,
@@ -563,8 +563,8 @@ async def test_other_maintenance_modes_cannot_reinterpret_bootstrap_operation(
                 operation_id=scenario.command.operation_id,
             )
         assert recovery.value.code.value == "idempotency_key_reused"
-        with pytest.raises(ProjectMetadataMaintenanceError) as metadata:
-            await PostgresProjectMetadataRepairFactsReader(session).receipt(
+        with pytest.raises(StrandedAuthorityMaintenanceError) as metadata:
+            await PostgresStrandedAuthorityRepairFactsReader(session).receipt(
                 installation_id=scenario.binding.installation_id,
                 operation_id=scenario.command.operation_id,
             )

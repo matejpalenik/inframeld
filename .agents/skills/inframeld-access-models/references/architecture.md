@@ -46,6 +46,16 @@ The implemented human services are `HumanSessionAuthenticationService` and `Huma
 
 Current operation checks use focused authorizers and policies. `PrincipalAccessEvaluationService` interprets authentication evidence against current facts. `ActionAuthorizationService` coordinates ordinary action checks. Each grant service composes its current facts with the existing principal, visibility and exact-grant policies. Neither a typed ID nor an `AccessContextDTO` proves current authority.
 
+<a id="stranded-authority-repair-components"></a>
+
+## Repair one stranded Access responsibility
+
+Alice is an eligible Support member, but SupportKnowledge has no eligible manager. [Private host maintenance](host-maintenance.md#access-owned-authority-repair) can establish her membership and management of that exact group. The same consumer can repair one use-and-grant action on an Access-owned Organization, Project, group or application account. Ordinary credentials still supply no host authority.
+
+[StrandedAuthorityMaintenanceCli](../../../../apps/backend/src/inframeld_backend/access/cli/stranded_authority_maintenance_cli.py) verifies recipient proof before opening the application service's SQL session. Bootstrap owns the [private dispatch and resource composition](../../../../apps/backend/src/inframeld_backend/bootstrap/stranded_authority_repair_composition.py). [StrandedAuthorityRepairService](../../../../apps/backend/src/inframeld_backend/access/application/services/stranded_authority_repair_service.py) coordinates current recipient eligibility, exact target, reviewed revision and original-result replay. The [PostgreSQL facts reader](../../../../apps/backend/src/inframeld_backend/access/infrastructure/readers/postgres_stranded_authority_repair_facts_reader.py) owns identity/Organization/Project ordering and refreshed stranded-state observations. The [writer](../../../../apps/backend/src/inframeld_backend/access/infrastructure/writers/postgres_stranded_authority_repair_writer.py) saves only the checked assignment, revision, audit and original in that transaction.
+
+The database foundation and private installed-command path are locally qualified, including real Ory verification. The broader operator proof-acquisition procedure remains unfinished. The metadata-only proof example retains its existing scope. Pipeline, Deployment, Collection, Source, model-connection and profile owners still supply their actual target integration and tests through the [repair ownership boundary](host-maintenance.md#maintenance-resource-integration).
+
 <a id="document-access-components"></a>
 
 ## Authorize selected Document evidence
@@ -257,7 +267,7 @@ Authentication establishes the caller. A later `ActionAuthorizationService.requi
 
 ## Decision references for dependent implementation
 
-[PD-ACCESS-03 is resolved](decision-recovery-production-completion.md). Use the accepted [private handoff](private-recovery-handoff.md), [completion workflow](recovery-completion.md) and [host continuation](host-maintenance.md#recovery-cleanup-continuation) for their inspected implementations and qualification limits. Bootstrap, stranded-authority repair and account restoration remain separate work. The entries below distinguish accepted policies from choices still pending.
+[PD-ACCESS-03 is resolved](decision-recovery-production-completion.md). Use the accepted [private handoff](private-recovery-handoff.md), [completion workflow](recovery-completion.md) and [host continuation](host-maintenance.md#recovery-cleanup-continuation) for their inspected implementations and qualification limits. First-setup proof acquisition, future resource repair integrations and account restoration retain their separate work. The entries below distinguish accepted policies from choices still pending.
 
 Apply the accepted entries below when their scope matches. Discuss only choices still explicitly marked pending:
 

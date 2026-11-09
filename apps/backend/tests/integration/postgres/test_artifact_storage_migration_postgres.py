@@ -322,7 +322,7 @@ async def test_artifact_upgrade_preserves_0014_metadata_deletion_status_product_
         async with database.session() as session:
             assert (
                 await session.scalar(select(AlembicVersionRow.version_num))
-                == "0029_application_key_revocation"
+                == "0030_stranded_authority_repair"
             )
             snapshot = await PostgresJobStore(session).find(OperationId("original-job"))
             assert snapshot is not None and snapshot.job_id.value == job_id
@@ -462,7 +462,7 @@ async def test_retained_artifact_ownership_refuses_downgrade_without_changing_st
         async with database.session() as session:
             assert (
                 await session.scalar(select(AlembicVersionRow.version_num))
-                == "0029_application_key_revocation"
+                == "0030_stranded_authority_repair"
             )
             attempt = await session.get(ArtifactAttemptRow, scenario.attempt_id.value)
             reservation = await session.get(

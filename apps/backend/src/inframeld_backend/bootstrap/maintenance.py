@@ -14,8 +14,8 @@ from structlog.contextvars import bound_contextvars
 from inframeld_backend.access.application.commands.bootstrap_first_administrator_command import (
     BootstrapFirstAdministratorCommand,
 )
-from inframeld_backend.access.application.commands.repair_project_metadata_authority_command import (
-    RepairProjectMetadataAuthorityCommand,
+from inframeld_backend.access.application.commands.repair_stranded_authority_command import (
+    RepairStrandedAuthorityCommand,
 )
 from inframeld_backend.access.application.commands.resume_identity_recovery_cleanup_command import (
     ResumeIdentityRecoveryCleanupCommand,
@@ -26,20 +26,20 @@ from inframeld_backend.access.application.enums.recovery_maintenance_error_code 
 from inframeld_backend.access.application.errors.first_administrator_bootstrap_error import (
     FirstAdministratorBootstrapError,
 )
-from inframeld_backend.access.application.errors.project_metadata_maintenance_error import (
-    ProjectMetadataMaintenanceError,
-)
 from inframeld_backend.access.application.errors.recovery_maintenance_error import (
     RecoveryMaintenanceError,
+)
+from inframeld_backend.access.application.errors.stranded_authority_maintenance_error import (
+    StrandedAuthorityMaintenanceError,
 )
 from inframeld_backend.access.application.services.identity_recovery_cleanup_resume_service import (
     IdentityRecoveryCleanupResumeService,
 )
-from inframeld_backend.access.cli.errors.project_metadata_maintenance_input_error import (
-    ProjectMetadataMaintenanceInputError,
-)
 from inframeld_backend.access.cli.errors.recovery_maintenance_input_error import (
     RecoveryMaintenanceInputError,
+)
+from inframeld_backend.access.cli.errors.stranded_authority_maintenance_input_error import (
+    StrandedAuthorityMaintenanceInputError,
 )
 from inframeld_backend.access.cli.maintenance_cli import MaintenanceCli
 from inframeld_backend.access.cli.recovery_maintenance_cli import RecoveryMaintenanceCli
@@ -64,11 +64,11 @@ from inframeld_backend.bootstrap.first_administrator_bootstrap_settings import (
 from inframeld_backend.bootstrap.maintenance_application_settings import (
     MaintenanceApplicationSettings,
 )
-from inframeld_backend.bootstrap.project_metadata_maintenance_settings import (
-    ProjectMetadataMaintenanceSettings,
+from inframeld_backend.bootstrap.stranded_authority_maintenance_settings import (
+    StrandedAuthorityMaintenanceSettings,
 )
-from inframeld_backend.bootstrap.project_metadata_repair_composition import (
-    execute_project_metadata_repair,
+from inframeld_backend.bootstrap.stranded_authority_repair_composition import (
+    execute_stranded_authority_repair,
 )
 from inframeld_backend.shared.application.errors.application_errors import (
     ConflictError,
@@ -88,7 +88,7 @@ from inframeld_backend.shared.infrastructure.resources.database import Database
 async def _execute(
     command: (
         ResumeIdentityRecoveryCleanupCommand
-        | RepairProjectMetadataAuthorityCommand
+        | RepairStrandedAuthorityCommand
         | BootstrapFirstAdministratorCommand
     ),
     settings: MaintenanceApplicationSettings,
@@ -98,10 +98,10 @@ async def _execute(
         if not isinstance(settings, FirstAdministratorBootstrapSettings):
             raise RuntimeError("The first-administrator configuration is missing.")
         return await execute_first_administrator_bootstrap(command, settings)
-    if isinstance(command, RepairProjectMetadataAuthorityCommand):
-        if not isinstance(settings, ProjectMetadataMaintenanceSettings):
+    if isinstance(command, RepairStrandedAuthorityCommand):
+        if not isinstance(settings, StrandedAuthorityMaintenanceSettings):
             raise RuntimeError("The metadata repair configuration is missing.")
-        return await execute_project_metadata_repair(command, settings)
+        return await execute_stranded_authority_repair(command, settings)
     database = Database(settings.database)
     try:
         await database.startup()
@@ -150,11 +150,11 @@ def main(arguments: Sequence[str] | None = None) -> int:
         error["operationId"] = command.operation_id.value
         if isinstance(command, BootstrapFirstAdministratorCommand):
             settings = FirstAdministratorBootstrapSettings.model_validate({})
-        elif isinstance(command, RepairProjectMetadataAuthorityCommand):
-            settings = ProjectMetadataMaintenanceSettings.model_validate({})
+        elif isinstance(command, RepairStrandedAuthorityCommand):
+            settings = StrandedAuthorityMaintenanceSettings.model_validate({})
         else:
             settings = MaintenanceApplicationSettings.model_validate({})
-    except (RecoveryMaintenanceInputError, ProjectMetadataMaintenanceInputError) as failure:
+    except (RecoveryMaintenanceInputError, StrandedAuthorityMaintenanceInputError) as failure:
         if failure.operation_id is not None:
             error["operationId"] = failure.operation_id.value
         return _emit(error | {"code": "invalid_input"}, 2)
@@ -166,7 +166,7 @@ def main(arguments: Sequence[str] | None = None) -> int:
         response = asyncio.run(_execute(command, settings))
     except (
         RecoveryMaintenanceError,
-        ProjectMetadataMaintenanceError,
+        StrandedAuthorityMaintenanceError,
         FirstAdministratorBootstrapError,
     ) as failure:
         code = failure.code.value

@@ -202,7 +202,7 @@ async def test_empty_revocation_history_round_trips_without_changing_existing_is
             ) == before
             assert (
                 await session.scalar(select(AlembicVersionRow.version_num))
-                == "0029_application_key_revocation"
+                == "0030_stranded_authority_repair"
             )
 
 
@@ -216,7 +216,7 @@ async def test_retained_revocation_original_prevents_lossy_downgrade(
     async with database.session() as session:
         assert (
             await session.scalar(select(AlembicVersionRow.version_num))
-            == "0029_application_key_revocation"
+            == "0030_stranded_authority_repair"
         )
         original = await session.get(
             ApplicationKeyRevocationResultRow, revoked_original.operation.operation_id.value

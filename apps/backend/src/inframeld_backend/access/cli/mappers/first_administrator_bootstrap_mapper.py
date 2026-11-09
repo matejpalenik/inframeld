@@ -11,8 +11,8 @@ from inframeld_backend.access.application.dtos.first_administrator_bootstrap_res
 from inframeld_backend.access.application.value_objects.human_access_token_credential import (
     HumanAccessTokenCredential,
 )
-from inframeld_backend.access.cli.errors.project_metadata_maintenance_input_error import (
-    ProjectMetadataMaintenanceInputError,
+from inframeld_backend.access.cli.errors.stranded_authority_maintenance_input_error import (
+    StrandedAuthorityMaintenanceInputError,
 )
 from inframeld_backend.access.cli.mappers.maintenance_input_mapper import MaintenanceInputMapper
 from inframeld_backend.shared.application.value_objects.operation_id import OperationId
@@ -70,7 +70,7 @@ class FirstAdministratorBootstrapMapper:
                 identity_proof=HumanAccessTokenCredential(_text(proof["accessToken"])),
             )
         except (ValueError, TypeError, UnicodeError, RecursionError):
-            raise ProjectMetadataMaintenanceInputError(operation_id) from None
+            raise StrandedAuthorityMaintenanceInputError(operation_id) from None
 
     @staticmethod
     def result(result: FirstAdministratorBootstrapResultDTO) -> dict[str, object]:

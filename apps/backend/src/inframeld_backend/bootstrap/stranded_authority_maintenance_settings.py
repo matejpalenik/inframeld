@@ -1,3 +1,5 @@
+"""Load recipient-proof configuration only for the repair mode that requires it."""
+
 from typing import Self
 
 from pydantic import Field, model_validator
@@ -15,9 +17,7 @@ from inframeld_backend.shared.infrastructure.settings.request_fingerprint_settin
 )
 
 
-class ProjectMetadataMaintenanceSettings(MaintenanceApplicationSettings):
-    """Load recipient-proof configuration only for the repair mode that requires it."""
-
+class StrandedAuthorityMaintenanceSettings(MaintenanceApplicationSettings):
     kratos: KratosSettings
     hydra: HydraSettings
     request_fingerprint: RequestFingerprintSettings
@@ -28,5 +28,5 @@ class ProjectMetadataMaintenanceSettings(MaintenanceApplicationSettings):
     @model_validator(mode="after")
     def _require_private_identity_api(self) -> Self:
         if self.kratos.admin_url is None:
-            raise ValueError("Metadata repair requires the configured private Kratos API.")
+            raise ValueError("Authority repair requires the configured private Kratos API.")
         return self

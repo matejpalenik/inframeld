@@ -2,7 +2,7 @@
 
 Alice wants to stop managing SupportKnowledge but keep reading its documents. Demotion removes her management assignment while preserving ordinary membership. Removing membership, suspending Alice and deleting the group have different effects.
 
-**Status:** these are accepted lifecycle and persistence requirements. The manager-membership foreign key and guarded Project membership addition/removal are implemented. Group creation, appointment, group-only departure, safe inspection and unused-group deletion are implemented through focused services and migration 0025. Application retirement, stranded-group repair and Project deletion retain their separate implementation status. Exact database definitions remain in [Access persistence](access-persistence.md).
+**Status:** these are accepted lifecycle and persistence requirements. The manager-membership foreign key and guarded Project membership addition/removal are implemented. Group creation, appointment, group-only departure, safe inspection and unused-group deletion are implemented through focused services and migration 0025. Private stranded-group and exact Access-owned action repair are implemented and locally qualified through PostgreSQL and the private installed command with real Ory verification. Application retirement and Project deletion retain their separate implementation status. Exact database definitions remain in [Access persistence](access-persistence.md).
 
 ## Apply one guarded write
 
@@ -28,6 +28,14 @@ When an authorized operation removes both, it checks handover and removes manage
 Creating a group, appointing a manager, or recovering a stranded group saves both assignments together. Demotion removes only management. Removing membership also removes management, and rejoining does not restore it. Save each change, scope revision, and audit event in the same protected Access transaction. See the [group workflow](memberships-groups-and-handover.md#group-managers).
 
 Suspension keeps both records but blocks their use. Foreign keys cannot prove that Alice is active, may make this change, or will leave another eligible manager. Application policy still checks those conditions. The initial migration implements the membership constraint, and the PostgreSQL constraint tests exercise it. Project removal and group-only member removal apply the manager-before-membership order. Current group changes use Organization-shared then Project-exclusive coordination and count only eligible remaining human managers.
+
+<a id="stranded-group-repair-lifecycle"></a>
+
+## Keep a repaired relationship separate from its original receipt
+
+[Private Access-owned repair](host-maintenance.md#access-owned-authority-repair) requires an eligible admitted human and, for a group, current membership in its active Project. After refreshed checks prove that no eligible manager remains, the writer saves ordinary group membership and management together with the Project revision, audit and original receipt. Action-grantor repair instead sets only the one exact use-and-grant assignment. An eligible same-group manager already able to administer a document action prevents treating that action as stranded.
+
+Later ordinary removal, demotion or suspension retains its normal effects. Replaying the original repair does not restore the removed relationship or grant. It still requires current same-person proof, credential eligibility and applicable Project membership. [Typed repair originals](access-persistence.md#stranded-authority-repair-persistence) survive mutable target/assignment removal as history, while current target and recipient checks still govern access to the result. Recovery continuation and bootstrap originals retain their separate meanings.
 
 <a id="project-membership-original-results"></a>
 

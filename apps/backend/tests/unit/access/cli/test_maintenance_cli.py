@@ -10,15 +10,19 @@ import pytest
 from inframeld_backend.access.application.commands.bootstrap_first_administrator_command import (
     BootstrapFirstAdministratorCommand,
 )
-from inframeld_backend.access.application.commands.repair_project_metadata_authority_command import (
-    RepairProjectMetadataAuthorityCommand,
+from inframeld_backend.access.application.commands.repair_stranded_authority_command import (
+    RepairStrandedAuthorityCommand,
 )
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
+from inframeld_backend.access.application.dtos.action_grantor_repair_responsibility_dto import (
+    ActionGrantorRepairResponsibilityDTO,
+)
 from inframeld_backend.access.application.dtos.human_oauth_credential_binding_dto import (
     HumanOAuthCredentialBindingDTO,
 )
-from inframeld_backend.access.application.dtos.project_metadata_repair_result_dto import (
-    ProjectMetadataRepairResultDTO,
+from inframeld_backend.access.application.dtos.project_grant_target_dto import ProjectGrantTargetDTO
+from inframeld_backend.access.application.dtos.stranded_authority_repair_result_dto import (
+    StrandedAuthorityRepairResultDTO,
 )
 from inframeld_backend.access.application.dtos.verified_human_identity_dto import (
     VerifiedHumanIdentityDTO,
@@ -26,16 +30,17 @@ from inframeld_backend.access.application.dtos.verified_human_identity_dto impor
 from inframeld_backend.access.application.protocols.human_access_token_authenticator import (
     HumanAccessTokenAuthenticator,
 )
-from inframeld_backend.access.application.protocols.project_metadata_repairer import (
-    ProjectMetadataRepairer,
+from inframeld_backend.access.application.protocols.stranded_authority_repairer import (
+    StrandedAuthorityRepairer,
 )
 from inframeld_backend.access.application.value_objects.human_access_token_credential import (
     HumanAccessTokenCredential,
 )
 from inframeld_backend.access.cli.maintenance_cli import MaintenanceCli
-from inframeld_backend.access.cli.project_metadata_maintenance_cli import (
-    ProjectMetadataMaintenanceCli,
+from inframeld_backend.access.cli.stranded_authority_maintenance_cli import (
+    StrandedAuthorityMaintenanceCli,
 )
+from inframeld_backend.access.domain.value_objects.action_id import ActionId
 from inframeld_backend.access.domain.value_objects.human_credential_version import (
     HumanCredentialVersion,
 )
@@ -72,20 +77,20 @@ class MockProofAuthenticator(HumanAccessTokenAuthenticator):
         )
 
 
-class MockRepairOperation(ProjectMetadataRepairer):
+class MockRepairOperation(StrandedAuthorityRepairer):
     def __init__(self, events: list[str]) -> None:
         self.events = events
 
     @override
     async def repair(
-        self, *, access: AccessContextDTO, command: RepairProjectMetadataAuthorityCommand
-    ) -> ProjectMetadataRepairResultDTO:
+        self, *, access: AccessContextDTO, command: RepairStrandedAuthorityCommand
+    ) -> StrandedAuthorityRepairResultDTO:
         self.events.append("repair")
-        return ProjectMetadataRepairResultDTO(
+        return StrandedAuthorityRepairResultDTO(
             operation_id=command.operation_id,
             installation_id=command.expected_installation_id,
             organization_id=OrganizationId(UUID(int=2)),
-            project_id=command.project_id,
+            responsibility=command.responsibility,
             recipient_id=access.actor_principal_id,
             access_revision=1,
         )
@@ -93,38 +98,40 @@ class MockRepairOperation(ProjectMetadataRepairer):
 
 @pytest.mark.asyncio
 async def test_recipient_verification_finishes_before_opening_operation_session() -> None:
-    from inframeld_backend.access.application.errors.project_metadata_maintenance_error import (
-        ProjectMetadataMaintenanceError,
+    from inframeld_backend.access.application.errors.stranded_authority_maintenance_error import (
+        StrandedAuthorityMaintenanceError,
     )
 
     events: list[str] = []
 
     @asynccontextmanager
-    async def open_repair() -> AsyncGenerator[ProjectMetadataRepairer]:
+    async def open_repair() -> AsyncGenerator[StrandedAuthorityRepairer]:
         events.append("open-session")
         try:
             yield MockRepairOperation(events)
         finally:
             events.append("close-session")
 
-    command = RepairProjectMetadataAuthorityCommand(
+    command = RepairStrandedAuthorityCommand(
         expected_installation_id=InstallationId(UUID(int=4)),
         operation_id=OperationId("original"),
-        project_id=ProjectId(UUID(int=3)),
+        responsibility=ActionGrantorRepairResponsibilityDTO(
+            ProjectGrantTargetDTO(ProjectId(UUID(int=3))), ActionId("edit-project-metadata")
+        ),
         expected_access_revision=0,
         expected_identity_id=UUID(int=5),
         operator_label="Operator",
         reason="Repair",
         identity_proof=HumanAccessTokenCredential("private-proof"),
     )
-    result = await ProjectMetadataMaintenanceCli(
+    result = await StrandedAuthorityMaintenanceCli(
         MockProofAuthenticator(events), open_repair
     ).execute(command)
     assert result["outcome"] == "repaired"
     assert events == ["verify-proof", "open-session", "repair", "close-session"]
     events.clear()
-    with pytest.raises(ProjectMetadataMaintenanceError):
-        await ProjectMetadataMaintenanceCli(
+    with pytest.raises(StrandedAuthorityMaintenanceError):
+        await StrandedAuthorityMaintenanceCli(
             MockProofAuthenticator(events, reject=True), open_repair
         ).execute(command)
     assert events == ["verify-proof"]
@@ -163,3 +170,66 @@ def test_mode_dispatch_accepts_the_fixed_first_administrator_claim() -> None:
     assert command.operation_id == OperationId("first-claim")
     assert command.expected_identity_id == UUID(int=5)
     assert command.expected_access_revision == 0
+
+
+@pytest.mark.parametrize(
+    "responsibility",
+    [
+        {
+            "kind": "group-manager",
+            "projectId": "00000000-0000-0000-0000-000000000003",
+            "accessGroupId": "00000000-0000-0000-0000-000000000009",
+        },
+        {
+            "kind": "action-grantor",
+            "target": {
+                "kind": "organization",
+                "organizationId": "00000000-0000-0000-0000-000000000002",
+            },
+            "actionId": "admit-users",
+        },
+        {
+            "kind": "action-grantor",
+            "target": {"kind": "project", "projectId": "00000000-0000-0000-0000-000000000003"},
+            "actionId": "manage-project-members",
+        },
+        {
+            "kind": "action-grantor",
+            "target": {
+                "kind": "access-group",
+                "projectId": "00000000-0000-0000-0000-000000000003",
+                "accessGroupId": "00000000-0000-0000-0000-000000000009",
+            },
+            "actionId": "add-documents",
+        },
+        {
+            "kind": "action-grantor",
+            "target": {
+                "kind": "application-account",
+                "projectId": "00000000-0000-0000-0000-000000000003",
+                "applicationPrincipalId": "00000000-0000-0000-0000-000000000008",
+            },
+            "actionId": "revoke-application-keys",
+        },
+    ],
+)
+def test_private_dispatch_accepts_each_delivered_access_responsibility(
+    responsibility: dict[str, object],
+) -> None:
+    request = {
+        "schemaVersion": 1,
+        "mode": "repair-stranded-authority",
+        "expectedInstallationId": str(UUID(int=4)),
+        "operationId": "dispatch-original",
+        "operatorLabel": "Host operator",
+        "reason": "Repair exact reviewed Access responsibility",
+        "expectedAccessRevision": 0,
+        "expectedIdentityId": str(UUID(int=5)),
+        "identityProof": {"kind": "hydra-access-token", "accessToken": "private-proof"},
+        "responsibility": responsibility,
+    }
+    command = MaintenanceCli.read(io.BytesIO(json.dumps(request).encode()))
+    assert isinstance(command, RepairStrandedAuthorityCommand)
+    assert command.responsibility.kind.value == responsibility["kind"]
+    assert command.operation_id.value == "dispatch-original"
+    assert "private-proof" not in repr(command)
