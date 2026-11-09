@@ -2,7 +2,7 @@
 
 use std::{
     ffi::{OsStr, OsString},
-    io::{self, Write},
+    io::{self, IsTerminal as _, Write},
 };
 
 use clap::{CommandFactory, Parser, error::ErrorKind};
@@ -175,7 +175,8 @@ struct FinalRecord<'a, T> {
 /// submitted values. Help and version are offline. Target commands can read or
 /// update public local bindings and contact credential-free installation discovery.
 /// Dry-run describes the selected operation without its network or write effects.
-/// No invocation loads credentials or starts installation services.
+/// Explicit host-context bootstrap acquires transient proof for the reviewed host command.
+/// No invocation selects a saved login or starts installation services.
 /// The caller supplies terminal capability for this same output destination.
 ///
 /// # Errors
@@ -188,6 +189,13 @@ pub fn run(
     stdout_is_terminal: bool,
 ) -> io::Result<u8> {
     let mut arguments: Vec<OsString> = arguments.into_iter().map(Into::into).collect();
+    if arguments.len() == 2
+        && arguments[1] == crate::auth::maintenance_handoff::PRIVATE_BROWSER_LAUNCH_ARGUMENT
+    {
+        return Ok(u8::from(
+            crate::auth::maintenance_handoff::run_system_browser_child().is_err(),
+        ));
+    }
     // The process label is not a command operand or safe diagnostic content.
     if let Some(label) = arguments.first_mut() {
         *label = "inframeld".into();
@@ -239,6 +247,16 @@ pub fn run(
         term.as_deref(),
     );
     match parsed.command {
+        Some(Command::Auth(arguments)) => {
+            let execution = crate::commands::auth::run(
+                arguments,
+                parsed.target.as_deref(),
+                parsed.dry_run,
+                !parsed.no_input && io::stdin().is_terminal(),
+                stderr,
+            );
+            report_bootstrap(selected, &execution, stdout, stderr)
+        }
         Some(Command::Target(arguments)) => {
             let execution =
                 target_commands::run(arguments, parsed.target.as_deref(), parsed.dry_run, stderr);
@@ -326,6 +344,64 @@ fn report_help(
     command.write_long_help(&mut output)?;
     output.push(b'\n');
     plain(&output, stdout, stderr)
+}
+
+fn report_bootstrap(
+    intent: Intent,
+    execution: &crate::auth::BootstrapExecution,
+    stdout: &mut impl Write,
+    stderr: &mut impl Write,
+) -> io::Result<u8> {
+    if let Some(error) = execution.error {
+        let _ = writeln!(stderr, "error: {}", error.message());
+    }
+    if intent.format == Format::Human {
+        if !execution.human.is_empty() && plain(execution.human.as_bytes(), stdout, stderr)? != 0 {
+            return Ok(1);
+        }
+        return Ok(execution.exit);
+    }
+    let outcome = if matches!(execution.exit, 130 | 143) {
+        Outcome::Interrupted
+    } else if matches!(
+        execution.error,
+        Some(crate::auth::BootstrapError::Unconfirmed)
+    ) {
+        Outcome::Uncertain
+    } else if execution.exit == 0 {
+        Outcome::Succeeded
+    } else {
+        Outcome::Failed
+    };
+    let result = Envelope {
+        schema_version: 1,
+        mode: intent.mode,
+        outcome,
+        data: execution.data.as_ref(),
+        error: execution.error.map(|error| ErrorBody::Cli {
+            code: error.code(),
+            message: error.message().to_owned(),
+        }),
+        warnings: vec![],
+    };
+    machine(intent, &result, execution.exit, stdout, stderr)
+}
+
+pub(crate) fn report_native_bootstrap(
+    execution: &crate::auth::BootstrapExecution,
+) -> std::process::ExitCode {
+    let result = report_bootstrap(
+        Intent {
+            format: Format::Json,
+            mode: Mode::Execute,
+            help: false,
+            conflict: false,
+        },
+        execution,
+        &mut io::stdout().lock(),
+        &mut io::stderr().lock(),
+    );
+    std::process::ExitCode::from(result.unwrap_or(1))
 }
 
 fn report_target(

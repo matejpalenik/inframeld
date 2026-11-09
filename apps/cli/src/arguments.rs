@@ -10,7 +10,7 @@ use clap::{Parser, Subcommand};
     version,
     color = clap::ColorChoice::Never,
     about = "Work with Inframeld through its generated application client",
-    after_help = "Examples:\n  inframeld --help\n  inframeld version\n  inframeld version --help\n\nInstalling this executable does not start or change an installation.\nBrowser login and authenticated product commands are delivered separately."
+    after_help = "Examples:\n  inframeld --help\n  inframeld version\n  inframeld version --help\n  inframeld auth bootstrap-first-administrator --help\n\nInstalling this executable does not start or change an installation.\nHost-context bootstrap acquires transient proof only when explicitly requested. Saved browser login and authenticated product commands are delivered separately."
 )]
 pub(crate) struct Arguments {
     /// Override the registered target for this invocation only.
@@ -40,6 +40,8 @@ pub(crate) struct Arguments {
 
 #[derive(Debug, Subcommand)]
 pub(crate) enum Command {
+    /// Acquire transient human proof for an explicit host-maintenance operation
+    Auth(crate::commands::auth::Arguments),
     /// Register and select credential-free installation connections
     Target(crate::commands::targets::Arguments),
     /// Show offline build information and qualified runtime pairing

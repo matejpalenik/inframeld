@@ -25,6 +25,9 @@ printf 'Untrusted browser certificate check completed.\n'
 certutil -A -d "sql:${account_nss}" -n account-ui-fixture -t 'C,,' -i /run/account-trust/ca.pem
 certutil -L -d "sql:${account_nss}" -n account-ui-fixture >/dev/null
 printf 'Fixture certificate import and readback completed.\n'
+if [[ "${INFRAMELD_ACCOUNT_PROOF_MODE:-0}" == bootstrap ]]; then
+    exec node --import tsx --test --test-concurrency=1 tests/browser/native-bootstrap-proof.test.ts
+fi
 if [[ "${INFRAMELD_ACCOUNT_PROOF_MODE:-0}" == 1 ]]; then
     exec node --import tsx --test --test-concurrency=1 \
         --test-name-pattern '^recipient-proof ' tests/browser/native-hydra-login-consent.test.ts

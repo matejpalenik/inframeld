@@ -122,10 +122,14 @@ for suffix, expected in (("project", project), ("service", service)):
     if not observed or any(value != expected for value in observed): raise SystemExit("recipient-proof: inspect scope rejected (status 1)")
 if config.get("User") != "10001:10001" or host.get("Privileged") is not False: raise SystemExit("recipient-proof: inspect user rejected (status 1)")
 if host.get("Init") is not True or host.get("PidMode") not in ("", "private"): raise SystemExit("recipient-proof: inspect process rejected (status 1)")
-if service in ("browser-tests", "proof-driver", "proof-denied-driver") and host.get("NetworkMode") != "container:" + namespace_owner: raise SystemExit("recipient-proof: inspect namespace rejected (status 1)")
+if service in ("browser-tests", "proof-driver", "proof-denied-driver", "bootstrap-first-driver", "bootstrap-replay-driver", "bootstrap-competing-driver", "bootstrap-reused-driver") and host.get("NetworkMode") != "container:" + namespace_owner: raise SystemExit("recipient-proof: inspect namespace rejected (status 1)")
 status, code = state.get("Status"), state.get("ExitCode")
 health = state.get("Health", {}).get("Status", "absent")
-if status not in ("created", "running", "exited", "dead") or type(code) is not int or not 0 <= code <= 255: raise SystemExit("recipient-proof: inspect state rejected (status 1)")
+if status not in ("created", "running", "exited", "dead") or type(code) is not int or not 0 <= code <= 255:
+    state_category = status if status in ("configured", "created", "initialized", "running", "stopped", "paused", "restarting", "removing", "stopping", "exited", "dead") else "other"
+    exit_type = "integer" if type(code) is int else "string" if type(code) is str else "other"
+    exit_range = "negative" if type(code) is int and code < 0 else "above-range" if type(code) is int and code > 255 else "in-range" if type(code) is int else "not-integer"
+    raise SystemExit("recipient-proof: inspect state rejected (status 1) state=" + state_category + " exit-type=" + exit_type + " exit-range=" + exit_range)
 if health not in ("starting", "healthy", "unhealthy", "absent"): raise SystemExit("recipient-proof: inspect health rejected (status 1)")
 print(status, code, health)
 ' "${account_project}" "$1" "$2" "$3"
@@ -316,6 +320,76 @@ catch (error) { process.exit(error.code === "ENOENT" ? 10 : 1); }
     "${account_runtime}" logs "${driver_id}" 2>&1 |
         "${account_compose[@]}" exec -T backend python /fixture/backend.py verify-proof-result
 }
+
+bootstrap_proof_stack() (
+    local backend_id="" browser_id="" driver_id="" stage snapshot state code health ready service expected browser_state browser_code status diagnostic_status container_id
+    # The existing phase owns diagnostics too. Never replace its initiating failure.
+    trap 'status=$?
+        if [[ "${status}" != 0 ]]; then
+            for container_id in "${backend_id}" "${browser_id}" "${driver_id}"; do
+                [[ "${container_id}" =~ ^[0-9a-f]{64}$ ]] || continue
+                diagnostic_status=0
+                "${account_runtime}" logs "${container_id}" >&2 || diagnostic_status=$?
+                if [[ "${diagnostic_status}" != 0 ]]; then
+                    printf "bootstrap-proof: diagnostic logs unavailable (status %s)\n" "${diagnostic_status}" >&2
+                fi
+            done
+        fi
+        exit "${status}"' EXIT
+    backend_id="$(account_service_container_id backend)" || return "$?"
+    "${account_compose[@]}" --profile qualification up -d --no-deps --no-build browser-tests || return "$?"
+    browser_id="$(account_service_container_id browser-tests)" || return "$?"
+    for stage in first replay competing reused; do
+        while true; do
+            snapshot="$("${account_runtime}" inspect --format '{{json .}}' "${browser_id}" |
+                account_container_state "${browser_id}" browser-tests "${backend_id}")" || return 1
+            read -r state code health <<<"${snapshot}"
+            if [[ "${state}" == exited && "${code}" != 0 ]]; then return "${code}"; fi
+            [[ "${state}" == running ]] || return 1
+            ready=0
+            "${account_compose[@]}" --profile qualification exec -T browser-tests node -e                 'process.exit(require("node:fs").existsSync(process.argv[1]) ? 0 : 3)'                 "/run/account-proof/bootstrap-${stage}-ready" || ready="$?"
+            [[ "${ready}" == 0 ]] && break
+            [[ "${ready}" == 3 ]] || return "${ready}"
+            sleep 0.05 || return "$?"
+        done
+        if [[ "${stage}" == first ]]; then
+            "${account_compose[@]}" exec -T backend python /fixture/backend.py bootstrap-pristine || return "$?"
+        fi
+        service="bootstrap-${stage}-driver"
+        "${account_compose[@]}" --profile qualification up -d --no-deps --no-build "${service}" || return "$?"
+        driver_id="$(account_service_container_id "${service}")" || return "$?"
+        while true; do
+            snapshot="$("${account_runtime}" inspect --format '{{json .}}' "${driver_id}" |
+                account_container_state "${driver_id}" "${service}" "${backend_id}")" || return 1
+            read -r state code health <<<"${snapshot}"
+            snapshot="$("${account_runtime}" inspect --format '{{json .}}' "${browser_id}" |
+                account_container_state "${browser_id}" browser-tests "${backend_id}")" || return 1
+            read -r browser_state browser_code health <<<"${snapshot}"
+            if [[ "${browser_state}" == dead ]]; then return 1; fi
+            if [[ "${browser_state}" == exited && "${browser_code}" != 0 ]]; then return "${browser_code}"; fi
+            [[ "${state}" == exited ]] && break
+            [[ "${state}" == running || "${state}" == created ]] || return 1
+            sleep 0.05 || return "$?"
+        done
+        expected=0
+        [[ "${stage}" == competing || "${stage}" == reused ]] && expected=1
+        [[ "${code}" == "${expected}" ]] || { [[ "${code}" != 0 ]] && return "${code}"; return 1; }
+        "${account_runtime}" logs "${driver_id}" |
+            "${account_compose[@]}" exec -T backend python /fixture/backend.py "bootstrap-${stage}" || return "$?"
+        if [[ "${stage}" == first ]]; then
+            "${account_compose[@]}" exec -T backend python /fixture/backend.py bootstrap-remove || return "$?"
+        fi
+        "${account_compose[@]}" --profile qualification exec -T browser-tests node -e             'require("node:fs").writeFileSync(process.argv[1],"VERIFIED\n",{flag:"wx",mode:0o600})'             "/run/account-proof/bootstrap-${stage}-verified" || return "$?"
+    done
+    while true; do
+        snapshot="$("${account_runtime}" inspect --format '{{json .}}' "${browser_id}" |
+            account_container_state "${browser_id}" browser-tests "${backend_id}")" || return 1
+        read -r state code health <<<"${snapshot}"
+        [[ "${state}" == exited ]] && return "${code}"
+        [[ "${state}" == running ]] || return 1
+        sleep 0.05 || return "$?"
+    done
+)
 
 main() {
     local repository_root

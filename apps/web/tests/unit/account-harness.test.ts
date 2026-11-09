@@ -98,7 +98,8 @@ class Probe(Runner):
         (self.directory / "volumes-before.txt").write_text("original-a\noriginal-b\n")
         startup = os.environ["ACCOUNT_PROBE_STARTUP"] == "true"
         proof = os.environ.get("ACCOUNT_PROBE_PROOF", "")
-        command = self._shell("recipient_proof_stack") if proof else self._shell("startup_stack") if startup else ["docker", "probe-phase"]
+        bootstrap = os.environ.get("ACCOUNT_PROBE_BOOTSTRAP") == "true"
+        command = self._shell("bootstrap_proof_stack") if bootstrap else self._shell("recipient_proof_stack") if proof else self._shell("startup_stack") if startup else ["docker", "probe-phase"]
         status = self._run_phase("startup" if startup else "probe", command,
                                  float(os.environ["ACCOUNT_PROBE_BUDGET"]))
         self.qualification_complete = status == 0
@@ -122,6 +123,7 @@ type Options = {
   main?: boolean
   basename?: string
   startup?: boolean
+  bootstrap?: boolean
   startupFail?: string
   startupHang?: string
   volumeInventory?: "leak" | "missing" | "partial" | "fail" | "hang"
@@ -140,6 +142,10 @@ type Options = {
     | "driver-failed"
     | "driver-logs-failed"
     | "inspect-invalid"
+    | "inspect-initialized"
+    | "inspect-exit-negative"
+    | "inspect-exit-overflow"
+    | "inspect-hostile"
     | "never-ready"
     | "stalled-terminal"
     | "wrong-id"
@@ -288,6 +294,7 @@ if (process.argv.includes("build")) {
         ACCOUNT_PROBE_MAIN: String(options.main ?? false),
         ACCOUNT_PROBE_BASENAME: options.basename ?? "retained",
         ACCOUNT_PROBE_STARTUP: String(options.startup ?? false),
+        ACCOUNT_PROBE_BOOTSTRAP: String(options.bootstrap ?? false),
         ACCOUNT_PROBE_PROOF: options.proof ?? "",
         ACCOUNT_PROBE_STARTUP_FAIL: options.startupFail ?? "",
         ACCOUNT_PROBE_STARTUP_HANG: options.startupHang ?? "",
@@ -1241,6 +1248,86 @@ for (const phase of [
         assert.match(output(), /checks passed\. Cleanup confirmed/)
         assert.equal(await exists(join(directory, "fuse-fired")), false)
       })
+    }
+  )
+}
+
+for (const [proof, expected, id] of [
+  ["browser-failed", 8, "b"],
+  ["driver-failed", 7, "d"],
+  ["driver-logs-failed", 7, "d"],
+] as const) {
+  test(
+    `bootstrap proof retains ${proof} diagnostics before cleanup`,
+    { timeout: 15000 },
+    async () => {
+      await probe(
+        { proof, bootstrap: true, budget: 5 },
+        async ({ child, directory, output }) => {
+          assert.equal(await completion(child, 12000), expected, output())
+          const events = (
+            await readFile(join(directory, "events.jsonl"), "utf8")
+          )
+            .trim()
+            .split("\n")
+            .map((line) => JSON.parse(line) as { kind: string; args: string[] })
+          const logs = events.find(
+            (event) =>
+              event.args[0] === "logs" && event.args.at(-1) === id.repeat(64)
+          )
+          assert.ok(
+            logs,
+            "The exact owned failed container needs retained logs"
+          )
+          assert.ok(
+            events.indexOf(logs) <
+              events.findIndex((event) => event.kind === "down")
+          )
+          assert.match(output(), /controlled (browser|allowed) diagnostic/)
+          if (proof === "driver-logs-failed")
+            assert.match(output(), /diagnostic logs unavailable.*43/)
+        }
+      )
+    }
+  )
+}
+
+for (const [proof, state, type, range] of [
+  ["inspect-initialized", "initialized", "integer", "in-range"],
+  ["inspect-exit-negative", "running", "integer", "negative"],
+  ["inspect-exit-overflow", "running", "integer", "above-range"],
+  ["inspect-hostile", "other", "string", "not-integer"],
+] as const) {
+  test(
+    `recipient inspect safe categories ${proof}`,
+    { timeout: 15000 },
+    async () => {
+      await probe(
+        { proof, budget: 5 },
+        async ({ child, directory, output }) => {
+          assert.equal(await completion(child, 12000), 1)
+          assert.ok(
+            output().includes(
+              `recipient-proof: inspect state rejected (status 1) state=${state} exit-type=${type} exit-range=${range}`
+            ),
+            output()
+          )
+          assert.doesNotMatch(
+            output(),
+            /PRIVATE_INSPECT_SENTINEL_350|hostile-secret-value/
+          )
+          const events = (
+            await readFile(join(directory, "events.jsonl"), "utf8")
+          )
+            .trim()
+            .split("\n")
+            .map((line) => JSON.parse(line) as { kind: string })
+          assert.equal(
+            events.filter((event) => event.kind === "down").length,
+            1
+          )
+        }
+      )
     }
   )
 }

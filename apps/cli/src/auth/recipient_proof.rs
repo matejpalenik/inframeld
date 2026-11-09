@@ -1,9 +1,111 @@
-//! Validate the reviewed repair intent before any browser, provider or child effect.
+//! Validate reviewed host intent before any browser, provider or child effect.
 
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 const MAX_REVISION: i64 = 9_007_199_254_740_991;
+
+/// Proof-free intent for an operator-reviewed first-administrator claim.
+///
+/// Parsing binds request meaning, not host authority or current eligibility.
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BootstrapRequest {
+    schema_version: u8,
+    mode: BootstrapMode,
+    pub(super) expected_installation_id: Uuid,
+    pub(super) operation_id: String,
+    operator_label: String,
+    reason: String,
+    pub(super) expected_access_revision: i64,
+    pub(super) expected_identity_id: Uuid,
+}
+
+impl std::fmt::Debug for BootstrapRequest {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("BootstrapRequest([reviewed intent])")
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+enum BootstrapMode {
+    #[serde(rename = "bootstrap-first-administrator")]
+    BootstrapFirstAdministrator,
+}
+
+/// Invalid bootstrap input never discloses its submitted contents.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[error("The proof-free bootstrap request is invalid or unsupported.")]
+pub struct InvalidBootstrapRequest;
+
+impl BootstrapRequest {
+    /// Read one bounded bootstrap intent without supplied proof or responsibilities.
+    ///
+    /// # Errors
+    /// Rejects malformed, duplicate, unknown or unsupported request values.
+    pub fn parse(bytes: &[u8]) -> Result<Self, InvalidBootstrapRequest> {
+        if bytes.len() > 65_536 {
+            return Err(InvalidBootstrapRequest);
+        }
+        let request: Self = serde_json::from_slice(bytes).map_err(|_| InvalidBootstrapRequest)?;
+        if request.schema_version != 1
+            || request.expected_access_revision != 0
+            || !valid_text(&request.operation_id, 128)
+            || !valid_text(&request.operator_label, 128)
+            || !valid_text(&request.reason, 512)
+        {
+            return Err(InvalidBootstrapRequest);
+        }
+        Ok(request)
+    }
+}
+
+impl BootstrapRequest {
+    /// Match an original after-commit receipt, independently of current admission.
+    ///
+    /// # Errors
+    /// Rejects unbound, malformed or non-bootstrap results without disclosing output.
+    pub fn validate_receipt(&self, bytes: &[u8]) -> Result<BootstrapReceipt, InvalidReceipt> {
+        if bytes.len() > 65_536 {
+            return Err(InvalidReceipt::Unavailable);
+        }
+        let reply: BootstrapReply =
+            serde_json::from_slice(bytes).map_err(|_| InvalidReceipt::Unavailable)?;
+        let receipt = match reply {
+            BootstrapReply::Receipt(receipt) => receipt,
+            BootstrapReply::Error(error) => {
+                return Err(
+                    if error.schema_version == 1 && error.operation_id == self.operation_id {
+                        InvalidReceipt::Backend { code: error.code }
+                    } else {
+                        InvalidReceipt::Unavailable
+                    },
+                );
+            }
+        };
+        if receipt.schema_version != 1
+            || receipt.operation_id != self.operation_id
+            || receipt.installation_id != self.expected_installation_id
+            || receipt.access_revision != 1
+        {
+            return Err(InvalidReceipt::Unavailable);
+        }
+        Ok(receipt)
+    }
+
+    /// Retain the original request ID for explicit same-request recovery.
+    #[must_use]
+    pub fn operation_id(&self) -> &str {
+        &self.operation_id
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum BootstrapReply {
+    Receipt(BootstrapReceipt),
+    Error(MaintenanceErrorReply),
+}
 
 /// A proof-free request for an already-admitted Project metadata recipient.
 #[derive(Deserialize, Serialize)]
@@ -75,9 +177,41 @@ pub struct RecipientProof {
     pub(super) principal_id: Uuid,
 }
 
+/// An original first-administrator receipt, without a repair responsibility.
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BootstrapReceipt {
+    schema_version: u8,
+    mode: BootstrapMode,
+    operation_id: String,
+    installation_id: Uuid,
+    principal_id: Uuid,
+    access_revision: i64,
+    outcome: BootstrapReceiptOutcome,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+enum BootstrapReceiptOutcome {
+    #[serde(rename = "bootstrapped")]
+    Bootstrapped,
+}
+
 impl std::fmt::Debug for RecipientProof {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter.write_str("RecipientProof([redacted])")
+    }
+}
+
+/// Transient verified identity proof carries no claim of local admission.
+pub struct BootstrapProof {
+    pub(super) access_token: zeroize::Zeroizing<String>,
+    pub(super) installation_id: Uuid,
+    pub(super) identity_id: Uuid,
+}
+
+impl std::fmt::Debug for BootstrapProof {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("BootstrapProof([redacted])")
     }
 }
 
@@ -120,8 +254,8 @@ pub enum InvalidReceipt {
     },
 }
 
-/// Existing repair-consumer codes disclose no provider text or credential bytes.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+/// Closed host-maintenance codes disclose no provider text or credential bytes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum MaintenanceErrorCode {
     /// The protected request was invalid.
@@ -140,6 +274,8 @@ pub enum MaintenanceErrorCode {
     IdempotencyKeyReused,
     /// The reviewed responsibility was not stranded.
     ResponsibilityNotStranded,
+    /// A first administrator already exists for another original claim.
+    AlreadyBootstrapped,
     /// A required dependency was unavailable.
     DependencyUnavailable,
     /// The consumer could not complete its ordinary error classification.
@@ -157,6 +293,7 @@ impl std::fmt::Display for MaintenanceErrorCode {
             Self::RevisionExhausted => "revision_exhausted",
             Self::IdempotencyKeyReused => "idempotency_key_reused",
             Self::ResponsibilityNotStranded => "responsibility_not_stranded",
+            Self::AlreadyBootstrapped => "already_bootstrapped",
             Self::DependencyUnavailable => "dependency_unavailable",
             Self::UnexpectedError => "unexpected_error",
         })
