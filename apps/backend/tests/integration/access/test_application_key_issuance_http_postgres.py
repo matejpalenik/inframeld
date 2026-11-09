@@ -22,7 +22,14 @@ from tests.support.access_group_scenarios import change_group, create_group
 from tests.support.application_account_scenarios import create_account
 from tests.support.application_key_scenarios import store_application_key
 from tests.support.project_creation_scenarios import create_project, seed_project_creator
+from tests.support.project_membership_postgres_scenarios import (
+    change_membership,
+    seed_membership_project,
+)
 
+from inframeld_backend.access.application.commands.set_application_account_action_grant_command import (
+    SetApplicationAccountActionGrantCommand,
+)
 from inframeld_backend.access.application.dtos.human_oauth_credential_binding_dto import (
     HumanOAuthCredentialBindingDTO,
 )
@@ -65,6 +72,8 @@ from inframeld_backend.access.domain.enums.project_action import ProjectAction
 from inframeld_backend.access.domain.policies.application_key_lifetime_policy import (
     ApplicationKeyLifetimePolicy,
 )
+from inframeld_backend.access.domain.value_objects.action_id import ActionId
+from inframeld_backend.access.domain.value_objects.identity_subject import IdentitySubject
 from inframeld_backend.access.infrastructure.readers.postgres_human_credential_state_reader import (
     PostgresHumanCredentialStateReader,
 )
@@ -80,6 +89,9 @@ from inframeld_backend.access.infrastructure.rows.application_action_grant_row i
 )
 from inframeld_backend.access.infrastructure.rows.application_key_issuance_result_row import (
     ApplicationKeyIssuanceResultRow,
+)
+from inframeld_backend.access.infrastructure.rows.application_key_revocation_result_row import (
+    ApplicationKeyRevocationResultRow,
 )
 from inframeld_backend.access.infrastructure.rows.application_key_row import ApplicationKeyRow
 from inframeld_backend.access.infrastructure.rows.group_manager_row import GroupManagerRow
@@ -103,11 +115,26 @@ from inframeld_backend.access.infrastructure.settings.human_authentication_setti
 )
 from inframeld_backend.access.infrastructure.settings.hydra_settings import HydraSettings
 from inframeld_backend.access.infrastructure.settings.kratos_settings import KratosSettings
+from inframeld_backend.access.infrastructure.writers.postgres_human_credential_state_initializer import (
+    PostgresHumanCredentialStateInitializer,
+)
 from inframeld_backend.bootstrap.access_components import AccessComponents
 from inframeld_backend.bootstrap.access_composition import create_access_components
+from inframeld_backend.bootstrap.application_account_grant_composition import (
+    open_application_account_grant_change,
+)
 from inframeld_backend.bootstrap.application_environment import ApplicationEnvironment
 from inframeld_backend.bootstrap.application_factory import create_app
 from inframeld_backend.bootstrap.application_settings import ApplicationSettings, get_settings
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import IdempotencyContextDTO
+from inframeld_backend.shared.application.enums.http_method import HttpMethod
+from inframeld_backend.shared.application.services.request_fingerprint_service import (
+    RequestFingerprintService,
+)
+from inframeld_backend.shared.application.value_objects.idempotency_key import IdempotencyKey
+from inframeld_backend.shared.application.value_objects.request_fingerprint_key import (
+    RequestFingerprintKey,
+)
 from inframeld_backend.shared.infrastructure.resources.database import Database
 from inframeld_backend.shared.infrastructure.resources.sqlalchemy_transaction_manager import (
     SqlAlchemyTransactionManager,
@@ -391,6 +418,278 @@ async def test_lifetime_rejection_leaves_no_credential_or_original(
     assert response.status_code == 422 and "key" not in response.json()
     _safe(response)
     await _effects(database, route, keys=0, issues=0)
+
+
+@pytest.mark.parametrize("family", ["cookie", "bearer"])
+async def test_registered_http_revoke_only_actor_recovers_safe_original_and_rejects_old_key(
+    database: Database,
+    temporary_postgres_settings: DatabaseSettings,
+    tmp_path: Path,
+    family: str,
+) -> None:
+    """Replace provider proofs only, using delivered admission, membership and exact Revoke grants."""
+    seed = await seed_membership_project(database)
+    joined = await change_membership(
+        database, seed, revision=seed.project.access_revision, key="join-http-revoker"
+    )
+    account = (
+        await create_account(
+            database, seed.actor.access, seed.project.project_id, revision=joined.access_revision
+        )
+    ).account
+    keys_route = f"/v1/projects/{account.project_id.value}/application-accounts/{account.principal_id.value}/keys"
+    settings = _settings(temporary_postgres_settings, tmp_path)
+    async with _client(settings, seed.actor.binding) as client:
+        issued = await client.post(
+            keys_route,
+            json={
+                "allowedAdapters": ["mcp", "http"],
+                "expectedAccessRevision": account.access_revision,
+                "expiresInSeconds": 120,
+            },
+            headers=BEARER | {"Idempotency-Key": "issue-http-revoke-target"},
+        )
+    assert issued.status_code == 201
+    credential = ApplicationKeyCredential(issued.json()["key"])
+    action = ActionId(ApplicationAccountAction.REVOKE_KEYS.value)
+    async with open_application_account_grant_change(
+        database, RequestFingerprintService(RequestFingerprintKey(b"r" * 32))
+    ) as grants:
+        granted = await grants.set_grant(
+            access=seed.actor.access,
+            command=SetApplicationAccountActionGrantCommand(
+                account.project_id,
+                account.principal_id,
+                seed.bob_id,
+                action,
+                False,
+                issued.json()["accessRevision"],
+            ),
+            context=IdempotencyContextDTO(
+                HttpMethod.PUT,
+                f"/v1/projects/{account.project_id.value}/application-accounts/{account.principal_id.value}/grants/{seed.bob_id.value}/{action.value}",
+                IdempotencyKey("grant-http-revoke-only"),
+            ),
+        )
+    identity = VerifiedHumanIdentityDTO(
+        seed.actor.binding.identity.authority, IdentitySubject(str(UUID(int=200)))
+    )
+    state = await PostgresHumanCredentialStateInitializer(database).initialize(identity)
+    assert state.version is not None
+    binding = HumanOAuthCredentialBindingDTO(identity, state.installation_id, state.version)
+    async with database.session() as session:
+        assignments = (
+            (
+                await session.execute(
+                    select(
+                        ApplicationActionGrantRow.action, ApplicationActionGrantRow.can_grant
+                    ).where(
+                        ApplicationActionGrantRow.application_principal_id
+                        == account.principal_id.value,
+                        ApplicationActionGrantRow.recipient_principal_id == seed.bob_id.value,
+                    )
+                )
+            )
+            .tuples()
+            .all()
+        )
+        assert assignments == [(ApplicationAccountAction.REVOKE_KEYS.value, False)]
+        assert (
+            await session.scalar(
+                select(func.count())
+                .select_from(ProjectActionGrantRow)
+                .where(ProjectActionGrantRow.recipient_principal_id == seed.bob_id.value)
+            )
+            == 0
+        )
+        assert (
+            await session.scalar(
+                select(func.count())
+                .select_from(GroupManagerRow)
+                .where(GroupManagerRow.principal_id == seed.bob_id.value)
+            )
+            == 0
+        )
+
+    route = keys_route + f"/{credential.key_id.value}/revoke"
+    body = {"expectedAccessRevision": granted.access_revision}
+    headers = (COOKIE if family == "cookie" else BEARER) | {
+        "Idempotency-Key": "http-revoke-original"
+    }
+    async with _client(settings, binding) as client:
+        if family == "cookie":
+            for missing in ("Origin", "X-Inframeld-CSRF"):
+                denied = await client.post(
+                    route,
+                    json=body,
+                    headers={key: value for key, value in headers.items() if key != missing},
+                )
+                assert denied.status_code == 403
+                _safe(denied)
+            foreign_origin = await client.post(
+                route, json=body, headers=headers | {"Origin": "https://foreign.test"}
+            )
+            assert foreign_origin.status_code == 403
+            _safe(foreign_origin)
+        missing_issue = await client.post(
+            keys_route,
+            json={"allowedAdapters": ["http"], "expectedAccessRevision": granted.access_revision},
+            headers=headers | {"Idempotency-Key": "revoke-only-cannot-issue"},
+        )
+        assert missing_issue.status_code == 403
+        _safe(missing_issue)
+        application_denied = await client.post(
+            route,
+            json=body,
+            headers={
+                "Authorization": "Bearer " + credential.value,
+                "Idempotency-Key": "app-cannot-revoke",
+            },
+        )
+        assert application_denied.status_code == 403
+        _safe(application_denied)
+        for hidden in (
+            route.replace(str(account.project_id.value), str(UUID(int=999))),
+            route.replace(str(account.principal_id.value), str(UUID(int=999))),
+            route.replace(str(credential.key_id.value), str(UUID(int=999))),
+        ):
+            absent = await client.post(hidden, json=body, headers=headers)
+            assert absent.status_code == 404 and "metadata" not in absent.json()
+            _safe(absent)
+        identity_response = await client.get(
+            "/v1/application-session", headers={"Authorization": "Bearer " + credential.value}
+        )
+        assert identity_response.status_code == 200
+        first = await client.post(route, json=body, headers=headers)
+        assert first.status_code == 200
+        receipt = first.json()
+        assert set(receipt) == {"operationId", "accessRevision", "idempotencyExpiresAt", "metadata"}
+        assert receipt["accessRevision"] == granted.access_revision + 1
+        assert receipt["metadata"] == issued.json()["metadata"] | {
+            "revokedAt": receipt["metadata"]["revokedAt"]
+        }
+        assert receipt["metadata"]["revokedAt"] is not None
+        replay = await client.post(route, json=body, headers=headers)
+        assert replay.status_code == 200 and replay.json() == receipt
+        noop = await client.post(
+            route,
+            json={"expectedAccessRevision": receipt["accessRevision"]},
+            headers=headers | {"Idempotency-Key": "fresh-revoked-noop"},
+        )
+        assert noop.status_code == 200
+        assert noop.json()["operationId"] != receipt["operationId"]
+        assert noop.json()["accessRevision"] == receipt["accessRevision"]
+        assert noop.json()["metadata"] == receipt["metadata"]
+        old_key = await client.get(
+            "/v1/application-session", headers={"Authorization": "Bearer " + credential.value}
+        )
+        assert old_key.status_code == 401
+        assert (
+            old_key.headers["www-authenticate"] == 'Bearer realm="inframeld", error="invalid_token"'
+        )
+        for response in (first, replay, noop, old_key):
+            _safe(response)
+            assert credential.value not in response.text and "key" not in response.json()
+    async with database.session() as session:
+        assert (
+            await session.scalar(
+                select(func.count()).select_from(ApplicationKeyRevocationResultRow)
+            )
+            == 2
+        )
+        assert (
+            await session.scalar(
+                select(func.count())
+                .select_from(AccessAuditEventRow)
+                .where(AccessAuditEventRow.event_type == "application_key_revoked")
+            )
+            == 1
+        )
+        assert (
+            await session.scalar(
+                select(func.count())
+                .select_from(IdempotencyReservationRow)
+                .where(IdempotencyReservationRow.requested_route == route)
+            )
+            == 2
+        )
+
+
+@pytest.mark.parametrize("loss", ["revoke", "human-status", "credential"])
+async def test_registered_http_revoke_checks_current_authority_before_original_disclosure(
+    database: Database,
+    temporary_postgres_settings: DatabaseSettings,
+    tmp_path: Path,
+    loss: str,
+) -> None:
+    creator = await seed_project_creator(database)
+    project = (await create_project(database, creator)).project
+    account = (await create_account(database, creator.access, project.project_id)).account
+    keys_route = f"/v1/projects/{project.project_id.value}/application-accounts/{account.principal_id.value}/keys"
+    async with _client(_settings(temporary_postgres_settings, tmp_path), creator.binding) as client:
+        issued = await client.post(
+            keys_route,
+            json={"allowedAdapters": ["http"], "expectedAccessRevision": account.access_revision},
+            headers=BEARER | {"Idempotency-Key": "issue-current-revoke-target"},
+        )
+        assert issued.status_code == 201
+        route = keys_route + f"/{issued.json()['metadata']['keyId']}/revoke"
+        body = {"expectedAccessRevision": issued.json()["accessRevision"]}
+        headers = BEARER | {"Idempotency-Key": "current-revoke-original"}
+        first = await client.post(route, json=body, headers=headers)
+        assert first.status_code == 200
+        async with database.session() as session, session.begin():
+            if loss == "revoke":
+                await session.execute(
+                    delete(ApplicationActionGrantRow).where(
+                        ApplicationActionGrantRow.application_principal_id
+                        == account.principal_id.value,
+                        ApplicationActionGrantRow.recipient_principal_id
+                        == creator.access.actor_principal_id.value,
+                        ApplicationActionGrantRow.action
+                        == ApplicationAccountAction.REVOKE_KEYS.value,
+                    )
+                )
+            elif loss == "human-status":
+                await session.execute(
+                    update(PrincipalRow)
+                    .where(PrincipalRow.id == creator.access.actor_principal_id.value)
+                    .values(status=PrincipalStatus.SUSPENDED)
+                )
+            else:
+                await session.execute(
+                    update(HumanCredentialVersionRow)
+                    .where(
+                        HumanCredentialVersionRow.installation_id
+                        == creator.binding.installation_id.value,
+                        HumanCredentialVersionRow.authority
+                        == creator.binding.identity.authority.value,
+                        HumanCredentialVersionRow.subject == creator.binding.identity.subject.value,
+                    )
+                    .values(version=creator.binding.version.value + 1)
+                )
+        denied = await client.post(route, json=body, headers=headers)
+        assert denied.status_code == (401 if loss == "credential" else 403)
+        assert denied.json()["code"] == ("http_error" if loss == "credential" else "access_denied")
+        assert "metadata" not in denied.json() and issued.json()["key"] not in denied.text
+        if loss == "credential":
+            assert (
+                denied.headers["www-authenticate"]
+                == 'Bearer realm="inframeld", error="invalid_token"'
+            )
+        _safe(denied)
+    async with database.session() as session:
+        assert (
+            await session.scalar(
+                select(func.count()).select_from(ApplicationKeyRevocationResultRow)
+            )
+            == 1
+        )
+        original = await session.scalar(select(ApplicationKeyRevocationResultRow))
+        assert original is not None
+        assert original.operation_id == first.json()["operationId"]
+        assert original.access_revision == first.json()["accessRevision"]
+        assert original.revoked_at == datetime.fromisoformat(first.json()["metadata"]["revokedAt"])
 
 
 @pytest.mark.parametrize("uncertain", [False, True])

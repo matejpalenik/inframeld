@@ -51,6 +51,8 @@ Use a complete compatible credential from its actual supported issuer through th
 
 Keep the credential outside argv, URLs, request bodies, browser distribution and logs. Send one supported family per request. Invalid application credentials remain on the application path without Hydra verification or a fallback to a human. Verification and current local denial have different failure outcomes, as [the component guide](/guides/authenticate-an-application#understand-a-rejected-or-unconfirmed-check) explains.
 
+[Revoke a key](/guides/application-accounts#revoke-one-application-key) through a separate currently authorized human context. Revocation disables that parent key across its allowed adapters and may remove the last usable key. New credential checks reject it. The revocation receipt does not cancel already admitted work or retrieve the secret, and an uncertain response calls for exact original-request recovery rather than automatic replacement.
+
 ## Continue with a task
 
 - [Read or change an existing Project](/guides/name-and-rename-project).

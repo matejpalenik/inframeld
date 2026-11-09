@@ -20,6 +20,7 @@ import "./human-admission.ts";
 
 import "./application-accounts.ts";
 import "./application-key-issuance.ts";
+import "./application-key-revocation.ts";
 
 import "./access-groups.ts";
 

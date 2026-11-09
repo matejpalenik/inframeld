@@ -95,7 +95,8 @@ def test_legacy_group_label_survives_upgrade_downgrade_and_repeat_upgrade(
         stored = session.get(AccessGroupRow, group)
         assert stored is not None and stored.resource_name is None and stored.name == label
         assert (
-            session.scalar(select(AlembicVersionRow.version_num)) == "0028_application_key_issuance"
+            session.scalar(select(AlembicVersionRow.version_num))
+            == "0029_application_key_revocation"
         )
     command.downgrade(config, "0024_application_accounts")
     with database_session(settings) as session:
@@ -193,7 +194,8 @@ def test_named_group_requires_its_exact_scoped_binding_and_retirement_keeps_name
         )
     with database_session(settings) as session:
         assert (
-            session.scalar(select(AlembicVersionRow.version_num)) == "0028_application_key_issuance"
+            session.scalar(select(AlembicVersionRow.version_num))
+            == "0029_application_key_revocation"
         )
 
 
@@ -264,7 +266,7 @@ async def test_retained_legacy_group_deletion_status_prevents_unsafe_downgrade(
     async with database.session() as session:
         assert (
             await session.scalar(select(AlembicVersionRow.version_num))
-            == "0028_application_key_issuance"
+            == "0029_application_key_revocation"
         )
         assert await session.get(DeletionStatusBindingRow, operation_id) is not None
         assert await session.get(DeletionStatusObservationRow, operation_id) is not None

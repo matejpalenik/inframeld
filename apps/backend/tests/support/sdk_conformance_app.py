@@ -198,6 +198,9 @@ from inframeld_backend.access.application.protocols.application_account_reader i
 from inframeld_backend.access.application.protocols.application_key_issuer import (
     ApplicationKeyIssuer,
 )
+from inframeld_backend.access.application.protocols.application_key_revoker import (
+    ApplicationKeyRevoker,
+)
 from inframeld_backend.access.application.protocols.human_access_token_authenticator import (
     HumanAccessTokenAuthenticator,
 )
@@ -332,6 +335,9 @@ from inframeld_backend.access.http.routes.application_account_routes import (
 from inframeld_backend.access.http.routes.application_key_issuance_routes import (
     create_application_key_issuance_router,
 )
+from inframeld_backend.access.http.routes.application_key_revocation_routes import (
+    create_application_key_revocation_router,
+)
 from inframeld_backend.access.http.routes.current_application_session_routes import (
     create_application_session_router,
 )
@@ -439,6 +445,7 @@ from tests.support.mock_sdk_access_groups import MockSDKAccessGroups
 from tests.support.mock_sdk_application_accounts import MockSDKApplicationAccounts
 from tests.support.mock_sdk_application_authenticator import MockSDKApplicationAuthenticator
 from tests.support.mock_sdk_application_key_issuer import MockSDKApplicationKeyIssuer
+from tests.support.mock_sdk_application_key_revoker import MockSDKApplicationKeyRevoker
 from tests.support.mock_sdk_application_session_reader import MockSDKApplicationSessionReader
 from tests.support.mock_sdk_invitations import MockSDKInvitations
 from tests.support.openapi_schema_fixture import create_schema_fixture_app
@@ -1060,6 +1067,11 @@ async def _open_application_account_reader() -> AsyncGenerator[ApplicationAccoun
 @asynccontextmanager
 async def _open_application_key_issuer() -> AsyncGenerator[ApplicationKeyIssuer]:
     yield MockSDKApplicationKeyIssuer()
+
+
+@asynccontextmanager
+async def _open_application_key_revoker() -> AsyncGenerator[ApplicationKeyRevoker]:
+    yield MockSDKApplicationKeyRevoker()
 
 
 class MockSDKHumanAdmitter(HumanAdmitter):
@@ -1869,6 +1881,17 @@ def create_sdk_conformance_app(browser_origin: str | None = None) -> FastAPI:
                 application_authenticator=MockSDKApplicationAuthenticator(),
             ),
             _open_application_key_issuer,
+        )
+    )
+    application.include_router(
+        create_application_key_revocation_router(
+            ProductAccessDependency(
+                browser_authenticator,
+                csrf,
+                access_token_authenticator=token_authenticator,
+                application_authenticator=MockSDKApplicationAuthenticator(),
+            ),
+            _open_application_key_revoker,
         )
     )
     application.include_router(create_project_members_router(authenticate, _open_project_members))

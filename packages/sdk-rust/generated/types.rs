@@ -7236,6 +7236,18 @@ impl AsRef<str> for CompletedOperationLookupResponseClassification {
         self.as_str()
     }
 }
+///Return the original safe receipt for a revocation or an already-revoked no-op.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ApplicationKeyRevocationResponse {
+    ///Constraint: minimum=0, maximum=9007199254740991
+    #[serde(rename = "accessRevision")]
+    pub access_revision: i64,
+    #[serde(rename = "idempotencyExpiresAt")]
+    pub idempotency_expires_at: chrono::DateTime<chrono::Utc>,
+    pub metadata: ApplicationKeyMetadataResponse,
+    #[serde(rename = "operationId")]
+    pub operation_id: String,
+}
 ///Distinguish first credential delivery from credential-free original recovery.
 #[derive(Debug, Clone)]
 pub enum ApplicationKeyIssueResponse {
@@ -8239,6 +8251,12 @@ pub struct ApplicationAccountCreationRequest {
     pub expected_access_revision: i64,
     ///Constraint: minLength=1, maxLength=63, pattern=`^[a-z](?:[a-z0-9-]*[a-z0-9])?$`
     pub name: String,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ApplicationKeyRevocationRequest {
+    ///Constraint: minimum=0, maximum=9007199254740991
+    #[serde(rename = "expectedAccessRevision")]
+    pub expected_access_revision: i64,
 }
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct CurrentApplicationSessionResponse {

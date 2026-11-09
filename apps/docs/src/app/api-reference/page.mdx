@@ -31,6 +31,8 @@ Malformed or competing credential families fail before verification. Invalid, ex
 
 An eligible human can [issue an application key](/guides/application-accounts#issue-a-key) through the API with current issuance authority. Each selected adapter receives its server-configured binding. The browser integration uses a genuine signed-in human cookie; it does not acquire a terminal bearer token or complete saved CLI login. Use the supported credential path for your selected installation and client. Start with [health](/clients/http#make-your-first-request) when none is available.
 
+[Individual key revocation](/guides/application-accounts#revoke-one-application-key) instead requires exact independent Revoke authority on the account, without issuance delegation. It uses a reviewed Project Access revision and a saved original request key. Its `200` returns safe historical metadata only. A lost response never authorizes another request identity or a replacement credential.
+
 ## Requests and responses
 
 Use the exact method, canonical route and input names for the operation. Send `Content-Type: application/json` for JSON request bodies. Required idempotency headers and expected revisions protect the specific reviewed write.

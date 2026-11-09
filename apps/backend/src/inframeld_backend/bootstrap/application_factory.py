@@ -13,6 +13,9 @@ from inframeld_backend.access.application.services.application_account_creation_
 from inframeld_backend.access.application.services.application_key_issuance_fingerprint_service import (
     ApplicationKeyIssuanceFingerprintService,
 )
+from inframeld_backend.access.application.services.application_key_revocation_fingerprint_service import (
+    ApplicationKeyRevocationFingerprintService,
+)
 from inframeld_backend.access.application.services.human_admission_fingerprint_service import (
     HumanAdmissionFingerprintService,
 )
@@ -73,6 +76,9 @@ from inframeld_backend.access.http.requests.application_account_creation_request
 )
 from inframeld_backend.access.http.requests.application_key_issue_request import (
     ApplicationKeyIssueRequest,
+)
+from inframeld_backend.access.http.requests.application_key_revocation_request import (
+    ApplicationKeyRevocationRequest,
 )
 from inframeld_backend.access.http.requests.human_admission_request import HumanAdmissionRequest
 from inframeld_backend.access.http.requests.invitation_activation_request import (
@@ -149,6 +155,9 @@ from inframeld_backend.access.http.responses.application_key_issuance_replay_res
 from inframeld_backend.access.http.responses.application_key_issue_response import (
     ApplicationKeyIssueResponse,
 )
+from inframeld_backend.access.http.responses.application_key_revocation_response import (
+    ApplicationKeyRevocationResponse,
+)
 from inframeld_backend.access.http.responses.current_application_session_response import (
     CurrentApplicationSessionResponse,
 )
@@ -200,6 +209,9 @@ from inframeld_backend.access.http.routes.application_account_routes import (
 )
 from inframeld_backend.access.http.routes.application_key_issuance_routes import (
     create_application_key_issuance_router,
+)
+from inframeld_backend.access.http.routes.application_key_revocation_routes import (
+    create_application_key_revocation_router,
 )
 from inframeld_backend.access.http.routes.current_application_session_routes import (
     create_application_session_router,
@@ -271,7 +283,10 @@ from inframeld_backend.bootstrap.application_account_grant_composition import (
     open_application_account_grant_change,
     open_application_account_grant_read,
 )
-from inframeld_backend.bootstrap.application_key_composition import open_application_key_issuance
+from inframeld_backend.bootstrap.application_key_composition import (
+    open_application_key_issuance,
+    open_application_key_revocation,
+)
 from inframeld_backend.bootstrap.application_lifespan import application_lifespan
 from inframeld_backend.bootstrap.application_resources import ApplicationResources
 from inframeld_backend.bootstrap.application_settings import ApplicationSettings, get_settings
@@ -364,6 +379,9 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
         creation_fingerprints = ProjectCreationFingerprintService(request_fingerprints)
         account_fingerprints = ApplicationAccountCreationFingerprintService(request_fingerprints)
         key_issuance_fingerprints = ApplicationKeyIssuanceFingerprintService(request_fingerprints)
+        key_revocation_fingerprints = ApplicationKeyRevocationFingerprintService(
+            request_fingerprints
+        )
         admission_fingerprints = HumanAdmissionFingerprintService(request_fingerprints)
         membership_fingerprints = ProjectMembershipChangeFingerprintService(request_fingerprints)
         invitation_fingerprints = InvitationFingerprintService(request_fingerprints)
@@ -435,6 +453,7 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
                 AccessGroupManagerRequest,
                 ApplicationAccountCreationRequest,
                 ApplicationKeyIssueRequest,
+                ApplicationKeyRevocationRequest,
                 HumanAdmissionRequest,
                 ProjectCreationRequest,
                 ProjectMembershipRequest,
@@ -463,6 +482,7 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
                 ApplicationAccountCreationResponse,
                 ApplicationAccountMetadataResponse,
                 ApplicationKeyIssueResponse,
+                ApplicationKeyRevocationResponse,
                 ApplicationKeyFirstDeliveryResponse,
                 ApplicationKeyIssuanceReplayResponse,
                 MyOrganizationAccessResponse,
@@ -600,6 +620,12 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
         )
         application.include_router(
             create_project_members_router(product_access, partial(open_project_members, database))
+        )
+        application.include_router(
+            create_application_key_revocation_router(
+                product_access,
+                partial(open_application_key_revocation, database, key_revocation_fingerprints),
+            )
         )
         application.include_router(
             create_project_membership_router(

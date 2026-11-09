@@ -42,6 +42,8 @@ inframeld_sdk/models/application_key_issuance_replay_response.py
 inframeld_sdk/models/application_key_issue_request.py
 inframeld_sdk/models/application_key_issue_response.py
 inframeld_sdk/models/application_key_metadata_response.py
+inframeld_sdk/models/application_key_revocation_request.py
+inframeld_sdk/models/application_key_revocation_response.py
 inframeld_sdk/models/completed_operation_lookup_response.py
 inframeld_sdk/models/current_application_session_response.py
 inframeld_sdk/models/current_session_response.py

@@ -2,8 +2,8 @@ use crate::observation::{Problem, observed};
 use crate::protocol::{Call, Observation, WireValue, headers};
 use inframeld_sdk::client::*;
 use inframeld_sdk::types::{
-    ApplicationKeyIssueRequest, InvitationActivationRequest, InvitationIssueRequest,
-    InvitationPreviewRequest, InvitationRevocationRequest,
+    ApplicationKeyIssueRequest, ApplicationKeyRevocationRequest, InvitationActivationRequest,
+    InvitationIssueRequest, InvitationPreviewRequest, InvitationRevocationRequest,
 };
 use inframeld_sdk_test_rust::client as fixture;
 use serde_json::Value;
@@ -15,6 +15,21 @@ pub async fn observe(
 ) -> Observation {
     let body = request.body.clone().unwrap_or(Value::Null);
     match request.operation.as_str() {
+        "revokeApplicationKey" => observed!(
+            client
+                .revoke_application_key(
+                    request.path.as_ref().unwrap()["project_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.path.as_ref().unwrap()["application_principal_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.path.as_ref().unwrap()["key_id"].as_str().unwrap(),
+                    &request.headers["Idempotency-Key"],
+                    serde_json::from_value::<ApplicationKeyRevocationRequest>(body).unwrap()
+                )
+                .await
+        ),
         "issueApplicationKey" => observed!(
             client
                 .issue_application_key(
