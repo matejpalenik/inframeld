@@ -46,6 +46,16 @@ The implemented human services are `HumanSessionAuthenticationService` and `Huma
 
 Current operation checks use focused authorizers and policies. `PrincipalAccessEvaluationService` interprets authentication evidence against current facts. `ActionAuthorizationService` coordinates ordinary action checks. Each grant service composes its current facts with the existing principal, visibility and exact-grant policies. Neither a typed ID nor an `AccessContextDTO` proves current authority.
 
+<a id="document-access-components"></a>
+
+## Authorize selected Document evidence
+
+The locally qualified [document-access foundation](query-and-document-authorization.md#document-access-foundation) owns source readability, not Query authority or a public resource workflow. [DocumentAccessService](../../../../apps/backend/src/inframeld_backend/access/application/services/document_access_service.py) implements [DocumentAccessAuthorizer](../../../../apps/backend/src/inframeld_backend/access/application/protocols/document_access_authorizer.py), composing existing credential, principal and Project checks with the pure [DocumentReadPolicy](../../../../apps/backend/src/inframeld_backend/access/domain/policies/document_read_policy.py). It returns a readable subset or requires the complete evidence bundle.
+
+[PostgresDocumentAccessFactsReader](../../../../apps/backend/src/inframeld_backend/access/infrastructure/readers/postgres_document_access_facts_reader.py) implements [DocumentAccessFactsReader](../../../../apps/backend/src/inframeld_backend/access/application/protocols/document_access_facts_reader.py) on the caller's active READ COMMITTED transaction. Organization/Project/key coordination precedes refreshed actor, membership, audience-group, credential and recovery observations. Application keys require an explicitly injected trusted adapter profile. The reader opens no independent transaction, commits nothing and calls no provider.
+
+Trusted receiving producers supply [selected version observations](../../../../apps/backend/src/inframeld_backend/access/application/dtos/selected_document_source_dto.py) and [complete current Document observations](../../../../apps/backend/src/inframeld_backend/access/application/dtos/current_document_access_dto.py). Knowledge still owns their real lifecycle/audience joins and writer coordination. Receivers refresh those observations after waits at every protected boundary, independently authorize the operation and close the short transaction before network work. These DTOs and returned source pairs are not cached decisions. Real Document, retrieval, model-dispatch and retained-evidence integrations keep their own product tests.
+
 <a id="read-project-members-from-current-facts"></a>
 
 ## Read Project members from current facts
