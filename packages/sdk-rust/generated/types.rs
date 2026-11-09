@@ -8653,3 +8653,49 @@ pub struct ProjectNameResolutionResponse {
     #[serde(rename = "projectId")]
     pub project_id: uuid::Uuid,
 }
+///Retain the original resulting audience without disclosing its before snapshot.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ProjectUploadDefaultChangeResponse {
+    ///Project Access revision of this current read or immutable original result.
+    ///Constraint: minimum=0, maximum=9007199254740991
+    #[serde(rename = "accessRevision")]
+    pub access_revision: i64,
+    ///Original resulting audience. A later GET may show a different current default.
+    ///Constraint: minItems=1
+    #[serde(rename = "groupIds")]
+    pub group_ids: Vec<String>,
+    ///Original replay deadline, unchanged by recovery.
+    #[serde(rename = "idempotencyExpiresAt")]
+    pub idempotency_expires_at: chrono::DateTime<chrono::Utc>,
+    ///Original operation identity, retained across exact-request recovery.
+    #[serde(rename = "operationId")]
+    pub operation_id: String,
+    ///Exact Project whose saved future-upload audience is represented.
+    #[serde(rename = "projectId")]
+    pub project_id: uuid::Uuid,
+}
+///Replace the complete future-upload audience at an explicitly reviewed revision.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ProjectUploadDefaultRequest {
+    ///Current Project Access revision reviewed for this complete replacement. A fresh no-op still requires this revision.
+    ///Constraint: minimum=0, maximum=9007199254740991
+    #[serde(rename = "expectedAccessRevision")]
+    pub expected_access_revision: i64,
+    ///Complete nonempty same-Project audience. Every current and proposed group requires current management.
+    ///Constraint: minItems=1
+    #[serde(rename = "groupIds")]
+    pub group_ids: Vec<String>,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ProjectUploadDefaultResponse {
+    ///Project Access revision of this current read or immutable original result.
+    ///Constraint: minimum=0, maximum=9007199254740991
+    #[serde(rename = "accessRevision")]
+    pub access_revision: i64,
+    ///UUID-sorted saved audience, or null only when this valid Project has no saved default.
+    #[serde(rename = "groupIds", deserialize_with = "presence_serde::required_nullable")]
+    pub group_ids: Option<Vec<String>>,
+    ///Exact Project whose saved future-upload audience is represented.
+    #[serde(rename = "projectId")]
+    pub project_id: uuid::Uuid,
+}

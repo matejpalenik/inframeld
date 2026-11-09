@@ -176,6 +176,19 @@ A target kind and ID are suitable in history because they are not used to author
 
 The audit table's existence does not grant anyone audit-reading rights or promise permanent retention. Define permitted viewers, required fields per event, payload bounds, and retention before exposing an audit API. Apply the [retention policy](../../inframeld-knowledge/references/deletion-and-retention.md) to attribution and surviving events too.
 
+<a id="project-upload-defaults"></a>
+
+## Saved future-upload defaults
+
+[0030_project_upload_defaults](../../../../apps/backend/migrations/versions/0030_project_upload_defaults.py) implements these Access-owned records. The [upload-default contract](upload-default-contracts.md) owns administration and the receiving Knowledge admission boundary.
+
+| Table | Identity and retained meaning | Integrity and lifecycle |
+| --- | --- | --- |
+| `project_upload_default_groups` | Primary key `(project_id, group_id)`, with owning `organization_id`. Zero rows mean unconfigured. The Project stores the Access revision. | Restrictive scoped foreign keys bind Organization/Project and Project/group. Replace the complete nonempty set atomically. In-use groups cannot be deleted until replacement removes the live reference. There is no configuration parent or required-child anchor. |
+| `project_upload_default_results` | `operation_id`, Organization, Project and actor IDs, private before/result revisions and before/result group arrays. Only the resulting audience is public. | Exact scoped foreign key to the reservation's operation, Organization, Project and principal. Existing reservation retention owns expiry and child removal. No foreign key to removable groups, memberships or managers. Arrays and revision deltas have database checks. |
+
+A real change saves links, one Project revision increment, safe audit, original result and completion in the same transaction. A fresh authorized equal-set no-op checks revision first, retains that revision and saves its original without a change audit. Current authority precedes recovery, while an authentic original precedes the fresh revision check. Historical recovery cannot restore a later changed default. Downgrade refuses to discard either retained live links or original results.
+
 <a id="tables-integrated-with-later-features"></a>
 
 ## Tables integrated with later features
@@ -187,7 +200,6 @@ The following are integration points, **not records to create before their ownin
 | `pipeline_action_grants` | `(project_id, pipeline_id, recipient_principal_id, action)` PK. Scoped FK to real Pipeline and recipient project membership. The common grant fields/checks. | With the Pipeline feature. Build and its other settled actions use the fixed catalogue. |
 | `deployment_action_grants` | `(project_id, deployment_id, recipient_principal_id, action)` PK. Scoped FK to real Deployment and recipient project membership. The common grant fields/checks. | With Deployments/Releases. Query, Manage releases, configuration, and Delete stay separate under [Bound administration, grants, and recovery](memberships-groups-and-handover.md#section-bound-administration-grants-and-recovery). |
 | Document/group allowlist join | `(project_id, document_id, group_id)` unique. Scoped FKs to real Document and access group. | Owned by Knowledge, with document-access checks following [Access policy](query-and-document-authorization.md#documents). The current nonempty allowlist belongs to the logical Document and protects all its versions. No per-version access copy. |
-| Project upload-default/group join | `(project_id, group_id)` unique. Scoped FK to project/group, with the owning default configuration and revision. | Default provisioning/configuration under [From a new account to a first useful answer](../../inframeld-architecture/references/first-use-and-private-defaults.md) and its authorized update workflow. Applies to future admissions. Not an automatic change to existing Documents. |
 | Active upload and source-configuration group references | Scoped FKs from their real configuration/intent records to each group they currently reference. | Owning Knowledge workflows. These references must block deletion of an in-use group. Historical snapshots need their separate retention treatment. Source configuration, credential administration and deletion are human-only under the [fixed Access catalogue](actions-and-initial-grants.md#capability-catalogue). Synchronization has its separately granted authority, as explained in [Knowledge](../../inframeld-knowledge/references/documents-and-collections.md). |
 
 Invitation and admission, provisioning completion and retry state, idempotency reservations, and cleanup jobs belong to the workflows that need them. They follow the shared job contract. They are not missing permission tables or a reason to duplicate Kratos credentials and sessions.

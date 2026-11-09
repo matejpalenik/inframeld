@@ -61,6 +61,8 @@ export const operations = [
   "resolveProjectName",
   "getProjectMetadata",
   "updateProjectMetadata",
+  "getProjectUploadDefaults",
+  "setProjectUploadDefaults",
   "contractFixturePayload",
   "contractFixturePage",
   "contractFixtureUpload",

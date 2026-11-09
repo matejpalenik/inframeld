@@ -130,7 +130,7 @@ Record both completed setup and deliberate removal. Otherwise a restart could mi
 
 Every Document lists at least one allowed group from its project. Uploads need Add documents on every group, even when the server chose the defaults. That permission includes no reading, replacement, deletion, sharing, or release rights. Imports also select Inframeld groups rather than copy the source system's permissions.
 
-Changing defaults needs Manage upload defaults and management of every old and new group. It affects only future uploads. A missing or unauthorized group blocks the upload instead of making it public. [Access document rules](../../inframeld-access-models/references/query-and-document-authorization.md#documents) give the full permission list.
+The implemented [saved upload-default contract](../../inframeld-access-models/references/upload-default-contracts.md) provides authoritative inspection and revision-checked replacement. Changing defaults needs Manage upload defaults and management of every current and proposed group, including retained groups. It affects only future uploads. Actual upload consumption, the administration journey and starter provisioning remain with #41, #264 and #349 respectively. A missing or unauthorized group blocks the upload instead of making it public. [Access document rules](../../inframeld-access-models/references/query-and-document-authorization.md#documents) give the full permission list.
 
 Setup issues no application key automatically. An authorized human must pass Access's key-administration and grant-authority checks. The application's access must be safe for everyone using it. Applications cannot administer permissions or incoming keys in v1. A person leaving follows ordinary handover or deletion rules.
 

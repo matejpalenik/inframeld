@@ -105,7 +105,7 @@ The server chooses storage keys. Original filenames are display text, never path
 
 ### Alice changes the default audience for uploads
 
-Changing upload defaults requires both Manage upload defaults on the project and management of every group in the old or new defaults. The new default must contain at least one group, all from the same project.
+The implemented Access [saved upload-default contract](../../inframeld-access-models/references/upload-default-contracts.md) owns authoritative inspection and revision-checked replacement. Changing defaults requires Manage upload defaults on the Project and current membership plus management of every current or proposed group, including retained groups. The new set is nonempty and all groups belong to the same Project. The receiving upload admission reads Access's coordinated set/revision projection without requiring administration GET authority, then checks its own current actor and Add documents authority on every selected group. This actual consumption remains in #41.
 
 Changing the default from HRPrivate to SupportKnowledge affects future uploads, not existing documents. Each upload still needs Add documents on every selected group. If that fails, the backend must report the failure rather than silently choose a different audience.
 

@@ -62,6 +62,8 @@ class Operation(StrEnum):
     RESOLVE_PROJECT_NAME = "resolveProjectName"
     GET_PROJECT_METADATA = "getProjectMetadata"
     UPDATE_PROJECT_METADATA = "updateProjectMetadata"
+    GET_PROJECT_UPLOAD_DEFAULTS = "getProjectUploadDefaults"
+    SET_PROJECT_UPLOAD_DEFAULTS = "setProjectUploadDefaults"
     CONTRACT_FIXTURE_PAYLOAD = "contractFixturePayload"
     CONTRACT_FIXTURE_PAGE = "contractFixturePage"
     CONTRACT_FIXTURE_UPLOAD = "contractFixtureUpload"

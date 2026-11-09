@@ -346,6 +346,20 @@ A candidate's appearance grants no permission and cannot guarantee eligibility a
 
 One combined page has at most `limit` entries across the three arrays, default 25 and maximum 100. Grants carry a typed exact Project/access-group/application-account target, `actionId` and `canGrant`. Group relationships carry only `accessGroupId`. Each page checks current authority and revision, with a principal/scope-bound cursor. It supplies no implied grants, hidden linked resources or permission snapshot. [The guide](/guides/assign-project-grant#read-your-project-access-and-current-revision) explains revision review.
 
+## Read future-upload defaults
+
+<ApiOperation operationId="getProjectUploadDefaults" />
+
+Read the authoritative saved audience and current Project Access revision. An eligible admitted human needs current Project membership, permission to use `manage-upload-defaults`, and ordinary membership plus management of every saved group. `groupIds: null` means unconfigured for a valid Project. A hidden, denied or unavailable observation is not an unset default. The read has no body or request key.
+
+## Set future-upload defaults
+
+<ApiOperation operationId="setProjectUploadDefaults" />
+
+Replace the complete nonempty same-Project audience with strict `groupIds` and `expectedAccessRevision` JSON plus the original `Idempotency-Key`. Current management of every saved and proposed group, including retained groups, is required before original-result recovery. A fresh no-op still checks the reviewed revision. Only a real change advances it.
+
+HTTP `200` returns the original resulting audience, revision, operation ID and expiry. If A→B was followed by C, exact-request recovery returns historical B without disclosing A or overwriting C. Current management must cover C∪B. GET separately reports current C. Preserve the exact original PUT meaning after uncertain effects. Expired retention does not authorize redispatch over later state. [The task guide](/guides/manage-access-groups#inspect-and-change-future-upload-audiences) supplies current reads, reviewed changes and recovery examples.
+
 ## Set a Project action grant
 
 <ApiOperation operationId="setProjectActionGrant" />

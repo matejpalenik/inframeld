@@ -542,7 +542,7 @@ async def test_retained_original_prevents_destructive_downgrade(
     async with database.session() as session:
         assert (
             await session.scalar(select(AlembicVersionRow.version_num))
-            == "0029_application_key_revocation"
+            == "0030_project_upload_defaults"
         )
         assert (
             await session.get(ApplicationKeyIssuanceResultRow, first.operation.operation_id.value)
