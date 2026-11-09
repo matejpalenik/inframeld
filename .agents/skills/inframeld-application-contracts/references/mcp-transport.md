@@ -99,6 +99,8 @@ The shared application-key verifier must check the key's hash, expiry, revocatio
 
 The shared application-key verifier and trusted-adapter middleware are implemented. They do not establish a mounted MCP server or a complete MCP client journey. Hydra-backed human CLI access tokens have their own API audience and verifier. The MCP profile does not accept them or Kratos browser cookies by implication.
 
+The separate [application-key revocation candidate](../../inframeld-access-models/references/application-key-contracts.md#implemented-revocation-boundary) disables one parent key across every allowed adapter, including MCP, through current human Revoke authority. New incoming key checks reject the revoked credential. This does not add a credential-management MCP tool, deliver a mounted server or automatically cancel already admitted jobs. Later protected deliveries and dispatches keep their owning fresh-authorization checks, while bytes already sent cannot be recalled.
+
 A key with additional permissions still gets only this adapter's query and receipt tools. Permission to deploy through another API does not create a deployment tool here.
 
 <a id="bind-the-credential-to-this-mcp-resource"></a>

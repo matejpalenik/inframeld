@@ -25,6 +25,18 @@ macro_rules! problems {
     };
 }
 problems!(
+    RevokeApplicationKeyApiError,
+    RevokeApplicationKeyApiError::Status400,
+    RevokeApplicationKeyApiError::Status401,
+    RevokeApplicationKeyApiError::Status403,
+    RevokeApplicationKeyApiError::Status404,
+    RevokeApplicationKeyApiError::Status409,
+    RevokeApplicationKeyApiError::Status413,
+    RevokeApplicationKeyApiError::Status415,
+    RevokeApplicationKeyApiError::Status422,
+    RevokeApplicationKeyApiError::Status503
+);
+problems!(
     IssueApplicationKeyApiError,
     IssueApplicationKeyApiError::Status400,
     IssueApplicationKeyApiError::Status401,

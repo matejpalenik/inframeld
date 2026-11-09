@@ -87,7 +87,7 @@ Application, Kratos and Hydra databases use three separate named volumes, preser
 
 ## Run the ordinary application worker
 
-After applying schema `0018_spending_accounting`, start the worker from the same checkout as the API, with the development database still running:
+After explicitly applying the [current required schema revision](../../../apps/backend/src/inframeld_backend/shared/infrastructure/migrations/migration_runner.py) through [migrations](#migrations), start the worker from the same checkout as the API, with the development database still running:
 
 ```bash
 mise exec -- uv run --project apps/backend --locked --env-file apps/backend/.env python -m inframeld_backend.application_worker
@@ -217,6 +217,12 @@ Audience values remain exact strings, including paths and trailing slashes. A ke
 Omitting an audience permits startup, but a supported application credential at that adapter returns `503 dependency_unavailable` before database or provider I/O. Missing credentials and unsupported identity families still return 401, and malformed or competing credentials return 400 before authentication. Application-key authentication is assembled independently of Kratos and Hydra. Human-provider configuration does not supply its verification profile or an alternate verifier.
 
 The [authentication error contract](../error-handling.md#authentication-contract) separates credential rejection from local ineligibility. The adapters, profile configuration and PostgreSQL local-admission/current-key reads are implemented. [Ordinary Project action facts](../../../apps/backend/src/inframeld_backend/access/infrastructure/readers/postgres_project_action_facts_reader.py) use the explicitly supplied profile and current persisted key/account state within the calling operation's transaction. HTTP metadata composition forwards the configured HTTP profile. An MCP consumer must likewise inject its trusted MCP profile into its authorizer. Initial authentication cannot supply a missing current-authorization profile. Configuration alone does not establish complete client, platform or production qualification. These settings alone issue no key. Eligible human callers use the registered issuance operation, while a mounted MCP transport remains separate delivery work.
+
+### Application-key revocation
+
+The implementation registers `revokeApplicationKey` through the human-authenticated POST route described in [the user guide](../../../apps/docs/src/app/guides/application-accounts/page.mdx#revoke-one-application-key). It requires current exact Revoke authority and a reviewed Project Access revision, without issuance delegation or a selected application-key verification profile. It returns safe metadata only. Exact original-request replay preserves the historical result, and revocation affects new incoming key checks rather than automatically cancelling admitted work.
+
+[Migration 0029](../../../apps/backend/migrations/versions/0029_application_key_revocation.py) follows `0028_application_key_issuance` and adds retained safe revocation originals. The implemented schema does not mean an existing installation has already upgraded. Apply the checkout's required schema explicitly through [the normal migration command](#migrations) before starting it. Startup never migrates. The selected generated clients cover the implemented route, while deployment qualification remains separate and [human qualification #358](https://github.com/matejpalenik/inframeld/issues/358) remains unready and Not run. Account retirement stays with #233; mounted MCP and full saved CLI remain separate consumers.
 
 <a id="development-services"></a>
 
@@ -436,7 +442,7 @@ The backend-only maintenance command also consumes the narrow `repair-stranded-a
 
 ## Private recovery callbacks
 
-The development `recovery-callbacks` service uses the backend image on private port 8081. The `recovery` profile is opt-in. It shares the application database and expects the supported head, currently `0018_spending_accounting`, applied deliberately through the ordinary migration command before startup. Starting the callback process never migrates a database.
+The development `recovery-callbacks` service uses the backend image on private port 8081. The `recovery` profile is opt-in. It shares the application database and expects the [current required schema revision](../../../apps/backend/src/inframeld_backend/shared/infrastructure/migrations/migration_runner.py), applied deliberately through the [ordinary migration command](#migrations) before startup. Starting the callback process never migrates a database.
 
 Supply a dedicated 32 to 256 byte printable ASCII key through `INFRAMELD_RECOVERY_KEY_HOST_FILE`. The mounted regular file must be readable by the container's runtime UID 10001, with mode 0400 or 0600 as seen inside the container. Compose file-backed secrets do not reliably remap host ownership. Provision the correct runtime ownership rather than making the file group/world-readable. Do not reuse an API, database or fingerprint secret.
 
@@ -452,7 +458,7 @@ For rotation, configure a current file plus optional retiring file and `INFRAMEL
 
 Alice remains blocked after Hydra rejects cleanup or a run exhausts its budget. Fix the provider/configuration problem first. A trusted deployment operator can then authorize one additional twelve-attempt, one-hour run of the original recovery. This is a local container command with no network endpoint. Keep container-exec and database credentials restricted to operators.
 
-Apply the supported schema `0018_spending_accounting` deliberately before starting the updated backend, callbacks or worker. Migration `0008_host_maintenance_receipts` introduced the maintenance receipt. The command never migrates a database. It needs only `INFRAMELD_DATABASE__*` and optional logging settings. The backend image installs both `inframeld-maintenance` and `python -m inframeld_backend.maintenance`, running as the existing non-root user.
+Apply the [current required schema revision](../../../apps/backend/src/inframeld_backend/shared/infrastructure/migrations/migration_runner.py) deliberately through [migrations](#migrations) before starting the updated backend, callbacks or worker. Migration `0008_host_maintenance_receipts` introduced the maintenance receipt. The command never migrates a database. It needs only `INFRAMELD_DATABASE__*` and optional logging settings. The backend image installs both `inframeld-maintenance` and `python -m inframeld_backend.maintenance`, running as the existing non-root user.
 
 Obtain the expected installation UUID from your protected installation record and the original recovery operation ID from protected recovery records. Replace the placeholders below. Choose a unique operator request ID and retain the exact request privately until its outcome is known. Supply attribution and the repair reason, without passwords, cookies or tokens.
 

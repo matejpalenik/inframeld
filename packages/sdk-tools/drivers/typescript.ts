@@ -34,6 +34,16 @@ const options = (client: Client, call: SdkCall, signal?: AbortSignal) => ({
 // Cast only the validated test-protocol input at the generated API boundary.
 // Request validation remains the generator's qualified policy, not a driver repair.
 const calls = {
+  revokeApplicationKey: (client: Client, call: SdkCall) =>
+    sdk.revokeApplicationKey({
+      ...options(client, call),
+      path: call.path as sdk.RevokeApplicationKeyData["path"],
+      headers: {
+        ...call.headers,
+        "Idempotency-Key": call.headers["Idempotency-Key"]!,
+      },
+      body: call.body as sdk.RevokeApplicationKeyData["body"],
+    }),
   issueApplicationKey: (client: Client, call: SdkCall) =>
     sdk.issueApplicationKey({
       ...options(client, call),

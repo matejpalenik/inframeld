@@ -37,6 +37,7 @@ class Operation(StrEnum):
     LIST_APPLICATION_KEYS = "listApplicationKeys"
     GET_APPLICATION_KEY = "getApplicationKey"
     ISSUE_APPLICATION_KEY = "issueApplicationKey"
+    REVOKE_APPLICATION_KEY = "revokeApplicationKey"
     LIST_PROJECT_MEMBERS = "listProjectMembers"
     LIST_PROJECT_ACTION_GRANTS = "listProjectActionGrants"
     LIST_ORGANIZATION_ACTION_GRANTS = "listOrganizationActionGrants"

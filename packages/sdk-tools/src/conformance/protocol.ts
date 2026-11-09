@@ -36,6 +36,7 @@ export const operations = [
   "listApplicationKeys",
   "getApplicationKey",
   "issueApplicationKey",
+  "revokeApplicationKey",
   "listProjectMembers",
   "listProjectActionGrants",
   "listOrganizationActionGrants",

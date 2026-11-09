@@ -34,7 +34,7 @@ Changing a name or credential does not change the principal. Creating another ac
 
 #### Logical application-key record contract
 
-The [accepted key contract](application-key-contracts.md#application-key-contract) requires the following values. This is the logical record specification for the incoming-credential workflow. The [application_keys persistence](access-persistence.md#application-creation-names-and-key-metadata) now stores these values for safe metadata reads. Authentication is implemented separately. The current issuance candidate supplies the coordinated key write and original-result persistence:
+The [accepted key contract](application-key-contracts.md#application-key-contract) requires the following values. This is the logical record specification for the incoming-credential workflow. The [application_keys persistence](access-persistence.md#application-creation-names-and-key-metadata) stores these values for safe metadata reads. Authentication is implemented separately. Issuance supplies the coordinated key write and original-result persistence, while individual revocation retains its own safe originals below:
 
 | Value | Meaning and constraint |
 | --- | --- |
@@ -46,6 +46,14 @@ The [accepted key contract](application-key-contracts.md#application-key-contrac
 | Safe lifecycle metadata | Issuance attribution/time, expiry and revocation state/time sufficient for the authorized management workflow. Public metadata excludes the secret and digest. |
 
 The secret is 32 cryptographically random bytes encoded as 43 unpadded base64url characters. The default lifetime is 90 days and the maximum 365 days, both operator-configurable. Validate default against maximum. The account has at most two usable keys across audiences. Issuance coordinates the current usable count, full issuer delegation/group-management authority, bindings and audit under the Access write protocol. Revocation and retirement use their independent current human Revoke keys/Delete application account authority and lifecycle checks. They do not require issuance delegation or document-reading authority. Keys use current grants, not a historical issuer ceiling or cached permission snapshot. General UUID identifier constructors retain their existing valid-version/zero-value rules.
+
+<a id="application-key-revocation-records"></a>
+
+#### Safe original revocation records
+
+Revocation stores [ApplicationKeyRevocationResultRow](../../../../apps/backend/src/inframeld_backend/access/infrastructure/rows/application_key_revocation_result_row.py) through [migration 0029](../../../../apps/backend/migrations/versions/0029_application_key_revocation.py). The row binds the original reservation, actor, installation, Organization, Project and application account to safe key metadata and its before/after Project Access revisions. It retains the key ID, selected adapters and creation/expiry/revocation timestamps, with no secret, verifier or audience payload. The immutable original is separate from mutable key state.
+
+First revocation saves the key transition, revision advance, audit and original together. A fresh already-revoked no-op retains a new original at the unchanged revision without another revocation audit. Exact completed replay still requires current eligible-human Revoke authority and Project membership, but returns the original captured metadata before fresh revision checks. It does not renew retention or reapply effects. [The contract](application-key-contracts.md#implemented-revocation-boundary) owns explicit same-request recovery, independent of an issuance original and without generic lookup authority. Candidate schema availability does not imply that a retained installation has already applied it.
 
 <a id="application-key-verification-result"></a>
 

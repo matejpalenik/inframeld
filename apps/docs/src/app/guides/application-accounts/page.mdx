@@ -1,14 +1,14 @@
 export const pageMetadata = {
   title: "Create and inspect an application account",
   description:
-    "Give an integration a separate Project-bound identity, issue an expiring key and inspect safe metadata.",
+    "Give an integration a separate Project-bound identity, issue or revoke a key and inspect safe metadata.",
 }
 
 # Create and inspect an application account
 
 Create SupportBot in your Support Project as a separate identity for an integration. The account belongs to that one Project and starts with no action permissions, document-group memberships or keys. Creating it does not copy your human access.
 
-You receive three permissions to administer this specific account. The account's permissions and its incoming credentials remain separate. This guide covers account creation, explicit key issuance and safe metadata reads. [Application identity authentication](/guides/authenticate-an-application) checks the resulting credential separately. Creation and metadata reads issue no key. Revocation and account retirement remain separate operations without a public procedure here.
+You receive three permissions to administer this specific account. The account's permissions and its incoming credentials remain separate. This guide covers account creation, explicit key issuance, individual revocation and safe metadata reads. [Application identity authentication](/guides/authenticate-an-application) checks the resulting credential separately. Creation and metadata reads issue no key. Permanent account retirement remains a separate operation without a public procedure here.
 
 Use [exact action-grant administration](/guides/manage-action-grants) to share one account-administration permission with another eligible human in the Project. Those grants control the human's authority over SupportBot. They do not give SupportBot an action permission, create a key or copy any human access. An application account cannot receive account-administration grants or grant authority.
 
@@ -467,7 +467,7 @@ A timeout, cancellation, `503` or unusable response can leave remote issuance un
 
 Explicitly repeat only the exact original POST. Current authority is checked again. A completed original returns its captured operation, revision, metadata and retention expiry without another key, audit or revision change. It stays historical even after the credential expires or is revoked, or server profiles and lifetime defaults change. Use the existing authorized key metadata reads for current lifecycle state. A replay neither rebinds the key nor renews retention. If the original did not commit, the same request can still be processed under its original meaning and current fresh checks.
 
-Choosing a replacement after a lost secret is a separate deliberate decision. This issuance operation does not provide revocation or automatically complete that replacement sequence.
+Choosing a replacement after a lost secret is a separate deliberate decision. A human with the independent Revoke permission can [revoke that key](#revoke-one-application-key), then consider a separate issuance under its full current requirements. Issuance never revokes or replaces a key automatically.
 
 ## Inspect safe key metadata
 
@@ -512,6 +512,134 @@ EOF_HEADERS
 </CodeGroup>
 
 The single-key response has the same safe item shape. It cannot retrieve a lost secret. These GETs take no body, reviewed revision or idempotency key. Account and key responses use `Cache-Control: no-store`. [The API reference](/api-reference/projects-and-access#read-application-key-metadata) shows their exact native contracts.
+
+## Revoke one application key
+
+Revoke a leaked or replaced credential while keeping SupportBot's account and permissions. You must be a currently eligible admitted human member of its Project with permission to use `revoke-application-keys` on this exact account. Issue keys, Delete account or authority on another account is insufficient. Revoke does not require issuance delegation, group management or document access. You may revoke the last usable key immediately.
+
+Use your genuine human browser session and the installation's supported Origin/CSRF path, as for the [browser issuance integration](#submit-from-your-existing-human-browser-session). The application key being revoked is not your administration credential. Browser sign-in does not export a human bearer token for terminal examples.
+
+Read the account's current metadata to review its Project `accessRevision`, and select the exact `keyId` from [safe key metadata](#inspect-safe-key-metadata). Preserve the installation, same human, Project ID, application principal ID and key ID. Send `POST /v1/projects/{project_id}/application-accounts/{application_principal_id}/keys/{key_id}/revoke` with a new saved `Idempotency-Key`. The JSON body contains only the reviewed `expectedAccessRevision`, a nonnegative whole integer within the safe revision range. Keep that complete original context before sending.
+
+A successful response is `200` with the original `operationId`, Project `accessRevision`, `idempotencyExpiresAt` and safe nested `metadata`. It contains no secret or verifier. First revocation records `revokedAt`, advances the Project Access revision once and saves the revocation audit and original result together. The single parent key is revoked for every adapter it allowed, including both bindings of a dual-adapter key.
+
+A fresh request for an already revoked key still requires current Revoke authority and the reviewed current revision. It returns `200` with the existing revocation time, without another revision change or revocation audit. This new request has its own retained original receipt. Issuing another key and permanently retiring the account remain separate decisions.
+
+### Submit from the same human browser context
+
+Use the [source TypeScript package setup](/clients/typescript#build-and-install-the-package) and the existing browser application on the configured HTTPS account/API origin described for issuance. Save this complete module as `revoke-application-key.ts` in that application's client bundle and load it once in the intended signed-in human's browser profile. Supply the saved original IDs, revision and revocation request key. The key ID is public metadata, not the full application credential. For a fresh request, review and save the current revision first. For recovery, keep the originally reviewed revision even if today's value has advanced.
+
+<CodeGroup>
+
+```typescript {{ title: "TypeScript (browser)" }}
+import {
+  createClient,
+  revokeApplicationKey,
+  type ApplicationKeyRevocationRequest,
+} from "@inframeld/sdk"
+
+async function main(): Promise<void> {
+  const projectId = window.prompt("Saved Project ID")
+  const applicationPrincipalId = window.prompt("Saved application principal ID")
+  const keyId = window.prompt("Saved public key ID, not the key secret")
+  const revisionText = window.prompt("Saved original Project Access revision")
+  const idempotencyKey = window.prompt(
+    "Saved original revocation idempotency key"
+  )
+  if (
+    !projectId ||
+    !applicationPrincipalId ||
+    !keyId ||
+    revisionText === null ||
+    idempotencyKey === null
+  )
+    return
+  const revision = Number(revisionText)
+  if (
+    !/^(0|[1-9][0-9]*)$/.test(revisionText) ||
+    !Number.isSafeInteger(revision) ||
+    !idempotencyKey.trim() ||
+    idempotencyKey.length > 128
+  ) {
+    throw new Error("Review the exact saved revision and original request key")
+  }
+  const body: ApplicationKeyRevocationRequest = {
+    expectedAccessRevision: revision,
+  }
+  if (
+    !window.confirm(
+      "Submit this saved revocation request? It may revoke the last usable key. Explicit recovery must keep every original input and key."
+    )
+  )
+    return
+  const client = createClient({
+    baseUrl: window.location.origin,
+    credentials: "same-origin",
+    timeoutMs: 5000,
+    responseStyle: "fields",
+    throwOnError: false,
+  })
+  const result = await revokeApplicationKey({
+    client,
+    path: {
+      project_id: projectId,
+      application_principal_id: applicationPrincipalId,
+      key_id: keyId,
+    },
+    headers: {
+      "X-Inframeld-CSRF": "1",
+      "Idempotency-Key": idempotencyKey,
+    },
+    body,
+  })
+  if (result.error !== undefined) {
+    console.error({
+      httpStatus: result.response?.status,
+      failureKind: result.error.kind,
+    })
+    if (result.error.kind === "api") {
+      console.error({
+        code: result.error.body.code,
+        requestId: result.error.body.requestId,
+      })
+    } else if (result.error.kind === "transport") {
+      console.error({ reason: result.error.reason })
+    }
+    console.info("Keep the original request. No automatic repeat was sent")
+    return
+  }
+  if (result.data === undefined) throw new Error("No usable revocation receipt")
+  const receipt = result.data
+  console.info({
+    httpStatus: result.response?.status,
+    operationId: receipt.operationId,
+    accessRevision: receipt.accessRevision,
+    idempotencyExpiresAt: receipt.idempotencyExpiresAt,
+    metadata: receipt.metadata,
+  })
+  console.info(
+    "Keep this historical receipt. Current account authority is separate"
+  )
+}
+
+void main().catch(() => {
+  console.error(
+    "No usable result. Preserve the exact original request and key. Do not send an automatic replacement"
+  )
+})
+```
+
+</CodeGroup>
+
+The browser supplies its actual cookie and Origin, and the module adds the CSRF marker. It sends one explicit POST and reports only safe metadata or fixed failure categories. A validated API failure exposes its code and correlation ID. A transport failure distinguishes network, timeout and cancellation, while decode and request failures remain separate kinds. An HTTP status without a usable typed receipt does not establish the revocation result. No failure triggers another write, changes the request key or issues a replacement credential.
+
+### Recover an uncertain revocation
+
+If a timeout, cancellation, `503` or unusable response leaves the result unknown, preserve the exact original POST route, body and request key. Explicitly repeat that same request under the same human's current Revoke authority. Do not replace its reviewed revision with today's value or silently choose another request key. A completed original returns its captured metadata, revision and retention expiry before fresh revision checks, with no repeated revocation or renewed retention. Current authority is checked before returning that result. The generic operation lookup does not support this request.
+
+A current metadata read can show that the key is revoked, but does not prove which request revoked it. Missing or hidden state and a denied replay do not establish that the original failed. Retain the original context and use the installation's supported recovery procedure before considering distinct work.
+
+After revocation commits, new requests through that credential are rejected by current key checks. Revocation does not delete SupportBot, remove its grants or undo committed effects. It cannot recall bytes or external calls already sent. An [already admitted job](/guides/authenticate-an-application#keep-admitted-jobs-separate-from-incoming-credentials) has its own current-account and authority checks rather than automatic cancellation by this credential operation.
 
 ## Read with a generated client
 

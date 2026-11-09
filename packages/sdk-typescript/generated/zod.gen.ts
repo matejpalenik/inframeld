@@ -323,6 +323,25 @@ export const zApplicationKeyIssueResponse = z.discriminatedUnion('secretAvailabl
 ]);
 
 /**
+ * ApplicationKeyRevocationRequest
+ */
+export const zApplicationKeyRevocationRequest = z.object({
+    expectedAccessRevision: z.int().gte(0).lte(9007199254740991)
+});
+
+/**
+ * ApplicationKeyRevocationResponse
+ *
+ * Return the original safe receipt for a revocation or an already-revoked no-op.
+ */
+export const zApplicationKeyRevocationResponse = z.object({
+    accessRevision: z.int().gte(0).lte(9007199254740991),
+    idempotencyExpiresAt: z.iso.datetime(),
+    metadata: zApplicationKeyMetadataResponse,
+    operationId: z.string()
+});
+
+/**
  * CompletedOperationLookupResponse
  *
  * Expose safe synchronous outcome metadata without replaying content.
@@ -3706,6 +3725,73 @@ export const zGetApplicationKey503Representation0Response = zProblemDetails;
  * Successful Response
  */
 export const zGetApplicationKeyResponse = zApplicationKeyMetadataResponse;
+
+export const zRevokeApplicationKeyBody = zApplicationKeyRevocationRequest;
+
+export const zRevokeApplicationKeyHeaders = z.object({
+    'Idempotency-Key': z.string().min(1).max(128).regex(/.*\S.*/)
+});
+
+export const zRevokeApplicationKeyPath = z.object({
+    project_id: z.uuid(),
+    application_principal_id: z.uuid(),
+    key_id: z.uuid()
+});
+
+/**
+ * Successful Response
+ */
+export const zRevokeApplicationKey200Representation0Response = zApplicationKeyRevocationResponse;
+
+/**
+ * Invalid authentication request
+ */
+export const zRevokeApplicationKey400Representation0Response = zProblemDetails;
+
+/**
+ * Unauthorized
+ */
+export const zRevokeApplicationKey401Representation0Response = zProblemDetails;
+
+/**
+ * Access denied
+ */
+export const zRevokeApplicationKey403Representation0Response = zProblemDetails;
+
+/**
+ * Resource not found
+ */
+export const zRevokeApplicationKey404Representation0Response = zProblemDetails;
+
+/**
+ * Operation conflicts with current state
+ */
+export const zRevokeApplicationKey409Representation0Response = zProblemDetails;
+
+/**
+ * Content Too Large
+ */
+export const zRevokeApplicationKey413Representation0Response = zProblemDetails;
+
+/**
+ * Unsupported Media Type
+ */
+export const zRevokeApplicationKey415Representation0Response = zProblemDetails;
+
+/**
+ * Request validation failed
+ */
+export const zRevokeApplicationKey422Representation0Response = zProblemDetails;
+
+/**
+ * Dependency unavailable
+ */
+export const zRevokeApplicationKey503Representation0Response = zProblemDetails;
+
+/**
+ * Successful Response
+ */
+export const zRevokeApplicationKeyResponse = zApplicationKeyRevocationResponse;
 
 export const zListProjectGrantRecipientsPath = z.object({
     project_id: z.uuid()
