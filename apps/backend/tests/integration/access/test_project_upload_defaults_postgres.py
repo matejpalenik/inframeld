@@ -927,3 +927,82 @@ async def test_group_deletion_and_default_update_take_the_same_project_turn(
                 raise BaseExceptionGroup(
                     "Holder rollback and task finalization failed", cleanup_errors
                 ) from None
+
+
+@pytest.mark.parametrize(
+    ("action", "binding"),
+    [
+        ("add-documents", "exact-use"),
+        ("update-documents", "exact-use"),
+        ("delete-documents", "exact-use"),
+        ("add-documents", "exact-delegating"),
+        ("add-documents", "other-recipient"),
+        ("add-documents", "other-group"),
+    ],
+)
+async def test_current_group_visibility_projects_only_exact_supported_action_grants(
+    database: Database, scope: UploadDefaultScenario, action: str, binding: str
+) -> None:
+    target = scope.groups[1].group_id
+    actor = scope.actor.access.actor_principal_id
+    async with database.session() as session, session.begin():
+        session.add(
+            GroupMembershipRow(
+                project_id=scope.project_id.value,
+                group_id=target.value,
+                principal_id=scope.bob_id.value,
+            )
+        )
+        await session.flush()
+        session.add(
+            GroupManagerRow(
+                project_id=scope.project_id.value,
+                group_id=target.value,
+                principal_id=scope.bob_id.value,
+                principal_kind=PrincipalKind.HUMAN,
+            )
+        )
+        await session.flush()
+        await session.execute(
+            delete(GroupActionGrantRow).where(
+                GroupActionGrantRow.project_id == scope.project_id.value,
+                GroupActionGrantRow.recipient_principal_id == actor.value,
+            )
+        )
+        await session.execute(
+            delete(GroupManagerRow).where(
+                GroupManagerRow.project_id == scope.project_id.value,
+                GroupManagerRow.group_id == target.value,
+                GroupManagerRow.principal_id == actor.value,
+            )
+        )
+        await session.execute(
+            delete(GroupMembershipRow).where(
+                GroupMembershipRow.project_id == scope.project_id.value,
+                GroupMembershipRow.group_id == target.value,
+                GroupMembershipRow.principal_id == actor.value,
+            )
+        )
+        session.add(
+            GroupActionGrantRow(
+                project_id=scope.project_id.value,
+                group_id=(scope.groups[2].group_id if binding == "other-group" else target).value,
+                recipient_principal_id=(
+                    scope.bob_id if binding == "other-recipient" else actor
+                ).value,
+                recipient_kind=PrincipalKind.HUMAN,
+                action=action,
+                can_grant=binding == "exact-delegating",
+            )
+        )
+    before = await upload_default_effects(database, scope.project_id)
+    async with database.session() as session, session.begin():
+        facts = await PostgresProjectUploadDefaultFactsReader(session).lock_for_change(
+            access=scope.actor.access, command=_command(scope, (1,))
+        )
+        assert facts is not None
+        observed = next(group for group in facts.groups if group.group_id == target)
+        assert observed.project_id == scope.project_id
+        assert not observed.is_member and not observed.is_manager
+        assert observed.has_group_action is binding.startswith("exact-")
+    assert await upload_default_effects(database, scope.project_id) == before

@@ -6,9 +6,10 @@ from inframeld_backend.access.domain.value_objects.project_id import ProjectId
 
 @dataclass(frozen=True, slots=True)
 class UploadDefaultGroupFactsDTO:
-    """Observe a requested group's scoped existence and both management relationships."""
+    """Observe scoped existence, relationships and exact supported group action grants."""
 
     group_id: AccessGroupId
     project_id: ProjectId | None
     is_member: bool
     is_manager: bool
+    has_group_action: bool

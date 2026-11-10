@@ -232,14 +232,30 @@ class ProjectUploadDefaultService(ProjectUploadDefaultReader, ProjectUploadDefau
         if observed != needed or len(observed) != len(facts.groups):
             raise DependencyUnavailableError("The complete upload audience is unavailable.")
         for group in facts.groups:
+            if group.group_id not in current:
+                continue
             if group.project_id != project_id:
-                if group.group_id in current:
-                    raise DependencyUnavailableError("The stored upload audience is unavailable.")
-                raise ResourceNotFoundError()
+                raise DependencyUnavailableError("The stored upload audience is unavailable.")
             if group.is_manager and not group.is_member:
                 raise DependencyUnavailableError("Current group management is incoherent.")
             if not group.is_member or not group.is_manager:
                 raise AccessDeniedError()
+
+        if proposed is not None:
+            for group in facts.groups:
+                if group.group_id not in proposed.group_ids:
+                    continue
+                if group.project_id != project_id or not (
+                    group.is_member or group.is_manager or group.has_group_action
+                ):
+                    raise ResourceNotFoundError()
+            for group in facts.groups:
+                if group.group_id not in proposed.group_ids:
+                    continue
+                if group.is_manager and not group.is_member:
+                    raise DependencyUnavailableError("Current group management is incoherent.")
+                if not group.is_member or not group.is_manager:
+                    raise AccessDeniedError()
         return facts
 
     @staticmethod

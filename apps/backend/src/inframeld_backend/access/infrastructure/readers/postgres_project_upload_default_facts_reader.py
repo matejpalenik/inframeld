@@ -25,6 +25,7 @@ from inframeld_backend.access.application.protocols.project_upload_audience_read
 from inframeld_backend.access.application.protocols.project_upload_default_facts_reader import (
     ProjectUploadDefaultFactsReader,
 )
+from inframeld_backend.access.domain.enums.access_group_action import AccessGroupAction
 from inframeld_backend.access.domain.enums.project_action import ProjectAction
 from inframeld_backend.access.domain.value_objects.access_group_id import AccessGroupId
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
@@ -37,6 +38,7 @@ from inframeld_backend.access.infrastructure.readers.project_actor_queries impor
     ProjectActorQueries,
 )
 from inframeld_backend.access.infrastructure.rows.access_group_row import AccessGroupRow
+from inframeld_backend.access.infrastructure.rows.group_action_grant_row import GroupActionGrantRow
 from inframeld_backend.access.infrastructure.rows.group_manager_row import GroupManagerRow
 from inframeld_backend.access.infrastructure.rows.group_membership_row import GroupMembershipRow
 from inframeld_backend.access.infrastructure.rows.organization_row import OrganizationRow
@@ -246,10 +248,24 @@ class PostgresProjectUploadDefaultFactsReader(
                         )
                         .correlate(AccessGroupRow)
                     )
+                    group_action = (
+                        exists()
+                        .where(
+                            GroupActionGrantRow.project_id == AccessGroupRow.project_id,
+                            GroupActionGrantRow.group_id == AccessGroupRow.id,
+                            GroupActionGrantRow.recipient_principal_id
+                            == access.actor_principal_id.value,
+                            GroupActionGrantRow.recipient_kind == principal.kind,
+                            GroupActionGrantRow.action.in_(
+                                tuple(action.value for action in AccessGroupAction)
+                            ),
+                        )
+                        .correlate(AccessGroupRow)
+                    )
                     groups = (
                         (
                             await self._session.execute(
-                                select(AccessGroupRow.id, group_member, group_manager)
+                                select(AccessGroupRow.id, group_member, group_manager, group_action)
                                 .where(
                                     AccessGroupRow.project_id == project_id.value,
                                     AccessGroupRow.id.in_(tuple(group.value for group in needed)),
@@ -261,8 +277,8 @@ class PostgresProjectUploadDefaultFactsReader(
                         .all()
                     )
                     current = {
-                        identifier: (is_member, is_manager)
-                        for identifier, is_member, is_manager in groups
+                        identifier: (is_member, is_manager, has_action)
+                        for identifier, is_member, is_manager, has_action in groups
                     }
                     for group in sorted(needed, key=lambda group: group.value):
                         relationships = current.get(group.value)
@@ -272,6 +288,7 @@ class PostgresProjectUploadDefaultFactsReader(
                                 project_id if relationships is not None else None,
                                 relationships[0] if relationships is not None else False,
                                 relationships[1] if relationships is not None else False,
+                                relationships[2] if relationships is not None else False,
                             )
                         )
                 return ProjectUploadDefaultFactsDTO(

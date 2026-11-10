@@ -58,8 +58,8 @@ FACTS = ProjectUploadDefaultFactsDTO(
     ProjectActionFactsDTO(ACTOR, False, None, ProjectStatus.ACTIVE, True, True),
     OLD,
     (
-        UploadDefaultGroupFactsDTO(A, PROJECT_ID, True, True),
-        UploadDefaultGroupFactsDTO(B, PROJECT_ID, True, True),
+        UploadDefaultGroupFactsDTO(A, PROJECT_ID, True, True, False),
+        UploadDefaultGroupFactsDTO(B, PROJECT_ID, True, True, False),
     ),
 )
 ORIGINAL = ProjectUploadDefaultRecordDTO(

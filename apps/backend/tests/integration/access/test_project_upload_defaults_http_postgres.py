@@ -50,6 +50,7 @@ from inframeld_backend.access.infrastructure.readers.postgres_identity_recovery_
     PostgresIdentityRecoveryBlockReader,
 )
 from inframeld_backend.access.infrastructure.rows.application_key_row import ApplicationKeyRow
+from inframeld_backend.access.infrastructure.rows.group_action_grant_row import GroupActionGrantRow
 from inframeld_backend.access.infrastructure.rows.group_manager_row import GroupManagerRow
 from inframeld_backend.access.infrastructure.rows.group_membership_row import GroupMembershipRow
 from inframeld_backend.access.infrastructure.rows.human_credential_version_row import (
@@ -499,4 +500,217 @@ async def test_registered_application_is_denied_and_revoked_key_stays_unauthoriz
             )
         rejected = await client.get(route, headers={"Authorization": "Bearer " + key.value})
     assert rejected.status_code == 401 and "invalid_token" in rejected.headers["www-authenticate"]
+    assert await upload_default_effects(database, scope.project_id) == before
+
+
+@pytest.mark.parametrize("replay", [False, True])
+@pytest.mark.parametrize(
+    ("visibility", "expected_status", "expected_code"),
+    [
+        ("hidden", 404, "resource_not_found"),
+        ("member", 403, "access_denied"),
+        ("action", 403, "access_denied"),
+    ],
+)
+async def test_registered_proposed_visibility_is_checked_before_fresh_or_original_work(
+    database: Database,
+    temporary_postgres_settings: DatabaseSettings,
+    tmp_path: Path,
+    replay: bool,
+    visibility: str,
+    expected_status: int,
+    expected_code: str,
+) -> None:
+    scope = await seed_upload_default_scenario(database)
+    initial = await replace_upload_default(database, scope, (0,), scope.revision, "privacy-seed")
+    reviewed = initial.default.access_revision
+    key = "privacy-original" if replay else "privacy-fresh"
+    if replay:
+        original = await replace_upload_default(database, scope, (1,), reviewed, key)
+        await replace_upload_default(
+            database, scope, (2,), original.default.access_revision, "privacy-later"
+        )
+    target = scope.groups[1].group_id.value
+    actor = scope.actor.access.actor_principal_id.value
+    async with database.session() as session, session.begin():
+        session.add(
+            GroupMembershipRow(
+                project_id=scope.project_id.value,
+                group_id=target,
+                principal_id=scope.bob_id.value,
+            )
+        )
+        await session.flush()
+        session.add(
+            GroupManagerRow(
+                project_id=scope.project_id.value,
+                group_id=target,
+                principal_id=scope.bob_id.value,
+                principal_kind=PrincipalKind.HUMAN,
+            )
+        )
+        await session.flush()
+        await session.execute(
+            delete(GroupActionGrantRow).where(
+                GroupActionGrantRow.project_id == scope.project_id.value,
+                GroupActionGrantRow.group_id == target,
+                GroupActionGrantRow.recipient_principal_id == actor,
+            )
+        )
+        await session.execute(
+            delete(GroupManagerRow).where(
+                GroupManagerRow.project_id == scope.project_id.value,
+                GroupManagerRow.group_id == target,
+                GroupManagerRow.principal_id == actor,
+            )
+        )
+        if visibility != "member":
+            await session.execute(
+                delete(GroupMembershipRow).where(
+                    GroupMembershipRow.project_id == scope.project_id.value,
+                    GroupMembershipRow.group_id == target,
+                    GroupMembershipRow.principal_id == actor,
+                )
+            )
+        if visibility == "action":
+            session.add(
+                GroupActionGrantRow(
+                    project_id=scope.project_id.value,
+                    group_id=target,
+                    recipient_principal_id=actor,
+                    recipient_kind=PrincipalKind.HUMAN,
+                    action="add-documents",
+                    can_grant=False,
+                )
+            )
+    before = await upload_default_effects(database, scope.project_id)
+    async with _client(
+        _settings(temporary_postgres_settings, tmp_path), scope.actor.binding
+    ) as client:
+        response = await client.put(
+            f"/v1/projects/{scope.project_id.value}/upload-defaults",
+            json={"groupIds": [str(target)], "expectedAccessRevision": reviewed},
+            headers=BEARER | {"Idempotency-Key": key},
+        )
+    assert response.status_code == expected_status and response.json()["code"] == expected_code
+    assert str(target) not in response.text
+    assert await upload_default_effects(database, scope.project_id) == before
+
+
+@pytest.mark.parametrize("hidden_lower", [False, True])
+async def test_registered_hidden_proposal_wins_over_visible_management_denial_in_both_uuid_orders(
+    database: Database,
+    temporary_postgres_settings: DatabaseSettings,
+    tmp_path: Path,
+    hidden_lower: bool,
+) -> None:
+    scope = await seed_upload_default_scenario(database)
+    initial = await replace_upload_default(database, scope, (0,), scope.revision, "mixed-seed")
+    pair = sorted(scope.groups[1:], key=lambda group: group.group_id.value)
+    hidden, visible = pair if hidden_lower else tuple(reversed(pair))
+    actor = scope.actor.access.actor_principal_id.value
+    async with database.session() as session, session.begin():
+        for group in pair:
+            session.add(
+                GroupMembershipRow(
+                    project_id=scope.project_id.value,
+                    group_id=group.group_id.value,
+                    principal_id=scope.bob_id.value,
+                )
+            )
+        await session.flush()
+        for group in pair:
+            session.add(
+                GroupManagerRow(
+                    project_id=scope.project_id.value,
+                    group_id=group.group_id.value,
+                    principal_id=scope.bob_id.value,
+                    principal_kind=PrincipalKind.HUMAN,
+                )
+            )
+        await session.flush()
+        await session.execute(
+            delete(GroupActionGrantRow).where(
+                GroupActionGrantRow.project_id == scope.project_id.value,
+                GroupActionGrantRow.group_id.in_([group.group_id.value for group in pair]),
+                GroupActionGrantRow.recipient_principal_id == actor,
+            )
+        )
+        await session.execute(
+            delete(GroupManagerRow).where(
+                GroupManagerRow.project_id == scope.project_id.value,
+                GroupManagerRow.group_id.in_([group.group_id.value for group in pair]),
+                GroupManagerRow.principal_id == actor,
+            )
+        )
+        await session.execute(
+            delete(GroupMembershipRow).where(
+                GroupMembershipRow.project_id == scope.project_id.value,
+                GroupMembershipRow.group_id == hidden.group_id.value,
+                GroupMembershipRow.principal_id == actor,
+            )
+        )
+    before = await upload_default_effects(database, scope.project_id)
+    async with _client(
+        _settings(temporary_postgres_settings, tmp_path), scope.actor.binding
+    ) as client:
+        response = await client.put(
+            f"/v1/projects/{scope.project_id.value}/upload-defaults",
+            json={
+                "groupIds": [str(hidden.group_id.value), str(visible.group_id.value)],
+                "expectedAccessRevision": initial.default.access_revision,
+            },
+            headers=BEARER | {"Idempotency-Key": "mixed-proposals"},
+        )
+    assert response.status_code == 404 and response.json()["code"] == "resource_not_found"
+    assert all(str(group.group_id.value) not in response.text for group in pair)
+    assert await upload_default_effects(database, scope.project_id) == before
+
+
+async def test_registered_current_audience_denial_precedes_a_missing_proposal(
+    database: Database,
+    temporary_postgres_settings: DatabaseSettings,
+    tmp_path: Path,
+) -> None:
+    scope = await seed_upload_default_scenario(database)
+    initial = await replace_upload_default(database, scope, (0,), scope.revision, "current-seed")
+    target = scope.groups[0].group_id.value
+    async with database.session() as session, session.begin():
+        session.add(
+            GroupMembershipRow(
+                project_id=scope.project_id.value,
+                group_id=target,
+                principal_id=scope.bob_id.value,
+            )
+        )
+        await session.flush()
+        session.add(
+            GroupManagerRow(
+                project_id=scope.project_id.value,
+                group_id=target,
+                principal_id=scope.bob_id.value,
+                principal_kind=PrincipalKind.HUMAN,
+            )
+        )
+        await session.flush()
+        await session.execute(
+            delete(GroupManagerRow).where(
+                GroupManagerRow.project_id == scope.project_id.value,
+                GroupManagerRow.group_id == target,
+                GroupManagerRow.principal_id == scope.actor.access.actor_principal_id.value,
+            )
+        )
+    before = await upload_default_effects(database, scope.project_id)
+    async with _client(
+        _settings(temporary_postgres_settings, tmp_path), scope.actor.binding
+    ) as client:
+        response = await client.put(
+            f"/v1/projects/{scope.project_id.value}/upload-defaults",
+            json={
+                "groupIds": [str(UUID(int=1))],
+                "expectedAccessRevision": initial.default.access_revision,
+            },
+            headers=BEARER | {"Idempotency-Key": "current-before-proposal"},
+        )
+    assert response.status_code == 403 and response.json()["code"] == "access_denied"
     assert await upload_default_effects(database, scope.project_id) == before

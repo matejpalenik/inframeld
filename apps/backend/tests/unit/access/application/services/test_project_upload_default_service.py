@@ -216,6 +216,7 @@ async def test_every_old_new_and_retained_group_requires_management(
     groups = list(FACTS.groups)
     groups[group_index] = replace(
         groups[group_index],
+        has_group_action=group_index == 1 and relationship == "member",
         **(
             {"is_member": False, "is_manager": False}
             if relationship == "member"
@@ -288,8 +289,8 @@ async def test_original_a_to_b_after_current_c_needs_c_and_b_but_not_a(setup: Se
         access_revision=10,
         audience=UploadAudience((C,)),
         groups=(
-            UploadDefaultGroupFactsDTO(B, PROJECT_ID, True, True),
-            UploadDefaultGroupFactsDTO(C, PROJECT_ID, True, True),
+            UploadDefaultGroupFactsDTO(B, PROJECT_ID, True, True, False),
+            UploadDefaultGroupFactsDTO(C, PROJECT_ID, True, True, False),
         ),
     )
     idem.result = SAVED_RESULT
@@ -313,7 +314,9 @@ async def test_loss_of_current_c_or_original_destination_b_denies_replay(
         FACTS,
         access_revision=10,
         audience=UploadAudience((C,)),
-        groups=tuple(UploadDefaultGroupFactsDTO(g, PROJECT_ID, True, g != lost) for g in (B, C)),
+        groups=tuple(
+            UploadDefaultGroupFactsDTO(g, PROJECT_ID, True, g != lost, False) for g in (B, C)
+        ),
     )
     idem.result = SAVED_RESULT
     with pytest.raises(AccessDeniedError):
@@ -583,3 +586,97 @@ async def test_completion_must_retain_safe_original_identity(setup: Setup, wrong
     with pytest.raises(ConflictError):
         await service.set(access=ACCESS, command=COMMAND, context=CONTEXT)
     assert events[-1] == "rollback-requested"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("replay", [False, True])
+@pytest.mark.parametrize(
+    ("member", "manager", "grant", "expected"),
+    [
+        (False, False, False, ResourceNotFoundError),
+        (True, False, False, AccessDeniedError),
+        (False, True, False, DependencyUnavailableError),
+        (False, False, True, AccessDeniedError),
+    ],
+    ids=["hidden", "member-only", "manager-only", "action-only"],
+)
+async def test_proposed_visibility_is_distinct_from_management_before_original(
+    setup: Setup,
+    replay: bool,
+    member: bool,
+    manager: bool,
+    grant: bool,
+    expected: type[Exception],
+) -> None:
+    service, facts, repo, idem, _, events = setup
+    facts.facts = replace(
+        FACTS,
+        groups=(FACTS.groups[0], UploadDefaultGroupFactsDTO(B, PROJECT_ID, member, manager, grant)),
+    )
+    idem.result = SAVED_RESULT if replay else NEW_RESERVATION
+    with pytest.raises(expected):
+        await service.set(access=ACCESS, command=COMMAND, context=CONTEXT)
+    assert idem.calls == 0 and repo.saved == []
+    assert repo.saved_original == ORIGINAL
+    assert events == ["begin", "lock-current", "rollback-requested"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("concealed", ["hidden", "missing", "foreign"])
+@pytest.mark.parametrize("denied_lower", [False, True])
+async def test_all_proposed_visibility_precedes_any_management_denial(
+    setup: Setup, concealed: str, denied_lower: bool
+) -> None:
+    service, facts, repo, idem, _, events = setup
+    denied, hidden = (B, C) if denied_lower else (C, B)
+    hidden_project = (
+        None
+        if concealed == "missing"
+        else ProjectId(UUID(int=999))
+        if concealed == "foreign"
+        else PROJECT_ID
+    )
+    observations = [
+        FACTS.groups[0],
+        UploadDefaultGroupFactsDTO(denied, PROJECT_ID, True, False, False),
+        UploadDefaultGroupFactsDTO(hidden, hidden_project, False, False, False),
+    ]
+    facts.facts = replace(
+        FACTS, groups=tuple(sorted(observations, key=lambda group: group.group_id.value))
+    )
+    with pytest.raises(ResourceNotFoundError):
+        await service.set(
+            access=ACCESS,
+            command=replace(COMMAND, audience=UploadAudience((B, C))),
+            context=CONTEXT,
+        )
+    assert idem.calls == 0 and repo.saved == []
+    assert events == ["begin", "lock-current", "rollback-requested"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("replay", [False, True])
+@pytest.mark.parametrize("current_state", ["unmanaged", "missing", "incoherent"])
+async def test_current_audience_gate_precedes_hidden_proposals_and_history(
+    setup: Setup, replay: bool, current_state: str
+) -> None:
+    service, facts, repo, idem, _, events = setup
+    current = UploadDefaultGroupFactsDTO(
+        C,
+        None if current_state == "missing" else PROJECT_ID,
+        current_state != "incoherent",
+        current_state == "incoherent",
+        False,
+    )
+    facts.facts = replace(
+        FACTS,
+        audience=UploadAudience((C,)),
+        groups=(UploadDefaultGroupFactsDTO(A, None, False, False, False), current),
+    )
+    idem.result = SAVED_RESULT if replay else NEW_RESERVATION
+    expected = AccessDeniedError if current_state == "unmanaged" else DependencyUnavailableError
+    with pytest.raises(expected):
+        await service.set(access=ACCESS, command=replace(COMMAND, audience=OLD), context=CONTEXT)
+    assert idem.calls == 0 and repo.saved == []
+    assert repo.saved_original == ORIGINAL
+    assert events == ["begin", "lock-current", "rollback-requested"]

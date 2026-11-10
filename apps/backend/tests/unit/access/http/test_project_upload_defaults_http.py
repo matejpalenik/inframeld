@@ -536,8 +536,8 @@ def test_real_historical_replay_returns_b_without_overwriting_later_c(
         access_revision=99,
         audience=UploadAudience((C,)),
         groups=(
-            UploadDefaultGroupFactsDTO(B, PROJECT_ID, True, True),
-            UploadDefaultGroupFactsDTO(C, PROJECT_ID, True, True),
+            UploadDefaultGroupFactsDTO(B, PROJECT_ID, True, True, False),
+            UploadDefaultGroupFactsDTO(C, PROJECT_ID, True, True, False),
         ),
     )
     idem.result = SAVED_RESULT
