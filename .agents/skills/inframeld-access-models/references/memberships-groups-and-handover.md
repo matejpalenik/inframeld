@@ -133,7 +133,7 @@ Only current eligible human managers list the group's safe principal IDs, kinds 
 
 Creation requires current Project `create-access-groups` use authority and a reviewed Project revision. PUT uses strict revision JSON and returns 201 for a changed assignment or 200 for an original no-op. DELETE carries exactly one revision query value and no body, and returns 200. Current authority precedes original replay. Saved receipts describe original outcomes rather than restoring a later removed relationship.
 
-The current deletion writer handles the actual Access relationships. Future Document/source/active-upload/default/case owners add their real restrictive references and compatible coordination. Their absence does not create a replacement reference registry or qualify those future journeys.
+The current deletion writer handles actual Access relationships, including restrictive [saved upload-default references](upload-default-contracts.md#persistence-and-admission-boundaries). An in-use default group returns 409 and rolls back deletion until an authorized replacement removes the reference. Future Document/source/active-upload/case owners add their real restrictive references and compatible coordination. Their absence does not create a replacement reference registry or qualify those future journeys.
 
 ### Admission, memberships and lifecycle
 

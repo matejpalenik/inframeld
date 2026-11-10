@@ -929,6 +929,30 @@ The former POST request export has retired. Preserve an original request as evid
 
 The former POST response export has retired. Historical operation metadata retains its original outcome and expiry. It supplies no current assignment or permission to dispatch PUT.
 
+<a id="ProjectUploadDefaultChangeResponse" />
+
+## ProjectUploadDefaultChangeResponse
+
+The immutable resulting audience and revision for the original PUT, with its operation ID and unchanged replay expiry. It contains no previous-audience snapshot. A current GET can report a later set.
+
+<ApiSchema name="ProjectUploadDefaultChangeResponse" />
+
+<a id="ProjectUploadDefaultRequest" />
+
+## ProjectUploadDefaultRequest
+
+The complete nonempty audience and explicitly reviewed safe-integer Project Access revision. Omitted, null, empty or duplicate group inputs cannot select a reset. A fresh equal-set request still needs the current revision.
+
+<ApiSchema name="ProjectUploadDefaultRequest" />
+
+<a id="ProjectUploadDefaultResponse" />
+
+## ProjectUploadDefaultResponse
+
+Current Project ID, Access revision and the UUID-sorted audience. Required `groupIds` is null only when the valid Project has no configured default.
+
+<ApiSchema name="ProjectUploadDefaultResponse" />
+
 <a id="ProtectedResourceMetadataResponse" />
 
 ## ProtectedResourceMetadataResponse

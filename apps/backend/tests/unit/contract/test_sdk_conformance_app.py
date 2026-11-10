@@ -1509,3 +1509,129 @@ def test_invitation_fixture_presents_registered_outcomes_and_independent_wire_ev
         body,
     )
     assert witness["headers"].get("idempotency-key") == key
+
+
+@pytest.mark.parametrize("unset", [False, True])
+def test_upload_default_fixture_uses_production_read_and_independent_dispatch_witness(
+    unset: bool,
+) -> None:
+    project = (
+        "00000000-0000-4000-8000-000000000005" if unset else "00000000-0000-4000-8000-000000000003"
+    )
+    route = f"/v1/projects/{project}/upload-defaults"
+    with TestClient(create_sdk_conformance_app(), raise_server_exceptions=False) as client:
+        client.post("/sdk-control/cases/upload-read", json={"calls": {"read": {"kind": "none"}}})
+        response = client.get(
+            route, headers={"Authorization": "Bearer sdk-human", "X-SDK-Test": "read"}
+        )
+        seen = client.get("/sdk-control/cases/upload-read").json()
+    assert response.status_code == 200
+    assert response.json() == {
+        "projectId": project,
+        "accessRevision": 7 if unset else 9,
+        "groupIds": None if unset else ["00000000-0000-4000-8000-000000000030"],
+    }
+    assert response.headers["cache-control"] == "no-store"
+    assert seen["counts"] == {"read": 1}
+    witness = seen["observations"]["read"]
+    assert (witness["method"], witness["path"], witness["query"], witness["rawBodyBase64"]) == (
+        "GET",
+        route,
+        "",
+        "",
+    )
+    assert witness["authorization"] == "Bearer sdk-human"
+
+
+@pytest.mark.parametrize(
+    "intent,revision,groups,after",
+    [
+        ("first", 7, ["00000000-0000-4000-8000-000000000020"], 8),
+        ("replay", 7, ["00000000-0000-4000-8000-000000000020"], 8),
+        ("noop", 9, ["00000000-0000-4000-8000-000000000030"], 9),
+        ("first", 9007199254740990, ["00000000-0000-4000-8000-000000000020"], 9007199254740991),
+    ],
+)
+def test_upload_default_fixture_preserves_exact_original_request_and_after_only_receipt(
+    intent: str, revision: int, groups: list[str], after: int
+) -> None:
+    project = "00000000-0000-4000-8000-000000000003"
+    route = f"/v1/projects/{project}/upload-defaults"
+    body = {"groupIds": groups, "expectedAccessRevision": revision}
+    headers = {
+        "Authorization": "Bearer sdk-human",
+        "Idempotency-Key": "sdk-upload-" + intent,
+        "X-SDK-Test": "set",
+    }
+    with TestClient(create_sdk_conformance_app(), raise_server_exceptions=False) as client:
+        client.post("/sdk-control/cases/upload-set", json={"calls": {"set": {"kind": "none"}}})
+        response = client.put(route, json=body, headers=headers)
+        seen = client.get("/sdk-control/cases/upload-set").json()
+    assert response.status_code == 200
+    assert response.json() == {
+        "projectId": project,
+        "accessRevision": after,
+        "groupIds": groups,
+        "operationId": "sdk-upload-noop" if intent == "noop" else "sdk-upload-original",
+        "idempotencyExpiresAt": "2030-01-02T00:00:00Z",
+    }
+    assert response.headers["cache-control"] == "no-store"
+    assert "beforeGroupIds" not in response.json()
+    assert seen["counts"] == {"set": 1}
+    witness = seen["observations"]["set"]
+    assert witness["method"] == "PUT" and witness["path"] == route and witness["query"] == ""
+    assert (
+        witness["jsonBody"] == body
+        and witness["headers"]["idempotency-key"] == "sdk-upload-" + intent
+    )
+
+
+@pytest.mark.parametrize(
+    "key,revision,status,code",
+    [
+        ("first", 6, 409, "stale_revision"),
+        ("noop", 8, 409, "stale_revision"),
+        ("expired", 7, 409, "conflict"),
+        ("unknown", 7, 503, "dependency_unavailable"),
+        ("denied-old", 7, 403, "access_denied"),
+        ("denied-new", 7, 403, "access_denied"),
+        ("denied-retained", 7, 403, "access_denied"),
+    ],
+)
+def test_upload_default_fixture_retains_controlled_currentness_and_recovery_errors(
+    key: str, revision: int, status: int, code: str
+) -> None:
+    with TestClient(create_sdk_conformance_app(), raise_server_exceptions=False) as client:
+        response = client.put(
+            "/v1/projects/00000000-0000-4000-8000-000000000003/upload-defaults",
+            json={
+                "groupIds": ["00000000-0000-4000-8000-000000000020"],
+                "expectedAccessRevision": revision,
+            },
+            headers={"Authorization": "Bearer sdk-human", "Idempotency-Key": "sdk-upload-" + key},
+        )
+    assert (
+        response.status_code == response.json()["status"] == status
+        and response.json()["code"] == code
+    )
+    assert response.headers["cache-control"] == "no-store"
+
+
+def test_upload_default_fixture_cookie_csrf_and_duplicate_groups_use_production_guards() -> None:
+    route = "/v1/projects/00000000-0000-4000-8000-000000000003/upload-defaults"
+    group = "00000000-0000-4000-8000-000000000020"
+    body = {"groupIds": [group], "expectedAccessRevision": 7}
+    cookie = {"Cookie": "ory_kratos_session=sdk-cookie", "Idempotency-Key": "sdk-upload-first"}
+    with TestClient(create_sdk_conformance_app(), raise_server_exceptions=False) as client:
+        denied = client.put(route, json=body, headers=cookie)
+        allowed = client.put(
+            route,
+            json=body,
+            headers=cookie | {"Origin": "https://account.test", "X-Inframeld-CSRF": "1"},
+        )
+        duplicate = client.put(
+            route,
+            json=body | {"groupIds": [group, group]},
+            headers={"Authorization": "Bearer sdk-human", "Idempotency-Key": "sdk-upload-first"},
+        )
+    assert denied.status_code == 403 and allowed.status_code == 200 and duplicate.status_code == 422

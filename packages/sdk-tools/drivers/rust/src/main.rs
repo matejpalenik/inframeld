@@ -62,6 +62,8 @@ const BINDINGS: &[&str] = &[
     "resolveProjectName",
     "getProjectMetadata",
     "updateProjectMetadata",
+    "getProjectUploadDefaults",
+    "setProjectUploadDefaults",
     "contractFixturePayload",
     "contractFixturePage",
     "contractFixtureUpload",
@@ -157,6 +159,8 @@ async fn main() {
                 | "resolveProjectName"
                 | "getProjectMetadata"
                 | "updateProjectMetadata"
+                | "getProjectUploadDefaults"
+                | "setProjectUploadDefaults"
         ) {
             if let Some(token) = call
                 .headers
@@ -171,6 +175,7 @@ async fn main() {
         if matches!(
             call.operation.as_str(),
             "updateProjectMetadata"
+                | "setProjectUploadDefaults"
                 | "createProject"
                 | "createAccessGroup"
                 | "addAccessGroupMember"

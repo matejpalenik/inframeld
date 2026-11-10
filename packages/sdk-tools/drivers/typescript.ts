@@ -368,6 +368,21 @@ const calls = {
       ...options(client, call),
       path: call.path as { name: string },
     }),
+  getProjectUploadDefaults: (client: Client, call: SdkCall) =>
+    sdk.getProjectUploadDefaults({
+      ...options(client, call),
+      path: call.path as sdk.GetProjectUploadDefaultsData["path"],
+    }),
+  setProjectUploadDefaults: (client: Client, call: SdkCall) =>
+    sdk.setProjectUploadDefaults({
+      ...options(client, call),
+      path: call.path as sdk.SetProjectUploadDefaultsData["path"],
+      headers: {
+        ...call.headers,
+        "Idempotency-Key": call.headers["Idempotency-Key"]!,
+      },
+      body: call.body as sdk.SetProjectUploadDefaultsData["body"],
+    }),
   getProjectMetadata: (client: Client, call: SdkCall) =>
     sdk.getProjectMetadata({
       ...options(client, call),

@@ -34,6 +34,9 @@ from inframeld_backend.access.application.services.project_membership_change_fin
 from inframeld_backend.access.application.services.project_metadata_fingerprint_service import (
     ProjectMetadataFingerprintService,
 )
+from inframeld_backend.access.application.services.project_upload_default_fingerprint_service import (
+    ProjectUploadDefaultFingerprintService,
+)
 from inframeld_backend.access.domain.enums.application_key_adapter import ApplicationKeyAdapter
 from inframeld_backend.access.http.dependencies.application_key_dependency import (
     ApplicationKeyDependency,
@@ -103,6 +106,9 @@ from inframeld_backend.access.http.requests.project_membership_request import (
 )
 from inframeld_backend.access.http.requests.project_metadata_update_request import (
     ProjectMetadataUpdateRequest,
+)
+from inframeld_backend.access.http.requests.project_upload_default_request import (
+    ProjectUploadDefaultRequest,
 )
 from inframeld_backend.access.http.responses.access_group_action_grant_removal_response import (
     AccessGroupActionGrantRemovalResponse,
@@ -197,6 +203,12 @@ from inframeld_backend.access.http.responses.project_action_grant_removal_respon
 from inframeld_backend.access.http.responses.project_action_grant_response import (
     ProjectActionGrantResponse,
 )
+from inframeld_backend.access.http.responses.project_upload_default_change_response import (
+    ProjectUploadDefaultChangeResponse,
+)
+from inframeld_backend.access.http.responses.project_upload_default_response import (
+    ProjectUploadDefaultResponse,
+)
 from inframeld_backend.access.http.routes.access_group_action_grant_routes import (
     create_access_group_action_grant_router,
 )
@@ -254,6 +266,9 @@ from inframeld_backend.access.http.routes.project_membership_routes import (
 )
 from inframeld_backend.access.http.routes.project_metadata_routes import (
     create_project_metadata_router,
+)
+from inframeld_backend.access.http.routes.project_upload_default_routes import (
+    create_project_upload_default_router,
 )
 from inframeld_backend.access.infrastructure.resources.installation_discovery_resource import (
     InstallationDiscoveryResource,
@@ -318,6 +333,9 @@ from inframeld_backend.bootstrap.project_metadata_composition import (
     open_project_metadata,
     open_project_name_resolution,
 )
+from inframeld_backend.bootstrap.project_upload_default_composition import (
+    open_project_upload_default,
+)
 from inframeld_backend.shared.application.services.request_fingerprint_service import (
     RequestFingerprintService,
 )
@@ -375,6 +393,7 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
             FileRequestFingerprintKeyReader(resolved_settings.request_fingerprint.key_file).read()
         )
         fingerprints = ProjectGrantChangeFingerprintService(request_fingerprints)
+        upload_default_fingerprints = ProjectUploadDefaultFingerprintService(request_fingerprints)
         metadata_fingerprints = ProjectMetadataFingerprintService(request_fingerprints)
         creation_fingerprints = ProjectCreationFingerprintService(request_fingerprints)
         account_fingerprints = ApplicationAccountCreationFingerprintService(request_fingerprints)
@@ -458,6 +477,7 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
                 ProjectCreationRequest,
                 ProjectMembershipRequest,
                 ProjectMetadataUpdateRequest,
+                ProjectUploadDefaultRequest,
                 ProjectActionGrantRequest,
                 OrganizationActionGrantRequest,
                 AccessGroupActionGrantRequest,
@@ -471,6 +491,8 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
                 InvitationPreviewResponse,
                 InvitationActivationResponse,
                 CurrentApplicationSessionResponse,
+                ProjectUploadDefaultResponse,
+                ProjectUploadDefaultChangeResponse,
                 AccessGroupCreationResponse,
                 AccessGroupMetadataResponse,
                 AccessGroupMembershipResponse,
@@ -712,6 +734,14 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
         application.include_router(
             create_deletion_status_router(
                 product_access, partial(open_deletion_status_lookup, database)
+            )
+        )
+
+        application.include_router(
+            create_project_upload_default_router(
+                product_access,
+                partial(open_project_upload_default, database, upload_default_fingerprints),
+                partial(open_project_upload_default, database, upload_default_fingerprints),
             )
         )
 

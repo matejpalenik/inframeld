@@ -247,6 +247,12 @@ from inframeld_backend.access.application.protocols.project_metadata_reader impo
     ProjectMetadataReader,
 )
 from inframeld_backend.access.application.protocols.project_name_resolver import ProjectNameResolver
+from inframeld_backend.access.application.protocols.project_upload_default_changer import (
+    ProjectUploadDefaultChanger,
+)
+from inframeld_backend.access.application.protocols.project_upload_default_reader import (
+    ProjectUploadDefaultReader,
+)
 from inframeld_backend.access.application.queries.get_project_metadata_query import (
     GetProjectMetadataQuery,
 )
@@ -380,6 +386,9 @@ from inframeld_backend.access.http.routes.project_membership_routes import (
 from inframeld_backend.access.http.routes.project_metadata_routes import (
     create_project_metadata_router,
 )
+from inframeld_backend.access.http.routes.project_upload_default_routes import (
+    create_project_upload_default_router,
+)
 from inframeld_backend.shared.application.dtos.accepted_operation_lookup_dto import (
     AcceptedOperationLookupDTO,
 )
@@ -448,6 +457,7 @@ from tests.support.mock_sdk_application_key_issuer import MockSDKApplicationKeyI
 from tests.support.mock_sdk_application_key_revoker import MockSDKApplicationKeyRevoker
 from tests.support.mock_sdk_application_session_reader import MockSDKApplicationSessionReader
 from tests.support.mock_sdk_invitations import MockSDKInvitations
+from tests.support.mock_sdk_project_upload_defaults import MockSDKProjectUploadDefaults
 from tests.support.openapi_schema_fixture import create_schema_fixture_app
 
 
@@ -1072,6 +1082,16 @@ async def _open_application_key_issuer() -> AsyncGenerator[ApplicationKeyIssuer]
 @asynccontextmanager
 async def _open_application_key_revoker() -> AsyncGenerator[ApplicationKeyRevoker]:
     yield MockSDKApplicationKeyRevoker()
+
+
+@asynccontextmanager
+async def _open_upload_default_reader() -> AsyncGenerator[ProjectUploadDefaultReader]:
+    yield MockSDKProjectUploadDefaults()
+
+
+@asynccontextmanager
+async def _open_upload_default_changer() -> AsyncGenerator[ProjectUploadDefaultChanger]:
+    yield MockSDKProjectUploadDefaults()
 
 
 class MockSDKHumanAdmitter(HumanAdmitter):
@@ -1892,6 +1912,18 @@ def create_sdk_conformance_app(browser_origin: str | None = None) -> FastAPI:
                 application_authenticator=MockSDKApplicationAuthenticator(),
             ),
             _open_application_key_revoker,
+        )
+    )
+    application.include_router(
+        create_project_upload_default_router(
+            ProductAccessDependency(
+                browser_authenticator,
+                csrf,
+                access_token_authenticator=token_authenticator,
+                application_authenticator=MockSDKApplicationAuthenticator(),
+            ),
+            _open_upload_default_reader,
+            _open_upload_default_changer,
         )
     )
     application.include_router(create_project_members_router(authenticate, _open_project_members))
