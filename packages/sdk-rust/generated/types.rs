@@ -1556,6 +1556,8 @@ pub enum OperationLookupAuthorityFamily {
     ApplicationAccountGrantRead,
     #[serde(rename = "access_group_deletion")]
     AccessGroupDeletion,
+    #[serde(rename = "project_deletion")]
+    ProjectDeletion,
 }
 impl OperationLookupAuthorityFamily {
     pub fn as_str(&self) -> &'static str {
@@ -1567,6 +1569,7 @@ impl OperationLookupAuthorityFamily {
             Self::AccessGroupGrantRead => "access_group_grant_read",
             Self::ApplicationAccountGrantRead => "application_account_grant_read",
             Self::AccessGroupDeletion => "access_group_deletion",
+            Self::ProjectDeletion => "project_deletion",
         }
     }
 }
@@ -8477,6 +8480,27 @@ pub struct ProjectCreationRequest {
     pub name: String,
     #[serde(rename = "organizationId")]
     pub organization_id: uuid::Uuid,
+}
+///Expose original admission, never internal execution or physical progress.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ProjectDeletionAdmissionResponse {
+    #[serde(rename = "accessBlocked")]
+    pub access_blocked: BooleanConstant<true>,
+    ///Constraint: minimum=0, maximum=9007199254740991
+    #[serde(rename = "accessRevision")]
+    pub access_revision: i64,
+    #[serde(rename = "admissionConfirmed")]
+    pub admission_confirmed: BooleanConstant<true>,
+    #[serde(
+        rename = "idempotencyExpiresAt",
+        deserialize_with = "presence_serde::required_nullable"
+    )]
+    pub idempotency_expires_at: Option<chrono::DateTime<chrono::Utc>>,
+    ///Constraint: minLength=1, maxLength=128
+    #[serde(rename = "operationId")]
+    pub operation_id: String,
+    #[serde(rename = "projectId")]
+    pub project_id: uuid::Uuid,
 }
 ///Report original removal, independently of a later rejoin.
 #[derive(Debug, Clone, Deserialize, Serialize)]

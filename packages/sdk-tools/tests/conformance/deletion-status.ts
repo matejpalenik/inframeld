@@ -213,3 +213,43 @@ sdkTest(
     }
   },
 );
+
+for (const complete of [false, true]) {
+  const operationId = complete
+    ? "sdk-project-delete"
+    : "sdk-project-delete-pending";
+  sdkTest(
+    {
+      id: `deletion-status-project-${complete ? "local-complete" : "unfinished"}`,
+      operation,
+      outcome: "success",
+    },
+    async ({ call }) => {
+      const { observation, witness } = await call({
+        operation,
+        headers,
+        query: { operationId },
+        timeout: 2000,
+      });
+      assert.deepEqual(assertSuccess(observation, 200), {
+        outcome: "retained",
+        operationId,
+        jobState: complete ? "succeeded" : "queued",
+        admissionConfirmed: true,
+        accessBlocked: true,
+        applicationShutdownComplete: complete,
+        physicalCleanupComplete: false,
+        retentionExpiresAt: null,
+      });
+      assertDispatch(witness, "GET", "/v1/deletions/status");
+      assert.deepEqual(
+        [...new URLSearchParams(String(witness.query))],
+        [["operationId", operationId]],
+      );
+      assert.equal(witness.rawBodyBase64, "");
+      assert.deepEqual(headerValues(observation, "cache-control"), [
+        "no-store",
+      ]);
+    },
+  );
+}

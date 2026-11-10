@@ -161,6 +161,16 @@ const calls = {
       },
       query: call.query as sdk.RemoveAccessGroupManagerData["query"],
     }),
+  deleteProject: (client: Client, call: SdkCall) =>
+    sdk.deleteProject({
+      ...options(client, call),
+      path: call.path as sdk.DeleteProjectData["path"],
+      query: call.query as sdk.DeleteProjectData["query"],
+      headers: {
+        ...call.headers,
+        "Idempotency-Key": call.headers["Idempotency-Key"]!,
+      },
+    }),
   deleteAccessGroup: (client: Client, call: SdkCall) =>
     sdk.deleteAccessGroup({
       ...options(client, call),

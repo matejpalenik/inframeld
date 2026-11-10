@@ -79,6 +79,7 @@ For other supported operations, preserve the original authority meaning:
 | Application-account grant PUT/DELETE | `application_account_grant_read` | Original account-administration action | Original Project UUID |
 | Generic Project operation            | `project_action_use`             | Original Project action                | Original Project UUID |
 | Other Organization operation         | `organization_action_use`        | Original Organization action           | Explicit `null`       |
+| Project deletion status              | `project_deletion`               | `delete-project`                       | Original Project UUID |
 
 For a Project metadata change, retain method `PATCH`, canonical route `/v1/projects/{project_id}/metadata`, family `project_action_use` and action `edit-project-metadata`. [Name and rename an existing Project](/guides/name-and-rename-project) explains the write and recovery path. Lookup observes its retained operation metadata. A separate Project metadata GET reports current fields.
 
@@ -432,7 +433,30 @@ It does not say whether history was absent, expired, or did not match the full o
 
 If you already have the original deletion operation ID, [read its retained deletion status](/guides/read-deletion-status). That separate content-free reader permits the currently eligible original initiating human to read after ordinary Project membership disappears. It grants no cancellation, continuation or restored access.
 
-Keep the operation ID before losing membership. This original-request lookup still checks its own current authority before searching and is not an alternative permission bypass. An unresolved deletion-status read does not establish completion or authorize another deletion.
+If the first [Project-deletion response](/guides/delete-project) was lost before you saved its operation ID, use the same lookup clients above in a separate example directory, saving this request as `original-request.json`, the filename those programs read. Keep any other operation’s saved file unchanged. Replace these illustrative values with the exact context retained before your DELETE. The concrete route contains the original canonical Project UUID and excludes the `expectedAccessRevision` query.
+
+<CodeGroup>
+
+```json
+{
+  "installationId": "00000000-0000-4000-8000-000000000001",
+  "organizationId": "00000000-0000-4000-8000-000000000002",
+  "projectId": "00000000-0000-4000-8000-000000000003",
+  "method": "DELETE",
+  "requestedRoute": "/v1/projects/00000000-0000-4000-8000-000000000003",
+  "key": "support-project-deletion-1",
+  "expectedAuthority": {
+    "family": "project_deletion",
+    "actionId": "delete-project"
+  }
+}
+```
+
+</CodeGroup>
+
+This lookup-only guard checks your current eligible-human credential and recovery state before matching the original initiating human and exact saved scope. It can return only retained content-free deletion status or the uniform unresolved result, including after ordinary membership loss. It does not require current Delete authority for this narrow read, supply that authority or return the full admission receipt.
+
+An ordinary repeat of the DELETE still requires current membership and exact Delete authority and uses the original revision and key. Do not substitute a weaker guard or treat retained status as permission to send that write. An unresolved result proves neither completion nor absence and never authorizes another deletion.
 
 ## Handle an error or lost response
 

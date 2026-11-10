@@ -1182,6 +1182,26 @@ async def remove_access_group_manager_async(clients: Clients, call: Call) -> Nat
     )
 
 
+def delete_project_sync(clients: Clients, call: Call) -> NativeResponse:
+    return AccessApi(clients.production).delete_project_sync_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        expected_access_revision=integer(call.query["expectedAccessRevision"]),
+        idempotency_key=call.headers["Idempotency-Key"],
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def delete_project_async(clients: Clients, call: Call) -> NativeResponse:
+    return await AccessApi(clients.production).delete_project_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        expected_access_revision=integer(call.query["expectedAccessRevision"]),
+        idempotency_key=call.headers["Idempotency-Key"],
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
 def delete_access_group_sync(clients: Clients, call: Call) -> NativeResponse:
     return AccessApi(clients.production).delete_access_group_sync_with_http_info(
         project_id=UUID(call.path["project_id"]),
@@ -1444,6 +1464,7 @@ BINDINGS: dict[Operation, Binding] = {
     Operation.REMOVE_ACCESS_GROUP_MANAGER: Binding(
         remove_access_group_manager_sync, remove_access_group_manager_async
     ),
+    Operation.DELETE_PROJECT: Binding(delete_project_sync, delete_project_async),
     Operation.DELETE_ACCESS_GROUP: Binding(delete_access_group_sync, delete_access_group_async),
     Operation.CREATE_APPLICATION_ACCOUNT: Binding(
         create_application_account_sync, create_application_account_async

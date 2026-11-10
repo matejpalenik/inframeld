@@ -54,3 +54,7 @@ class DurableJobRow(SharedPersistenceBase):
     cleanup_obligation_id: Mapped[UUID | None] = mapped_column(
         Uuid(as_uuid=True), nullable=True, default=None
     )
+
+    deletion_obligation_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True), nullable=True, default=None
+    )

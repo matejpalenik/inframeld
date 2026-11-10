@@ -21,6 +21,7 @@ class Operation(StrEnum):
     PREVIEW_INVITATION = "previewInvitation"
     ACTIVATE_INVITATION = "activateInvitation"
     CREATE_PROJECT = "createProject"
+    DELETE_PROJECT = "deleteProject"
     CREATE_ACCESS_GROUP = "createAccessGroup"
     GET_ACCESS_GROUP = "getAccessGroup"
     RESOLVE_ACCESS_GROUP = "resolveAccessGroup"

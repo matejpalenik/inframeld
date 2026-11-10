@@ -255,6 +255,9 @@ from inframeld_backend.access.http.routes.project_action_grant_routes import (
 from inframeld_backend.access.http.routes.project_creation_routes import (
     create_project_creation_router,
 )
+from inframeld_backend.access.http.routes.project_deletion_routes import (
+    create_project_deletion_router,
+)
 from inframeld_backend.access.http.routes.project_grant_recipients_routes import (
     create_project_grant_recipients_router,
 )
@@ -327,6 +330,7 @@ from inframeld_backend.bootstrap.postgres_project_membership_change_service_fact
 )
 from inframeld_backend.bootstrap.project_action_grants_composition import open_project_action_grants
 from inframeld_backend.bootstrap.project_creation_composition import open_project_creation
+from inframeld_backend.bootstrap.project_deletion_composition import open_project_deletion
 from inframeld_backend.bootstrap.project_grant_composition import open_project_grant_change
 from inframeld_backend.bootstrap.project_members_composition import open_project_members
 from inframeld_backend.bootstrap.project_metadata_composition import (
@@ -598,6 +602,17 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
         application.include_router(
             create_project_creation_router(
                 product_access, partial(open_project_creation, database, creation_fingerprints)
+            )
+        )
+        application.include_router(
+            create_project_deletion_router(
+                product_access,
+                partial(
+                    open_project_deletion,
+                    database,
+                    request_fingerprints,
+                    resolved_settings.deletion_status_retention.to_profile(),
+                ),
             )
         )
         application.include_router(

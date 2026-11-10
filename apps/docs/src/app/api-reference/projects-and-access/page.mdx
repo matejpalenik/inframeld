@@ -100,6 +100,16 @@ Require current human `create-projects` authority on the requested Organization,
 
 The creation receipt's `initialGrants` describes the original assignments. Exact replay requires current authorization and returns that original result without restoring removed grants or reversing later renames. [The guide](/guides/create-project) covers the saved request, generated clients, current metadata and uncertain-result recovery. This operation creates no starter or RAG resources.
 
+## Admit Project deletion
+
+<ApiOperation operationId="deleteProject" />
+
+Require current eligible-human Project membership and use of exact `delete-project`. Send one strict `expectedAccessRevision` query value and the original opaque `Idempotency-Key`, without a body. Unknown or duplicate query fields are rejected. No per-document Delete or per-account Delete permission is added. [Delete a Project](/guides/delete-project) explains reviewed inputs and safe recovery.
+
+The closed `202` returns original `operationId`, required nullable `idempotencyExpiresAt`, `projectId`, original `accessRevision`, `admissionConfirmed: true` and `accessBlocked: true`. It exposes no job ID or physical progress. A new admission saves the block, audit, original and exact durable obligation together. Local application/key shutdown and physical erasure are later distinct facts.
+
+Current membership, credentials and Delete authority precede full same-request replay. An already deleting Project allows recovery of its original `202`, never a fresh admission. The separate `project_deletion` saved-identity lookup and known-ID status instead allow only the currently eligible original initiator to read content-free facts after membership loss. They return no full admission receipt or mutation authority.
+
 ## Create an application account
 
 <ApiOperation operationId="createApplicationAccount" />
