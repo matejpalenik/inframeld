@@ -1,5 +1,7 @@
 import asyncio
+import os
 from collections.abc import Callable, Coroutine
+from pathlib import Path
 from typing import override
 
 import pytest
@@ -16,6 +18,10 @@ from inframeld_backend.shared.application.dtos.job_attempt_context_dto import Jo
 from inframeld_backend.shared.application.protocols.artifact_cleanup_preparer import (
     ArtifactCleanupPreparer,
 )
+from inframeld_backend.shared.application.protocols.artifact_local_cleanup import (
+    ArtifactLocalCleanup,
+)
+from inframeld_backend.shared.application.protocols.artifact_staging import ArtifactStaging
 from inframeld_backend.shared.application.protocols.artifact_store import ArtifactStore
 from inframeld_backend.shared.application.protocols.job_checkpoints import JobCheckpoints
 from inframeld_backend.shared.application.protocols.job_effect_observation_recorder import (
@@ -31,6 +37,9 @@ from inframeld_backend.shared.infrastructure.readers.postgres_installation_ident
 )
 from inframeld_backend.shared.infrastructure.resources.database import Database
 from inframeld_backend.shared.infrastructure.resources.s3_artifact_store import S3ArtifactStore
+from inframeld_backend.shared.infrastructure.settings.artifact_staging_settings import (
+    ArtifactStagingSettings,
+)
 from inframeld_backend.shared.infrastructure.settings.artifact_storage_settings import (
     ArtifactStorageSettings,
 )
@@ -92,6 +101,13 @@ class MockBlockedInstallationIdentityReader(PostgresInstallationIdentityReader):
         raise AssertionError("The blocked identity read cannot complete independently.")
 
 
+@pytest.fixture(autouse=True)
+def private_staging_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    root = tmp_path / "staging"
+    root.mkdir(mode=0o700)
+    monkeypatch.setenv("INFRAMELD_ARTIFACT_STAGING__ROOT", str(root))
+
+
 def _startup_resources(
     monkeypatch: pytest.MonkeyPatch,
     *,
@@ -101,6 +117,9 @@ def _startup_resources(
     ApplicationWorkerApplicationSettings, MockStartupDatabase, MockBlockedInstallationIdentityReader
 ]:
     settings = ApplicationWorkerApplicationSettings(
+        artifact_staging=ArtifactStagingSettings(
+            root=Path(os.environ["INFRAMELD_ARTIFACT_STAGING__ROOT"])
+        ),
         database=DatabaseSettings(name="test", user="test", password=SecretStr("test")),
         artifact_storage=ArtifactStorageSettings(
             endpoint_url="https://storage.example.test",
@@ -280,7 +299,10 @@ async def test_preloop_failure_closes_constructed_storage_and_pool(
         return storage
 
     def failing_handler(
-        preparer: ArtifactCleanupPreparer, artifacts: ArtifactStore
+        preparer: ArtifactCleanupPreparer,
+        artifacts: ArtifactStore,
+        local: ArtifactLocalCleanup,
+        staging: ArtifactStaging,
     ) -> ArtifactCleanupJobHandler:
         raise failure
 

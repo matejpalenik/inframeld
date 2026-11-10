@@ -7,6 +7,9 @@ from inframeld_backend.shared.application.dtos.artifact_staging_reservation_dto 
     ArtifactStagingReservationDTO,
 )
 from inframeld_backend.shared.application.value_objects.artifact_attempt_id import ArtifactAttemptId
+from inframeld_backend.shared.application.value_objects.artifact_content_digest import (
+    ArtifactContentDigest,
+)
 from inframeld_backend.shared.application.value_objects.artifact_id import ArtifactId
 from inframeld_backend.shared.application.value_objects.artifact_staging_reservation_id import (
     ArtifactStagingReservationId,
@@ -38,4 +41,11 @@ class PostgresArtifactAttemptMapper:
             expires_at=reservation.expires_at,
             observed_at=observed_at,
             released=reservation.released,
+            retired=attempt.retired,
+            length=attempt.length,
+            digest=ArtifactContentDigest(attempt.digest) if attempt.digest is not None else None,
+            put_pending=attempt.put_pending,
+            put_confirmed=attempt.put_confirmed,
+            published=attempt.published,
+            staging_removed=reservation.staging_removed,
         )

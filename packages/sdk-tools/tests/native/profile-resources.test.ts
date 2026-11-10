@@ -591,9 +591,7 @@ test(
             Math.max(0, testDeadline - performance.now()),
           );
           assert.equal(closed.length, 1);
-          if (observation?.closeResult === "resolved")
-            assert.equal(closed[0], 0);
-          else assert.ok(closed[0] === 0 || closed[0] === 1);
+          assert.equal(closed[0], 0);
         } catch (cause) {
           throw Object.assign(
             new Error("SDK_DENIED_OUTER_CUSTODY", { cause }),
