@@ -837,7 +837,8 @@ export const zOperationLookupAuthorityFamily = z.enum([
     'organization_grant_read',
     'access_group_grant_read',
     'application_account_grant_read',
-    'access_group_deletion'
+    'access_group_deletion',
+    'project_deletion'
 ]);
 
 /**
@@ -1125,6 +1126,20 @@ export const zProjectCreationRequest = z.object({
     expectedAccessRevision: z.int().gte(0).lte(9007199254740991),
     name: z.string().min(1).max(63).regex(/^[a-z](?:[a-z0-9-]*[a-z0-9])?$/),
     organizationId: z.uuid()
+});
+
+/**
+ * ProjectDeletionAdmissionResponse
+ *
+ * Expose original admission, never internal execution or physical progress.
+ */
+export const zProjectDeletionAdmissionResponse = z.object({
+    accessBlocked: z.literal(true),
+    accessRevision: z.int().gte(0).lte(9007199254740991),
+    admissionConfirmed: z.literal(true),
+    idempotencyExpiresAt: z.iso.datetime().nullable(),
+    operationId: z.string().min(1).max(128),
+    projectId: z.uuid()
 });
 
 /**
@@ -2441,6 +2456,63 @@ export const zResolveProjectName503Representation0Response = zProblemDetails;
  * Successful Response
  */
 export const zResolveProjectNameResponse = zProjectNameResolutionResponse;
+
+export const zDeleteProjectHeaders = z.object({
+    'Idempotency-Key': z.string().min(1).max(128).regex(/.*\S.*/)
+});
+
+export const zDeleteProjectPath = z.object({
+    project_id: z.uuid()
+});
+
+export const zDeleteProjectQuery = z.object({
+    expectedAccessRevision: z.int().gte(0).lte(9007199254740991)
+});
+
+/**
+ * Successful Response
+ */
+export const zDeleteProject202Representation0Response = zProjectDeletionAdmissionResponse;
+
+/**
+ * Invalid authentication request
+ */
+export const zDeleteProject400Representation0Response = zProblemDetails;
+
+/**
+ * Unauthorized
+ */
+export const zDeleteProject401Representation0Response = zProblemDetails;
+
+/**
+ * Access denied
+ */
+export const zDeleteProject403Representation0Response = zProblemDetails;
+
+/**
+ * Resource not found
+ */
+export const zDeleteProject404Representation0Response = zProblemDetails;
+
+/**
+ * Operation conflicts with current state
+ */
+export const zDeleteProject409Representation0Response = zProblemDetails;
+
+/**
+ * Request validation failed
+ */
+export const zDeleteProject422Representation0Response = zProblemDetails;
+
+/**
+ * Dependency unavailable
+ */
+export const zDeleteProject503Representation0Response = zProblemDetails;
+
+/**
+ * Successful Response
+ */
+export const zDeleteProjectResponse = zProjectDeletionAdmissionResponse;
 
 export const zCreateAccessGroupBody = zAccessGroupCreationRequest;
 

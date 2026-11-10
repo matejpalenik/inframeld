@@ -49,10 +49,12 @@ class OriginalOperationLookupService(OriginalOperationLookup):
         operation_lookup_authorizer: OperationLookupAuthorizer,
         operation_lookup_reader: OperationLookupReader,
         group_deletion_lookup: OriginalOperationLookup | None = None,
+        project_deletion_lookup: OriginalOperationLookup | None = None,
     ) -> None:
         self._operation_lookup_authorizer = operation_lookup_authorizer
         self._operation_lookup_reader = operation_lookup_reader
         self._group_deletion_lookup = group_deletion_lookup
+        self._project_deletion_lookup = project_deletion_lookup
 
     @override
     async def lookup(
@@ -75,6 +77,10 @@ class OriginalOperationLookupService(OriginalOperationLookup):
             if self._group_deletion_lookup is None:
                 raise DependencyUnavailableError()
             return await self._group_deletion_lookup.lookup(access=access, query=query)
+        if query.expected_authority.family is OperationLookupAuthorityFamily.PROJECT_DELETION:
+            if self._project_deletion_lookup is None:
+                raise DependencyUnavailableError()
+            return await self._project_deletion_lookup.lookup(access=access, query=query)
         authorized = await self._operation_lookup_authorizer.require_authorization(
             access=access, request=query
         )

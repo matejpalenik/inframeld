@@ -149,6 +149,7 @@ __all__ = [
     "ProjectActionGrantResponse",
     "ProjectCreationRequest",
     "ProjectCreationResponse",
+    "ProjectDeletionAdmissionResponse",
     "ProjectGrantTargetResponse",
     "ProjectMemberResponse",
     "ProjectMembersPageResponse",
@@ -309,6 +310,7 @@ from inframeld_sdk.models.project_action_grant_request import ProjectActionGrant
 from inframeld_sdk.models.project_action_grant_response import ProjectActionGrantResponse as ProjectActionGrantResponse
 from inframeld_sdk.models.project_creation_request import ProjectCreationRequest as ProjectCreationRequest
 from inframeld_sdk.models.project_creation_response import ProjectCreationResponse as ProjectCreationResponse
+from inframeld_sdk.models.project_deletion_admission_response import ProjectDeletionAdmissionResponse as ProjectDeletionAdmissionResponse
 from inframeld_sdk.models.project_grant_target_response import ProjectGrantTargetResponse as ProjectGrantTargetResponse
 from inframeld_sdk.models.project_member_response import ProjectMemberResponse as ProjectMemberResponse
 from inframeld_sdk.models.project_members_page_response import ProjectMembersPageResponse as ProjectMembersPageResponse

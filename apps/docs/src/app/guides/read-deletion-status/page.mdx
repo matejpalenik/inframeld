@@ -10,7 +10,9 @@ Use this read when you have the original operation ID for a Project deletion and
 
 An access group has a separate synchronous deletion path. Its currently eligible original human can also read content-free retained status after the group disappears. [Group deletion recovery](#read-status-for-a-deleted-access-group) explains the difference from a Project's cleanup stages.
 
-Read each reported fact separately. A completed job alone does not establish that stored bytes have been erased.
+[Project deletion admission](/guides/delete-project) supplies the original operation ID after a reviewed DELETE. If that response was lost before you saved the ID, use its [exact saved-request lookup](/guides/recover-original-request#read-a-known-project-deletion-operation). Both inspection paths return the same content-free retained facts. Neither supplies full-receipt replay or Delete authority after membership loss.
+
+Read each reported fact separately. A completed local shutdown job alone does not establish that stored bytes have been erased.
 
 <a id="before-you-begin" />
 
@@ -196,6 +198,8 @@ The response confirms admission and blocked access. It reports unfinished applic
 | `retentionExpiresAt`                  | Established expiry of the retained status, or `null` when none has been established.                |
 
 Every field is present in a retained response. `null` means there is no authoritative value for that fact. It is different from the observed value `false`. Keep each fact separate rather than inventing a completion state from the job status.
+
+The authentic Project producer records admission and blocking first. Its local application/key child later confirms shutdown, while the physical-cleanup parent remains unfinished. That parent can report `physicalCleanupComplete: false` even after local shutdown succeeds. A missing child state can leave `jobState: null` without erasing confirmed parent facts. Missing required unfinished-child backing or incoherent observations fail rather than being reported as completion. Physical erasure remains a separate receiving workflow.
 
 An established expiry is returned unchanged. Repeating the read or changing installation settings never extends that operation's captured expiry. A `null` expiry does not prove completion or promise permanent availability. The server rechecks current human eligibility on every read.
 

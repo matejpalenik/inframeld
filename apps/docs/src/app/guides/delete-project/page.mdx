@@ -1,0 +1,265 @@
+export const pageMetadata = {
+  title: "Delete a Project",
+  description:
+    "Admit one reviewed Project deletion and recover its original status without starting another deletion.",
+}
+
+# Delete a Project
+
+Alice is closing the Support Project. Deleting it blocks access and admits durable cleanup for that exact Project. She needs the Project's Delete permission, not permission to read every document or delete each application account. Other Projects remain outside this operation.
+
+A `202` response confirms admission and blocked access. It does not confirm that applications have finished shutting down or that stored data has been erased. Read those later facts separately.
+
+## Prepare the exact Project and original request
+
+Use a disposable Project when following this example. You must be a currently eligible human member of the Project with permission to use `delete-project`. Either grant level permits use. Review the permanent Project ID and its [current Access revision](/guides/assign-project-grant#read-your-project-access-and-current-revision) before acting. A Project name or display name cannot replace that ID.
+
+The HTTP example assumes an existing valid human bearer credential from [protected HTTP setup](/clients/http#call-protected-operations). Set `INFRAMELD_URL` to the operator-supplied HTTPS backend URL without a trailing slash and `INFRAMELD_TOKEN` through your supported private credential procedure. Browser sign-in does not produce a terminal bearer token. For a browser integration, reuse the genuine same-origin [browser-session setup](/guides/admit-human#use-the-existing-browser-sessions), where the browser supplies its cookie and Origin and the generated write sends `X-Inframeld-CSRF: 1`.
+
+Before dispatch, privately retain the installation and Organization IDs, exact Project ID, method `DELETE`, canonical route `/v1/projects/<Project UUID>`, reviewed `expectedAccessRevision` and one unique opaque idempotency key. The actual DELETE carries the revision in its query. The saved lookup route excludes that query. Keep the same complete values after an uncertain response rather than reconstructing them from a later selection.
+
+Use your actual Project ID, reviewed revision and saved key as `INFRAMELD_PROJECT_ID`, `INFRAMELD_ACCESS_REVISION` and `INFRAMELD_DELETE_KEY`. Choose the key once for this deletion. A new key identifies different work.
+
+## Admit the reviewed deletion
+
+Run this request from the shell where those values are set. It sends no body and accepts exactly one `expectedAccessRevision` query value.
+
+<CodeGroup>
+
+```shell
+curl --silent --show-error --fail-with-body --max-time 5 \
+  --request DELETE \
+  --url "${INFRAMELD_URL}/v1/projects/${INFRAMELD_PROJECT_ID}?expectedAccessRevision=${INFRAMELD_ACCESS_REVISION}" \
+  --header @- <<EOF
+Authorization: Bearer ${INFRAMELD_TOKEN}
+Idempotency-Key: ${INFRAMELD_DELETE_KEY}
+EOF
+```
+
+</CodeGroup>
+
+A successful request returns HTTP `202` with this shape. The IDs and revision below are illustrative.
+
+<CodeGroup>
+
+```json
+{
+  "operationId": "project-deletion-1",
+  "idempotencyExpiresAt": null,
+  "projectId": "00000000-0000-4000-8000-000000000003",
+  "accessRevision": 8,
+  "admissionConfirmed": true,
+  "accessBlocked": true
+}
+```
+
+</CodeGroup>
+
+Save `operationId` with the original context. `accessRevision` is the revision committed by that admission, not a later current revision. The response has no job ID or physical-progress fields. An unfinished original can have `idempotencyExpiresAt: null`. This neither means completion nor selects the separate retained-status expiry.
+
+Admission blocks ordinary access and new Project work before its local shutdown child runs. That child retires the Project's application accounts, revokes their keys and removes their scoped Access relationships. It does not need Alice's separate Delete permission on each account. Shutdown continues from the exact admitted obligation rather than depending on her later Project membership.
+
+## Use a generated client instead
+
+These complete programs send the same bodyless DELETE once. Use the same saved Project ID, revision, key, backend URL and existing human bearer credential as the HTTP request. Choosing another language must not create a new operation identity. No program acquires credentials or retries after failure.
+
+Use a separate example project and the current local source-package setup. Choose one program:
+
+- [Python setup](/clients/python#install-from-a-checkout): save `delete_project.py` and run `.venv/bin/python delete_project.py`.
+- [TypeScript setup](/clients/typescript#build-and-install-the-package): save `delete-project.ts` and run `node delete-project.ts` with Node 26.
+- [Rust setup](/clients/rust#set-up-an-example-project): replace that example project's `src/main.rs` and run `cargo run`. Its shared setup supplies the SDK, Tokio and serde_json dependencies.
+
+<CodeGroup>
+
+```python
+import asyncio
+import os
+from uuid import UUID
+
+import httpx
+from inframeld_sdk import ApiClient, Configuration
+from inframeld_sdk.api.access_api import AccessApi
+from inframeld_sdk.exceptions import ApiException
+
+
+async def main() -> None:
+    project_id = UUID(os.environ["INFRAMELD_PROJECT_ID"])
+    revision = int(os.environ["INFRAMELD_ACCESS_REVISION"])
+    if not 0 <= revision <= 9_007_199_254_740_991:
+        raise SystemExit("Use the saved reviewed Access revision")
+
+    configuration = Configuration(host=os.environ["INFRAMELD_URL"])
+    async with ApiClient(configuration) as client:
+        try:
+            response = await AccessApi(client).delete_project_with_http_info(
+                project_id=project_id,
+                expected_access_revision=revision,
+                idempotency_key=os.environ["INFRAMELD_DELETE_KEY"],
+                _headers={
+                    "Authorization": f"Bearer {os.environ['INFRAMELD_TOKEN']}"
+                },
+                _request_timeout=5.0,
+            )
+        except ApiException as error:
+            kind = "decode" if error.__cause__ is not None else "api"
+            request_id = (
+                error.headers.get("x-request-id", "unavailable")
+                if error.headers else "unavailable"
+            )
+            print(f"Deletion unconfirmed: {kind}, HTTP {error.status}")
+            print(f"Request ID: {request_id}. Keep the original context")
+            raise SystemExit(1) from None
+        except httpx.HTTPError:
+            print("Transport failure. Keep the original context and inspect it")
+            raise SystemExit(1) from None
+
+        print(f"HTTP {response.status_code}")
+        print(response.data.to_json())
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+```typescript
+import { createClient, deleteProject } from "@inframeld/sdk"
+
+const baseUrl = process.env.INFRAMELD_URL
+const token = process.env.INFRAMELD_TOKEN
+const projectId = process.env.INFRAMELD_PROJECT_ID
+const revisionText = process.env.INFRAMELD_ACCESS_REVISION
+const key = process.env.INFRAMELD_DELETE_KEY
+if (!baseUrl || !token || !projectId || !revisionText || !key) {
+  throw new Error("Set the saved deletion inputs and current human credential")
+}
+if (!/^(0|[1-9][0-9]{0,15})$/.test(revisionText)) {
+  throw new Error("Use the saved reviewed Access revision")
+}
+const revision = Number(revisionText)
+if (!Number.isSafeInteger(revision)) {
+  throw new Error("The reviewed Access revision is outside the supported range")
+}
+
+const client = createClient({ baseUrl, timeoutMs: 5000 })
+const result = await deleteProject({
+  client,
+  path: { project_id: projectId },
+  query: { expectedAccessRevision: revision },
+  headers: {
+    Authorization: `Bearer ${token}`,
+    "Idempotency-Key": key,
+  },
+  responseStyle: "fields",
+  throwOnError: false,
+})
+
+if (result.error) {
+  console.error("Deletion unconfirmed:", result.error.kind)
+  console.error("HTTP:", result.response?.status ?? "unavailable")
+  console.error(
+    "Request ID:",
+    result.response?.headers.get("x-request-id") ?? "unavailable"
+  )
+  console.error("Keep the original context and inspect it")
+  process.exitCode = 1
+} else if (result.data && result.response) {
+  console.log("HTTP", result.response.status)
+  console.log(JSON.stringify(result.data, null, 2))
+} else {
+  throw new Error("No usable response. Keep the original context")
+}
+```
+
+```rust
+use inframeld_sdk::HttpClient;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let base_url = std::env::var("INFRAMELD_URL")?;
+    let token = std::env::var("INFRAMELD_TOKEN")
+        .map_err(|_| std::io::Error::other("Set a current human bearer credential"))?;
+    let project_id = std::env::var("INFRAMELD_PROJECT_ID")?;
+    let revision: i64 = std::env::var("INFRAMELD_ACCESS_REVISION")?.parse()?;
+    let key = std::env::var("INFRAMELD_DELETE_KEY")?;
+    if !(0..=9_007_199_254_740_991).contains(&revision) {
+        return Err(std::io::Error::other("Use the saved reviewed Access revision").into());
+    }
+
+    let client = HttpClient::new()
+        .with_base_url(base_url)
+        .with_header("Authorization", format!("Bearer {token}"));
+    match client.delete_project(&project_id, revision, &key).await {
+        Ok(response) => {
+            println!("HTTP {}", response.status);
+            println!("{}", serde_json::to_string_pretty(&response.body)?);
+        }
+        Err(error) => {
+            if let Some(context) = error.api() {
+                let kind = if context.parse_error.is_some() {
+                    "decode"
+                } else {
+                    "api"
+                };
+                let request_id = context
+                    .headers
+                    .get("x-request-id")
+                    .and_then(|value| value.to_str().ok())
+                    .unwrap_or("unavailable");
+                eprintln!("Deletion unconfirmed: {kind}, HTTP {}", context.status);
+                eprintln!("Request ID: {request_id}");
+            } else {
+                eprintln!("Transport failure. No usable response was confirmed");
+            }
+            return Err(std::io::Error::other(
+                "Keep the original context and inspect it before another action",
+            ).into());
+        }
+    }
+    Ok(())
+}
+```
+
+</CodeGroup>
+
+Success prints the original HTTP `202` and safe admission receipt. An API failure, response-decoding failure or transport failure instead reports failure without displaying the credential or raw response. Even HTTP `202` is insufficient when decoding fails. Keep the saved request and use explicit inspection. These programs do not infer cleanup completion or submit a replacement deletion.
+
+## Recover an uncertain response explicitly
+
+A timeout, disconnect, `503` or decoding failure can leave admission unknown. Keep the exact original context. Do not create another key, fetch a new revision for the old request or assume that cancellation of your wait rolled back the server.
+
+If you still have current eligible-human membership and exact Delete authority, an explicit repeat of the same DELETE, query revision and key can return the original `202` receipt. Current authority is checked before that full replay. The original result does not repeat admission, advance the revision again or report today's cleanup progress. A fresh key cannot start another deletion on an already deleting Project.
+
+When the operation ID is known, [read retained deletion status](/guides/read-deletion-status). If the first response was lost before you saved that ID, use the exact [saved Project-deletion lookup](/guides/recover-original-request#read-a-known-project-deletion-operation). Its closed `project_deletion` guard returns content-free status, not the admission receipt.
+
+Only the currently eligible original human can resolve that retained status after ordinary Project membership disappears. Another administrator receives the same unresolved result as missing or expired history. The exception grants no Delete, cancellation, continuation or restored access. Invalid credentials, suspension and recovery blocks still deny inspection.
+
+## Separate local shutdown from physical cleanup
+
+The status reader reports independent facts. For example, this illustrative observation confirms local shutdown while physical cleanup remains unfinished. The child job's state is unavailable here.
+
+<CodeGroup>
+
+```json
+{
+  "outcome": "retained",
+  "operationId": "project-deletion-1",
+  "jobState": null,
+  "admissionConfirmed": true,
+  "accessBlocked": true,
+  "applicationShutdownComplete": true,
+  "physicalCleanupComplete": false,
+  "retentionExpiresAt": null
+}
+```
+
+</CodeGroup>
+
+A successful or unavailable child-job state cannot establish physical erasure. The authoritative physical-cleanup obligation remains unfinished after local shutdown. Physical removal is a separate workflow, and this operation supplies no public cleanup-continuation command. An unavailable required observation fails rather than inventing success.
+
+Reads do not renew an established status expiry. An unresolved observation does not establish that deletion failed, finished or never existed. Follow [the status guide](/guides/read-deletion-status#handle-unresolved-status-and-failures) before another action.
+
+## Handle rejection without changing the original request
+
+A stale fresh review receives `409` without partial admission. Invalid query syntax, duplicate or unknown query fields and a nonempty DELETE body are rejected. Missing or invalid credentials, hidden Project membership and insufficient Delete authority retain their ordinary authentication and authorization failures.
+
+If a request may already have been sent, do not repair its inputs under the same key or turn a failed observation into a fresh deletion. Preserve the original and use the documented recovery path. There is no delivered CLI deletion command or undo operation.

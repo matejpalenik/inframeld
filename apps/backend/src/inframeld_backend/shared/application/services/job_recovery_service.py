@@ -43,7 +43,8 @@ class JobRecoveryService(JobRecovery):
                 else JobStatus.CANCELED
                 if result.reason == "cancellation_requested"
                 else JobStatus.SUCCEEDED
-                if result.reason == "cleanup_already_complete"
+                if result.reason
+                in ("cleanup_already_complete", "project_shutdown_already_complete")
                 else JobStatus.FAILED
             )
         await self._job_store.retire_attempt(

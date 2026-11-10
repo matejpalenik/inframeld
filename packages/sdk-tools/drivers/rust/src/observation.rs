@@ -241,6 +241,16 @@ problems!(
     RemoveAccessGroupManagerApiError::Status503
 );
 problems!(
+    DeleteProjectApiError,
+    DeleteProjectApiError::Status400,
+    DeleteProjectApiError::Status401,
+    DeleteProjectApiError::Status403,
+    DeleteProjectApiError::Status404,
+    DeleteProjectApiError::Status409,
+    DeleteProjectApiError::Status422,
+    DeleteProjectApiError::Status503
+);
+problems!(
     DeleteAccessGroupApiError,
     DeleteAccessGroupApiError::Status400,
     DeleteAccessGroupApiError::Status401,

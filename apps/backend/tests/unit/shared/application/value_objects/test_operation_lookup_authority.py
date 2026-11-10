@@ -223,3 +223,35 @@ def test_project_scoped_target_grant_lookup_binds_catalogue_and_canonical_route(
             family=OperationLookupAuthorityFamily.PROJECT_ACTION_USE,
             action_id=ActionId("inspect-budget"),
         ).require_supported_scope(project_id=project, method=method, requested_route=route)
+
+
+def test_project_deletion_lookup_scope_is_exact() -> None:
+    project = ProjectId(UUID(int=3))
+    authority = OperationLookupAuthority(
+        OperationLookupAuthorityFamily.PROJECT_DELETION, ActionId("delete-project")
+    )
+    authority.require_supported_scope(
+        project_id=project, method="DELETE", requested_route=f"/v1/projects/{project.value}"
+    )
+
+
+@pytest.mark.parametrize(
+    "method,route,action",
+    [
+        ("POST", f"/v1/projects/{UUID(int=3)}", "delete-project"),
+        ("DELETE", f"/v1/projects/{UUID(int=9)}", "delete-project"),
+        ("DELETE", f"/v1/projects/{UUID(int=3)}?other=1", "delete-project"),
+        ("DELETE", f"/v1/projects/{UUID(int=3)}/metadata", "delete-project"),
+        ("DELETE", f"/v1/projects/{UUID(int=3)}", "edit-project-metadata"),
+    ],
+)
+def test_project_deletion_lookup_rejects_changed_original_scope(
+    method: str, route: str, action: str
+) -> None:
+    authority = OperationLookupAuthority(
+        OperationLookupAuthorityFamily.PROJECT_DELETION, ActionId(action)
+    )
+    with pytest.raises(InvalidInputError):
+        authority.require_supported_scope(
+            project_id=ProjectId(UUID(int=3)), method=method, requested_route=route
+        )

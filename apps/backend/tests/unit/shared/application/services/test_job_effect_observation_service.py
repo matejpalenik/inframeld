@@ -1,3 +1,4 @@
+from dataclasses import replace
 from uuid import uuid4
 
 import pytest
@@ -7,6 +8,10 @@ from tests.support.job_effect_recovery_handler import (
     MockEffectStore,
     MockEffectTransactions,
     original_effect,
+)
+from tests.unit.shared.application.services.test_project_deletion_job_authorization_service import (
+    BINDING,
+    FACTS,
 )
 
 from inframeld_backend.shared.application.errors.application_errors import (
@@ -102,3 +107,42 @@ async def test_registration_rechecks_original_target_without_inventing_sealed_co
     assert store.observation is not None and store.observation.binding == binding
     assert store.observation.binding.length is None and store.observation.binding.digest is None
     assert store.events == ["begin", "fence", "cleanup", "target", "register", "commit"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("action", ["register", "admit-delete", "record-abort"])
+async def test_project_deletion_never_acquires_artifact_dispatch_or_abort_proof(
+    action: str,
+) -> None:
+
+    original = original_effect()
+    binding = replace(
+        original, context=replace(original.context, binding=BINDING, payload=FACTS.payload)
+    )
+    store = MockEffectStore(binding)
+    # The artifact authorizer is initialized from its real artifact fixture.
+    # It must never be consulted for the hostile deletion invocation.
+    cleanup = MockEffectCleanupAuthority(MockEffectStore(original))
+    operation = JobEffectObservationService(
+        MockEffectTransactions(store.events),
+        store,
+        MockEffectProductAuthority(store.events),
+        cleanup,
+    )
+    if action == "record-abort":
+        assert store.observation is not None
+        store.observation = replace(store.observation, admitted_at=store.job.observed_at)
+    with pytest.raises(ConflictError):
+        if action == "register":
+            await operation.register(binding)
+        elif action == "admit-delete":
+            await operation.admit_delete(
+                binding.effect_id, binding.scope, binding.artifact_attempt_id
+            )
+        else:
+            await operation.record_delete_abort(
+                binding.effect_id, binding.scope, binding.artifact_attempt_id
+            )
+    assert not {"fence", "product", "target", "admit", "register", "abort"}.intersection(
+        store.events
+    )

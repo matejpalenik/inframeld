@@ -189,6 +189,18 @@ The audit table's existence does not grant anyone audit-reading rights or promis
 
 A real change saves links, one Project revision increment, safe audit, original result and completion in the same transaction. A fresh authorized equal-set no-op checks revision first, retains that revision and saves its original without a change audit. Current authority precedes recovery, while an authentic original precedes the fresh revision check. Historical recovery cannot restore a later changed default. Downgrade refuses to discard either retained live links or original results.
 
+<a id="project-deletion-obligations"></a>
+
+## Retain Project deletion independently of its local child
+
+The candidate [0031_project_deletion migration](../../../../apps/backend/migrations/versions/0031_project_deletion.py) follows `0030_project_upload_defaults`. It adds `project_deletion_obligations`, retaining the exact installation, Organization, Project, initiating principal, original operation/request identity, fingerprint, original before/after Access revisions and admission time. The parent references the matching retained status binding with restricted deletion. One Project has at most one obligation, and one original has one local child. Migration availability does not mean it has been applied to a retained installation.
+
+The durable job’s closed `project_deletion` binding references the exact parent, child job, request and scope together. It carries no substitute human credential or cached permission. [The admission writer](../../../../apps/backend/src/inframeld_backend/access/infrastructure/writers/postgres_project_deletion_admission_writer.py) commits block, revision, audit, binding, original outcome and queued child capacity in its caller’s transaction. Retention of this parent is independent of ordinary idempotency history.
+
+`source_revision` orders progress observations. `shutdown_completed_at` confirms only local application/key shutdown. `physical_cleanup_completed_at` is a separate receiving-owner checkpoint and cannot precede shutdown. The pending-parent index exposes exact admitted work after local shutdown without settling it. The local shutdown writer advances the parent checkpoint atomically with its effects, while original admission revisions and identity remain immutable. Settled-status retention cannot start merely because that child finished.
+
+Downgrade refuses retained Project-deletion obligations or child bindings before dropping their constraints or table. It neither discards unfinished work nor fabricates completion. [Lifecycle orchestration](access-lifecycle-persistence.md#project-deletion-admission-and-shutdown) and [the retained-status contract](../../inframeld-application-contracts/references/operation-recovery-contracts.md#project-deletion-recovery) own authorization and disclosure. Local PostgreSQL checks qualify these candidate records, not #250 physical cleanup.
+
 <a id="tables-integrated-with-later-features"></a>
 
 ## Tables integrated with later features

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { sdkTest } from "../../src/conformance/cases.ts";
 import {
+  assertDispatch,
   assertJsonBody,
   assertSuccess,
   headerValues,
@@ -340,3 +341,114 @@ sdkTest(
     assert.deepEqual(headerValues(observation, "cache-control"), ["no-store"]);
   },
 );
+
+const deletionInput = {
+  ...input,
+  method: "DELETE",
+  requestedRoute: `/v1/projects/${input.projectId}`,
+  key: "sdk-project-delete",
+  expectedAuthority: { family: "project_deletion", actionId: "delete-project" },
+};
+sdkTest(
+  {
+    id: "lookup-project-deletion-exact-original",
+    operation,
+    outcome: "success",
+  },
+  async ({ call }) => {
+    const { observation, witness } = await call({
+      operation,
+      headers: bearer,
+      body: deletionInput,
+      timeout: 2000,
+    });
+    assert.deepEqual(assertSuccess(observation, 200), {
+      outcome: "retained",
+      operationId: "sdk-project-delete",
+      jobState: "succeeded",
+      admissionConfirmed: true,
+      accessBlocked: true,
+      applicationShutdownComplete: true,
+      physicalCleanupComplete: false,
+      retentionExpiresAt: null,
+    });
+    assertDispatch(witness, "POST", "/v1/operations/lookup");
+    assertJsonBody(witness, deletionInput);
+    assert.deepEqual(headerValues(observation, "cache-control"), ["no-store"]);
+  },
+);
+
+for (const [id, credentials, changed] of [
+  ["other-human", { Authorization: "Bearer sdk-other-human" }, {}],
+  [
+    "installation-mismatch",
+    bearer,
+    { installationId: "00000000-0000-4000-8000-000000000099" },
+  ],
+  ["original-key-mismatch", bearer, { key: "another-original" }],
+] as const)
+  sdkTest(
+    { id: `lookup-project-deletion-${id}`, operation, outcome: "success" },
+    async ({ call }) => {
+      const body = { ...deletionInput, ...changed };
+      const { observation, witness } = await call({
+        operation,
+        headers: credentials,
+        body,
+        timeout: 2000,
+      });
+      assert.deepEqual(assertSuccess(observation, 200), {
+        outcome: "unresolved",
+      });
+      assertJsonBody(witness, body);
+      assert.deepEqual(headerValues(observation, "cache-control"), [
+        "no-store",
+      ]);
+    },
+  );
+for (const [id, changed] of [
+  ["method", { method: "POST" }],
+  ["route", { requestedRoute: "/v1/projects/not-a-uuid" }],
+  [
+    "action",
+    {
+      expectedAuthority: {
+        family: "project_deletion",
+        actionId: "read-documents",
+      },
+    },
+  ],
+] as const)
+  sdkTest(
+    {
+      id: `lookup-project-deletion-invalid-${id}`,
+      operation,
+      outcome: "failure",
+    },
+    async ({ call }) => {
+      const body = { ...deletionInput, ...changed };
+      const { observation, witness } = await call({
+        operation,
+        headers: bearer,
+        body,
+        timeout: 2000,
+      });
+      assert.equal(observation.kind, "sdk-error");
+      assert.equal(observation.status, 422);
+      assert.ok(
+        ["generated-model", "generated-schema"].includes(
+          observation.validation,
+        ),
+      );
+      assert.ok(
+        observation.body &&
+          typeof observation.body === "object" &&
+          !Array.isArray(observation.body),
+      );
+      assert.equal(observation.body.status, 422);
+      assertJsonBody(witness, body);
+      assert.deepEqual(headerValues(observation, "cache-control"), [
+        "no-store",
+      ]);
+    },
+  );

@@ -20,6 +20,7 @@ export const operations = [
   "previewInvitation",
   "activateInvitation",
   "createProject",
+  "deleteProject",
   "createAccessGroup",
   "getAccessGroup",
   "resolveAccessGroup",

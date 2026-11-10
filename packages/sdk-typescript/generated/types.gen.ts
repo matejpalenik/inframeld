@@ -1829,7 +1829,7 @@ export type OAuthConsentDecision = 'allow' | 'deny';
  *
  * Select a fixed current-authority check without granting permission.
  */
-export type OperationLookupAuthorityFamily = 'project_action_use' | 'project_grant_read' | 'organization_action_use' | 'organization_grant_read' | 'access_group_grant_read' | 'application_account_grant_read' | 'access_group_deletion';
+export type OperationLookupAuthorityFamily = 'project_action_use' | 'project_grant_read' | 'organization_action_use' | 'organization_grant_read' | 'access_group_grant_read' | 'application_account_grant_read' | 'access_group_deletion' | 'project_deletion';
 
 /**
  * OperationLookupAuthorityRequest
@@ -2381,6 +2381,38 @@ export type ProjectCreationResponse = {
      * Organizationid
      */
     organizationId: string;
+    /**
+     * Projectid
+     */
+    projectId: string;
+};
+
+/**
+ * ProjectDeletionAdmissionResponse
+ *
+ * Expose original admission, never internal execution or physical progress.
+ */
+export type ProjectDeletionAdmissionResponse = {
+    /**
+     * Accessblocked
+     */
+    accessBlocked: true;
+    /**
+     * Accessrevision
+     */
+    accessRevision: number;
+    /**
+     * Admissionconfirmed
+     */
+    admissionConfirmed: true;
+    /**
+     * Idempotencyexpiresat
+     */
+    idempotencyExpiresAt: string | null;
+    /**
+     * Operationid
+     */
+    operationId: string;
     /**
      * Projectid
      */
@@ -3968,6 +4000,71 @@ export type ResolveProjectNameResponses = {
 };
 
 export type ResolveProjectNameResponse = ResolveProjectNameResponses[keyof ResolveProjectNameResponses];
+
+export type DeleteProjectData = {
+    body?: never;
+    headers: {
+        /**
+         * Idempotency-Key
+         */
+        'Idempotency-Key': string;
+    };
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query: {
+        /**
+         * Expectedaccessrevision
+         */
+        expectedAccessRevision: number;
+    };
+    url: '/v1/projects/{project_id}';
+};
+
+export type DeleteProjectErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Operation conflicts with current state
+     */
+    409: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type DeleteProjectError = DeleteProjectErrors[keyof DeleteProjectErrors];
+
+export type DeleteProjectResponses = {
+    /**
+     * Successful Response
+     */
+    202: ProjectDeletionAdmissionResponse;
+};
+
+export type DeleteProjectResponse = DeleteProjectResponses[keyof DeleteProjectResponses];
 
 export type CreateAccessGroupData = {
     body: AccessGroupCreationRequest;

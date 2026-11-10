@@ -638,3 +638,37 @@ def test_own_organization_contract_exposes_only_bounded_supported_assignments() 
         "restore-users",
         "create-projects",
     }
+
+
+def test_project_deletion_contract_preserves_original_admission_and_lookup_tag() -> None:
+    """Describe bodyless admission without exposing execution or physical completion."""
+    schema = create_app().openapi()
+    operation = schema["paths"]["/v1/projects/{project_id}"]["delete"]
+    assert operation["operationId"] == "deleteProject"
+    assert "requestBody" not in operation
+    assert operation["security"] == [{"KratosSession": []}, {"ProductBearer": []}]
+    assert operation["responses"]["202"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/ProjectDeletionAdmissionResponse"
+    }
+    response = schema["components"]["schemas"]["ProjectDeletionAdmissionResponse"]
+    fields = {
+        "operationId",
+        "idempotencyExpiresAt",
+        "projectId",
+        "accessRevision",
+        "admissionConfirmed",
+        "accessBlocked",
+    }
+    assert response["additionalProperties"] is False
+    assert set(response["required"]) == set(response["properties"]) == fields
+    assert {
+        part.get("type") for part in response["properties"]["idempotencyExpiresAt"]["anyOf"]
+    } == {"string", "null"}
+    for field in ("admissionConfirmed", "accessBlocked"):
+        assert response["properties"][field]["const"] is True
+    revision = response["properties"]["accessRevision"]
+    assert (revision["minimum"], revision["maximum"]) == (0, 2**53 - 1)
+    assert (
+        "project_deletion"
+        in schema["components"]["schemas"]["OperationLookupAuthorityFamily"]["enum"]
+    )

@@ -665,6 +665,8 @@ Identifies one actual own group membership or management relationship by `access
 
 ## OperationLookupAuthorityFamily
 
+`project_deletion` is lookup-only, paired with `delete-project` and the original concrete Project DELETE route. It permits only the original eligible human’s content-free retained status, without recreating ordinary Project authority.
+
 <ApiSchema name="OperationLookupAuthorityFamily" />
 
 <a id="OperationLookupAuthorityRequest" />
@@ -677,7 +679,7 @@ Identifies one actual own group membership or management relationship by `access
 
 ## OperationLookupResponse
 
-Includes the content-free retained deletion-status alternative for the closed access-group deletion family. Ordinary completed-operation metadata and a retained group deletion observation have different meanings. [Group recovery](/guides/recover-original-request#recover-an-access-group-change) explains the boundary.
+Includes the content-free retained deletion-status alternative for the closed Project and access-group deletion families. It is distinct from ordinary completed-operation metadata or a full deletion receipt. [Project recovery](/guides/recover-original-request#read-a-known-project-deletion-operation) and [group recovery](/guides/recover-original-request#recover-an-access-group-change) preserve their separate authority and lifecycle.
 
 <ApiSchema name="OperationLookupResponse" />
 
@@ -898,6 +900,14 @@ A bounded page of stored memberships and the current Project Access revision. A 
 ## ProjectMetadataChangeResponse
 
 <ApiSchema name="ProjectMetadataChangeResponse" />
+
+<a id="ProjectDeletionAdmissionResponse" />
+
+## ProjectDeletionAdmissionResponse
+
+The closed original `202` admission result. `admissionConfirmed` and `accessBlocked` are literal true. The original Access revision and required nullable idempotency expiry do not describe current cleanup progress or the separate retained-status expiry. No job ID or physical-completion field is exposed.
+
+<ApiSchema name="ProjectDeletionAdmissionResponse" />
 
 <a id="ProjectMetadataResponse" />
 

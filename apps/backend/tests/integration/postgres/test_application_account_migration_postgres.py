@@ -150,8 +150,7 @@ async def test_retained_account_outcome_prevents_destructive_downgrade(
         command.downgrade(_config(temporary_postgres_settings), "0023_safe_numeric_revisions")
     async with database.session() as session:
         assert (
-            await session.scalar(select(AlembicVersionRow.version_num))
-            == "0030_project_upload_defaults"
+            await session.scalar(select(AlembicVersionRow.version_num)) == "0031_project_deletion"
         )
         assert (
             await session.get(

@@ -31,6 +31,7 @@ const BINDINGS: &[&str] = &[
     "appointAccessGroupManager",
     "removeAccessGroupManager",
     "deleteAccessGroup",
+    "deleteProject",
     "createApplicationAccount",
     "getApplicationAccount",
     "resolveApplicationAccount",
@@ -127,6 +128,7 @@ async fn main() {
                 | "appointAccessGroupManager"
                 | "removeAccessGroupManager"
                 | "deleteAccessGroup"
+                | "deleteProject"
                 | "createApplicationAccount"
                 | "getApplicationAccount"
                 | "resolveApplicationAccount"
@@ -183,6 +185,7 @@ async fn main() {
                 | "appointAccessGroupManager"
                 | "removeAccessGroupManager"
                 | "deleteAccessGroup"
+                | "deleteProject"
                 | "createApplicationAccount"
                 | "issueApplicationKey"
                 | "revokeApplicationKey"

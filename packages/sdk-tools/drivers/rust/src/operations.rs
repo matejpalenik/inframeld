@@ -678,6 +678,19 @@ pub async fn observe(
                 )
                 .await
         ),
+        "deleteProject" => observed!(
+            client
+                .delete_project(
+                    request.path.as_ref().unwrap()["project_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.query.as_ref().unwrap()["expectedAccessRevision"]
+                        .as_i64()
+                        .unwrap(),
+                    &request.headers["Idempotency-Key"]
+                )
+                .await
+        ),
         "deleteAccessGroup" => observed!(
             client
                 .delete_access_group(
