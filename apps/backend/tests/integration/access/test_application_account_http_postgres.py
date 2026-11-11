@@ -297,14 +297,6 @@ async def test_hidden_accounts_wrong_project_and_changed_credential_do_not_discl
         ).status_code == 404
         async with database.session() as session, session.begin():
             await session.execute(
-                update(HumanCredentialVersionRow).values(
-                    version=HumanCredentialVersionRow.version + 1
-                )
-            )
-        stale = await client.get(base + f"/{account.principal_id.value}", headers=_BEARER)
-        assert stale.status_code == 401
-        async with database.session() as session, session.begin():
-            await session.execute(
                 delete(ApplicationActionGrantRow).where(
                     ApplicationActionGrantRow.application_principal_id == account.principal_id.value
                 )
@@ -315,6 +307,15 @@ async def test_hidden_accounts_wrong_project_and_changed_credential_do_not_discl
             f"/{account.principal_id.value}/keys",
         ):
             assert (await client.get(base + suffix, headers=_COOKIE)).status_code == 404
+        async with database.session() as session, session.begin():
+            await session.execute(
+                update(HumanCredentialVersionRow).values(
+                    version=HumanCredentialVersionRow.version + 1
+                )
+            )
+        for headers in (_BEARER, _COOKIE):
+            stale = await client.get(base + f"/{account.principal_id.value}", headers=headers)
+            assert stale.status_code == 401
 
 
 async def test_concrete_creation_context_is_found_by_generic_lookup_under_current_authority(
