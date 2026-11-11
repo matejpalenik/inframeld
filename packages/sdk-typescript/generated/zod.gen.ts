@@ -247,6 +247,20 @@ export const zApplicationAccountCreationRequest = z.object({
 });
 
 /**
+ * ApplicationAccountDeletionResponse
+ *
+ * Describe committed local retirement, preserving the original safe receipt.
+ */
+export const zApplicationAccountDeletionResponse = z.object({
+    accessBlocked: z.literal(true),
+    accessRevision: z.int().gte(1).lte(9007199254740991),
+    idempotencyExpiresAt: z.iso.datetime(),
+    operationId: z.string().min(1).max(128),
+    principalId: z.uuid(),
+    projectId: z.uuid()
+});
+
+/**
  * ApplicationAccountGrantTargetResponse
  */
 export const zApplicationAccountGrantTargetResponse = z.object({
@@ -3418,6 +3432,64 @@ export const zResolveApplicationAccount503Representation0Response = zProblemDeta
  * Successful Response
  */
 export const zResolveApplicationAccountResponse = zApplicationAccountMetadataResponse;
+
+export const zDeleteApplicationAccountHeaders = z.object({
+    'Idempotency-Key': z.string().min(1).max(128).regex(/.*\S.*/)
+});
+
+export const zDeleteApplicationAccountPath = z.object({
+    project_id: z.uuid(),
+    application_principal_id: z.uuid()
+});
+
+export const zDeleteApplicationAccountQuery = z.object({
+    expectedAccessRevision: z.int().gte(0).lte(9007199254740991)
+});
+
+/**
+ * Successful Response
+ */
+export const zDeleteApplicationAccount200Representation0Response = zApplicationAccountDeletionResponse;
+
+/**
+ * Invalid authentication request
+ */
+export const zDeleteApplicationAccount400Representation0Response = zProblemDetails;
+
+/**
+ * Unauthorized
+ */
+export const zDeleteApplicationAccount401Representation0Response = zProblemDetails;
+
+/**
+ * Access denied
+ */
+export const zDeleteApplicationAccount403Representation0Response = zProblemDetails;
+
+/**
+ * Resource not found
+ */
+export const zDeleteApplicationAccount404Representation0Response = zProblemDetails;
+
+/**
+ * Operation conflicts with current state
+ */
+export const zDeleteApplicationAccount409Representation0Response = zProblemDetails;
+
+/**
+ * Request validation failed
+ */
+export const zDeleteApplicationAccount422Representation0Response = zProblemDetails;
+
+/**
+ * Dependency unavailable
+ */
+export const zDeleteApplicationAccount503Representation0Response = zProblemDetails;
+
+/**
+ * Successful Response
+ */
+export const zDeleteApplicationAccountResponse = zApplicationAccountDeletionResponse;
 
 export const zGetApplicationAccountPath = z.object({
     project_id: z.uuid(),

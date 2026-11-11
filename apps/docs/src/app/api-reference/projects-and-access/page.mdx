@@ -118,7 +118,7 @@ Require a currently eligible human Project member with permission to use `create
 
 HTTP `201` returns one permanent `principalId`, also used as the application account ID, plus its original names, Project Access revision and three `initialGrants`. Those use-and-grant assignments belong to the human creator for Issue keys, Revoke keys and Delete account on this exact account. The application starts with no received actions, groups or keys. It inherits no human permissions and cannot move Projects.
 
-Exact completed replay checks current creation authority and returns the same original `201`, account and receipt. It neither restores removed grants nor creates another account. [Create and inspect an application account](/guides/application-accounts) explains preparation, saved requests, generated clients and uncertain-result recovery. Key issuance, authentication and revocation have their own contracts below. Permanent account retirement remains separate unfinished work.
+Exact completed replay checks current creation authority and returns the same original `201`, account and receipt. It neither restores removed grants nor creates another account. [Create and inspect an application account](/guides/application-accounts) explains preparation, saved requests, generated clients and uncertain-result recovery. Key issuance, authentication and revocation have their own contracts below. [Permanent account retirement](#retire-an-application-account) is a separate operation.
 
 ## Read application-account metadata
 
@@ -142,7 +142,7 @@ Require a currently eligible human Project member with exact `issue-application-
 
 Omitted lifetime uses the configured default (90 days by default), within the configured maximum (365 days by default). An explicit value must be positive whole seconds, within that maximum and the safe-integer/date range. Explicit `null` is invalid. Selected adapters use server-owned profiles, not caller audiences. Only a missing selected profile prevents fresh issuance with `503`. The coordinated limit is two unexpired, unrevoked parent keys, including dual-adapter keys only once, without automatic eviction.
 
-First delivery is `201`, `secretAvailable: true` and a complete `key`. Save it privately. Original replay is also `201`, with `secretAvailable: false` and `key` absent. Its nested metadata, revision and expiry describe the original result, not current usability. Local saving failure does not reverse confirmed issuance; network or decoding uncertainty does not prove it failed. [Exact original-request recovery](/guides/application-accounts#recover-an-uncertain-key-issuance) never automatically creates a replacement or returns plaintext again after completion. Independent revocation is described below. Permanent retirement and mounted MCP delivery remain separate unfinished workflows.
+First delivery is `201`, `secretAvailable: true` and a complete `key`. Save it privately. Original replay is also `201`, with `secretAvailable: false` and `key` absent. Its nested metadata, revision and expiry describe the original result, not current usability. Local saving failure does not reverse confirmed issuance; network or decoding uncertainty does not prove it failed. [Exact original-request recovery](/guides/application-accounts#recover-an-uncertain-key-issuance) never automatically creates a replacement or returns plaintext again after completion. Independent revocation is described below. [Permanent retirement](#retire-an-application-account) has its own operation. Mounted MCP delivery remains separate unfinished work.
 
 ## Revoke an application key
 
@@ -153,6 +153,16 @@ Use `POST /v1/projects/{project_id}/application-accounts/{application_principal_
 `200` contains only the operation, captured Project Access revision, retained-result expiry and safe key metadata. First revocation records its timestamp, advances the revision once and commits the audit and original result together. A fresh already-revoked no-op still requires the current reviewed revision and retains the original timestamp without another revision change or revocation audit. Replaying the exact completed request checks current authority and returns its captured original before fresh revision checks, without renewing retention or repeating effects. [The guide](/guides/application-accounts#revoke-one-application-key) explains current metadata review and uncertain-result recovery.
 
 The last usable key may be revoked immediately. A dual-adapter key is disabled for both bindings. Subsequent incoming key checks reject it, while already committed effects and previously admitted jobs retain their owning lifecycle rules. The account, grants and other keys are not removed by this operation.
+
+## Retire an application account
+
+<ApiOperation operationId="deleteApplicationAccount" />
+
+Send a bodyless `DELETE` to the exact Project and application principal path with one canonical `expectedAccessRevision` query value and one `Idempotency-Key`. The revision is an unsigned ASCII decimal integer from `0` through `9007199254740991`, with no leading zero except `0` itself. Use a currently eligible human credential, Project membership and exact `delete-application-account` use authority on that account.
+
+`200` confirms the committed local retirement. [ApplicationAccountDeletionResponse](/api-reference/models#ApplicationAccountDeletionResponse) carries the original operation, expiry, IDs and revision, and `accessBlocked: true`. The transaction revokes every key and removes the account’s received Access relationships and targeting grants while retaining Project work, attribution and its Name.
+
+An exact same-request recovery checks current authority before reading the original. Retirement removes targeting grants, so a denied replay can leave an uncertain original unconfirmed. [The guide](/guides/application-accounts#retire-an-application-account) explains what to save before sending the request.
 
 ## Read application key metadata
 

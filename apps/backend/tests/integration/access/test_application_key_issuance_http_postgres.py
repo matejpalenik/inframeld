@@ -81,6 +81,9 @@ from inframeld_backend.access.infrastructure.readers.postgres_human_identity_lin
     PostgresHumanIdentityLinkReader,
 )
 from inframeld_backend.access.infrastructure.rows.access_audit_event_row import AccessAuditEventRow
+from inframeld_backend.access.infrastructure.rows.application_account_deletion_result_row import (
+    ApplicationAccountDeletionResultRow,
+)
 from inframeld_backend.access.infrastructure.rows.application_action_grant_row import (
     ApplicationActionGrantRow,
 )
@@ -125,6 +128,9 @@ from inframeld_backend.bootstrap.application_factory import create_app
 from inframeld_backend.bootstrap.application_settings import ApplicationSettings, get_settings
 from inframeld_backend.shared.application.dtos.idempotency_context_dto import IdempotencyContextDTO
 from inframeld_backend.shared.application.enums.http_method import HttpMethod
+from inframeld_backend.shared.application.enums.operation_reservation_state import (
+    OperationReservationState,
+)
 from inframeld_backend.shared.application.services.request_fingerprint_service import (
     RequestFingerprintService,
 )
@@ -1025,3 +1031,246 @@ async def test_waited_http_issuance_rechecks_current_state_before_any_effect(
                 ):
                     raise outcome
     await _effects(database, route, keys=0, issues=0)
+
+
+@pytest.mark.parametrize("family", ["browser", "oauth"])
+async def test_registered_http_retires_application_account_and_denies_original_after_grant_loss(
+    database: Database, temporary_postgres_settings: DatabaseSettings, tmp_path: Path, family: str
+) -> None:
+    """Retire through the production route and recheck the same human's current Delete grant."""
+    creator = await seed_project_creator(database)
+    project = (await create_project(database, creator)).project
+    account = (await create_account(database, creator.access, project.project_id)).account
+    route = (
+        f"/v1/projects/{account.project_id.value}/application-accounts/{account.principal_id.value}"
+    )
+    human = COOKIE if family == "browser" else BEARER
+    original_key = "retire-Original:+/="
+    headers = human | {"Idempotency-Key": original_key}
+
+    async with _client(_settings(temporary_postgres_settings, tmp_path), creator.binding) as client:
+        issued = await client.post(
+            route + "/keys",
+            json={
+                "allowedAdapters": ["http", "mcp"],
+                "expectedAccessRevision": account.access_revision,
+                "expiresInSeconds": 120,
+            },
+            headers=human | {"Idempotency-Key": "issue-retirement-http-target"},
+        )
+        assert issued.status_code == 201
+        credential = ApplicationKeyCredential(issued.json()["key"])
+        revision = issued.json()["accessRevision"]
+        params = {"expectedAccessRevision": revision}
+        key_headers = {"Authorization": "Bearer " + credential.value}
+        session = await client.get("/v1/application-session", headers=key_headers)
+        assert session.status_code == 200 and session.json() == {
+            "principalId": str(account.principal_id.value),
+            "projectId": str(account.project_id.value),
+        }
+
+        first = await client.delete(route, params=params, headers=headers)
+        assert first.status_code == 200
+        assert first.request.content == b""
+        receipt = first.json()
+        assert set(receipt) == {
+            "operationId",
+            "idempotencyExpiresAt",
+            "projectId",
+            "principalId",
+            "accessRevision",
+            "accessBlocked",
+        }
+        operation_id = receipt["operationId"]
+        assert isinstance(operation_id, str) and 1 <= len(operation_id) <= 128
+        expiry = datetime.fromisoformat(receipt["idempotencyExpiresAt"])
+        assert expiry.utcoffset() is not None
+        assert receipt["projectId"] == str(account.project_id.value)
+        assert receipt["principalId"] == str(account.principal_id.value)
+        assert type(receipt["accessRevision"]) is int and receipt["accessRevision"] == revision + 1
+        assert receipt["accessBlocked"] is True
+
+        rejected_key = await client.get("/v1/application-session", headers=key_headers)
+        assert rejected_key.status_code == 401
+        assert (
+            rejected_key.headers["www-authenticate"]
+            == 'Bearer realm="inframeld", error="invalid_token"'
+        )
+        denied = await client.delete(route, params=params, headers=headers)
+        assert denied.status_code == 403 and denied.json()["code"] == "access_denied"
+        assert not set(receipt).intersection(denied.json())
+        assert operation_id not in denied.text
+        for response in (first, rejected_key, denied):
+            _safe(response)
+            assert credential.value not in response.text and "key" not in response.json()
+
+    async with database.session() as session:
+        result = await session.get(ApplicationAccountDeletionResultRow, operation_id)
+        reservation = await session.get(IdempotencyReservationRow, operation_id)
+        principal = await session.get(PrincipalRow, account.principal_id.value)
+        key = await session.get(ApplicationKeyRow, credential.key_id.value)
+        current = await session.get(ProjectRow, account.project_id.value)
+        assert (
+            result is not None
+            and result.actor_principal_id == creator.access.actor_principal_id.value
+        )
+        assert (result.project_id, result.application_principal_id) == (
+            account.project_id.value,
+            account.principal_id.value,
+        )
+        assert (result.before_revision, result.access_revision) == (revision, revision + 1)
+        assert reservation is not None and reservation.state is OperationReservationState.REPLAYABLE
+        assert (reservation.method, reservation.requested_route, reservation.request_key) == (
+            "DELETE",
+            route,
+            original_key,
+        )
+        assert reservation.expires_at == expiry
+        assert principal is not None and principal.status is PrincipalStatus.RETIRED
+        assert key is not None and key.revoked_at is not None
+        assert current is not None and current.access_revision == revision + 1
+        assert (
+            await session.scalar(
+                select(ApplicationActionGrantRow.action).where(
+                    ApplicationActionGrantRow.project_id == account.project_id.value,
+                    ApplicationActionGrantRow.application_principal_id
+                    == account.principal_id.value,
+                    ApplicationActionGrantRow.recipient_principal_id
+                    == creator.access.actor_principal_id.value,
+                    ApplicationActionGrantRow.action
+                    == ApplicationAccountAction.DELETE_ACCOUNT.value,
+                )
+            )
+            is None
+        )
+        assert (
+            await session.scalar(
+                select(func.count())
+                .select_from(IdempotencyReservationRow)
+                .where(
+                    IdempotencyReservationRow.project_id == account.project_id.value,
+                    IdempotencyReservationRow.method == "DELETE",
+                    IdempotencyReservationRow.requested_route == route,
+                )
+            )
+            == 1
+        )
+        assert (
+            await session.scalar(
+                select(func.count())
+                .select_from(AccessAuditEventRow)
+                .where(
+                    AccessAuditEventRow.project_id == account.project_id.value,
+                    AccessAuditEventRow.target_id == account.principal_id.value,
+                    AccessAuditEventRow.event_type == "application_account_retired",
+                )
+            )
+            == 1
+        )
+
+
+async def test_registered_http_retirement_denials_leave_no_effects_or_original(
+    database: Database, temporary_postgres_settings: DatabaseSettings, tmp_path: Path
+) -> None:
+    creator = await seed_project_creator(database)
+    project = (await create_project(database, creator)).project
+    account = (await create_account(database, creator.access, project.project_id)).account
+    credential = await store_application_key(
+        database,
+        principal_id=account.principal_id,
+        organization_id=account.organization_id,
+        project_id=account.project_id,
+    )
+    route = (
+        f"/v1/projects/{account.project_id.value}/application-accounts/{account.principal_id.value}"
+    )
+    params = {"expectedAccessRevision": account.access_revision}
+    key_headers = {"Authorization": "Bearer " + credential.value}
+    binding = creator.binding
+
+    async with _client(_settings(temporary_postgres_settings, tmp_path), binding) as client:
+        assert (await client.get(route, headers=BEARER)).status_code == 200
+        assert (await client.get("/v1/application-session", headers=key_headers)).status_code == 200
+        missing_csrf = await client.delete(
+            route,
+            params=params,
+            headers={
+                "Cookie": COOKIE["Cookie"],
+                "Origin": COOKIE["Origin"],
+                "Idempotency-Key": "retire-missing-csrf",
+            },
+        )
+        application = await client.delete(
+            route, params=params, headers=key_headers | {"Idempotency-Key": "retire-as-application"}
+        )
+        async with database.session() as session, session.begin():
+            version = await session.get(
+                HumanCredentialVersionRow,
+                (
+                    binding.installation_id.value,
+                    binding.identity.authority.value,
+                    binding.identity.subject.value,
+                ),
+            )
+            assert version is not None and version.version == binding.version.value
+            version.version += 1
+        stale_oauth = await client.delete(
+            route, params=params, headers=BEARER | {"Idempotency-Key": "retire-stale-oauth"}
+        )
+        assert missing_csrf.status_code == application.status_code == 403
+        assert missing_csrf.json()["code"] == application.json()["code"] == "access_denied"
+        assert stale_oauth.status_code == 401
+        assert (
+            stale_oauth.headers["www-authenticate"]
+            == 'Bearer realm="inframeld", error="invalid_token"'
+        )
+        for response in (missing_csrf, application, stale_oauth):
+            _safe(response)
+            assert not {"operationId", "idempotencyExpiresAt", "accessBlocked"}.intersection(
+                response.json()
+            )
+            assert credential.value not in response.text and "controlled-human" not in response.text
+
+    async with database.session() as session:
+        principal = await session.get(PrincipalRow, account.principal_id.value)
+        key = await session.get(ApplicationKeyRow, credential.key_id.value)
+        current = await session.get(ProjectRow, account.project_id.value)
+        assert principal is not None and principal.status is PrincipalStatus.ACTIVE
+        assert key is not None and key.revoked_at is None
+        assert current is not None and current.access_revision == account.access_revision
+        assert (
+            await session.scalar(
+                select(func.count())
+                .select_from(IdempotencyReservationRow)
+                .where(
+                    IdempotencyReservationRow.project_id == account.project_id.value,
+                    IdempotencyReservationRow.method == "DELETE",
+                    IdempotencyReservationRow.requested_route == route,
+                )
+            )
+            == 0
+        )
+        assert (
+            await session.scalar(
+                select(func.count())
+                .select_from(ApplicationAccountDeletionResultRow)
+                .where(
+                    ApplicationAccountDeletionResultRow.project_id == account.project_id.value,
+                    ApplicationAccountDeletionResultRow.application_principal_id
+                    == account.principal_id.value,
+                )
+            )
+            == 0
+        )
+        assert (
+            await session.scalar(
+                select(func.count())
+                .select_from(AccessAuditEventRow)
+                .where(
+                    AccessAuditEventRow.project_id == account.project_id.value,
+                    AccessAuditEventRow.target_id == account.principal_id.value,
+                    AccessAuditEventRow.event_type == "application_account_retired",
+                )
+            )
+            == 0
+        )

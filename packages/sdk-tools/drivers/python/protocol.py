@@ -33,6 +33,7 @@ class Operation(StrEnum):
     REMOVE_ACCESS_GROUP_MANAGER = "removeAccessGroupManager"
     DELETE_ACCESS_GROUP = "deleteAccessGroup"
     CREATE_APPLICATION_ACCOUNT = "createApplicationAccount"
+    DELETE_APPLICATION_ACCOUNT = "deleteApplicationAccount"
     GET_APPLICATION_ACCOUNT = "getApplicationAccount"
     RESOLVE_APPLICATION_ACCOUNT = "resolveApplicationAccount"
     LIST_APPLICATION_KEYS = "listApplicationKeys"

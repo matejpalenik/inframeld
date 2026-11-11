@@ -332,6 +332,16 @@ const calls = {
       },
       body: call.body as sdk.CreateApplicationAccountData["body"],
     }),
+  deleteApplicationAccount: (client: Client, call: SdkCall) =>
+    sdk.deleteApplicationAccount({
+      ...options(client, call),
+      path: call.path as sdk.DeleteApplicationAccountData["path"],
+      query: call.query as sdk.DeleteApplicationAccountData["query"],
+      headers: {
+        ...call.headers,
+        "Idempotency-Key": call.headers["Idempotency-Key"]!,
+      },
+    }),
   getApplicationAccount: (client: Client, call: SdkCall) =>
     sdk.getApplicationAccount({
       ...options(client, call),

@@ -575,6 +575,28 @@ async def create_application_account_async(clients: Clients, call: Call) -> Nati
     )
 
 
+def delete_application_account_sync(clients: Clients, call: Call) -> NativeResponse:
+    return AccessApi(clients.production).delete_application_account_sync_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        application_principal_id=UUID(call.path["application_principal_id"]),
+        expected_access_revision=integer(call.query["expectedAccessRevision"]),
+        idempotency_key=call.headers["Idempotency-Key"],
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def delete_application_account_async(clients: Clients, call: Call) -> NativeResponse:
+    return await AccessApi(clients.production).delete_application_account_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        application_principal_id=UUID(call.path["application_principal_id"]),
+        expected_access_revision=integer(call.query["expectedAccessRevision"]),
+        idempotency_key=call.headers["Idempotency-Key"],
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
 def get_application_account_sync(clients: Clients, call: Call) -> NativeResponse:
     return AccessApi(clients.production).get_application_account_sync_with_http_info(
         project_id=UUID(call.path["project_id"]),
@@ -1468,6 +1490,9 @@ BINDINGS: dict[Operation, Binding] = {
     Operation.DELETE_ACCESS_GROUP: Binding(delete_access_group_sync, delete_access_group_async),
     Operation.CREATE_APPLICATION_ACCOUNT: Binding(
         create_application_account_sync, create_application_account_async
+    ),
+    Operation.DELETE_APPLICATION_ACCOUNT: Binding(
+        delete_application_account_sync, delete_application_account_async
     ),
     Operation.GET_APPLICATION_ACCOUNT: Binding(
         get_application_account_sync, get_application_account_async
