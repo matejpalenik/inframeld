@@ -12,6 +12,9 @@ from tests.support.access_scenarios import MockAccessScenarios
 from tests.support.authentication_evidence import MockAuthenticationEvidence
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
+from inframeld_backend.access.application.dtos.browser_session_authentication_dto import (
+    BrowserSessionAuthenticationDTO,
+)
 from inframeld_backend.access.application.dtos.project_action_authorization_dto import (
     ProjectActionAuthorizationDTO,
 )
@@ -20,6 +23,9 @@ from inframeld_backend.access.application.dtos.project_action_authorization_requ
 )
 from inframeld_backend.access.application.dtos.project_operation_admission_request_dto import (
     ProjectOperationAdmissionRequestDTO,
+)
+from inframeld_backend.access.application.dtos.verified_human_identity_dto import (
+    VerifiedHumanIdentityDTO,
 )
 from inframeld_backend.access.application.protocols.action_authorizer import ActionAuthorizer
 from inframeld_backend.access.application.protocols.authorized_operation_scope import (
@@ -31,18 +37,27 @@ from inframeld_backend.access.application.services.action_authorization_service 
 from inframeld_backend.access.application.services.project_operation_admission_service import (
     ProjectOperationAdmissionService,
 )
+from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.enums.project_status import ProjectStatus
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
+from inframeld_backend.access.domain.value_objects.identity_authority import IdentityAuthority
+from inframeld_backend.access.domain.value_objects.identity_subject import IdentitySubject
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
 from inframeld_backend.access.infrastructure.readers.postgres_project_action_facts_reader import (
     PostgresProjectActionFactsReader,
 )
 from inframeld_backend.access.infrastructure.rows.access_audit_event_row import AccessAuditEventRow
+from inframeld_backend.access.infrastructure.rows.human_identity_link_row import (
+    HumanIdentityLinkRow,
+)
 from inframeld_backend.access.infrastructure.rows.project_action_grant_row import (
     ProjectActionGrantRow,
 )
 from inframeld_backend.access.infrastructure.rows.project_row import ProjectRow
+from inframeld_backend.access.infrastructure.writers.postgres_human_credential_state_initializer import (
+    PostgresHumanCredentialStateInitializer,
+)
 from inframeld_backend.shared.application.dtos.accepted_async_operation_dto import (
     AcceptedAsyncOperationDTO,
 )
@@ -184,6 +199,9 @@ async def _authorized_request(
     database: Database,
 ) -> tuple[AccessContextDTO, ActionId, ProjectOperationAdmissionRequestDTO]:
     """Commit a grant and describe the project request without caller scope fields."""
+    identity = VerifiedHumanIdentityDTO(
+        IdentityAuthority("kratos:test"), IdentitySubject(str(uuid4()))
+    )
     async with database.session() as session, session.begin():
         scenario = await MockAccessScenarios.seed_project_authorization(
             session,
@@ -200,11 +218,24 @@ async def _authorized_request(
             .values(action="create-access-groups")
         )
 
+        session.add(
+            HumanIdentityLinkRow(
+                authority=identity.authority.value,
+                subject=identity.subject.value,
+                organization_id=scenario.organization_id.value,
+                principal_id=scenario.principal_id.value,
+                principal_kind=PrincipalKind.HUMAN,
+            )
+        )
+
+    state = await PostgresHumanCredentialStateInitializer(database).initialize(identity)
+    assert state.version is not None
+    access = AccessContextDTO(
+        scenario.principal_id,
+        BrowserSessionAuthenticationDTO(identity, state.installation_id, state.version),
+    )
     return (
-        AccessContextDTO(
-            actor_principal_id=scenario.principal_id,
-            authentication_evidence=MockAuthenticationEvidence.browser(),
-        ),
+        access,
         ActionId("create-access-groups"),
         ProjectOperationAdmissionRequestDTO(
             project_id=scenario.project_id,

@@ -94,10 +94,7 @@ def test_legacy_group_label_survives_upgrade_downgrade_and_repeat_upgrade(
     with database_session(settings) as session:
         stored = session.get(AccessGroupRow, group)
         assert stored is not None and stored.resource_name is None and stored.name == label
-        assert (
-            session.scalar(select(AlembicVersionRow.version_num))
-            == "0029_application_key_revocation"
-        )
+        assert session.scalar(select(AlembicVersionRow.version_num)) == "0031_project_deletion"
     command.downgrade(config, "0024_application_accounts")
     with database_session(settings) as session:
         assert session.scalar(select(legacy.c.name).where(legacy.c.id == group)) == label
@@ -193,10 +190,7 @@ def test_named_group_requires_its_exact_scoped_binding_and_retirement_keeps_name
             )
         )
     with database_session(settings) as session:
-        assert (
-            session.scalar(select(AlembicVersionRow.version_num))
-            == "0029_application_key_revocation"
-        )
+        assert session.scalar(select(AlembicVersionRow.version_num)) == "0031_project_deletion"
 
 
 @pytest.mark.asyncio
@@ -265,8 +259,7 @@ async def test_retained_legacy_group_deletion_status_prevents_unsafe_downgrade(
         command.downgrade(_config(temporary_postgres_settings), "0024_application_accounts")
     async with database.session() as session:
         assert (
-            await session.scalar(select(AlembicVersionRow.version_num))
-            == "0029_application_key_revocation"
+            await session.scalar(select(AlembicVersionRow.version_num)) == "0031_project_deletion"
         )
         assert await session.get(DeletionStatusBindingRow, operation_id) is not None
         assert await session.get(DeletionStatusObservationRow, operation_id) is not None

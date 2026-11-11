@@ -24,7 +24,7 @@ Prepare Bob and Carol as eligible admitted humans who already belong to the Proj
 
 An application account such as SupportBot may be an ordinary group member. Use the stable `principalId` returned by [application-account creation](/guides/application-accounts). Giving the account group membership needs no application key. An application cannot be a manager.
 
-The supported account-to-client setup, complete engineering walkthrough and human acceptance for this task remain unfinished in [qualification #354](https://github.com/matejpalenik/inframeld/issues/354). That qualification also retains the later real default-reference case. This guide does not establish document-ingestion, query or application-authentication qualification.
+The supported account-to-client setup, complete engineering walkthrough and human acceptance for this task remain unfinished in [qualification #354](https://github.com/matejpalenik/inframeld/issues/354). That qualification also retains the default-reference case. This guide does not establish document-ingestion, query or application-authentication qualification.
 
 For an exercise, choose positively identified disposable resources and agree on supported cleanup before starting. An unused group has its own deletion path. Application-account retirement remains separate, so an exercise that creates SupportBot may need a wholly disposable installation and its operator-supported teardown.
 
@@ -684,11 +684,339 @@ For a deliberate rejoin, use the add-member operation with a fresh reviewed revi
 
 Removal ends access through this group. A document shared with another group Bob still belongs to may remain accessible through that other relationship. Removing a group membership does not erase Project-owned documents or revoke unrelated action permissions.
 
+## Inspect and change future-upload audiences
+
+Save the complete set of groups to use as this Project's future-upload audience. For example, Alice can replace HRPrivate with SupportKnowledge when she manages every group in both the current and proposed sets. Saving defaults does not upload files or change an existing Document's audience.
+
+Use the same installation URL, `PROJECT_ID` and current human credential prepared above. You need permission to use `manage-upload-defaults`, current membership in the Project, and ordinary membership plus management of **every** current and proposed group. This includes a group retained in both sets. GET requires management of every saved group too. A read checks the complete audience rather than returning only the groups you may manage.
+
+### Read the current audience and revision
+
+Use the permanent `projectId` from creation or authorized Project inspection. Obtain each proposed `accessGroupId` from group creation or the exact-ID/Name inspection above. Display names do not select groups.
+
+<CodeGroup>
+
+```shell {{ title: "Read current defaults" }}
+curl --silent --show-error --fail-with-body \
+  --max-time 5 \
+  --url "$INFRAMELD_URL/v1/projects/$PROJECT_ID/upload-defaults" \
+  --header @- \
+  --header 'Accept: application/json' <<EOF_HEADERS
+Authorization: Bearer $INFRAMELD_TOKEN
+EOF_HEADERS
+```
+
+</CodeGroup>
+
+A successful GET returns `projectId`, the current Project `accessRevision` and `groupIds` in UUID order. `groupIds: null` means this valid Project has no configured default. A denied, missing or unavailable observation does not mean unset. Reads create no write receipt or revision change.
+
+Review the complete current set and the groups you intend to save before preparing a change. The PUT replaces the whole set. It accepts at least one same-Project group, rejects duplicates, and cannot use `null` or `[]` to clear the default.
+
+### Save one reviewed replacement
+
+Create `upload-defaults.json` in your separate example directory. Replace the example UUID with the actual complete group set and `0` with the revision returned by your current GET. Use `0` only if that is the observed current revision. Retain this file unchanged after dispatch:
+
+<CodeGroup>
+
+```json {{ title: "upload-defaults.json" }}
+{
+  "groupIds": ["00000000-0000-4000-8000-000000000005"],
+  "expectedAccessRevision": 0
+}
+```
+
+</CodeGroup>
+
+Choose a distinct key for this new reviewed operation and retain it with the installation, Project ID, method, concrete route and request file. Keep credentials separately. Set these values in the example directory:
+
+<CodeGroup>
+
+```shell {{ title: "Retain request identity" }}
+export DEFAULTS_REQUEST_FILE='upload-defaults.json'
+export DEFAULTS_KEY='support-upload-defaults-1'
+```
+
+</CodeGroup>
+
+<CodeGroup>
+
+```shell {{ title: "Set reviewed defaults" }}
+curl --silent --show-error --fail-with-body \
+  --max-time 5 \
+  --request PUT \
+  --url "$INFRAMELD_URL/v1/projects/$PROJECT_ID/upload-defaults" \
+  --header @- \
+  --header "Idempotency-Key: $DEFAULTS_KEY" \
+  --header 'Content-Type: application/json' \
+  --header 'Accept: application/json' \
+  --data-binary "@$DEFAULTS_REQUEST_FILE" <<EOF_HEADERS
+Authorization: Bearer $INFRAMELD_TOKEN
+EOF_HEADERS
+```
+
+</CodeGroup>
+
+HTTP `200` returns the original `projectId`, resulting `groupIds`, `accessRevision`, `operationId` and `idempotencyExpiresAt`. A real replacement advances the Project Access revision once. A fresh request for the already saved set still checks the reviewed revision, then succeeds without advancing it. A stale fresh request conflicts even when its audience equals the current set.
+
+Run the GET again to inspect current state. The PUT receipt describes that operation's result, which may differ from a later current read.
+
+### Use a generated client
+
+Use the source-package setup for [Python](/clients/python), [TypeScript](/clients/typescript) or [Rust](/clients/rust). These complete programs use the existing valid human `INFRAMELD_TOKEN` prerequisite. Installing an SDK or signing into the browser does not produce that terminal token. If no supported credential is available for your chosen client, complete the installation's supported authentication setup before running it.
+
+Save the Python file as `upload_defaults.py`, the Node 26 ESM file as `upload-defaults.ts`, or replace `src/main.rs` in the Cargo example project. Each program performs only its explicitly selected `read` or `put` action. The PUT reads the retained file and key above without fetching a replacement revision.
+
+<CodeGroup>
+
+```python {{ title: "Python" }}
+import asyncio
+import os
+import sys
+from pathlib import Path
+from uuid import UUID
+
+import httpx
+from inframeld_sdk import ApiClient, Configuration
+from inframeld_sdk.api.access_api import AccessApi
+from inframeld_sdk.exceptions import ApiException
+from inframeld_sdk.models.problem_details import ProblemDetails
+from inframeld_sdk.models.project_upload_default_request import ProjectUploadDefaultRequest
+
+
+async def main() -> None:
+    mode = sys.argv[1] if len(sys.argv) == 2 else ""
+    if mode not in ("read", "put"):
+        raise ValueError("Choose read or put")
+
+    project_id = UUID(os.environ["PROJECT_ID"])
+    configuration = Configuration(
+        host=os.environ["INFRAMELD_URL"],
+        access_token=os.environ["INFRAMELD_TOKEN"],
+    )
+    async with ApiClient(configuration) as client:
+        api = AccessApi(client)
+        if mode == "read":
+            response = await api.get_project_upload_defaults_with_http_info(
+                project_id=project_id,
+            )
+        else:
+            request = ProjectUploadDefaultRequest.model_validate_json(
+                Path(os.environ["DEFAULTS_REQUEST_FILE"]).read_text(encoding="utf-8")
+            )
+            response = await api.set_project_upload_defaults_with_http_info(
+                project_id=project_id,
+                idempotency_key=os.environ["DEFAULTS_KEY"],
+                project_upload_default_request=request,
+            )
+        print(f"HTTP {response.status_code}")
+        print(response.data.model_dump_json(by_alias=True, indent=2))
+
+
+try:
+    asyncio.run(main())
+except ApiException as error:
+    print({"httpStatus": error.status}, file=sys.stderr)
+    if isinstance(error.data, ProblemDetails):
+        print(
+            {"code": error.data.code, "requestId": str(error.data.request_id)},
+            file=sys.stderr,
+        )
+    else:
+        print("HTTP or response-decoding failure.", file=sys.stderr)
+    print("Keep the original request. No automatic retry.", file=sys.stderr)
+    sys.exit(1)
+except httpx.RequestError:
+    print("Transport failure. Keep the original request.", file=sys.stderr)
+    sys.exit(1)
+except Exception as error:
+    print({"failure": "input-or-unclassified", "type": type(error).__name__}, file=sys.stderr)
+    print("No automatic retry. Preserve any uncertain original request.", file=sys.stderr)
+    sys.exit(1)
+```
+
+</CodeGroup>
+
+<CodeGroup>
+
+```typescript {{ title: "TypeScript (Node)" }}
+import { readFile } from "node:fs/promises"
+import {
+  createClient,
+  getProjectUploadDefaults,
+  setProjectUploadDefaults,
+  type ProblemDetails,
+  type ProjectUploadDefaultRequest,
+  type SdkFailure,
+} from "@inframeld/sdk"
+
+function required(name: string): string {
+  const value = process.env[name]
+  if (!value) throw new Error("Set " + name)
+  return value
+}
+
+function report(error: SdkFailure<ProblemDetails>, httpStatus?: number): void {
+  console.error({ failure: error.kind, httpStatus })
+  if (error.kind === "api") {
+    console.error({ code: error.body.code, requestId: error.body.requestId })
+  } else if (error.kind === "transport") {
+    console.error({ reason: error.reason })
+  }
+  console.error("Keep the original request. No automatic retry.")
+  process.exitCode = 1
+}
+
+async function main(): Promise<void> {
+  const mode = process.argv[2]
+  if (process.argv.length !== 3 || (mode !== "read" && mode !== "put")) {
+    throw new Error("Choose read or put")
+  }
+  const projectId = required("PROJECT_ID")
+  const client = createClient({
+    baseUrl: required("INFRAMELD_URL"),
+    headers: { Authorization: "Bearer " + required("INFRAMELD_TOKEN") },
+    responseStyle: "fields",
+    throwOnError: false,
+  })
+
+  if (mode === "read") {
+    const result = await getProjectUploadDefaults({
+      client,
+      path: { project_id: projectId },
+    })
+    if (result.error) report(result.error, result.response?.status)
+    else console.log(JSON.stringify(result.data, null, 2))
+    return
+  }
+
+  const value: unknown = JSON.parse(
+    await readFile(required("DEFAULTS_REQUEST_FILE"), "utf8")
+  )
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("The request file must contain one object")
+  }
+  const input = value as Record<string, unknown>
+  const revision = input.expectedAccessRevision
+  if (
+    Object.keys(input).sort().join(",") !== "expectedAccessRevision,groupIds" ||
+    typeof revision !== "number" ||
+    !Number.isSafeInteger(revision) ||
+    revision < 0 ||
+    !Array.isArray(input.groupIds) ||
+    input.groupIds.length === 0
+  ) {
+    throw new Error(
+      "Use the complete reviewed audience and safe integer revision"
+    )
+  }
+  const groupIds: string[] = []
+  for (const group of input.groupIds) {
+    if (typeof group !== "string") throw new Error("Group IDs must be strings")
+    groupIds.push(group)
+  }
+  const body: ProjectUploadDefaultRequest = {
+    groupIds,
+    expectedAccessRevision: revision,
+  }
+  const result = await setProjectUploadDefaults({
+    client,
+    path: { project_id: projectId },
+    headers: { "Idempotency-Key": required("DEFAULTS_KEY") },
+    body,
+  })
+  if (result.error) report(result.error, result.response?.status)
+  else console.log(JSON.stringify(result.data, null, 2))
+}
+
+main().catch((error: unknown) => {
+  console.error({
+    failure: "input-or-unclassified",
+    type: error instanceof Error ? error.name : "unknown",
+  })
+  console.error("No automatic retry. Preserve any uncertain original request.")
+  process.exitCode = 1
+})
+```
+
+</CodeGroup>
+
+<CodeGroup>
+
+```rust {{ title: "Rust" }}
+use inframeld_sdk::{ApiOpError, HttpClient, ProjectUploadDefaultRequest};
+use std::{env, fs, io};
+
+fn report_error<E: std::fmt::Debug>(error: ApiOpError<E>) -> io::Error {
+    if let Some(api) = error.api() {
+        eprintln!(
+            "failure={} HTTP {} requestId={}",
+            if api.parse_error.is_some() { "decode" } else { "http" },
+            api.status,
+            api.headers
+                .get("x-request-id")
+                .and_then(|value| value.to_str().ok())
+                .unwrap_or("unavailable")
+        );
+    } else {
+        eprintln!("Transport or request failure.");
+    }
+    io::Error::other("Keep the original request. No automatic retry.")
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let arguments: Vec<String> = env::args().collect();
+    let mode = arguments.get(1).map(String::as_str);
+    if arguments.len() != 2 || !matches!(mode, Some("read" | "put")) {
+        return Err(io::Error::other("Choose read or put").into());
+    }
+
+    let project_id = env::var("PROJECT_ID")?;
+    let token = env::var("INFRAMELD_TOKEN")?;
+    let client = HttpClient::new()
+        .with_base_url(env::var("INFRAMELD_URL")?)
+        .with_header("Authorization", format!("Bearer {token}"));
+
+    if mode == Some("read") {
+        let response = client
+            .get_project_upload_defaults(&project_id)
+            .await
+            .map_err(report_error)?;
+        println!("HTTP {}", response.status);
+        println!("{}", serde_json::to_string_pretty(&response.body)?);
+    } else {
+        let request: ProjectUploadDefaultRequest =
+            serde_json::from_slice(&fs::read(env::var("DEFAULTS_REQUEST_FILE")?)?)?;
+        let response = client
+            .set_project_upload_defaults(&project_id, env::var("DEFAULTS_KEY")?, request)
+            .await
+            .map_err(report_error)?;
+        println!("HTTP {}", response.status);
+        println!("{}", serde_json::to_string_pretty(&response.body)?);
+    }
+    Ok(())
+}
+```
+
+</CodeGroup>
+
+Run `.venv/bin/python upload_defaults.py read`, `node upload-defaults.ts read`, or `cargo run -- read` to review the current state. After preparing and reviewing the request file and key, run `.venv/bin/python upload_defaults.py put`, `node upload-defaults.ts put`, or `cargo run -- put` for one dispatch. A failed request does not trigger another write. A decode failure remains a failure even after HTTP `200`.
+
+### Recover without replacing a later audience
+
+If the PUT response is lost, preserve the exact original installation, Project, `PUT` route, request key, group set and reviewed revision. Within original-result retention, explicitly repeat that same PUT or the same program's `put` invocation with its original file and key. Do not refresh the body from today's GET or choose a replacement key to recover it.
+
+Suppose the original operation replaced A with B, and another authorized operation later saved C. Recovery returns **historical B** with the original operation ID, result revision and expiry. It neither reveals previous A nor writes B over C. A separate current GET still reports C. At recovery time, you must manage every group in **current C plus original proposed B**, including any overlap. You do not need management of old A unless one of its groups is also in B or C. Current eligibility, Project membership and `manage-upload-defaults` still apply.
+
+The captured `idempotencyExpiresAt` does not renew on replay. After retention expires, the old receipt is no longer recoverable. Do not edit the old revision or replay over later state. Preserve the uncertain original and inspect current state before deliberately reviewing any distinct new work. A `503`, timeout or lost/decode response cannot prove rollback.
+
+A `403` requires current authority to be resolved, and a `404` does not disclose hidden groups. Fresh stale review or original-request conflicts use `409`. Invalid fields use `422`, oversized JSON `413` and an unsupported media type `415`. Rejections leave no partial audience change. All defaults responses use `Cache-Control: no-store`. Cookie-authenticated PUT uses the installation's real Origin and `X-Inframeld-CSRF: 1`, without combining cookie and bearer credentials.
+
 ## Delete an unused group
 
 Delete a group only when it is no longer needed and no protected stored reference uses it. Replace a protected reference through the operation owned by that resource before preparing a fresh deletion. Managing a group does not authorize changing every resource that references it.
 
-Deletion removes the group's owned relationships and the group together. A referenced-group rejection leaves those effects unchanged. Future Document, source, upload, default and case features supply their real references and deletion protection. The later default-reference workflow is separate from creating and administering this group.
+Deletion removes the group's owned relationships and the group together. A referenced-group rejection leaves those effects unchanged. Saved upload defaults already protect their referenced groups. [Replace the default audience](#inspect-and-change-future-upload-audiences) through its authorized operation before preparing a fresh group deletion. An in-use group returns a safe `409` and leaves deletion effects unchanged. Document, source, upload and case owners add their own real references and deletion protection.
 
 Keep your current management until the group deletion. You do not need to remove the last manager first. For an unused group, deletion removes the scope and its owned relationships together.
 

@@ -75,7 +75,7 @@ async def test_0016_upgrade_and_empty_outcome_roundtrip_preserve_admission_and_l
         async with database.session() as session:
             assert (
                 await session.scalar(select(AlembicVersionRow.version_num))
-                == "0029_application_key_revocation"
+                == "0031_project_deletion"
             )
             receipt = await session.get(
                 FirstAdministratorBootstrapReceiptRow, seed.binding.installation_id.value
@@ -126,8 +126,7 @@ async def test_retained_creation_outcome_refuses_downgrade_without_losing_replay
         command.downgrade(_configuration(temporary_postgres_settings), "0016_first_administrator")
     async with database.session() as session:
         assert (
-            await session.scalar(select(AlembicVersionRow.version_num))
-            == "0029_application_key_revocation"
+            await session.scalar(select(AlembicVersionRow.version_num)) == "0031_project_deletion"
         )
         receipt = await session.get(
             ProjectCreationOperationResultRow, first.operation.operation_id.value

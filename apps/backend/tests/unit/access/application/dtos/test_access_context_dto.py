@@ -32,7 +32,9 @@ ACTOR = PrincipalId(UUID(int=1))
 @pytest.mark.parametrize(
     "evidence",
     [
-        BrowserSessionAuthenticationDTO(IDENTITY),
+        BrowserSessionAuthenticationDTO(
+            IDENTITY, InstallationId(UUID(int=2)), HumanCredentialVersion(7)
+        ),
         HumanOAuthCredentialBindingDTO(
             IDENTITY, InstallationId(UUID(int=2)), HumanCredentialVersion(7)
         ),
@@ -54,7 +56,10 @@ def test_context_preserves_complete_authentication_evidence(
 def test_context_rejects_missing_or_unrecognized_evidence(invalid: object) -> None:
     """An absent binding cannot silently turn a CLI caller into a browser caller."""
     context = AccessContextDTO(
-        ACTOR, authentication_evidence=BrowserSessionAuthenticationDTO(IDENTITY)
+        ACTOR,
+        authentication_evidence=BrowserSessionAuthenticationDTO(
+            IDENTITY, InstallationId(UUID(int=2)), HumanCredentialVersion(7)
+        ),
     )
     with pytest.raises(TypeError, match="authentication evidence"):
         replace(context, authentication_evidence=invalid)

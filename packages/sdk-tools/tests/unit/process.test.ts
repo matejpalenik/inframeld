@@ -12,7 +12,10 @@ import {
   hasConfirmedCleanup,
 } from "../../src/system/process.ts";
 import { describeError } from "../../src/workflows/stages.ts";
-import { withDeniedFixtureRecovery } from "../native/fixtures/denied-cleanup.ts";
+import {
+  readDeniedUncertainReceipt,
+  withDeniedFixtureRecovery,
+} from "../native/fixtures/denied-cleanup.ts";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -24,6 +27,53 @@ import { Duplex, PassThrough, Writable } from "node:stream";
 const finiteFixture = fileURLToPath(
   new URL("./fixtures/process_tree.py", import.meta.url),
 );
+
+test("denied uncertain receipt waits for atomic publication", async () => {
+  const missing = Object.assign(new Error("receipt absent"), {
+    code: "ENOENT",
+  });
+  const receipt = '{"unknown":true}';
+  let reads = 0;
+  assert.equal(
+    await readDeniedUncertainReceipt(
+      "unused",
+      performance.now() + 500,
+      async () => {
+        if (++reads === 1) throw missing;
+        return receipt;
+      },
+    ),
+    receipt,
+  );
+  assert.equal(reads, 2);
+});
+
+test("denied uncertain receipt immediately preserves a non-ENOENT error", async () => {
+  const denied = Object.assign(new Error("receipt denied"), { code: "EACCES" });
+  let reads = 0;
+  await assert.rejects(
+    readDeniedUncertainReceipt("unused", performance.now() + 500, async () => {
+      reads++;
+      throw denied;
+    }),
+    (error: unknown) => error === denied,
+  );
+  assert.equal(reads, 1);
+});
+
+test("denied uncertain receipt bounds persistent absence", async () => {
+  const missing = Object.assign(new Error("receipt still absent"), {
+    code: "ENOENT",
+  });
+  const began = performance.now();
+  await assert.rejects(
+    readDeniedUncertainReceipt("unused", began + 40, async () => {
+      throw missing;
+    }),
+    (error: unknown) => error === missing,
+  );
+  assert.ok(performance.now() - began < 1000);
+});
 
 test("denied fixture receipt reconciliation runs after an early assertion and retains its identity", async () => {
   const work = await mkdtemp(join(tmpdir(), "sdk-denied-unit-"));

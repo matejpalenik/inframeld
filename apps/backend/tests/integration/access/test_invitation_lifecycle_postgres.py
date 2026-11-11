@@ -20,7 +20,6 @@ from sqlalchemy.orm import ORMExecuteState, Session, SessionTransaction
 from tests.support.access_group_scenarios import create_group, delete_group
 from tests.support.application_account_scenarios import create_account
 from tests.support.application_key_scenarios import store_application_key
-from tests.support.authentication_evidence import MockAuthenticationEvidence
 from tests.support.project_action_grant_postgres_scenarios import change_project_grant
 from tests.support.project_creation_scenarios import (
     ProjectCreationSeedDTO,
@@ -320,6 +319,7 @@ from inframeld_backend.shared.application.enums.operation_reservation_state impo
 )
 from inframeld_backend.shared.application.errors.application_errors import (
     AccessDeniedError,
+    AuthenticationRequiredError,
     ConflictError,
     DependencyUnavailableError,
     IdempotencyInProgressError,
@@ -636,9 +636,17 @@ async def test_application_issuance_replays_original_without_redelivering_secret
         assert stored is not None and stored.token_digest == first.token.digest().value
 
 
-@pytest.mark.parametrize("loss", ["admission-grant", "suspension", "recovery", "oauth-version"])
+@pytest.mark.parametrize(
+    ("loss", "expected_error"),
+    [
+        pytest.param("admission-grant", AccessDeniedError, id="admission-grant"),
+        pytest.param("suspension", AccessDeniedError, id="suspension"),
+        pytest.param("recovery", AuthenticationRequiredError, id="recovery"),
+        pytest.param("oauth-version", HumanOAuthCredentialRejectedError, id="oauth-version"),
+    ],
+)
 async def test_actual_current_issuer_loss_blocks_original_disclosure(
-    database: Database, loss: str
+    database: Database, loss: str, expected_error: type[Exception]
 ) -> None:
     seed = await seed_project_creator(database)
     access = (
@@ -693,10 +701,9 @@ async def test_actual_current_issuer_loss_blocks_original_disclosure(
                 )
             )
     async with database.session() as session:
-        with pytest.raises(
-            HumanOAuthCredentialRejectedError if loss == "oauth-version" else AccessDeniedError
-        ):
+        with pytest.raises(expected_error) as rejection:
             await _administration(session).issue(access=access, command=command, context=context)
+        assert type(rejection.value) is expected_error
     async with database.session() as session:
         assert await session.scalar(select(func.count()).select_from(InvitationRow)) == 1
         assert (
@@ -1370,9 +1377,17 @@ async def test_revocation_service_preserves_original_and_noop_revision_timestamp
         ]
 
 
-@pytest.mark.parametrize("loss", ["admission-grant", "suspension", "recovery", "oauth-version"])
+@pytest.mark.parametrize(
+    ("loss", "expected_error"),
+    [
+        pytest.param("admission-grant", AccessDeniedError, id="admission-grant"),
+        pytest.param("suspension", AccessDeniedError, id="suspension"),
+        pytest.param("recovery", AuthenticationRequiredError, id="recovery"),
+        pytest.param("oauth-version", HumanOAuthCredentialRejectedError, id="oauth-version"),
+    ],
+)
 async def test_current_revocation_authority_loss_precedes_retained_result(
-    database: Database, loss: str
+    database: Database, loss: str, expected_error: type[Exception]
 ) -> None:
     seed = await seed_project_creator(database)
     record, token, _ = await _issue(database, seed=seed)
@@ -1429,10 +1444,9 @@ async def test_current_revocation_authority_loss_precedes_retained_result(
                 )
             )
     async with database.session() as session:
-        with pytest.raises(
-            HumanOAuthCredentialRejectedError if loss == "oauth-version" else AccessDeniedError
-        ):
+        with pytest.raises(expected_error) as rejection:
             await _administration(session).revoke(access=access, command=command, context=context)
+        assert type(rejection.value) is expected_error
     async with database.session() as session:
         current = await PostgresInvitationFactsReader(session).read_by_digest(token.digest())
         assert current is not None and current.revoked_at is not None
@@ -1483,15 +1497,7 @@ async def test_other_admitted_human_needs_current_admission_delegation_to_revoke
                 key=IdempotencyKey("bob-admit-users"),
             ),
         )
-    bob = AccessContextDTO(
-        actor_principal_id=seed.bob_id,
-        authentication_evidence=MockAuthenticationEvidence.browser(
-            VerifiedHumanIdentityDTO(
-                authority=seed.actor.binding.identity.authority,
-                subject=IdentitySubject(str(UUID(int=200))),
-            )
-        ),
-    )
+    bob = seed.bob_access
     command = RevokeInvitationCommand(
         invitation_id=record.invitation_id, expected_access_revision=granted.access_revision
     )

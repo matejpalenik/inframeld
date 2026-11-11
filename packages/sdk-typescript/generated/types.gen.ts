@@ -1829,7 +1829,7 @@ export type OAuthConsentDecision = 'allow' | 'deny';
  *
  * Select a fixed current-authority check without granting permission.
  */
-export type OperationLookupAuthorityFamily = 'project_action_use' | 'project_grant_read' | 'organization_action_use' | 'organization_grant_read' | 'access_group_grant_read' | 'application_account_grant_read' | 'access_group_deletion';
+export type OperationLookupAuthorityFamily = 'project_action_use' | 'project_grant_read' | 'organization_action_use' | 'organization_grant_read' | 'access_group_grant_read' | 'application_account_grant_read' | 'access_group_deletion' | 'project_deletion';
 
 /**
  * OperationLookupAuthorityRequest
@@ -2388,6 +2388,38 @@ export type ProjectCreationResponse = {
 };
 
 /**
+ * ProjectDeletionAdmissionResponse
+ *
+ * Expose original admission, never internal execution or physical progress.
+ */
+export type ProjectDeletionAdmissionResponse = {
+    /**
+     * Accessblocked
+     */
+    accessBlocked: true;
+    /**
+     * Accessrevision
+     */
+    accessRevision: number;
+    /**
+     * Admissionconfirmed
+     */
+    admissionConfirmed: true;
+    /**
+     * Idempotencyexpiresat
+     */
+    idempotencyExpiresAt: string | null;
+    /**
+     * Operationid
+     */
+    operationId: string;
+    /**
+     * Projectid
+     */
+    projectId: string;
+};
+
+/**
  * ProjectGrantTargetResponse
  */
 export type ProjectGrantTargetResponse = {
@@ -2664,6 +2696,88 @@ export type ProjectNameResolutionResponse = {
      * Projectid
      *
      * Permanent Project identity, preserved through rename.
+     */
+    projectId: string;
+};
+
+/**
+ * ProjectUploadDefaultChangeResponse
+ *
+ * Retain the original resulting audience without disclosing its before snapshot.
+ */
+export type ProjectUploadDefaultChangeResponse = {
+    /**
+     * Accessrevision
+     *
+     * Project Access revision of this current read or immutable original result.
+     */
+    accessRevision: number;
+    /**
+     * Groupids
+     *
+     * Original resulting audience. A later GET may show a different current default.
+     */
+    groupIds: Array<string>;
+    /**
+     * Idempotencyexpiresat
+     *
+     * Original replay deadline, unchanged by recovery.
+     */
+    idempotencyExpiresAt: string;
+    /**
+     * Operationid
+     *
+     * Original operation identity, retained across exact-request recovery.
+     */
+    operationId: string;
+    /**
+     * Projectid
+     *
+     * Exact Project whose saved future-upload audience is represented.
+     */
+    projectId: string;
+};
+
+/**
+ * ProjectUploadDefaultRequest
+ *
+ * Replace the complete future-upload audience at an explicitly reviewed revision.
+ */
+export type ProjectUploadDefaultRequest = {
+    /**
+     * Expectedaccessrevision
+     *
+     * Current Project Access revision reviewed for this complete replacement. A fresh no-op still requires this revision.
+     */
+    expectedAccessRevision: number;
+    /**
+     * Groupids
+     *
+     * Complete nonempty same-Project audience. Every current and proposed group requires current management.
+     */
+    groupIds: Array<string>;
+};
+
+/**
+ * ProjectUploadDefaultResponse
+ */
+export type ProjectUploadDefaultResponse = {
+    /**
+     * Accessrevision
+     *
+     * Project Access revision of this current read or immutable original result.
+     */
+    accessRevision: number;
+    /**
+     * Groupids
+     *
+     * UUID-sorted saved audience, or null only when this valid Project has no saved default.
+     */
+    groupIds: Array<string> | null;
+    /**
+     * Projectid
+     *
+     * Exact Project whose saved future-upload audience is represented.
      */
     projectId: string;
 };
@@ -3886,6 +4000,71 @@ export type ResolveProjectNameResponses = {
 };
 
 export type ResolveProjectNameResponse = ResolveProjectNameResponses[keyof ResolveProjectNameResponses];
+
+export type DeleteProjectData = {
+    body?: never;
+    headers: {
+        /**
+         * Idempotency-Key
+         */
+        'Idempotency-Key': string;
+    };
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query: {
+        /**
+         * Expectedaccessrevision
+         */
+        expectedAccessRevision: number;
+    };
+    url: '/v1/projects/{project_id}';
+};
+
+export type DeleteProjectErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Operation conflicts with current state
+     */
+    409: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type DeleteProjectError = DeleteProjectErrors[keyof DeleteProjectErrors];
+
+export type DeleteProjectResponses = {
+    /**
+     * Successful Response
+     */
+    202: ProjectDeletionAdmissionResponse;
+};
+
+export type DeleteProjectResponse = DeleteProjectResponses[keyof DeleteProjectResponses];
 
 export type CreateAccessGroupData = {
     body: AccessGroupCreationRequest;
@@ -6175,6 +6354,128 @@ export type GetMyProjectAccessResponses = {
 };
 
 export type GetMyProjectAccessResponse = GetMyProjectAccessResponses[keyof GetMyProjectAccessResponses];
+
+export type GetProjectUploadDefaultsData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/v1/projects/{project_id}/upload-defaults';
+};
+
+export type GetProjectUploadDefaultsErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Operation conflicts with current state
+     */
+    409: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type GetProjectUploadDefaultsError = GetProjectUploadDefaultsErrors[keyof GetProjectUploadDefaultsErrors];
+
+export type GetProjectUploadDefaultsResponses = {
+    /**
+     * Successful Response
+     */
+    200: ProjectUploadDefaultResponse;
+};
+
+export type GetProjectUploadDefaultsResponse = GetProjectUploadDefaultsResponses[keyof GetProjectUploadDefaultsResponses];
+
+export type SetProjectUploadDefaultsData = {
+    body: ProjectUploadDefaultRequest;
+    headers: {
+        /**
+         * Idempotency-Key
+         */
+        'Idempotency-Key': string;
+    };
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/v1/projects/{project_id}/upload-defaults';
+};
+
+export type SetProjectUploadDefaultsErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Operation conflicts with current state
+     */
+    409: ProblemDetails;
+    /**
+     * Content Too Large
+     */
+    413: ProblemDetails;
+    /**
+     * Unsupported Media Type
+     */
+    415: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type SetProjectUploadDefaultsError = SetProjectUploadDefaultsErrors[keyof SetProjectUploadDefaultsErrors];
+
+export type SetProjectUploadDefaultsResponses = {
+    /**
+     * Successful Response
+     */
+    200: ProjectUploadDefaultChangeResponse;
+};
+
+export type SetProjectUploadDefaultsResponse = SetProjectUploadDefaultsResponses[keyof SetProjectUploadDefaultsResponses];
 
 export type GetCurrentSessionData = {
     body?: never;

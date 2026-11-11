@@ -3,11 +3,9 @@
 import asyncio
 import os
 from dataclasses import replace
-from uuid import UUID
 
 import pytest
 from sqlalchemy import func, select
-from tests.support.authentication_evidence import MockAuthenticationEvidence
 from tests.support.project_membership_postgres_scenarios import (
     MembershipProjectSeedDTO,
     seed_membership_project,
@@ -23,11 +21,7 @@ from inframeld_backend.access.application.dtos.access_context_dto import AccessC
 from inframeld_backend.access.application.dtos.organization_action_grant_change_result_dto import (
     OrganizationActionGrantChangeResultDTO,
 )
-from inframeld_backend.access.application.dtos.verified_human_identity_dto import (
-    VerifiedHumanIdentityDTO,
-)
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
-from inframeld_backend.access.domain.value_objects.identity_subject import IdentitySubject
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.infrastructure.rows.access_audit_event_row import AccessAuditEventRow
 from inframeld_backend.access.infrastructure.rows.organization_action_grant_operation_result_row import (
@@ -247,18 +241,6 @@ async def _remove(
         )
 
 
-def _bob(seed: MembershipProjectSeedDTO) -> AccessContextDTO:
-    return AccessContextDTO(
-        actor_principal_id=seed.bob_id,
-        authentication_evidence=MockAuthenticationEvidence.browser(
-            VerifiedHumanIdentityDTO(
-                authority=seed.actor.binding.identity.authority,
-                subject=IdentitySubject(str(UUID(int=200))),
-            ),
-        ),
-    )
-
-
 @pytest.mark.parametrize(
     "action", ["admit-users", "suspend-users", "restore-users", "create-projects"]
 )
@@ -395,7 +377,7 @@ async def test_original_organization_lookup_and_write_replay_both_require_curren
         action="create-projects",
         revision=revision + 1,
         key="org-bob-removes-alice",
-        access=_bob(seed),
+        access=seed.bob_access,
     )
     async with open_original_operation_lookup(database) as lookup:
         with pytest.raises(AccessDeniedError):
@@ -418,7 +400,7 @@ async def test_original_organization_lookup_and_write_replay_both_require_curren
             action="create-projects",
             revision=revision + 2,
             key="org-last",
-            access=_bob(seed),
+            access=seed.bob_access,
         )
 
 
@@ -452,7 +434,7 @@ async def test_competing_organization_delegators_reread_after_the_exclusive_turn
             action="create-projects",
             revision=revision + 1,
             key="org-race-bob",
-            access=_bob(seed),
+            access=seed.bob_access,
         ),
         return_exceptions=True,
     )

@@ -15,6 +15,9 @@ from inframeld_backend.access.application.dtos.human_admission_facts_dto import 
 from inframeld_backend.access.application.dtos.human_admission_result_dto import (
     HumanAdmissionResultDTO,
 )
+from inframeld_backend.access.application.dtos.human_credential_facts_dto import (
+    HumanCredentialFactsDTO,
+)
 from inframeld_backend.access.application.dtos.human_credential_state_dto import (
     HumanCredentialStateDTO,
 )
@@ -49,6 +52,9 @@ from inframeld_backend.access.domain.entities.principal import Principal
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.enums.principal_status import PrincipalStatus
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
+from inframeld_backend.access.domain.value_objects.human_credential_version import (
+    HumanCredentialVersion,
+)
 from inframeld_backend.access.domain.value_objects.identity_authority import IdentityAuthority
 from inframeld_backend.access.domain.value_objects.identity_subject import IdentitySubject
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
@@ -88,7 +94,11 @@ CONTEXT = IdempotencyContextDTO(
     key=IdempotencyKey("admit-bob"),
 )
 ACTOR_FACTS = OrganizationAccessFactsDTO(
-    ALICE, 7, (OrganizationActionGrantDTO(ActionId("admit-users"), False),), False, None
+    ALICE,
+    7,
+    (OrganizationActionGrantDTO(ActionId("admit-users"), False),),
+    False,
+    HumanCredentialFactsDTO(True, HumanCredentialVersion(1)),
 )
 FACTS = HumanAdmissionFactsDTO(
     installation_id=INSTALLATION,

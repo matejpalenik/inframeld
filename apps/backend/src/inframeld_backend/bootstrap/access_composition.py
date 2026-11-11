@@ -47,9 +47,6 @@ from inframeld_backend.access.infrastructure.readers.postgres_human_credential_s
 from inframeld_backend.access.infrastructure.readers.postgres_human_identity_link_reader import (
     PostgresHumanIdentityLinkReader,
 )
-from inframeld_backend.access.infrastructure.readers.postgres_identity_recovery_block_reader import (
-    PostgresIdentityRecoveryBlockReader,
-)
 from inframeld_backend.access.infrastructure.settings.application_key_authentication_settings import (
     ApplicationKeyAuthenticationSettings,
 )
@@ -130,7 +127,7 @@ def create_access_components(
         )
 
     reader = PostgresHumanIdentityLinkReader(database)
-    recovery_block_reader = PostgresIdentityRecoveryBlockReader(database)
+    credential_state_reader = PostgresHumanCredentialStateReader(database)
 
     with ExitStack() as provider_cleanup:
         kratos_client = KratosApiClient(
@@ -152,8 +149,7 @@ def create_access_components(
         )
         authenticator = HumanSessionAuthenticationService(
             browser_verifier,
-            reader,
-            recovery_block_reader=recovery_block_reader,
+            credential_state_reader,
             provider_timeout_seconds=human_authentication_settings.provider_timeout_seconds,
             total_timeout_seconds=human_authentication_settings.total_timeout_seconds,
         )
@@ -194,7 +190,6 @@ def create_access_components(
                         OAuth2Api(hydra_client), public_url=str(hydra_settings.public_url)
                     ),
                     browser_verifier,
-                    recovery_block_reader,
                     credential_state_reader=PostgresHumanCredentialStateReader(database),
                     credential_initializer=PostgresHumanCredentialStateInitializer(database),
                     authority=kratos_settings.authority,

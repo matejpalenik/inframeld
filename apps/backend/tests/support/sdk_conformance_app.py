@@ -33,6 +33,9 @@ from inframeld_backend.access.application.commands.create_project_command import
 from inframeld_backend.access.application.commands.decide_human_oauth_consent_command import (
     DecideHumanOAuthConsentCommand,
 )
+from inframeld_backend.access.application.commands.delete_project_command import (
+    DeleteProjectCommand,
+)
 from inframeld_backend.access.application.commands.remove_access_group_action_grant_command import (
     RemoveAccessGroupActionGrantCommand,
 )
@@ -88,6 +91,9 @@ from inframeld_backend.access.application.dtos.application_account_action_grants
 from inframeld_backend.access.application.dtos.application_account_grant_target_dto import (
     ApplicationAccountGrantTargetDTO,
 )
+from inframeld_backend.access.application.dtos.browser_session_authentication_dto import (
+    BrowserSessionAuthenticationDTO,
+)
 from inframeld_backend.access.application.dtos.created_project_dto import CreatedProjectDTO
 from inframeld_backend.access.application.dtos.grant_recipient_dto import GrantRecipientDTO
 from inframeld_backend.access.application.dtos.grant_recipients_page_dto import (
@@ -96,14 +102,14 @@ from inframeld_backend.access.application.dtos.grant_recipients_page_dto import 
 from inframeld_backend.access.application.dtos.human_admission_result_dto import (
     HumanAdmissionResultDTO,
 )
+from inframeld_backend.access.application.dtos.human_credential_facts_dto import (
+    HumanCredentialFactsDTO,
+)
 from inframeld_backend.access.application.dtos.human_oauth_consent_details_dto import (
     HumanOAuthConsentDetailsDTO,
 )
 from inframeld_backend.access.application.dtos.human_oauth_credential_binding_dto import (
     HumanOAuthCredentialBindingDTO,
-)
-from inframeld_backend.access.application.dtos.human_oauth_credential_facts_dto import (
-    HumanOAuthCredentialFactsDTO,
 )
 from inframeld_backend.access.application.dtos.my_organization_access_dto import (
     MyOrganizationAccessDTO,
@@ -142,6 +148,9 @@ from inframeld_backend.access.application.dtos.project_action_grants_page_facts_
 )
 from inframeld_backend.access.application.dtos.project_creation_result_dto import (
     ProjectCreationResultDTO,
+)
+from inframeld_backend.access.application.dtos.project_deletion_result_dto import (
+    ProjectDeletionResultDTO,
 )
 from inframeld_backend.access.application.dtos.project_grant_target_dto import ProjectGrantTargetDTO
 from inframeld_backend.access.application.dtos.project_member_dto import ProjectMemberDTO
@@ -227,6 +236,7 @@ from inframeld_backend.access.application.protocols.project_action_grants_facts_
     ProjectActionGrantsFactsReader,
 )
 from inframeld_backend.access.application.protocols.project_creator import ProjectCreator
+from inframeld_backend.access.application.protocols.project_deleter import ProjectDeleter
 from inframeld_backend.access.application.protocols.project_grant_changer import ProjectGrantChanger
 from inframeld_backend.access.application.protocols.project_grant_recipients_reader import (
     ProjectGrantRecipientsReader,
@@ -247,6 +257,12 @@ from inframeld_backend.access.application.protocols.project_metadata_reader impo
     ProjectMetadataReader,
 )
 from inframeld_backend.access.application.protocols.project_name_resolver import ProjectNameResolver
+from inframeld_backend.access.application.protocols.project_upload_default_changer import (
+    ProjectUploadDefaultChanger,
+)
+from inframeld_backend.access.application.protocols.project_upload_default_reader import (
+    ProjectUploadDefaultReader,
+)
 from inframeld_backend.access.application.queries.get_project_metadata_query import (
     GetProjectMetadataQuery,
 )
@@ -303,6 +319,9 @@ from inframeld_backend.access.domain.value_objects.identity_authority import Ide
 from inframeld_backend.access.domain.value_objects.identity_subject import IdentitySubject
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
+from inframeld_backend.access.domain.value_objects.project_deletion_obligation_id import (
+    ProjectDeletionObligationId,
+)
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
 from inframeld_backend.access.http.dependencies.application_key_dependency import (
     ApplicationKeyDependency,
@@ -368,6 +387,9 @@ from inframeld_backend.access.http.routes.project_action_grant_routes import (
 from inframeld_backend.access.http.routes.project_creation_routes import (
     create_project_creation_router,
 )
+from inframeld_backend.access.http.routes.project_deletion_routes import (
+    create_project_deletion_router,
+)
 from inframeld_backend.access.http.routes.project_grant_recipients_routes import (
     create_project_grant_recipients_router,
 )
@@ -379,6 +401,12 @@ from inframeld_backend.access.http.routes.project_membership_routes import (
 )
 from inframeld_backend.access.http.routes.project_metadata_routes import (
     create_project_metadata_router,
+)
+from inframeld_backend.access.http.routes.project_upload_default_routes import (
+    create_project_upload_default_router,
+)
+from inframeld_backend.shared.application.dtos.accepted_async_operation_dto import (
+    AcceptedAsyncOperationDTO,
 )
 from inframeld_backend.shared.application.dtos.accepted_operation_lookup_dto import (
     AcceptedOperationLookupDTO,
@@ -429,6 +457,7 @@ from inframeld_backend.shared.application.queries.lookup_original_operation_quer
 )
 from inframeld_backend.shared.application.value_objects.job_id import JobId
 from inframeld_backend.shared.application.value_objects.operation_id import OperationId
+from inframeld_backend.shared.application.value_objects.request_id import RequestId
 from inframeld_backend.shared.domain.enums.job_status import JobStatus
 from inframeld_backend.shared.domain.value_objects.installation_id import InstallationId
 from inframeld_backend.shared.domain.value_objects.resource_name import ResourceName
@@ -448,6 +477,7 @@ from tests.support.mock_sdk_application_key_issuer import MockSDKApplicationKeyI
 from tests.support.mock_sdk_application_key_revoker import MockSDKApplicationKeyRevoker
 from tests.support.mock_sdk_application_session_reader import MockSDKApplicationSessionReader
 from tests.support.mock_sdk_invitations import MockSDKInvitations
+from tests.support.mock_sdk_project_upload_defaults import MockSDKProjectUploadDefaults
 from tests.support.openapi_schema_fixture import create_schema_fixture_app
 
 
@@ -483,12 +513,28 @@ class MockSDKBrowserAuthenticator(HumanSessionAuthenticator):
         if credential is None or credential.value != "sdk-cookie":
             raise AuthenticationRequiredError()
 
-        return AccessContextDTO(PRINCIPAL, MockAuthenticationEvidence.browser(IDENTITY))
+        return AccessContextDTO(
+            PRINCIPAL,
+            MockAuthenticationEvidence.browser(
+                IDENTITY,
+                installation_id=InstallationId(UUID(int=123)),
+                version=HumanCredentialVersion(1),
+            ),
+        )
 
 
 class MockSDKTokenAuthenticator(HumanAccessTokenAuthenticator):
     @override
     async def authenticate(self, credential: HumanAccessTokenCredential | None) -> AccessContextDTO:
+        if credential is not None and credential.value == "sdk-other-human":
+            return AccessContextDTO(
+                PrincipalId(UUID(int=999)),
+                MockAuthenticationEvidence.human_oauth(
+                    VerifiedHumanIdentityDTO(
+                        IdentityAuthority("kratos:test"), IdentitySubject("bob")
+                    )
+                ),
+            )
         if credential is not None and credential.value == "sdk-denied":
             raise AccessDeniedError()
         if credential is not None and credential.value == "sdk-unavailable":
@@ -1074,6 +1120,16 @@ async def _open_application_key_revoker() -> AsyncGenerator[ApplicationKeyRevoke
     yield MockSDKApplicationKeyRevoker()
 
 
+@asynccontextmanager
+async def _open_upload_default_reader() -> AsyncGenerator[ProjectUploadDefaultReader]:
+    yield MockSDKProjectUploadDefaults()
+
+
+@asynccontextmanager
+async def _open_upload_default_changer() -> AsyncGenerator[ProjectUploadDefaultChanger]:
+    yield MockSDKProjectUploadDefaults()
+
+
 class MockSDKHumanAdmitter(HumanAdmitter):
     """Supply typed original outcomes without simulating admission or provider state."""
 
@@ -1238,8 +1294,11 @@ class MockSDKProjectMembersFacts(ProjectMembersFactsReader):
                     PrincipalStatus.ACTIVE,
                 ),
                 has_pending_recovery=False,
-                oauth_credential_facts=HumanOAuthCredentialFactsDTO(True, HumanCredentialVersion(1))
-                if isinstance(access.authentication_evidence, HumanOAuthCredentialBindingDTO)
+                oauth_credential_facts=HumanCredentialFactsDTO(True, HumanCredentialVersion(1))
+                if isinstance(
+                    access.authentication_evidence,
+                    (BrowserSessionAuthenticationDTO, HumanOAuthCredentialBindingDTO),
+                )
                 else None,
                 project_status=ProjectStatus.ACTIVE,
                 is_project_member=True,
@@ -1296,8 +1355,11 @@ class MockSDKProjectActionGrantsFacts(ProjectActionGrantsFactsReader):
                     PrincipalStatus.ACTIVE,
                 ),
                 has_pending_recovery=False,
-                oauth_credential_facts=HumanOAuthCredentialFactsDTO(True, HumanCredentialVersion(1))
-                if isinstance(access.authentication_evidence, HumanOAuthCredentialBindingDTO)
+                oauth_credential_facts=HumanCredentialFactsDTO(True, HumanCredentialVersion(1))
+                if isinstance(
+                    access.authentication_evidence,
+                    (BrowserSessionAuthenticationDTO, HumanOAuthCredentialBindingDTO),
+                )
                 else None,
                 project_status=ProjectStatus.ACTIVE,
                 is_project_member=True,
@@ -1391,8 +1453,11 @@ class MockSDKMyProjectAccessFacts(MyProjectAccessFactsReader):
                 access.actor_principal_id, organization, PrincipalKind.HUMAN, PrincipalStatus.ACTIVE
             ),
             has_pending_recovery=False,
-            oauth_credential_facts=HumanOAuthCredentialFactsDTO(True, HumanCredentialVersion(1))
-            if isinstance(access.authentication_evidence, HumanOAuthCredentialBindingDTO)
+            oauth_credential_facts=HumanCredentialFactsDTO(True, HumanCredentialVersion(1))
+            if isinstance(
+                access.authentication_evidence,
+                (BrowserSessionAuthenticationDTO, HumanOAuthCredentialBindingDTO),
+            )
             else None,
             project_status=ProjectStatus.ACTIVE,
             is_project_member=True,
@@ -1479,6 +1544,49 @@ async def _open_name_resolver() -> AsyncGenerator[ProjectNameResolver]:
     yield MockSDKProjectMetadata()
 
 
+class MockSDKProjectDeleter(ProjectDeleter):
+    """Supply controlled wire admission without performing deletion or persistence."""
+
+    @override
+    async def delete(
+        self,
+        *,
+        access: AccessContextDTO,
+        command: DeleteProjectCommand,
+        context: IdempotencyContextDTO,
+        request_id: RequestId,
+    ) -> ProjectDeletionResultDTO:
+        if access.actor_principal_id != PRINCIPAL:
+            raise AccessDeniedError()
+        if command.project_id.value != UUID("00000000-0000-4000-8000-000000000003"):
+            raise ResourceNotFoundError()
+        if context.key.value == "sdk-project-delete-fresh":
+            raise ConflictError("The controlled Project is already blocked.")
+        if context.key.value == "sdk-project-delete-unavailable":
+            raise DependencyUnavailableError()
+        if command.expected_access_revision != 7:
+            raise StaleRevisionError()
+        if context.key.value != "sdk-project-delete":
+            raise ValueError("The SDK changed the deletion idempotency header.")
+
+        return ProjectDeletionResultDTO(
+            installation_id=InstallationId(UUID("00000000-0000-4000-8000-000000000001")),
+            organization_id=OrganizationId(UUID("00000000-0000-4000-8000-000000000002")),
+            project_id=command.project_id,
+            actor_principal_id=access.actor_principal_id,
+            obligation_id=ProjectDeletionObligationId(UUID(int=23)),
+            job_id=JobId(UUID(int=24)),
+            before_access_revision=7,
+            access_revision=8,
+            operation=AcceptedAsyncOperationDTO(OperationId("sdk-project-delete"), True, None),
+        )
+
+
+@asynccontextmanager
+async def _open_project_deleter() -> AsyncGenerator[ProjectDeleter]:
+    yield MockSDKProjectDeleter()
+
+
 class MockSDKOriginalOperationLookup(OriginalOperationLookup):
     """Supply explicit retained outcomes without a database or business dispatch."""
 
@@ -1499,6 +1607,25 @@ class MockSDKOriginalOperationLookup(OriginalOperationLookup):
             method=query.method,
             requested_route=query.requested_route,
         )
+        if query.expected_authority.family is OperationLookupAuthorityFamily.PROJECT_DELETION:
+            if (
+                access.actor_principal_id != PRINCIPAL
+                or query.installation_id.value != UUID("00000000-0000-4000-8000-000000000001")
+                or query.organization_id.value != UUID("00000000-0000-4000-8000-000000000002")
+                or query.project_id != ProjectId(UUID("00000000-0000-4000-8000-000000000003"))
+                or query.requested_route != "/v1/projects/00000000-0000-4000-8000-000000000003"
+                or query.key.value != "sdk-project-delete"
+            ):
+                return UnresolvedOperationDTO()
+            return RetainedDeletionStatusDTO(
+                operation_id=OperationId("sdk-project-delete"),
+                job_status=JobStatus.SUCCEEDED,
+                admission_confirmed=True,
+                access_blocked=True,
+                application_shutdown_complete=True,
+                physical_cleanup_complete=False,
+                expires_at=None,
+            )
         if query.expected_authority.family is OperationLookupAuthorityFamily.ACCESS_GROUP_DELETION:
             if (
                 query.key.value == "sdk-group-delete"
@@ -1639,6 +1766,21 @@ class MockSDKDeletionStatusLookup(DeletionStatusLookup):
     async def lookup(
         self, *, access: AccessContextDTO, query: GetDeletionStatusQuery
     ) -> RetainedDeletionStatusDTO | UnresolvedOperationDTO:
+        if query.operation_id.value.startswith("sdk-project-delete"):
+            if access.actor_principal_id != PRINCIPAL:
+                return UnresolvedOperationDTO()
+            if query.operation_id.value not in {"sdk-project-delete", "sdk-project-delete-pending"}:
+                return UnresolvedOperationDTO()
+            complete = query.operation_id.value == "sdk-project-delete"
+            return RetainedDeletionStatusDTO(
+                operation_id=query.operation_id,
+                job_status=JobStatus.SUCCEEDED if complete else JobStatus.QUEUED,
+                admission_confirmed=True,
+                access_blocked=True,
+                application_shutdown_complete=complete,
+                physical_cleanup_complete=False,
+                expires_at=None,
+            )
         match query.operation_id.value:
             case "sdk-group-delete":
                 return RetainedDeletionStatusDTO(
@@ -1894,6 +2036,19 @@ def create_sdk_conformance_app(browser_origin: str | None = None) -> FastAPI:
             _open_application_key_revoker,
         )
     )
+    application.include_router(
+        create_project_upload_default_router(
+            ProductAccessDependency(
+                browser_authenticator,
+                csrf,
+                access_token_authenticator=token_authenticator,
+                application_authenticator=MockSDKApplicationAuthenticator(),
+            ),
+            _open_upload_default_reader,
+            _open_upload_default_changer,
+        )
+    )
+    application.include_router(create_project_deletion_router(authenticate, _open_project_deleter))
     application.include_router(create_project_members_router(authenticate, _open_project_members))
     application.include_router(
         create_project_membership_router(authenticate, MockSDKMembershipChangeServiceFactory())

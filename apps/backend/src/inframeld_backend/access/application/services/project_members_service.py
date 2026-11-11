@@ -6,9 +6,6 @@ from inframeld_backend.access.application.dtos.project_members_page_dto import P
 from inframeld_backend.access.application.dtos.project_membership_observation_dto import (
     ProjectMembershipObservationDTO,
 )
-from inframeld_backend.access.application.errors.human_oauth_credential_rejected_error import (
-    HumanOAuthCredentialRejectedError,
-)
 from inframeld_backend.access.application.protocols.project_members_facts_reader import (
     ProjectMembersFactsReader,
 )
@@ -80,8 +77,9 @@ class ProjectMembersService(ProjectMembersReader):
             has_pending_recovery=action.has_pending_recovery,
             oauth_credential_facts=action.oauth_credential_facts,
         )
-        if not eligibility.credential_is_current:
-            raise HumanOAuthCredentialRejectedError()
+        PrincipalAccessEvaluationService.require_current_credential(
+            access=access, principal_access=eligibility
+        )
         if not PrincipalAccessPolicy.may_use_product(
             eligibility
         ) or not ProjectActionEligibilityPolicy.may_use(

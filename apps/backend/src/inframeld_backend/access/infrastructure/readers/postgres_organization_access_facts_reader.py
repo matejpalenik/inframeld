@@ -7,11 +7,14 @@ from sqlalchemy.exc import TimeoutError as SqlAlchemyTimeoutError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
+from inframeld_backend.access.application.dtos.browser_session_authentication_dto import (
+    BrowserSessionAuthenticationDTO,
+)
+from inframeld_backend.access.application.dtos.human_credential_facts_dto import (
+    HumanCredentialFactsDTO,
+)
 from inframeld_backend.access.application.dtos.human_oauth_credential_binding_dto import (
     HumanOAuthCredentialBindingDTO,
-)
-from inframeld_backend.access.application.dtos.human_oauth_credential_facts_dto import (
-    HumanOAuthCredentialFactsDTO,
 )
 from inframeld_backend.access.application.dtos.organization_access_facts_dto import (
     OrganizationAccessFactsDTO,
@@ -88,12 +91,16 @@ class PostgresOrganizationAccessFactsReader(OrganizationAccessFactsReader):
         evidence = access.authentication_evidence
         binding_matches = (
             HumanCredentialStateQueries.binding_matches_actor(evidence)
-            if isinstance(evidence, HumanOAuthCredentialBindingDTO)
+            if isinstance(
+                evidence, HumanOAuthCredentialBindingDTO | BrowserSessionAuthenticationDTO
+            )
             else literal(False)
         )
         version = (
             Nullable(HumanCredentialStateQueries.version_for_actor(evidence))
-            if isinstance(evidence, HumanOAuthCredentialBindingDTO)
+            if isinstance(
+                evidence, HumanOAuthCredentialBindingDTO | BrowserSessionAuthenticationDTO
+            )
             else Nullable(literal(None, BigInteger))
         )
         statement = (
@@ -169,11 +176,13 @@ class PostgresOrganizationAccessFactsReader(OrganizationAccessFactsReader):
             revision,
             tuple(grants),
             blocked,
-            HumanOAuthCredentialFactsDTO(
+            HumanCredentialFactsDTO(
                 matches,
                 HumanCredentialVersion(current_version) if current_version is not None else None,
             )
-            if isinstance(evidence, HumanOAuthCredentialBindingDTO)
+            if isinstance(
+                evidence, HumanOAuthCredentialBindingDTO | BrowserSessionAuthenticationDTO
+            )
             else None,
         )
 

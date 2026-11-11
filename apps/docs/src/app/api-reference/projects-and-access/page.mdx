@@ -100,6 +100,16 @@ Require current human `create-projects` authority on the requested Organization,
 
 The creation receipt's `initialGrants` describes the original assignments. Exact replay requires current authorization and returns that original result without restoring removed grants or reversing later renames. [The guide](/guides/create-project) covers the saved request, generated clients, current metadata and uncertain-result recovery. This operation creates no starter or RAG resources.
 
+## Admit Project deletion
+
+<ApiOperation operationId="deleteProject" />
+
+Require current eligible-human Project membership and use of exact `delete-project`. Send one strict `expectedAccessRevision` query value and the original opaque `Idempotency-Key`, without a body. Unknown or duplicate query fields are rejected. No per-document Delete or per-account Delete permission is added. [Delete a Project](/guides/delete-project) explains reviewed inputs and safe recovery.
+
+The closed `202` returns original `operationId`, required nullable `idempotencyExpiresAt`, `projectId`, original `accessRevision`, `admissionConfirmed: true` and `accessBlocked: true`. It exposes no job ID or physical progress. A new admission saves the block, audit, original and exact durable obligation together. Local application/key shutdown and physical erasure are later distinct facts.
+
+Current membership, credentials and Delete authority precede full same-request replay. An already deleting Project allows recovery of its original `202`, never a fresh admission. The separate `project_deletion` saved-identity lookup and known-ID status instead allow only the currently eligible original initiator to read content-free facts after membership loss. They return no full admission receipt or mutation authority.
+
 ## Create an application account
 
 <ApiOperation operationId="createApplicationAccount" />
@@ -345,6 +355,20 @@ A candidate's appearance grants no permission and cannot guarantee eligibility a
 `GET /v1/projects/{project_id}/my-access` requires a currently eligible human member of the Project, without a separate action or membership-management grant. It accepts ordinary `limit`/`cursor` and no body or principal selector. `MyProjectAccessResponse` identifies the actual Project/principal and current `accessRevision`, plus stored `grants`, `groupMemberships`, `groupManagements` and required nullable `nextCursor`.
 
 One combined page has at most `limit` entries across the three arrays, default 25 and maximum 100. Grants carry a typed exact Project/access-group/application-account target, `actionId` and `canGrant`. Group relationships carry only `accessGroupId`. Each page checks current authority and revision, with a principal/scope-bound cursor. It supplies no implied grants, hidden linked resources or permission snapshot. [The guide](/guides/assign-project-grant#read-your-project-access-and-current-revision) explains revision review.
+
+## Read future-upload defaults
+
+<ApiOperation operationId="getProjectUploadDefaults" />
+
+Read the authoritative saved audience and current Project Access revision. An eligible admitted human needs current Project membership, permission to use `manage-upload-defaults`, and ordinary membership plus management of every saved group. `groupIds: null` means unconfigured for a valid Project. A hidden, denied or unavailable observation is not an unset default. The read has no body or request key.
+
+## Set future-upload defaults
+
+<ApiOperation operationId="setProjectUploadDefaults" />
+
+Replace the complete nonempty same-Project audience with strict `groupIds` and `expectedAccessRevision` JSON plus the original `Idempotency-Key`. Current management of every saved and proposed group, including retained groups, is required before original-result recovery. A fresh no-op still checks the reviewed revision. Only a real change advances it.
+
+HTTP `200` returns the original resulting audience, revision, operation ID and expiry. If A→B was followed by C, exact-request recovery returns historical B without disclosing A or overwriting C. Current management must cover C∪B. GET separately reports current C. Preserve the exact original PUT meaning after uncertain effects. Expired retention does not authorize redispatch over later state. [The task guide](/guides/manage-access-groups#inspect-and-change-future-upload-audiences) supplies current reads, reviewed changes and recovery examples.
 
 ## Set a Project action grant
 

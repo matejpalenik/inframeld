@@ -7,7 +7,7 @@ from inframeld_backend.shared.domain.value_objects.installation_id import Instal
 
 
 class HumanCredentialPolicy:
-    """Decide whether a CLI credential still belongs to the identity's current generation."""
+    """Decide whether human evidence belongs to the identity's current generation."""
 
     @staticmethod
     def is_current_for_actor(

@@ -20,11 +20,14 @@ from sqlalchemy.orm import aliased
 from sqlalchemy.sql.selectable import Exists
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
+from inframeld_backend.access.application.dtos.browser_session_authentication_dto import (
+    BrowserSessionAuthenticationDTO,
+)
+from inframeld_backend.access.application.dtos.human_credential_facts_dto import (
+    HumanCredentialFactsDTO,
+)
 from inframeld_backend.access.application.dtos.human_oauth_credential_binding_dto import (
     HumanOAuthCredentialBindingDTO,
-)
-from inframeld_backend.access.application.dtos.human_oauth_credential_facts_dto import (
-    HumanOAuthCredentialFactsDTO,
 )
 from inframeld_backend.access.application.dtos.project_action_grant_management_facts_dto import (
     ProjectActionGrantManagementFactsDTO,
@@ -366,7 +369,7 @@ class PostgresProjectGrantChangeFactsReader(
         )
 
         evidence = access.authentication_evidence
-        if isinstance(evidence, HumanOAuthCredentialBindingDTO):
+        if isinstance(evidence, HumanOAuthCredentialBindingDTO | BrowserSessionAuthenticationDTO):
             binding_matches_actor = HumanCredentialStateQueries.binding_matches_actor(evidence)
             credential_version = Nullable(HumanCredentialStateQueries.version_for_actor(evidence))
         else:
@@ -433,13 +436,15 @@ class PostgresProjectGrantChangeFactsReader(
             actor=_to_principal(actor_row),
             has_pending_recovery=pending_recovery,
             oauth_credential_facts=(
-                HumanOAuthCredentialFactsDTO(
+                HumanCredentialFactsDTO(
                     binding_matches_actor=matches_actor,
                     current_version=HumanCredentialVersion(current_credential_version)
                     if current_credential_version is not None
                     else None,
                 )
-                if isinstance(evidence, HumanOAuthCredentialBindingDTO)
+                if isinstance(
+                    evidence, HumanOAuthCredentialBindingDTO | BrowserSessionAuthenticationDTO
+                )
                 else None
             ),
             recipient=(_to_principal(recipient_row) if recipient_row is not None else None),

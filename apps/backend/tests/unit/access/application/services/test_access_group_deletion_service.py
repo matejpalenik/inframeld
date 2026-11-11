@@ -27,6 +27,9 @@ from inframeld_backend.access.application.dtos.access_group_read_facts_dto impor
     AccessGroupReadFactsDTO,
 )
 from inframeld_backend.access.application.dtos.deleted_access_group_dto import DeletedAccessGroupDTO
+from inframeld_backend.access.application.dtos.human_credential_facts_dto import (
+    HumanCredentialFactsDTO,
+)
 from inframeld_backend.access.application.dtos.project_action_facts_dto import ProjectActionFactsDTO
 from inframeld_backend.access.application.protocols.access_group_deletion_facts_reader import (
     AccessGroupDeletionFactsReader,
@@ -45,6 +48,9 @@ from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.enums.principal_status import PrincipalStatus
 from inframeld_backend.access.domain.enums.project_status import ProjectStatus
 from inframeld_backend.access.domain.value_objects.access_group_id import AccessGroupId
+from inframeld_backend.access.domain.value_objects.human_credential_version import (
+    HumanCredentialVersion,
+)
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
@@ -107,7 +113,7 @@ FACTS = AccessGroupReadFactsDTO(
             ACCESS.actor_principal_id, ORGANIZATION_ID, PrincipalKind.HUMAN, PrincipalStatus.ACTIVE
         ),
         has_pending_recovery=False,
-        oauth_credential_facts=None,
+        oauth_credential_facts=HumanCredentialFactsDTO(True, HumanCredentialVersion(1)),
         project_status=ProjectStatus.ACTIVE,
         is_project_member=True,
         has_exact_action_grant=True,

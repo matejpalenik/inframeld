@@ -15,7 +15,13 @@ from inframeld_backend.access.application.dtos.application_account_action_grants
 from inframeld_backend.access.application.dtos.application_account_grant_target_dto import (
     ApplicationAccountGrantTargetDTO,
 )
+from inframeld_backend.access.application.dtos.human_credential_facts_dto import (
+    HumanCredentialFactsDTO,
+)
 from inframeld_backend.access.application.dtos.project_action_facts_dto import ProjectActionFactsDTO
+from inframeld_backend.access.application.errors.human_oauth_credential_rejected_error import (
+    HumanOAuthCredentialRejectedError,
+)
 from inframeld_backend.access.application.protocols.application_account_action_grants_facts_reader import (
     ApplicationAccountActionGrantsFactsReader,
 )
@@ -33,11 +39,15 @@ from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.enums.principal_status import PrincipalStatus
 from inframeld_backend.access.domain.enums.project_status import ProjectStatus
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
+from inframeld_backend.access.domain.value_objects.human_credential_version import (
+    HumanCredentialVersion,
+)
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
 from inframeld_backend.shared.application.errors.application_errors import (
     AccessDeniedError,
+    AuthenticationRequiredError,
     InvalidInputError,
     ResourceNotFoundError,
 )
@@ -74,7 +84,7 @@ FACTS = ApplicationAccountActionGrantsPageFactsDTO(
     actor=ProjectActionFactsDTO(
         principal=ACTOR,
         has_pending_recovery=False,
-        oauth_credential_facts=None,
+        oauth_credential_facts=HumanCredentialFactsDTO(True, HumanCredentialVersion(1)),
         project_status=ProjectStatus.ACTIVE,
         is_project_member=True,
         has_exact_action_grant=True,
@@ -185,3 +195,21 @@ async def test_reader_cannot_change_assignment_action_or_uuid_order() -> None:
             await ApplicationAccountActionGrantsService(
                 MockGrantFacts(replace(FACTS, items=items))
             ).list_grants(access=ACCESS, query=_query())
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("oauth", [False, True])
+async def test_browser_currentness_preserves_the_presented_credential_family(oauth: bool) -> None:
+    """Reject stale evidence before disclosing data, recovering originals or changing authority."""
+    evidence = (
+        MockAuthenticationEvidence.human_oauth() if oauth else MockAuthenticationEvidence.browser()
+    )
+    stale = HumanCredentialFactsDTO(True, HumanCredentialVersion(2))
+    expected = HumanOAuthCredentialRejectedError if oauth else AuthenticationRequiredError
+    facts = MockGrantFacts(replace(FACTS, actor=replace(FACTS.actor, oauth_credential_facts=stale)))
+    with pytest.raises(AuthenticationRequiredError) as caught:
+        await ApplicationAccountActionGrantsService(facts).list_grants(
+            access=replace(ACCESS, authentication_evidence=evidence), query=_query()
+        )
+    assert type(caught.value) is expected
+    assert facts.calls == [(None, 2)]

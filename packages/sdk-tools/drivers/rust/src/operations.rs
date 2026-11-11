@@ -4,6 +4,7 @@ use inframeld_sdk::client::*;
 use inframeld_sdk::types::{
     ApplicationKeyIssueRequest, ApplicationKeyRevocationRequest, InvitationActivationRequest,
     InvitationIssueRequest, InvitationPreviewRequest, InvitationRevocationRequest,
+    ProjectUploadDefaultRequest,
 };
 use inframeld_sdk_test_rust::client as fixture;
 use serde_json::Value;
@@ -456,6 +457,26 @@ pub async fn observe(
                 .resolve_project_name(request.path.as_ref().unwrap()["name"].as_str().unwrap())
                 .await
         ),
+        "getProjectUploadDefaults" => observed!(
+            client
+                .get_project_upload_defaults(
+                    request.path.as_ref().unwrap()["project_id"]
+                        .as_str()
+                        .unwrap()
+                )
+                .await
+        ),
+        "setProjectUploadDefaults" => observed!(
+            client
+                .set_project_upload_defaults(
+                    request.path.as_ref().unwrap()["project_id"]
+                        .as_str()
+                        .unwrap(),
+                    &request.headers["Idempotency-Key"],
+                    serde_json::from_value::<ProjectUploadDefaultRequest>(body).unwrap()
+                )
+                .await
+        ),
         "getProjectMetadata" => observed!(
             client
                 .get_project_metadata(
@@ -648,6 +669,19 @@ pub async fn observe(
                         .as_str()
                         .unwrap(),
                     request.path.as_ref().unwrap()["principal_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.query.as_ref().unwrap()["expectedAccessRevision"]
+                        .as_i64()
+                        .unwrap(),
+                    &request.headers["Idempotency-Key"]
+                )
+                .await
+        ),
+        "deleteProject" => observed!(
+            client
+                .delete_project(
+                    request.path.as_ref().unwrap()["project_id"]
                         .as_str()
                         .unwrap(),
                     request.query.as_ref().unwrap()["expectedAccessRevision"]

@@ -76,9 +76,6 @@ from inframeld_backend.access.infrastructure.readers.postgres_human_credential_s
 from inframeld_backend.access.infrastructure.readers.postgres_human_identity_link_reader import (
     PostgresHumanIdentityLinkReader,
 )
-from inframeld_backend.access.infrastructure.readers.postgres_identity_recovery_block_reader import (
-    PostgresIdentityRecoveryBlockReader,
-)
 from inframeld_backend.access.infrastructure.rows.identity_recovery_admission_row import (
     IdentityRecoveryAdmissionRow,
 )
@@ -186,7 +183,9 @@ class MockBrowserVerifier(BrowserSessionVerifier):
         self.calls = 0
 
     @override
-    async def verify(self, credential: BrowserSessionCredential) -> VerifiedHumanIdentityDTO | None:
+    async def verify(
+        self, credential: BrowserSessionCredential, *, timeout_seconds: float | None = None
+    ) -> VerifiedHumanIdentityDTO | None:
         self.calls += 1
         return IDENTITY if credential == COOKIE else None
 
@@ -198,7 +197,6 @@ class SessionScenario:
         # `TestClient` uses its own event loop so it needs its own db pool
         api_database = Database(settings)
         reader = PostgresHumanIdentityLinkReader(api_database)
-        recovery_block_reader = PostgresIdentityRecoveryBlockReader(api_database)
 
         self.token = MockTokenVerifier(api_database)
         self.identity = MockIdentityVerifier()
@@ -206,7 +204,7 @@ class SessionScenario:
 
         authenticate = HumanSessionDependency(
             HumanSessionAuthenticationService(
-                self.browser, reader, recovery_block_reader=recovery_block_reader
+                self.browser, PostgresHumanCredentialStateReader(api_database)
             ),
             CSRFProtectionDependency(()),
             access_token_authenticator=HumanAccessTokenAuthenticationService(
@@ -256,7 +254,7 @@ async def test_cookie_and_bearer_resolve_the_same_local_human(
         assert bearer_response.status_code == 200, bearer_response.text
         assert bearer_response.json() == expected
 
-    assert scenario.browser.calls == 1
+    assert scenario.browser.calls == 2
     assert scenario.token.calls == 1
     assert scenario.identity.calls == 1
 

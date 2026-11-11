@@ -16,6 +16,9 @@ from inframeld_backend.access.application.protocols.operation_lookup_authorizer 
     OperationLookupAuthorizer,
 )
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
+from inframeld_backend.access.domain.value_objects.human_credential_version import (
+    HumanCredentialVersion,
+)
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
@@ -58,6 +61,9 @@ from inframeld_backend.shared.application.errors.application_errors import (
 from inframeld_backend.shared.application.protocols.operation_lookup_reader import (
     OperationLookupReader,
 )
+from inframeld_backend.shared.application.protocols.original_operation_lookup import (
+    OriginalOperationLookup,
+)
 from inframeld_backend.shared.application.queries.lookup_original_operation_query import (
     LookupOriginalOperationQuery,
 )
@@ -72,7 +78,12 @@ from inframeld_backend.shared.application.value_objects.operation_lookup_authori
 )
 from inframeld_backend.shared.domain.value_objects.installation_id import InstallationId
 
-ACCESS = AccessContextDTO(PrincipalId(UUID(int=1)), MockAuthenticationEvidence.browser())
+ACCESS = AccessContextDTO(
+    PrincipalId(UUID(int=1)),
+    MockAuthenticationEvidence.browser(
+        installation_id=InstallationId(UUID(int=2)), version=HumanCredentialVersion(1)
+    ),
+)
 QUERY = LookupOriginalOperationQuery(
     InstallationId(UUID(int=2)),
     OrganizationId(UUID(int=3)),
@@ -324,3 +335,54 @@ async def test_timeout_is_not_a_successful_unresolved_observation() -> None:
             access=ACCESS, query=QUERY
         )
     assert events == ["authorize", "read"]
+
+
+class MockProjectDeletionLookup(OriginalOperationLookup):
+    def __init__(self, events: list[str]) -> None:
+        self.events = events
+
+    @override
+    async def lookup(
+        self, *, access: AccessContextDTO, query: LookupOriginalOperationQuery
+    ) -> UnresolvedOperationDTO:
+        assert access == ACCESS
+        self.events.append("project-deletion")
+        return UnresolvedOperationDTO()
+
+
+@pytest.mark.asyncio
+async def test_project_deletion_lookup_dispatch_never_uses_ordinary_authorizer() -> None:
+    events: list[str] = []
+    query = replace(
+        QUERY,
+        method=HttpMethod.DELETE,
+        requested_route=f"/v1/projects/{UUID(int=4)}",
+        expected_authority=OperationLookupAuthority(
+            OperationLookupAuthorityFamily.PROJECT_DELETION, ActionId("delete-project")
+        ),
+    )
+    result = await OriginalOperationLookupService(
+        MockLookupAuthorizer(events),
+        MockLookupReader(events, SAVED),
+        project_deletion_lookup=MockProjectDeletionLookup(events),
+    ).lookup(access=ACCESS, query=query)
+    assert isinstance(result, UnresolvedOperationDTO)
+    assert events == ["project-deletion"]
+
+
+@pytest.mark.asyncio
+async def test_unconfigured_project_deletion_lookup_is_unavailable_not_ordinary_replay() -> None:
+    events: list[str] = []
+    query = replace(
+        QUERY,
+        method=HttpMethod.DELETE,
+        requested_route=f"/v1/projects/{UUID(int=4)}",
+        expected_authority=OperationLookupAuthority(
+            OperationLookupAuthorityFamily.PROJECT_DELETION, ActionId("delete-project")
+        ),
+    )
+    with pytest.raises(DependencyUnavailableError):
+        await OriginalOperationLookupService(
+            MockLookupAuthorizer(events), MockLookupReader(events, SAVED)
+        ).lookup(access=ACCESS, query=query)
+    assert events == []

@@ -6,8 +6,8 @@ from uuid import uuid4
 
 import pytest
 from sqlalchemy import delete
-from tests.support.authentication_evidence import MockAuthenticationEvidence
 from tests.support.project_metadata_scenarios import (
+    capture_metadata_browser,
     metadata_service,
     seed_another_metadata_project,
     seed_metadata_project,
@@ -16,7 +16,6 @@ from tests.support.project_metadata_scenarios import (
 from inframeld_backend.access.application.commands.update_project_metadata_command import (
     UpdateProjectMetadataCommand,
 )
-from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
 from inframeld_backend.access.infrastructure.rows.project_action_grant_row import (
     ProjectActionGrantRow,
 )
@@ -67,7 +66,7 @@ async def test_original_request_lookup_preserves_exact_project_installation_and_
     async with database.session() as session, session.begin():
         seed = await seed_metadata_project(session)
         other = await seed_another_metadata_project(session, seed)
-    access = AccessContextDTO(seed.principal_id, MockAuthenticationEvidence.browser())
+    access = await capture_metadata_browser(database, seed)
     context = IdempotencyContextDTO(
         HttpMethod.PATCH, "/v1/projects/{project_id}/metadata", IdempotencyKey("original")
     )

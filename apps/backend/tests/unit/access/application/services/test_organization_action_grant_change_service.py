@@ -22,11 +22,17 @@ from inframeld_backend.access.application.commands.set_organization_action_grant
     SetOrganizationActionGrantCommand,
 )
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
+from inframeld_backend.access.application.dtos.human_credential_facts_dto import (
+    HumanCredentialFactsDTO,
+)
 from inframeld_backend.access.application.dtos.organization_action_grant_change_result_dto import (
     OrganizationActionGrantChangeResultDTO,
 )
 from inframeld_backend.access.application.dtos.organization_grant_management_facts_dto import (
     OrganizationGrantManagementFactsDTO,
+)
+from inframeld_backend.access.application.errors.human_oauth_credential_rejected_error import (
+    HumanOAuthCredentialRejectedError,
 )
 from inframeld_backend.access.application.protocols.organization_action_grant_result_reader import (
     OrganizationActionGrantResultReader,
@@ -48,6 +54,9 @@ from inframeld_backend.access.domain.policy_inputs.organization_grant_candidate_
 )
 from inframeld_backend.access.domain.value_objects.action_grant_state import ActionGrantState
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
+from inframeld_backend.access.domain.value_objects.human_credential_version import (
+    HumanCredentialVersion,
+)
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.shared.application.dtos.completed_synchronous_operation_dto import (
@@ -57,6 +66,7 @@ from inframeld_backend.shared.application.dtos.idempotency_context_dto import Id
 from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.errors.application_errors import (
     AccessDeniedError,
+    AuthenticationRequiredError,
     ConflictError,
     InvalidInputError,
     ResourceNotFoundError,
@@ -96,7 +106,7 @@ FACTS = OrganizationGrantManagementFactsDTO(
     actor=ACTOR,
     actor_can_grant=True,
     actor_has_pending_recovery=False,
-    actor_oauth_credential_facts=None,
+    actor_oauth_credential_facts=HumanCredentialFactsDTO(True, HumanCredentialVersion(1)),
     recipient=BOB,
     recipient_has_pending_recovery=False,
     recipient_has_coherent_identity=True,
@@ -451,3 +461,21 @@ async def test_required_write_failure_rolls_back_without_completion_or_result() 
 
     assert "complete" not in scenario.events and not scenario.writer.results
     assert scenario.events[-1] == "rollback"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("oauth", [False, True])
+async def test_browser_currentness_preserves_the_presented_credential_family(oauth: bool) -> None:
+    """Reject stale evidence before disclosing data, recovering originals or changing authority."""
+    evidence = (
+        MockAuthenticationEvidence.human_oauth() if oauth else MockAuthenticationEvidence.browser()
+    )
+    stale = HumanCredentialFactsDTO(True, HumanCredentialVersion(2))
+    expected = HumanOAuthCredentialRejectedError if oauth else AuthenticationRequiredError
+    scenario = OrganizationGrantScenario()
+    scenario.facts.facts = replace(FACTS, actor_oauth_credential_facts=stale)
+    with pytest.raises(AuthenticationRequiredError) as caught:
+        await scenario.set(access=replace(ACCESS, authentication_evidence=evidence))
+    assert type(caught.value) is expected
+    assert scenario.events == ["begin", "lock-facts", "rollback"]
+    assert scenario.writer.changes == [] and scenario.writer.results == []

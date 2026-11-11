@@ -2,14 +2,12 @@
 
 import os
 from dataclasses import replace
-from uuid import UUID
 
 import pytest
 from sqlalchemy import event, func, select, update
 from sqlalchemy.orm import Session
 from tests.support.access_group_scenarios import create_group, delete_group
 from tests.support.application_account_scenarios import create_account
-from tests.support.authentication_evidence import MockAuthenticationEvidence
 from tests.support.project_membership_postgres_scenarios import (
     MembershipProjectSeedDTO,
     change_membership,
@@ -27,13 +25,9 @@ from inframeld_backend.access.application.dtos.access_group_action_grant_change_
     AccessGroupActionGrantChangeResultDTO,
 )
 from inframeld_backend.access.application.dtos.created_access_group_dto import CreatedAccessGroupDTO
-from inframeld_backend.access.application.dtos.verified_human_identity_dto import (
-    VerifiedHumanIdentityDTO,
-)
 from inframeld_backend.access.domain.enums.principal_status import PrincipalStatus
 from inframeld_backend.access.domain.value_objects.access_group_id import AccessGroupId
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
-from inframeld_backend.access.domain.value_objects.identity_subject import IdentitySubject
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
 from inframeld_backend.access.infrastructure.rows.access_audit_event_row import AccessAuditEventRow
@@ -187,18 +181,6 @@ async def _remove(
                 seed.project.project_id, target, recipient, action, key, HttpMethod.DELETE
             ),
         )
-
-
-def _bob(seed: MembershipProjectSeedDTO) -> AccessContextDTO:
-    return AccessContextDTO(
-        actor_principal_id=seed.bob_id,
-        authentication_evidence=MockAuthenticationEvidence.browser(
-            VerifiedHumanIdentityDTO(
-                authority=seed.actor.binding.identity.authority,
-                subject=IdentitySubject(str(UUID(int=200))),
-            ),
-        ),
-    )
 
 
 @pytest.mark.parametrize("action", ["add-documents", "update-documents", "delete-documents"])
@@ -537,7 +519,7 @@ async def test_no_eligible_manager_can_substitute_for_removing_the_last_current_
             recipient=seed.bob_id,
             revision=revision + 1,
             key="remove-last-with-ineligible-manager",
-            access=_bob(seed),
+            access=seed.bob_access,
         )
     assert await _revision(database, seed.project.project_id) == revision + 1
 

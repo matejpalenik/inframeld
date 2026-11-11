@@ -25,6 +25,9 @@ from inframeld_backend.shared.application.services.deletion_status_read_service 
 from inframeld_backend.shared.application.services.original_operation_lookup_service import (
     OriginalOperationLookupService,
 )
+from inframeld_backend.shared.application.services.project_deletion_lookup_service import (
+    ProjectDeletionLookupService,
+)
 from inframeld_backend.shared.infrastructure.readers.postgres_access_group_deletion_binding_reader import (
     PostgresAccessGroupDeletionBindingReader,
 )
@@ -33,6 +36,9 @@ from inframeld_backend.shared.infrastructure.readers.postgres_deletion_status_re
 )
 from inframeld_backend.shared.infrastructure.readers.postgres_operation_lookup_reader import (
     PostgresOperationLookupReader,
+)
+from inframeld_backend.shared.infrastructure.readers.postgres_project_deletion_binding_reader import (
+    PostgresProjectDeletionBindingReader,
 )
 from inframeld_backend.shared.infrastructure.resources.database import Database
 
@@ -50,5 +56,8 @@ async def open_original_operation_lookup(
             PostgresOperationLookupReader(session),
             AccessGroupDeletionLookupService(
                 current, PostgresAccessGroupDeletionBindingReader(session), retained
+            ),
+            project_deletion_lookup=ProjectDeletionLookupService(
+                current, PostgresProjectDeletionBindingReader(session), retained
             ),
         )

@@ -1509,3 +1509,376 @@ def test_invitation_fixture_presents_registered_outcomes_and_independent_wire_ev
         body,
     )
     assert witness["headers"].get("idempotency-key") == key
+
+
+@pytest.mark.parametrize("unset", [False, True])
+def test_upload_default_fixture_uses_production_read_and_independent_dispatch_witness(
+    unset: bool,
+) -> None:
+    project = (
+        "00000000-0000-4000-8000-000000000005" if unset else "00000000-0000-4000-8000-000000000003"
+    )
+    route = f"/v1/projects/{project}/upload-defaults"
+    with TestClient(create_sdk_conformance_app(), raise_server_exceptions=False) as client:
+        client.post("/sdk-control/cases/upload-read", json={"calls": {"read": {"kind": "none"}}})
+        response = client.get(
+            route, headers={"Authorization": "Bearer sdk-human", "X-SDK-Test": "read"}
+        )
+        seen = client.get("/sdk-control/cases/upload-read").json()
+    assert response.status_code == 200
+    assert response.json() == {
+        "projectId": project,
+        "accessRevision": 7 if unset else 9,
+        "groupIds": None if unset else ["00000000-0000-4000-8000-000000000030"],
+    }
+    assert response.headers["cache-control"] == "no-store"
+    assert seen["counts"] == {"read": 1}
+    witness = seen["observations"]["read"]
+    assert (witness["method"], witness["path"], witness["query"], witness["rawBodyBase64"]) == (
+        "GET",
+        route,
+        "",
+        "",
+    )
+    assert witness["authorization"] == "Bearer sdk-human"
+
+
+@pytest.mark.parametrize(
+    "intent,revision,groups,after",
+    [
+        ("first", 7, ["00000000-0000-4000-8000-000000000020"], 8),
+        ("replay", 7, ["00000000-0000-4000-8000-000000000020"], 8),
+        ("noop", 9, ["00000000-0000-4000-8000-000000000030"], 9),
+        ("first", 9007199254740990, ["00000000-0000-4000-8000-000000000020"], 9007199254740991),
+    ],
+)
+def test_upload_default_fixture_preserves_exact_original_request_and_after_only_receipt(
+    intent: str, revision: int, groups: list[str], after: int
+) -> None:
+    project = "00000000-0000-4000-8000-000000000003"
+    route = f"/v1/projects/{project}/upload-defaults"
+    body = {"groupIds": groups, "expectedAccessRevision": revision}
+    headers = {
+        "Authorization": "Bearer sdk-human",
+        "Idempotency-Key": "sdk-upload-" + intent,
+        "X-SDK-Test": "set",
+    }
+    with TestClient(create_sdk_conformance_app(), raise_server_exceptions=False) as client:
+        client.post("/sdk-control/cases/upload-set", json={"calls": {"set": {"kind": "none"}}})
+        response = client.put(route, json=body, headers=headers)
+        seen = client.get("/sdk-control/cases/upload-set").json()
+    assert response.status_code == 200
+    assert response.json() == {
+        "projectId": project,
+        "accessRevision": after,
+        "groupIds": groups,
+        "operationId": "sdk-upload-noop" if intent == "noop" else "sdk-upload-original",
+        "idempotencyExpiresAt": "2030-01-02T00:00:00Z",
+    }
+    assert response.headers["cache-control"] == "no-store"
+    assert "beforeGroupIds" not in response.json()
+    assert seen["counts"] == {"set": 1}
+    witness = seen["observations"]["set"]
+    assert witness["method"] == "PUT" and witness["path"] == route and witness["query"] == ""
+    assert (
+        witness["jsonBody"] == body
+        and witness["headers"]["idempotency-key"] == "sdk-upload-" + intent
+    )
+
+
+@pytest.mark.parametrize(
+    "key,revision,status,code",
+    [
+        ("first", 6, 409, "stale_revision"),
+        ("noop", 8, 409, "stale_revision"),
+        ("expired", 7, 409, "conflict"),
+        ("unknown", 7, 503, "dependency_unavailable"),
+        ("denied-old", 7, 403, "access_denied"),
+        ("denied-new", 7, 403, "access_denied"),
+        ("denied-retained", 7, 403, "access_denied"),
+    ],
+)
+def test_upload_default_fixture_retains_controlled_currentness_and_recovery_errors(
+    key: str, revision: int, status: int, code: str
+) -> None:
+    with TestClient(create_sdk_conformance_app(), raise_server_exceptions=False) as client:
+        response = client.put(
+            "/v1/projects/00000000-0000-4000-8000-000000000003/upload-defaults",
+            json={
+                "groupIds": ["00000000-0000-4000-8000-000000000020"],
+                "expectedAccessRevision": revision,
+            },
+            headers={"Authorization": "Bearer sdk-human", "Idempotency-Key": "sdk-upload-" + key},
+        )
+    assert (
+        response.status_code == response.json()["status"] == status
+        and response.json()["code"] == code
+    )
+    assert response.headers["cache-control"] == "no-store"
+
+
+def test_upload_default_fixture_cookie_csrf_and_duplicate_groups_use_production_guards() -> None:
+    route = "/v1/projects/00000000-0000-4000-8000-000000000003/upload-defaults"
+    group = "00000000-0000-4000-8000-000000000020"
+    body = {"groupIds": [group], "expectedAccessRevision": 7}
+    cookie = {"Cookie": "ory_kratos_session=sdk-cookie", "Idempotency-Key": "sdk-upload-first"}
+    with TestClient(create_sdk_conformance_app(), raise_server_exceptions=False) as client:
+        denied = client.put(route, json=body, headers=cookie)
+        allowed = client.put(
+            route,
+            json=body,
+            headers=cookie | {"Origin": "https://account.test", "X-Inframeld-CSRF": "1"},
+        )
+        duplicate = client.put(
+            route,
+            json=body | {"groupIds": [group, group]},
+            headers={"Authorization": "Bearer sdk-human", "Idempotency-Key": "sdk-upload-first"},
+        )
+    assert denied.status_code == 403 and allowed.status_code == 200 and duplicate.status_code == 422
+
+
+@pytest.mark.parametrize("cookie", [False, True])
+def test_project_deletion_fixture_preserves_original_202_and_bodyless_wire(cookie: bool) -> None:
+    """Expose an unchanged original acceptance on an explicitly requested replay."""
+    project = "00000000-0000-4000-8000-000000000003"
+    route = f"/v1/projects/{project}"
+    headers = {"Idempotency-Key": "sdk-project-delete", "X-SDK-Test": "project-delete"}
+    if cookie:
+        headers |= {
+            "Cookie": "ory_kratos_session=sdk-cookie",
+            "Origin": "https://account.test",
+            "X-Inframeld-CSRF": "1",
+        }
+    else:
+        headers["Authorization"] = "Bearer sdk-human"
+
+    with TestClient(create_sdk_conformance_app()) as client:
+        client.post(
+            "/sdk-control/cases/project-delete",
+            json={"calls": {"project-delete": {"kind": "none"}}},
+        )
+        before = client.get("/sdk-control/counts").json()["_total"]
+        first = client.delete(route, params={"expectedAccessRevision": 7}, headers=headers)
+        replay = client.delete(route, params={"expectedAccessRevision": 7}, headers=headers)
+        evidence = client.get("/sdk-control/cases/project-delete").json()
+        after = client.get("/sdk-control/counts").json()["_total"]
+
+    expected = {
+        "operationId": "sdk-project-delete",
+        "idempotencyExpiresAt": None,
+        "projectId": project,
+        "accessRevision": 8,
+        "admissionConfirmed": True,
+        "accessBlocked": True,
+    }
+    assert first.status_code == replay.status_code == 202
+    assert first.json() == replay.json() == expected
+    assert first.headers["cache-control"] == replay.headers["cache-control"] == "no-store"
+    assert evidence["counts"] == {"project-delete": 2} and after - before == 2
+    witness = evidence["observations"]["project-delete"]
+    assert (witness["method"], witness["path"], witness["query"], witness["rawBodyBase64"]) == (
+        "DELETE",
+        route,
+        "expectedAccessRevision=7",
+        "",
+    )
+    assert witness["headers"]["idempotency-key"] == "sdk-project-delete"
+    assert witness["authorization"] == ("" if cookie else "Bearer sdk-human")
+    if cookie:
+        assert witness["origin"] == "https://account.test"
+        assert witness["csrf"] == "1"
+
+
+@pytest.mark.parametrize(
+    "credential,key,revision,project,status,code",
+    [
+        ({}, "sdk-project-delete", 7, 3, 401, "http_error"),
+        ({"Authorization": "Bearer sdk-denied"}, "sdk-project-delete", 7, 3, 403, "access_denied"),
+        (
+            {"Authorization": "Bearer sdk-human"},
+            "sdk-project-delete",
+            7,
+            99,
+            404,
+            "resource_not_found",
+        ),
+        ({"Authorization": "Bearer sdk-human"}, "sdk-project-delete", 6, 3, 409, "stale_revision"),
+        ({"Authorization": "Bearer sdk-human"}, "sdk-project-delete-fresh", 7, 3, 409, "conflict"),
+        (
+            {"Authorization": "Bearer sdk-human"},
+            "sdk-project-delete-unavailable",
+            7,
+            3,
+            503,
+            "dependency_unavailable",
+        ),
+        (
+            {"Authorization": "Bearer sdk-other-human"},
+            "sdk-project-delete",
+            7,
+            3,
+            403,
+            "access_denied",
+        ),
+    ],
+)
+def test_project_deletion_fixture_preserves_safe_failure_classifications(
+    credential: dict[str, str], key: str, revision: int, project: int, status: int, code: str
+) -> None:
+    route = f"/v1/projects/{UUID(int=project)}"
+    if project == 3:
+        route = "/v1/projects/00000000-0000-4000-8000-000000000003"
+    with TestClient(create_sdk_conformance_app()) as client:
+        response = client.delete(
+            route,
+            params={"expectedAccessRevision": revision},
+            headers=credential | {"Idempotency-Key": key},
+        )
+
+    assert response.status_code == status
+    assert response.json()["status"] == status and response.json()["code"] == code
+    assert "operationId" not in response.json()
+    assert response.headers["cache-control"] == "no-store"
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "",
+        "expectedAccessRevision=07",
+        "expectedAccessRevision=7&expectedAccessRevision=7",
+        "expectedAccessRevision=7&extra=1",
+    ],
+)
+def test_project_deletion_fixture_keeps_strict_bodyless_query(query: str) -> None:
+    with TestClient(create_sdk_conformance_app()) as client:
+        response = client.delete(
+            "/v1/projects/00000000-0000-4000-8000-000000000003?" + query,
+            headers={"Authorization": "Bearer sdk-human", "Idempotency-Key": "sdk-project-delete"},
+        )
+    assert response.status_code == 422
+    assert response.json()["status"] == 422
+
+
+def test_project_deletion_fixture_preserves_cookie_guard_and_rejects_body() -> None:
+    route = "/v1/projects/00000000-0000-4000-8000-000000000003?expectedAccessRevision=7"
+    with TestClient(create_sdk_conformance_app()) as client:
+        denied = client.delete(
+            route,
+            headers={
+                "Cookie": "ory_kratos_session=sdk-cookie",
+                "Idempotency-Key": "sdk-project-delete",
+            },
+        )
+        body = client.request(
+            "DELETE",
+            route,
+            json={},
+            headers={"Authorization": "Bearer sdk-human", "Idempotency-Key": "sdk-project-delete"},
+        )
+    assert denied.status_code == 403 and denied.json()["code"] == "access_denied"
+    assert body.status_code == 422
+
+
+@pytest.mark.parametrize(
+    "mismatch", [None, "installation", "organization", "project", "key", "actor"]
+)
+def test_project_deletion_fixture_lookup_retains_only_exact_original_scope(
+    mismatch: str | None,
+) -> None:
+    project = "00000000-0000-4000-8000-000000000003"
+    body: dict[str, object] = {
+        "installationId": "00000000-0000-4000-8000-000000000001",
+        "organizationId": "00000000-0000-4000-8000-000000000002",
+        "projectId": project,
+        "method": "DELETE",
+        "requestedRoute": f"/v1/projects/{project}",
+        "key": "sdk-project-delete",
+        "expectedAuthority": {"family": "project_deletion", "actionId": "delete-project"},
+    }
+    if mismatch in {"installation", "organization", "project"}:
+        body[mismatch + "Id"] = str(UUID(int=999))
+        if mismatch == "project":
+            body["requestedRoute"] = f"/v1/projects/{UUID(int=999)}"
+    elif mismatch == "key":
+        body["key"] = "different-original"
+    token = "sdk-other-human" if mismatch == "actor" else "sdk-human"
+    with TestClient(create_sdk_conformance_app()) as client:
+        client.post(
+            "/sdk-control/cases/project-lookup",
+            json={"calls": {"project-lookup": {"kind": "none"}}},
+        )
+        response = client.post(
+            "/v1/operations/lookup",
+            json=body,
+            headers={"Authorization": f"Bearer {token}", "X-SDK-Test": "project-lookup"},
+        )
+        evidence = client.get("/sdk-control/cases/project-lookup").json()
+
+    assert response.status_code == 200
+    assert response.headers["cache-control"] == "no-store"
+    assert evidence["counts"] == {"project-lookup": 1}
+    assert evidence["observations"]["project-lookup"]["jsonBody"] == body
+    if mismatch is not None:
+        assert response.json() == {"outcome": "unresolved"}
+    else:
+        assert response.json() == {
+            "outcome": "retained",
+            "operationId": "sdk-project-delete",
+            "jobState": "succeeded",
+            "admissionConfirmed": True,
+            "accessBlocked": True,
+            "applicationShutdownComplete": True,
+            "physicalCleanupComplete": False,
+            "retentionExpiresAt": None,
+        }
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("method", "POST"),
+        ("requestedRoute", "/v1/projects/wrong"),
+        ("expectedAuthority", {"family": "project_deletion", "actionId": "read-documents"}),
+    ],
+)
+def test_project_deletion_fixture_rejects_invalid_lookup_capsules(
+    field: str, value: object
+) -> None:
+    body: dict[str, object] = {
+        "installationId": "00000000-0000-4000-8000-000000000001",
+        "organizationId": "00000000-0000-4000-8000-000000000002",
+        "projectId": "00000000-0000-4000-8000-000000000003",
+        "method": "DELETE",
+        "requestedRoute": "/v1/projects/00000000-0000-4000-8000-000000000003",
+        "key": "sdk-project-delete",
+        "expectedAuthority": {"family": "project_deletion", "actionId": "delete-project"},
+    }
+    body[field] = value
+    with TestClient(create_sdk_conformance_app()) as client:
+        response = client.post(
+            "/v1/operations/lookup", json=body, headers={"Authorization": "Bearer sdk-human"}
+        )
+    assert response.status_code == 422
+
+
+@pytest.mark.parametrize("complete", [False, True])
+def test_project_deletion_fixture_status_keeps_physical_work_pending(complete: bool) -> None:
+    operation = "sdk-project-delete" if complete else "sdk-project-delete-pending"
+    with TestClient(create_sdk_conformance_app()) as client:
+        response = client.get(
+            "/v1/deletions/status",
+            params={"operationId": operation},
+            headers={"Authorization": "Bearer sdk-human"},
+        )
+    assert response.status_code == 200
+    assert response.json() == {
+        "outcome": "retained",
+        "operationId": operation,
+        "jobState": "succeeded" if complete else "queued",
+        "admissionConfirmed": True,
+        "accessBlocked": True,
+        "applicationShutdownComplete": complete,
+        "physicalCleanupComplete": False,
+        "retentionExpiresAt": None,
+    }

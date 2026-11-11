@@ -5,13 +5,11 @@ from uuid import UUID, uuid4
 
 import pytest
 from sqlalchemy import delete, select
-from tests.support.authentication_evidence import MockAuthenticationEvidence
 from tests.support.project_membership_postgres_scenarios import (
     change_membership,
     seed_membership_project,
 )
 
-from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
 from inframeld_backend.access.application.dtos.identity_recovery_event_dto import (
     IdentityRecoveryEventDTO,
 )
@@ -214,14 +212,7 @@ async def test_self_departure_keeps_grants_assigned_to_remaining_human_and_block
             key="self-departure",
             remove=True,
         )
-    bob = AccessContextDTO(
-        seed.bob_id,
-        MockAuthenticationEvidence.browser(
-            VerifiedHumanIdentityDTO(
-                seed.actor.binding.identity.authority, IdentitySubject(str(UUID(int=200)))
-            )
-        ),
-    )
+    bob = seed.bob_access
     with pytest.raises(ConflictError):
         await change_membership(
             database, seed, revision=3, key="last-human", remove=True, access=bob

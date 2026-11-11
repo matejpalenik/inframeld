@@ -202,7 +202,7 @@ async def test_empty_revocation_history_round_trips_without_changing_existing_is
             ) == before
             assert (
                 await session.scalar(select(AlembicVersionRow.version_num))
-                == "0029_application_key_revocation"
+                == "0031_project_deletion"
             )
 
 
@@ -215,8 +215,7 @@ async def test_retained_revocation_original_prevents_lossy_downgrade(
         command.downgrade(_config(temporary_postgres_settings), "0028_application_key_issuance")
     async with database.session() as session:
         assert (
-            await session.scalar(select(AlembicVersionRow.version_num))
-            == "0029_application_key_revocation"
+            await session.scalar(select(AlembicVersionRow.version_num)) == "0031_project_deletion"
         )
         original = await session.get(
             ApplicationKeyRevocationResultRow, revoked_original.operation.operation_id.value

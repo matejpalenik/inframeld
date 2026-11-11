@@ -30,6 +30,9 @@ from inframeld_backend.access.application.dtos.verified_human_identity_dto impor
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.enums.principal_status import PrincipalStatus
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
+from inframeld_backend.access.domain.value_objects.human_credential_version import (
+    HumanCredentialVersion,
+)
 from inframeld_backend.access.domain.value_objects.identity_authority import IdentityAuthority
 from inframeld_backend.access.domain.value_objects.identity_subject import IdentitySubject
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
@@ -164,7 +167,12 @@ async def _seed_legacy_request(session: AsyncSession) -> DeletionStatusSeedDTO:
         ]
     )
     await session.flush()
-    access = AccessContextDTO(principal, BrowserSessionAuthenticationDTO(identity))
+    access = AccessContextDTO(
+        principal,
+        BrowserSessionAuthenticationDTO(
+            identity, InstallationId(installed), HumanCredentialVersion(1)
+        ),
+    )
     authority = OperationLookupAuthority(
         OperationLookupAuthorityFamily.PROJECT_ACTION_USE, ActionId("delete-project")
     )

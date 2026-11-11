@@ -12,6 +12,16 @@ SupportBot may ask Production a question without being entitled to every Support
 
 Accepted [PD-ACCESS-06](decision-setup-read-authority.md#approved-resolution) selects this workflow's detailed contract. Alice has Query on her starter Pipeline, but the first build failed before any Deployment was created. Query on a nonexistent Deployment cannot authorize useful setup details. Bob guessing the Project ID must not learn the Project's state. Apply its exact bounds, current-state checks and failure outcomes. Native implementation and qualification remain separate.
 
+<a id="document-access-foundation"></a>
+
+## Implemented document-access foundation
+
+The in-process [DocumentAccessService](../../../../apps/backend/src/inframeld_backend/access/application/services/document_access_service.py) and its current Access facts reader are implemented and locally qualified with unit and PostgreSQL coverage. This adds no HTTP route, CLI command, generated client or UI. The query sequence below remains an accepted receiving-feature workflow.
+
+Trusted producers supply exact [DocumentId and DocumentVersionId pairs](../../../../apps/backend/src/inframeld_backend/access/domain/value_objects/document_source_id.py) and one complete current logical Document audience for all its versions. `permitted_sources` returns only readable pairs from that selection, while `require_complete_evidence` denies an incomplete required bundle without partial disclosure. Missing current Document observations are unavailable information, not an empty result. Operation-specific action authority remains separate, including for a genuinely empty selection.
+
+The [component boundary](architecture.md#document-access-components) separates existing persisted Access facts from Knowledge's future Document/lifecycle/audience joins. Receivers must refresh their trusted observations after applicable waits at each retrieval, model/egress or disclosure boundary. The service does not refresh supplied Knowledge observations or turn returned IDs into future authority. Real resource integrations and product tests remain with their receiving features. Keep transactions short and release database locks before network waits.
+
 ## Follow a query
 
 SupportBot asks Production, “How do customers request a refund?” Inframeld first checks the bot's identity, project membership, and Query permission. It then needs to keep unauthorized documents out of both the answer and the work that produces it.

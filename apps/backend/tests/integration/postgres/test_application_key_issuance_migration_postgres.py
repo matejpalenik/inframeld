@@ -268,8 +268,7 @@ async def test_unequal_dual_bindings_refuse_downgrade_before_any_data_loss(
         command.downgrade(_config(temporary_postgres_settings), "0027_invitations")
     async with database.session() as session:
         assert (
-            await session.scalar(select(AlembicVersionRow.version_num))
-            == "0029_application_key_revocation"
+            await session.scalar(select(AlembicVersionRow.version_num)) == "0031_project_deletion"
         )
         key = await session.get(ApplicationKeyRow, seed.credential.key_id.value)
         assert (

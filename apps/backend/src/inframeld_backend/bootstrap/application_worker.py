@@ -12,6 +12,9 @@ from sqlalchemy.exc import TimeoutError as SqlAlchemyTimeoutError
 from inframeld_backend.access.application.services.admitted_work_authorization_service import (
     AdmittedWorkAuthorizationService,
 )
+from inframeld_backend.access.application.services.project_deletion_job_handler import (
+    ProjectDeletionJobHandler,
+)
 from inframeld_backend.access.infrastructure.readers.postgres_admitted_work_facts_reader import (
     PostgresAdmittedWorkFactsReader,
 )
@@ -21,6 +24,9 @@ from inframeld_backend.bootstrap.application_worker_application_settings import 
 from inframeld_backend.bootstrap.application_worker_operations import ApplicationWorkerOperations
 from inframeld_backend.shared.application.dtos.job_attempt_context_dto import JobAttemptContextDTO
 from inframeld_backend.shared.application.dtos.product_job_binding_dto import ProductJobBindingDTO
+from inframeld_backend.shared.application.dtos.project_deletion_job_binding_dto import (
+    ProjectDeletionJobBindingDTO,
+)
 from inframeld_backend.shared.application.errors.application_errors import (
     ConflictError,
     DependencyUnavailableError,
@@ -43,6 +49,9 @@ from inframeld_backend.shared.application.services.job_continuation_eligibility_
 )
 from inframeld_backend.shared.application.services.job_execution_service import JobExecutionService
 from inframeld_backend.shared.application.services.job_recovery_service import JobRecoveryService
+from inframeld_backend.shared.application.services.project_deletion_job_authorization_service import (
+    ProjectDeletionJobAuthorizationService,
+)
 from inframeld_backend.shared.application.value_objects.job_payload import JobPayload
 from inframeld_backend.shared.infrastructure.logging.logging_configuration import configure_logging
 from inframeld_backend.shared.infrastructure.readers.postgres_artifact_cleanup_facts_reader import (
@@ -53,6 +62,9 @@ from inframeld_backend.shared.infrastructure.readers.postgres_installation_ident
 )
 from inframeld_backend.shared.infrastructure.readers.postgres_job_queue_status_reader import (
     PostgresJobQueueStatusReader,
+)
+from inframeld_backend.shared.infrastructure.readers.postgres_project_deletion_job_facts_reader import (
+    PostgresProjectDeletionJobFactsReader,
 )
 from inframeld_backend.shared.infrastructure.repositories.postgres_job_store import PostgresJobStore
 from inframeld_backend.shared.infrastructure.resources.database import Database
@@ -92,6 +104,9 @@ async def _claim(
                         PostgresArtifactCleanupFactsReader(session)
                     ),
                     supported_payloads=supported,
+                    project_deletion_job_authorizer=ProjectDeletionJobAuthorizationService(
+                        PostgresProjectDeletionJobFactsReader(session)
+                    ),
                 ),
             )
             return await JobExecutionService(
@@ -141,7 +156,7 @@ async def _execute(
             job_id=str(context.job_id.value),
             **(
                 {"operation_id": context.binding.operation_id.value}
-                if isinstance(context.binding, ProductJobBindingDTO)
+                if isinstance(context.binding, (ProductJobBindingDTO, ProjectDeletionJobBindingDTO))
                 else {"cleanup_obligation_id": str(context.binding.obligation_id.value)}
             ),
         )
@@ -293,10 +308,15 @@ async def _serve(settings: ApplicationWorkerApplicationSettings) -> None:
             settings.artifact_storage, effect_observation_recorder=operations
         )
         handler = ArtifactCleanupJobHandler(operations, artifacts)
+        shutdown = ProjectDeletionJobHandler(operations)
         # Transfer the one pool to the runtime before validation or startup.
         delegated = True
         await run_application_worker(
-            settings, stopped, (handler,), database=database, operations=operations
+            settings,
+            stopped,
+            (handler, shutdown),
+            database=database,
+            operations=operations,
         )
     finally:
         try:

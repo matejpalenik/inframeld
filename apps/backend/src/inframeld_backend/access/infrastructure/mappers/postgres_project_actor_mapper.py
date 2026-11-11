@@ -1,9 +1,12 @@
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
+from inframeld_backend.access.application.dtos.browser_session_authentication_dto import (
+    BrowserSessionAuthenticationDTO,
+)
+from inframeld_backend.access.application.dtos.human_credential_facts_dto import (
+    HumanCredentialFactsDTO,
+)
 from inframeld_backend.access.application.dtos.human_oauth_credential_binding_dto import (
     HumanOAuthCredentialBindingDTO,
-)
-from inframeld_backend.access.application.dtos.human_oauth_credential_facts_dto import (
-    HumanOAuthCredentialFactsDTO,
 )
 from inframeld_backend.access.application.dtos.project_action_facts_dto import ProjectActionFactsDTO
 from inframeld_backend.access.domain.entities.principal import Principal
@@ -37,10 +40,13 @@ class PostgresProjectActorMapper:
                 principal.status,
             ),
             has_pending_recovery=recovering,
-            oauth_credential_facts=HumanOAuthCredentialFactsDTO(
+            oauth_credential_facts=HumanCredentialFactsDTO(
                 linked, HumanCredentialVersion(version) if version is not None else None
             )
-            if isinstance(access.authentication_evidence, HumanOAuthCredentialBindingDTO)
+            if isinstance(
+                access.authentication_evidence,
+                HumanOAuthCredentialBindingDTO | BrowserSessionAuthenticationDTO,
+            )
             else None,
             project_status=project.status,
             is_project_member=member,

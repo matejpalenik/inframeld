@@ -17,6 +17,9 @@ from inframeld_backend.access.application.commands.set_project_action_grant_comm
     SetProjectActionGrantCommand,
 )
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
+from inframeld_backend.access.application.dtos.human_credential_facts_dto import (
+    HumanCredentialFactsDTO,
+)
 from inframeld_backend.access.application.dtos.project_action_grant_change_result_dto import (
     ProjectActionGrantChangeResultDTO,
 )
@@ -31,6 +34,9 @@ from inframeld_backend.access.application.dtos.project_grant_change_facts_dto im
 )
 from inframeld_backend.access.application.enums.project_action_grant_change_kind import (
     ProjectActionGrantChangeKind,
+)
+from inframeld_backend.access.application.errors.human_oauth_credential_rejected_error import (
+    HumanOAuthCredentialRejectedError,
 )
 from inframeld_backend.access.application.protocols.authorized_operation_scope import (
     AuthorizedOperationScope,
@@ -63,6 +69,9 @@ from inframeld_backend.access.domain.policy_inputs.project_departure_candidate_p
     ProjectDepartureCandidatePolicyInput,
 )
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
+from inframeld_backend.access.domain.value_objects.human_credential_version import (
+    HumanCredentialVersion,
+)
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
@@ -88,6 +97,7 @@ from inframeld_backend.shared.application.enums.operation_lookup_authority_famil
 from inframeld_backend.shared.application.enums.operation_replay_kind import OperationReplayKind
 from inframeld_backend.shared.application.errors.application_errors import (
     AccessDeniedError,
+    AuthenticationRequiredError,
     ConflictError,
     InvalidInputError,
     ResourceNotFoundError,
@@ -161,7 +171,7 @@ MANAGEMENT = ProjectActionGrantManagementFactsDTO(
     grant=ProjectGrantChangeFactsDTO(
         actor=ACTOR,
         has_pending_recovery=False,
-        oauth_credential_facts=None,
+        oauth_credential_facts=HumanCredentialFactsDTO(True, HumanCredentialVersion(1)),
         recipient=RECIPIENT,
         project_status=ProjectStatus.ACTIVE,
         project_access_revision=7,
@@ -878,3 +888,31 @@ async def test_full_grant_original_metadata_lookup_retains_exact_delegation_guar
     assert scenario.idempotency.lookup_authority == OperationLookupAuthority(
         OperationLookupAuthorityFamily.PROJECT_GRANT_READ, ACTION_ID
     )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("oauth", [False, True])
+async def test_browser_currentness_preserves_the_presented_credential_family(oauth: bool) -> None:
+    """Reject stale evidence before disclosing data, recovering originals or changing authority."""
+    evidence = (
+        MockAuthenticationEvidence.human_oauth() if oauth else MockAuthenticationEvidence.browser()
+    )
+    stale = HumanCredentialFactsDTO(True, HumanCredentialVersion(2))
+    expected = HumanOAuthCredentialRejectedError if oauth else AuthenticationRequiredError
+    scenario = GrantScenario()
+    scenario.management.result = replace(
+        MANAGEMENT, grant=replace(MANAGEMENT.grant, oauth_credential_facts=stale)
+    )
+    with pytest.raises(AuthenticationRequiredError) as caught:
+        await scenario.service.set_action_grant(
+            access=replace(ACCESS, authentication_evidence=evidence),
+            command=SET_COMMAND,
+            context=IdempotencyContextDTO(
+                HttpMethod.PUT,
+                f"/v1/projects/{PROJECT_ID.value}/grants/{RECIPIENT_ID.value}/{ACTION_ID.value}",
+                IdempotencyKey("stale-family"),
+            ),
+        )
+    assert type(caught.value) is expected
+    assert scenario.events == ["fingerprint", "begin", "management_facts", "rollback"]
+    assert scenario.results.saved is None

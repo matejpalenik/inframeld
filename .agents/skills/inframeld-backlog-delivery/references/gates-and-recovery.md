@@ -97,7 +97,7 @@ Stop the affected action immediately for missing authority, an explicit human st
 | --- | --- |
 | Product operation/job deadline | A tested behavior guarantee. Preserve it and investigate an overrun as an acceptance failure. |
 | Cleanup bound | A limit on stopping an owned resource. Expiry leaves cleanup unverified and dependent resources occupied until positively reconciled. |
-| CI capacity allowance | Provisioning, required cases, normal teardown and reporting must fit. Preserve required platforms and complete evidence. Backend foundation has a 40-minute allowance. Test-duration optimization #330 is post-v1. |
+| CI capacity allowance | Provisioning, required cases, normal teardown and reporting must fit. Preserve required platforms and complete evidence. Backend foundation's current allowance is documented in the [testing guide](../../../../docs/development/guides/testing.md#ci-selection). Test-duration optimization #330 is post-v1. |
 | Development scheduling budget | Inspect, checkpoint or reschedule useful work. A successful check or commit stays valid after an estimate overruns. An expired command allowance ends that command and requires cleanup. A direct human hard stop remains binding. |
 
 Grant the scoped repair and maintained verification once. Routine edits, expected TDD failures, setup corrections and automatic CI batches need no separate human permission. Shared execution still needs the coordinator's operation grant for the frozen revision and reconciled resource state. Optional report formatting can be recovered from retained valid results. Missing source binding, a required test outcome or cleanup leaves that claim unverified.

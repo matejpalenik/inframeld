@@ -123,6 +123,10 @@
           {
             "title": "Manage access-group members and managers",
             "href": "/guides/manage-access-groups"
+          },
+          {
+            "title": "Delete a Project",
+            "href": "/guides/delete-project"
           }
         ]
       },

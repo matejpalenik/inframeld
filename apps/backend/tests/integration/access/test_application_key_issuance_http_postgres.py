@@ -80,9 +80,6 @@ from inframeld_backend.access.infrastructure.readers.postgres_human_credential_s
 from inframeld_backend.access.infrastructure.readers.postgres_human_identity_link_reader import (
     PostgresHumanIdentityLinkReader,
 )
-from inframeld_backend.access.infrastructure.readers.postgres_identity_recovery_block_reader import (
-    PostgresIdentityRecoveryBlockReader,
-)
 from inframeld_backend.access.infrastructure.rows.access_audit_event_row import AccessAuditEventRow
 from inframeld_backend.access.infrastructure.rows.application_action_grant_row import (
     ApplicationActionGrantRow,
@@ -168,7 +165,9 @@ class ControlledBrowserProof(BrowserSessionVerifier):
         self._binding = binding
 
     @override
-    async def verify(self, credential: BrowserSessionCredential) -> VerifiedHumanIdentityDTO | None:
+    async def verify(
+        self, credential: BrowserSessionCredential, *, timeout_seconds: float | None = None
+    ) -> VerifiedHumanIdentityDTO | None:
         return self._binding.identity if credential.value == "controlled-cookie" else None
 
 
@@ -249,8 +248,7 @@ async def _client(
         links = PostgresHumanIdentityLinkReader(database)
         browser = HumanSessionAuthenticationService(
             ControlledBrowserProof(binding),
-            links,
-            recovery_block_reader=PostgresIdentityRecoveryBlockReader(database),
+            PostgresHumanCredentialStateReader(database),
             provider_timeout_seconds=human_authentication_settings.provider_timeout_seconds,
             total_timeout_seconds=human_authentication_settings.total_timeout_seconds,
         )

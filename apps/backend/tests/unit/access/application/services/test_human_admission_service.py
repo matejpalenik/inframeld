@@ -4,6 +4,7 @@ from datetime import timedelta
 from uuid import UUID
 
 import pytest
+from tests.support.authentication_evidence import MockAuthenticationEvidence
 from tests.support.human_admission_scenarios import (
     ACCESS,
     ACTOR_FACTS,
@@ -19,8 +20,9 @@ from tests.support.human_admission_scenarios import (
 )
 from tests.support.mock_project_metadata import NEW_RESERVATION
 
-from inframeld_backend.access.application.dtos.human_oauth_credential_facts_dto import (
-    HumanOAuthCredentialFactsDTO,
+from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
+from inframeld_backend.access.application.dtos.human_credential_facts_dto import (
+    HumanCredentialFactsDTO,
 )
 from inframeld_backend.access.application.errors.human_oauth_credential_rejected_error import (
     HumanOAuthCredentialRejectedError,
@@ -33,6 +35,7 @@ from inframeld_backend.access.domain.value_objects.human_credential_version impo
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.shared.application.errors.application_errors import (
     AccessDeniedError,
+    AuthenticationRequiredError,
     ConflictError,
     DependencyUnavailableError,
     ResourceNotFoundError,
@@ -133,13 +136,13 @@ async def test_current_oauth_generation_is_rechecked_after_provider() -> None:
     access = AccessContextDTO(ALICE.id, MockAuthenticationEvidence.human_oauth())
     s.facts.preliminary = replace(
         ACTOR_FACTS,
-        oauth_credential_facts=HumanOAuthCredentialFactsDTO(True, HumanCredentialVersion(1)),
+        oauth_credential_facts=HumanCredentialFactsDTO(True, HumanCredentialVersion(1)),
     )
     s.facts.final = replace(
         FACTS,
         actor=replace(
             ACTOR_FACTS,
-            oauth_credential_facts=HumanOAuthCredentialFactsDTO(True, HumanCredentialVersion(2)),
+            oauth_credential_facts=HumanCredentialFactsDTO(True, HumanCredentialVersion(2)),
         ),
     )
     with pytest.raises(HumanOAuthCredentialRejectedError):
@@ -288,3 +291,31 @@ async def test_wrong_operation_route_is_rejected_before_work() -> None:
             context=replace(CONTEXT, requested_route="/v1/organizations/foreign/human-admissions"),
         )
     assert s.events == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("oauth", [False, True])
+@pytest.mark.parametrize("phase", ["preliminary", "final"])
+async def test_browser_currentness_preserves_the_presented_credential_family(
+    oauth: bool, phase: str
+) -> None:
+    """Reject stale evidence before disclosing data, recovering originals or changing authority."""
+    evidence = (
+        MockAuthenticationEvidence.human_oauth() if oauth else MockAuthenticationEvidence.browser()
+    )
+    stale = HumanCredentialFactsDTO(True, HumanCredentialVersion(2))
+    expected = HumanOAuthCredentialRejectedError if oauth else AuthenticationRequiredError
+    scenario = HumanAdmissionScenario()
+    denied = replace(ACTOR_FACTS, oauth_credential_facts=stale)
+    if phase == "preliminary":
+        scenario.facts.preliminary = denied
+    else:
+        scenario.facts.final = replace(FACTS, actor=denied)
+    with pytest.raises(AuthenticationRequiredError) as caught:
+        await scenario.service.admit(
+            access=AccessContextDTO(ALICE.id, evidence), command=COMMAND, context=CONTEXT
+        )
+    assert type(caught.value) is expected
+    assert "reserve" not in scenario.events and "original" not in scenario.events
+    assert scenario.writer.saved is None
+    assert ("verify" in scenario.events) is (phase == "final")

@@ -20,6 +20,9 @@ from inframeld_backend.access.application.dtos.access_context_dto import AccessC
 from inframeld_backend.access.application.dtos.admitted_work_authority_dto import (
     AdmittedWorkAuthorityDTO,
 )
+from inframeld_backend.access.application.dtos.browser_session_authentication_dto import (
+    BrowserSessionAuthenticationDTO,
+)
 from inframeld_backend.access.application.dtos.human_oauth_credential_binding_dto import (
     HumanOAuthCredentialBindingDTO,
 )
@@ -76,6 +79,9 @@ from inframeld_backend.access.infrastructure.rows.project_action_grant_row impor
 )
 from inframeld_backend.access.infrastructure.rows.project_membership_row import ProjectMembershipRow
 from inframeld_backend.access.infrastructure.rows.project_row import ProjectRow
+from inframeld_backend.access.infrastructure.writers.postgres_human_credential_state_initializer import (
+    PostgresHumanCredentialStateInitializer,
+)
 from inframeld_backend.access.infrastructure.writers.postgres_job_admission_audit_writer import (
     PostgresJobAdmissionAuditWriter,
 )
@@ -528,6 +534,9 @@ async def test_cleanup_business_origin_never_substitutes_product_job_reference(
 async def admitted(
     database: Database, kind: OperationReplayKind | None = OperationReplayKind.ASYNC_JOB
 ) -> tuple[AccessContextDTO, LookupOriginalOperationQuery, str]:
+    identity = VerifiedHumanIdentityDTO(
+        IdentityAuthority("kratos:test"), IdentitySubject(str(uuid4()))
+    )
     async with database.session() as session, session.begin():
         seed = await MockAccessScenarios.seed_project_authorization(
             session, is_project_member=True, has_action_grant=False
@@ -541,10 +550,24 @@ async def admitted(
                 can_grant=True,
             )
         )
-    access = AccessContextDTO(seed.principal_id, MockAuthenticationEvidence.browser())
-    installed = await PostgresInstallationIdentityReader(database).read()
+        session.add(
+            HumanIdentityLinkRow(
+                authority=identity.authority.value,
+                subject=identity.subject.value,
+                organization_id=seed.organization_id.value,
+                principal_id=seed.principal_id.value,
+                principal_kind=PrincipalKind.HUMAN,
+            )
+        )
+
+    state = await PostgresHumanCredentialStateInitializer(database).initialize(identity)
+    assert state.version is not None
+    access = AccessContextDTO(
+        seed.principal_id,
+        BrowserSessionAuthenticationDTO(identity, state.installation_id, state.version),
+    )
     query = LookupOriginalOperationQuery(
-        installed,
+        state.installation_id,
         seed.organization_id,
         seed.project_id,
         HttpMethod.POST,

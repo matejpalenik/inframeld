@@ -13,6 +13,8 @@ Use these readers to observe retained facts about the original action. They do n
 
 Retain the original installation, Organization/Project, method, canonical route, request key and authority guard. The server checks current authority before searching retained history. [Original-request lookup](/guides/recover-original-request) supplies equivalent cURL and SDK examples.
 
+The closed `project_deletion` / `delete-project` guard is a narrow exception for saved Project DELETE identity. Current eligible-human credential/recovery checks precede exact original-initiator matching. It returns only content-free retained status after ordinary membership loss, without a full admission receipt, Delete authority or redispatch. Ordinary grant-history authority and the separate access-group deletion branch retain their own rules.
+
 ## Read retained deletion status
 
 <ApiOperation operationId="getDeletionStatus" />

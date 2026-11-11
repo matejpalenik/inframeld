@@ -6,6 +6,9 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.exc import TimeoutError as SqlAlchemyTimeoutError
 
+from inframeld_backend.access.application.dtos.human_authentication_state_dto import (
+    HumanAuthenticationStateDTO,
+)
 from inframeld_backend.access.application.dtos.human_credential_state_dto import (
     HumanCredentialStateDTO,
 )
@@ -45,6 +48,12 @@ class PostgresHumanCredentialStateInitializer(HumanCredentialStateInitializer):
 
     @override
     async def initialize(self, identity: VerifiedHumanIdentityDTO) -> HumanCredentialStateDTO:
+        return (await self.initialize_authentication_state(identity)).credential_state
+
+    @override
+    async def initialize_authentication_state(
+        self, identity: VerifiedHumanIdentityDTO
+    ) -> HumanAuthenticationStateDTO:
         try:
             async with asyncio.timeout(5.0), self._database.session() as session, session.begin():
                 installation = await session.scalar(
@@ -57,10 +66,11 @@ class PostgresHumanCredentialStateInitializer(HumanCredentialStateInitializer):
                 await PostgresIdentityCoordinator(session).acquire(
                     installation_id=InstallationId(installation), identity=identity
                 )
-                statement = HumanCredentialStateQueries.for_identity(identity)
+                statement = HumanCredentialStateQueries.for_identity_with_principal(identity)
                 result = await session.execute(statement)
                 row = result.tuples().one_or_none()
-                state = PostgresHumanCredentialStateMapper.to_state(identity, row)
+                observed = PostgresHumanCredentialStateMapper.to_authentication_state(identity, row)
+                state = observed.credential_state
                 if state.installation_id.value != installation:
                     raise DependencyUnavailableError("The installation identity is not available.")
                 if state.version is None:
@@ -79,9 +89,9 @@ class PostgresHumanCredentialStateInitializer(HumanCredentialStateInitializer):
                         .on_conflict_do_nothing()
                     )
                     result = await session.execute(statement)
-                    state = PostgresHumanCredentialStateMapper.to_state(
+                    observed = PostgresHumanCredentialStateMapper.to_authentication_state(
                         identity, result.tuples().one_or_none()
                     )
-                return state
+                return observed
         except (TimeoutError, OperationalError, SqlAlchemyTimeoutError):
             raise DependencyUnavailableError() from None

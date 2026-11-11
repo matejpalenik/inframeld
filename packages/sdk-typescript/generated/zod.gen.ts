@@ -837,7 +837,8 @@ export const zOperationLookupAuthorityFamily = z.enum([
     'organization_grant_read',
     'access_group_grant_read',
     'application_account_grant_read',
-    'access_group_deletion'
+    'access_group_deletion',
+    'project_deletion'
 ]);
 
 /**
@@ -1128,6 +1129,20 @@ export const zProjectCreationRequest = z.object({
 });
 
 /**
+ * ProjectDeletionAdmissionResponse
+ *
+ * Expose original admission, never internal execution or physical progress.
+ */
+export const zProjectDeletionAdmissionResponse = z.object({
+    accessBlocked: z.literal(true),
+    accessRevision: z.int().gte(0).lte(9007199254740991),
+    admissionConfirmed: z.literal(true),
+    idempotencyExpiresAt: z.iso.datetime().nullable(),
+    operationId: z.string().min(1).max(128),
+    projectId: z.uuid()
+});
+
+/**
  * ProjectGrantTargetResponse
  */
 export const zProjectGrantTargetResponse = z.object({
@@ -1307,6 +1322,38 @@ export const zProjectNameResolutionResponse = z.object({
     metadataRevision: z.int().gte(0).lte(9007199254740991),
     name: z.string().nullable(),
     organizationId: z.uuid(),
+    projectId: z.uuid()
+});
+
+/**
+ * ProjectUploadDefaultChangeResponse
+ *
+ * Retain the original resulting audience without disclosing its before snapshot.
+ */
+export const zProjectUploadDefaultChangeResponse = z.object({
+    accessRevision: z.int().gte(0).lte(9007199254740991),
+    groupIds: z.array(z.uuid()).min(1),
+    idempotencyExpiresAt: z.iso.datetime(),
+    operationId: z.string(),
+    projectId: z.uuid()
+});
+
+/**
+ * ProjectUploadDefaultRequest
+ *
+ * Replace the complete future-upload audience at an explicitly reviewed revision.
+ */
+export const zProjectUploadDefaultRequest = z.object({
+    expectedAccessRevision: z.int().gte(0).lte(9007199254740991),
+    groupIds: z.array(z.uuid()).min(1)
+});
+
+/**
+ * ProjectUploadDefaultResponse
+ */
+export const zProjectUploadDefaultResponse = z.object({
+    accessRevision: z.int().gte(0).lte(9007199254740991),
+    groupIds: z.array(z.uuid()).min(1).nullable(),
     projectId: z.uuid()
 });
 
@@ -2409,6 +2456,63 @@ export const zResolveProjectName503Representation0Response = zProblemDetails;
  * Successful Response
  */
 export const zResolveProjectNameResponse = zProjectNameResolutionResponse;
+
+export const zDeleteProjectHeaders = z.object({
+    'Idempotency-Key': z.string().min(1).max(128).regex(/.*\S.*/)
+});
+
+export const zDeleteProjectPath = z.object({
+    project_id: z.uuid()
+});
+
+export const zDeleteProjectQuery = z.object({
+    expectedAccessRevision: z.int().gte(0).lte(9007199254740991)
+});
+
+/**
+ * Successful Response
+ */
+export const zDeleteProject202Representation0Response = zProjectDeletionAdmissionResponse;
+
+/**
+ * Invalid authentication request
+ */
+export const zDeleteProject400Representation0Response = zProblemDetails;
+
+/**
+ * Unauthorized
+ */
+export const zDeleteProject401Representation0Response = zProblemDetails;
+
+/**
+ * Access denied
+ */
+export const zDeleteProject403Representation0Response = zProblemDetails;
+
+/**
+ * Resource not found
+ */
+export const zDeleteProject404Representation0Response = zProblemDetails;
+
+/**
+ * Operation conflicts with current state
+ */
+export const zDeleteProject409Representation0Response = zProblemDetails;
+
+/**
+ * Request validation failed
+ */
+export const zDeleteProject422Representation0Response = zProblemDetails;
+
+/**
+ * Dependency unavailable
+ */
+export const zDeleteProject503Representation0Response = zProblemDetails;
+
+/**
+ * Successful Response
+ */
+export const zDeleteProjectResponse = zProjectDeletionAdmissionResponse;
 
 export const zCreateAccessGroupBody = zAccessGroupCreationRequest;
 
@@ -4366,6 +4470,120 @@ export const zGetMyProjectAccess503Representation0Response = zProblemDetails;
  * Successful Response
  */
 export const zGetMyProjectAccessResponse = zMyProjectAccessResponse;
+
+export const zGetProjectUploadDefaultsPath = z.object({
+    project_id: z.uuid()
+});
+
+/**
+ * Successful Response
+ */
+export const zGetProjectUploadDefaults200Representation0Response = zProjectUploadDefaultResponse;
+
+/**
+ * Invalid authentication request
+ */
+export const zGetProjectUploadDefaults400Representation0Response = zProblemDetails;
+
+/**
+ * Unauthorized
+ */
+export const zGetProjectUploadDefaults401Representation0Response = zProblemDetails;
+
+/**
+ * Access denied
+ */
+export const zGetProjectUploadDefaults403Representation0Response = zProblemDetails;
+
+/**
+ * Resource not found
+ */
+export const zGetProjectUploadDefaults404Representation0Response = zProblemDetails;
+
+/**
+ * Operation conflicts with current state
+ */
+export const zGetProjectUploadDefaults409Representation0Response = zProblemDetails;
+
+/**
+ * Request validation failed
+ */
+export const zGetProjectUploadDefaults422Representation0Response = zProblemDetails;
+
+/**
+ * Dependency unavailable
+ */
+export const zGetProjectUploadDefaults503Representation0Response = zProblemDetails;
+
+/**
+ * Successful Response
+ */
+export const zGetProjectUploadDefaultsResponse = zProjectUploadDefaultResponse;
+
+export const zSetProjectUploadDefaultsBody = zProjectUploadDefaultRequest;
+
+export const zSetProjectUploadDefaultsHeaders = z.object({
+    'Idempotency-Key': z.string().min(1).max(128).regex(/.*\S.*/)
+});
+
+export const zSetProjectUploadDefaultsPath = z.object({
+    project_id: z.uuid()
+});
+
+/**
+ * Successful Response
+ */
+export const zSetProjectUploadDefaults200Representation0Response = zProjectUploadDefaultChangeResponse;
+
+/**
+ * Invalid authentication request
+ */
+export const zSetProjectUploadDefaults400Representation0Response = zProblemDetails;
+
+/**
+ * Unauthorized
+ */
+export const zSetProjectUploadDefaults401Representation0Response = zProblemDetails;
+
+/**
+ * Access denied
+ */
+export const zSetProjectUploadDefaults403Representation0Response = zProblemDetails;
+
+/**
+ * Resource not found
+ */
+export const zSetProjectUploadDefaults404Representation0Response = zProblemDetails;
+
+/**
+ * Operation conflicts with current state
+ */
+export const zSetProjectUploadDefaults409Representation0Response = zProblemDetails;
+
+/**
+ * Content Too Large
+ */
+export const zSetProjectUploadDefaults413Representation0Response = zProblemDetails;
+
+/**
+ * Unsupported Media Type
+ */
+export const zSetProjectUploadDefaults415Representation0Response = zProblemDetails;
+
+/**
+ * Request validation failed
+ */
+export const zSetProjectUploadDefaults422Representation0Response = zProblemDetails;
+
+/**
+ * Dependency unavailable
+ */
+export const zSetProjectUploadDefaults503Representation0Response = zProblemDetails;
+
+/**
+ * Successful Response
+ */
+export const zSetProjectUploadDefaultsResponse = zProjectUploadDefaultChangeResponse;
 
 /**
  * Successful Response

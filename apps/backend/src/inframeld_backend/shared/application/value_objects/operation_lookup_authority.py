@@ -160,6 +160,16 @@ class OperationLookupAuthority:
                 raise InvalidInputError()
             return
 
+        if self.family is family.PROJECT_DELETION:
+            if (
+                project_id is None
+                or method != "DELETE"
+                or self.action_id.value != "delete-project"
+                or requested_route != f"/v1/projects/{project_id.value}"
+            ):
+                raise InvalidInputError()
+            return
+
         if self.family is family.ACCESS_GROUP_DELETION:
             valid = False
             if (

@@ -98,8 +98,7 @@ async def test_unsafe_downgrade_preserves_current_schema_and_exact_revision(
         command.downgrade(_config(temporary_postgres_settings), "0022_project_grant_results")
     async with database.session() as session:
         assert (
-            await session.scalar(select(AlembicVersionRow.version_num))
-            == "0029_application_key_revocation"
+            await session.scalar(select(AlembicVersionRow.version_num)) == "0031_project_deletion"
         )
         assert await session.scalar(select(ProjectRow.access_revision)) == 2**31
 

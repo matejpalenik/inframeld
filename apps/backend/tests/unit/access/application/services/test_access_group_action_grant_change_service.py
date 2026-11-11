@@ -29,7 +29,13 @@ from inframeld_backend.access.application.dtos.access_group_action_grant_change_
 from inframeld_backend.access.application.dtos.access_group_grant_management_facts_dto import (
     AccessGroupGrantManagementFactsDTO,
 )
+from inframeld_backend.access.application.dtos.human_credential_facts_dto import (
+    HumanCredentialFactsDTO,
+)
 from inframeld_backend.access.application.dtos.project_action_facts_dto import ProjectActionFactsDTO
+from inframeld_backend.access.application.errors.human_oauth_credential_rejected_error import (
+    HumanOAuthCredentialRejectedError,
+)
 from inframeld_backend.access.application.protocols.access_group_action_grant_result_reader import (
     AccessGroupActionGrantResultReader,
 )
@@ -52,6 +58,9 @@ from inframeld_backend.access.domain.policy_inputs.project_departure_candidate_p
 from inframeld_backend.access.domain.value_objects.access_group_id import AccessGroupId
 from inframeld_backend.access.domain.value_objects.action_grant_state import ActionGrantState
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
+from inframeld_backend.access.domain.value_objects.human_credential_version import (
+    HumanCredentialVersion,
+)
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
 from inframeld_backend.shared.application.dtos.completed_synchronous_operation_dto import (
@@ -61,6 +70,7 @@ from inframeld_backend.shared.application.dtos.idempotency_context_dto import Id
 from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.errors.application_errors import (
     AccessDeniedError,
+    AuthenticationRequiredError,
     ConflictError,
     InvalidInputError,
     ResourceNotFoundError,
@@ -104,7 +114,7 @@ FACTS = AccessGroupGrantManagementFactsDTO(
     actor=ProjectActionFactsDTO(
         principal=ACTOR,
         has_pending_recovery=False,
-        oauth_credential_facts=None,
+        oauth_credential_facts=HumanCredentialFactsDTO(True, HumanCredentialVersion(1)),
         project_status=ProjectStatus.ACTIVE,
         is_project_member=True,
         has_exact_action_grant=True,
@@ -582,3 +592,21 @@ async def test_foreign_project_application_remains_hidden_on_fresh_delete() -> N
     with pytest.raises(ResourceNotFoundError):
         await scenario.remove()
     assert not scenario.writer.results and scenario.events[-1] == "rollback"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("oauth", [False, True])
+async def test_browser_currentness_preserves_the_presented_credential_family(oauth: bool) -> None:
+    """Reject stale evidence before disclosing data, recovering originals or changing authority."""
+    evidence = (
+        MockAuthenticationEvidence.human_oauth() if oauth else MockAuthenticationEvidence.browser()
+    )
+    stale = HumanCredentialFactsDTO(True, HumanCredentialVersion(2))
+    expected = HumanOAuthCredentialRejectedError if oauth else AuthenticationRequiredError
+    scenario = AccessGroupGrantScenario()
+    scenario.facts.facts = replace(FACTS, actor=replace(FACTS.actor, oauth_credential_facts=stale))
+    with pytest.raises(AuthenticationRequiredError) as caught:
+        await scenario.set(access=replace(ACCESS, authentication_evidence=evidence))
+    assert type(caught.value) is expected
+    assert scenario.events == ["begin", "lock-facts", "rollback"]
+    assert scenario.writer.changes == [] and scenario.writer.results == []

@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
-from inframeld_backend.access.application.dtos.human_oauth_credential_facts_dto import (
-    HumanOAuthCredentialFactsDTO,
+from inframeld_backend.access.application.dtos.human_credential_facts_dto import (
+    HumanCredentialFactsDTO,
 )
 from inframeld_backend.access.application.protocols.authorized_operation_scope import (
     AuthorizedOperationScope,
@@ -27,7 +27,7 @@ class OrganizationGrantManagementFactsDTO(AuthorizedOperationScope[None]):
     actor: Principal
     actor_can_grant: bool
     actor_has_pending_recovery: bool
-    actor_oauth_credential_facts: HumanOAuthCredentialFactsDTO | None
+    actor_oauth_credential_facts: HumanCredentialFactsDTO | None
     recipient: Principal | None
     recipient_has_pending_recovery: bool
     recipient_has_coherent_identity: bool

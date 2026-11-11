@@ -41,6 +41,9 @@ from inframeld_backend.access.infrastructure.rows.human_identity_link_row import
 )
 from inframeld_backend.access.infrastructure.rows.principal_row import PrincipalRow
 from inframeld_backend.access.infrastructure.settings.kratos_settings import KratosSettings
+from inframeld_backend.access.infrastructure.writers.postgres_human_credential_state_initializer import (
+    PostgresHumanCredentialStateInitializer,
+)
 from inframeld_backend.bootstrap.application_factory import create_app
 from inframeld_backend.bootstrap.application_settings import get_settings
 from inframeld_backend.shared.application.errors.application_errors import AccessDeniedError
@@ -198,6 +201,11 @@ async def test_oidc_session_needs_exact_local_link_and_stored_action_grant(
                 )
             )
 
+        state = await PostgresHumanCredentialStateInitializer(database).initialize(
+            VerifiedHumanIdentityDTO(AUTHORITY, subject)
+        )
+        assert state.version is not None
+
         admitted = client.get("/v1/session")
         assert admitted.status_code == 200, admitted.text
         assert admitted.json() == {
@@ -213,7 +221,9 @@ async def test_oidc_session_needs_exact_local_link_and_stored_action_grant(
                 access=AccessContextDTO(
                     actor_principal_id=scenario.principal_id,
                     authentication_evidence=MockAuthenticationEvidence.browser(
-                        VerifiedHumanIdentityDTO(AUTHORITY, subject)
+                        VerifiedHumanIdentityDTO(AUTHORITY, subject),
+                        installation_id=state.installation_id,
+                        version=state.version,
                     ),
                 ),
                 request=ProjectActionAuthorizationRequestDTO(
