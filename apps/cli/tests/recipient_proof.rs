@@ -500,7 +500,7 @@ impl BrowserLauncher for Browser {
             tokio::time::advance(
                 deadline
                     .saturating_duration_since(Instant::now())
-                    .checked_sub(Duration::from_millis(200))
+                    .checked_sub(Duration::from_secs(3))
                     .unwrap(),
             )
             .await;
