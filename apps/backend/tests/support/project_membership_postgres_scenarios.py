@@ -11,11 +11,17 @@ from inframeld_backend.access.application.commands.remove_project_member_command
     RemoveProjectMemberCommand,
 )
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
+from inframeld_backend.access.application.dtos.browser_session_authentication_dto import (
+    BrowserSessionAuthenticationDTO,
+)
 from inframeld_backend.access.application.dtos.created_project_dto import (
     CreatedProjectDTO,
 )
 from inframeld_backend.access.application.dtos.project_membership_change_result_dto import (
     ProjectMembershipChangeResultDTO,
+)
+from inframeld_backend.access.application.dtos.verified_human_identity_dto import (
+    VerifiedHumanIdentityDTO,
 )
 from inframeld_backend.access.application.services.human_admission_fingerprint_service import (
     HumanAdmissionFingerprintService,
@@ -23,8 +29,12 @@ from inframeld_backend.access.application.services.human_admission_fingerprint_s
 from inframeld_backend.access.application.services.project_membership_change_fingerprint_service import (
     ProjectMembershipChangeFingerprintService,
 )
+from inframeld_backend.access.domain.value_objects.identity_subject import IdentitySubject
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
+from inframeld_backend.access.infrastructure.readers.postgres_human_credential_state_reader import (
+    PostgresHumanCredentialStateReader,
+)
 from inframeld_backend.bootstrap.human_admission_composition import open_human_admission
 from inframeld_backend.bootstrap.postgres_project_membership_change_service_factory import (
     PostgresProjectMembershipChangeServiceFactory,
@@ -54,6 +64,7 @@ class MembershipProjectSeedDTO:
     actor: ProjectCreationSeedDTO
     project: CreatedProjectDTO
     bob_id: PrincipalId
+    bob_access: AccessContextDTO
 
 
 def membership_fingerprints() -> ProjectMembershipChangeFingerprintService:
@@ -65,6 +76,7 @@ def membership_fingerprints() -> ProjectMembershipChangeFingerprintService:
 async def seed_membership_project(database: Database) -> MembershipProjectSeedDTO:
     """Use delivered services with controlled provider proof, without implicit Bob grants."""
     actor = await seed_project_creator(database)
+    bob_identity_id = UUID(int=200)
     fingerprints = HumanAdmissionFingerprintService(
         RequestFingerprintService(RequestFingerprintKey(b"a" * 32))
     )
@@ -73,16 +85,28 @@ async def seed_membership_project(database: Database) -> MembershipProjectSeedDT
     ) as service:
         admitted = await service.admit(
             access=actor.access,
-            command=AdmitHumanCommand(actor.organization_id, UUID(int=200), actor.access_revision),
+            command=AdmitHumanCommand(
+                actor.organization_id, bob_identity_id, actor.access_revision
+            ),
             context=IdempotencyContextDTO(
                 HttpMethod.POST,
                 f"/v1/organizations/{actor.organization_id.value}/human-admissions",
                 IdempotencyKey("admit-bob"),
             ),
         )
+    bob_identity = VerifiedHumanIdentityDTO(
+        actor.binding.identity.authority, IdentitySubject(str(bob_identity_id))
+    )
+    bob_state = await PostgresHumanCredentialStateReader(database).read(bob_identity)
+    assert bob_state.version is not None
+    bob_access = AccessContextDTO(
+        admitted.principal_id,
+        BrowserSessionAuthenticationDTO(bob_identity, bob_state.installation_id, bob_state.version),
+    )
+
     actor = replace(actor, access_revision=admitted.access_revision)
     return MembershipProjectSeedDTO(
-        actor, (await create_project(database, actor)).project, admitted.principal_id
+        actor, (await create_project(database, actor)).project, admitted.principal_id, bob_access
     )
 
 

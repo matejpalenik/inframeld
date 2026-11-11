@@ -20,9 +20,6 @@ from inframeld_backend.access.application.dtos.project_grant_authorization_dto i
 from inframeld_backend.access.application.enums.project_action_grant_change_kind import (
     ProjectActionGrantChangeKind,
 )
-from inframeld_backend.access.application.errors.human_oauth_credential_rejected_error import (
-    HumanOAuthCredentialRejectedError,
-)
 from inframeld_backend.access.application.protocols.project_action_grant_result_reader import (
     ProjectActionGrantResultReader,
 )
@@ -378,8 +375,9 @@ class ProjectGrantChangeService(ProjectGrantChanger):
             has_pending_recovery=grant.has_pending_recovery,
             oauth_credential_facts=grant.oauth_credential_facts,
         )
-        if not eligibility.credential_is_current:
-            raise HumanOAuthCredentialRejectedError()
+        PrincipalAccessEvaluationService.require_current_credential(
+            access=access, principal_access=eligibility
+        )
         if grant.actor.kind is not PrincipalKind.HUMAN or not PrincipalAccessPolicy.may_use_product(
             eligibility
         ):

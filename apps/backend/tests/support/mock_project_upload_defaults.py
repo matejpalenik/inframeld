@@ -7,6 +7,9 @@ from inframeld_backend.access.application.commands.set_project_upload_default_co
     SetProjectUploadDefaultCommand,
 )
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
+from inframeld_backend.access.application.dtos.human_credential_facts_dto import (
+    HumanCredentialFactsDTO,
+)
 from inframeld_backend.access.application.dtos.project_action_facts_dto import ProjectActionFactsDTO
 from inframeld_backend.access.application.dtos.project_upload_default_facts_dto import (
     ProjectUploadDefaultFactsDTO,
@@ -29,6 +32,9 @@ from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.enums.principal_status import PrincipalStatus
 from inframeld_backend.access.domain.enums.project_status import ProjectStatus
 from inframeld_backend.access.domain.value_objects.access_group_id import AccessGroupId
+from inframeld_backend.access.domain.value_objects.human_credential_version import (
+    HumanCredentialVersion,
+)
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
@@ -55,7 +61,14 @@ FACTS = ProjectUploadDefaultFactsDTO(
     ORGANIZATION_ID,
     PROJECT_ID,
     7,
-    ProjectActionFactsDTO(ACTOR, False, None, ProjectStatus.ACTIVE, True, True),
+    ProjectActionFactsDTO(
+        ACTOR,
+        False,
+        HumanCredentialFactsDTO(True, HumanCredentialVersion(1)),
+        ProjectStatus.ACTIVE,
+        True,
+        True,
+    ),
     OLD,
     (
         UploadDefaultGroupFactsDTO(A, PROJECT_ID, True, True, False),

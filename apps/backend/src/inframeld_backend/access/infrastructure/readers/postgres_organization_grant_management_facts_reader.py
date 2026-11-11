@@ -7,11 +7,14 @@ from sqlalchemy.exc import TimeoutError as SqlAlchemyTimeoutError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
+from inframeld_backend.access.application.dtos.browser_session_authentication_dto import (
+    BrowserSessionAuthenticationDTO,
+)
+from inframeld_backend.access.application.dtos.human_credential_facts_dto import (
+    HumanCredentialFactsDTO,
+)
 from inframeld_backend.access.application.dtos.human_oauth_credential_binding_dto import (
     HumanOAuthCredentialBindingDTO,
-)
-from inframeld_backend.access.application.dtos.human_oauth_credential_facts_dto import (
-    HumanOAuthCredentialFactsDTO,
 )
 from inframeld_backend.access.application.dtos.organization_grant_management_facts_dto import (
     OrganizationGrantManagementFactsDTO,
@@ -113,7 +116,9 @@ class PostgresOrganizationGrantManagementFactsReader(OrganizationGrantManagement
                         .correlate(PrincipalRow)
                     )
                     evidence = access.authentication_evidence
-                    if isinstance(evidence, HumanOAuthCredentialBindingDTO):
+                    if isinstance(
+                        evidence, HumanOAuthCredentialBindingDTO | BrowserSessionAuthenticationDTO
+                    ):
                         matches = HumanCredentialStateQueries.binding_matches_actor(evidence)
                         version = Nullable(HumanCredentialStateQueries.version_for_actor(evidence))
                     else:
@@ -201,13 +206,16 @@ class PostgresOrganizationGrantManagementFactsReader(OrganizationGrantManagement
                         actor=self._principal(actor[0]),
                         actor_can_grant=actor[2],
                         actor_has_pending_recovery=actor[3],
-                        actor_oauth_credential_facts=HumanOAuthCredentialFactsDTO(
+                        actor_oauth_credential_facts=HumanCredentialFactsDTO(
                             binding_matches_actor=actor[4],
                             current_version=HumanCredentialVersion(actor[5])
                             if actor[5] is not None
                             else None,
                         )
-                        if isinstance(evidence, HumanOAuthCredentialBindingDTO)
+                        if isinstance(
+                            evidence,
+                            HumanOAuthCredentialBindingDTO | BrowserSessionAuthenticationDTO,
+                        )
                         else None,
                         recipient=self._principal(recipient[0]) if recipient is not None else None,
                         recipient_has_pending_recovery=recipient[1]

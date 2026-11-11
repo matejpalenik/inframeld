@@ -4,9 +4,6 @@ from inframeld_backend.access.application.dtos.access_context_dto import AccessC
 from inframeld_backend.access.application.dtos.my_organization_access_dto import (
     MyOrganizationAccessDTO,
 )
-from inframeld_backend.access.application.errors.human_oauth_credential_rejected_error import (
-    HumanOAuthCredentialRejectedError,
-)
 from inframeld_backend.access.application.protocols.my_organization_access_reader import (
     MyOrganizationAccessReader,
 )
@@ -43,8 +40,9 @@ class MyOrganizationAccessService(MyOrganizationAccessReader):
             has_pending_recovery=facts.has_pending_recovery,
             oauth_credential_facts=facts.oauth_credential_facts,
         )
-        if not eligibility.credential_is_current:
-            raise HumanOAuthCredentialRejectedError()
+        PrincipalAccessEvaluationService.require_current_credential(
+            access=access, principal_access=eligibility
+        )
         if (
             facts.principal.kind is not PrincipalKind.HUMAN
             or not PrincipalAccessPolicy.may_use_product(eligibility)

@@ -17,18 +17,18 @@ Kratos owns human identity and browser sessions. An Access authenticator verifie
 
 Browsers send session cookies automatically. Cross-site request forgery (CSRF) protection prevents another site from abusing that behavior to submit a protected change as Alice. A valid cookie alone does not replace that check.
 
-`AccessContextDTO` carries actor identity and exactly one complete browser-session, human OAuth or application-key authentication-evidence record. The current inspected browser evidence retains the verified provider identity without retaining the cookie. The accepted [restoration extension](#restoration-evidence-cutover) additionally requires a captured version binding, with implementation still unfinished. Evidence records do not verify themselves and contain no permission or account-status snapshot.
+`AccessContextDTO` carries actor identity and exactly one complete browser-session, human OAuth or application-key authentication-evidence record. Browser evidence retains the verified identity and the installation/version captured before fresh final verification of the same cookie. It retains no cookie, permission or account-status snapshot. [The captured-evidence sequence](#restoration-evidence-cutover) describes how the request obtains and uses this binding. Full suspension/restoration and its provider-cleanup workflow remain separate unfinished work.
 
 <a id="follow-a-request"></a>
 
 ## Follow a request
 
-**Inspected implementation.** This sequence and the diagram below describe the existing identity-only browser path. The accepted restoration extension follows in [its separate sequence](#restoration-evidence-cutover) and is not yet implemented.
+**Implemented credential fence.** The steps below describe per-request captured browser evidence. They do not establish the full restoration transition or provider-deletion workflow.
 
 1. Parse the credential mechanism. Reject competing cookie/Authorization mechanisms and duplicate or malformed headers before provider calls. Unsupported families receive the selected session-contract outcome, not fallback verification.
-2. Verify the Kratos browser session under finite provider and total deadlines. Preserve cookie CSRF protection for protected writes. Bearer authentication has a separate verifier even though both routes may identify Alice.
-3. After provider verification, open an independent short database session to read the trusted identity link and local eligibility. Do not create a person from an email or treat an unknown identity as admitted.
-4. Return complete non-secret authentication evidence. Services pass this context unchanged. Current operation authorization remains separate and uses the caller's transaction when required.
+2. Discover the verified Kratos identity, then read its installation/version and complete local identity link in a short independent database operation. Require an eligible existing human. Do not create a person from an email or treat an unknown identity as admitted.
+3. Freshly verify the same cookie and exact identity under the original shared provider deadline. Reread current authentication state and reject changed identity, installation, version or principal binding. No SQL session spans provider I/O.
+4. Return the original captured installation/version with the freshly verified identity. Services pass this non-secret evidence unchanged. Current operation authorization separately rereads the required facts in its own scope. Preserve cookie CSRF protection for writes. Bearer authentication retains its own verifier.
 5. Interpret evidence against the stored principal kind and current credential observations before work or replay. A stored kind/evidence mismatch is an internal contract error, not an opportunity to reinterpret the caller.
 
 Keep observation separate from decision. Credential-query helpers construct SQL expressions, and readers return typed observations. The shared application evaluator interprets evidence, while domain policies decide whether the credential is current. Shared persistence mappers convert values only.
@@ -39,34 +39,14 @@ Every producer of an eligibility input must supply current credential facts expl
 
 ## Browser authentication as a sequence
 
-**Inspected human path.** This diagram shows the responsibilities in `HumanSessionAuthenticationService`. Credential selection and applicable CSRF follow the HTTP boundary's existing ordering. They must finish before protected application work.
+**Inspected human path.** This sequence shows the responsibilities in `HumanSessionAuthenticationService`. Credential selection and applicable CSRF follow the HTTP boundary's existing ordering. They must finish before protected application work.
 
-```mermaid
----
-title: "Browser authentication - inspected service path"
----
-sequenceDiagram
-    actor Alice
-    participant HTTP as HTTP credential boundary
-    participant Auth as Human session authenticator
-    participant Kratos as Kratos session verifier
-    participant IdentityLinkReader as Local identity reader
-    participant Block as Current recovery-block reader
-    participant Operation as Protected application operation
-    Alice->>HTTP: Request with Kratos browser cookie
-    Note over HTTP: Reject malformed or competing credential mechanisms first
-    HTTP->>Auth: Selected browser credential
-    Auth->>Kratos: Verify within provider and total deadlines
-    Kratos-->>Auth: Verified provider identity or failure
-    Note over Auth: Invalid or unavailable verification cannot continue
-    Auth->>IdentityLinkReader: Read existing linked principal in a short session
-    Note over Auth: Missing principal is not provisioned
-    Auth->>Block: Read current independent recovery block
-    Note over Auth: Apply current human admission policy
-    Auth-->>HTTP: Actor identity and non-secret browser evidence
-    HTTP->>Operation: Invoke with unchanged AccessContextDTO
-    Note over Operation: Current operation authorization is still required
-```
+1. Alice sends a Kratos browser cookie to the HTTP boundary. The boundary rejects malformed or competing credentials first, then selects browser authentication.
+2. `HumanSessionAuthenticationService` asks the Kratos session verifier to discover the verified identity under the original provider deadline. A verification failure ends the path.
+3. The local authentication-state reader captures the installation/version and linked human in a short read. The service checks initial eligibility.
+4. The service freshly verifies the same cookie and exact identity with Kratos. Discovery and final verification share the original provider and total deadlines.
+5. The local reader rereads the binding and current human eligibility. The service rejects changed identity, installation, version or principal binding.
+6. The service returns the actor and original captured browser evidence to HTTP. The boundary invokes the protected operation with unchanged `AccessContextDTO`, and the operation checks current credential facts before work or replay.
 
 Only a valid provider identity and eligible existing principal reach the later steps. Rejections terminate the path. The local reads are separate short sessions, not one database transaction around Kratos. [The source service](../../../../apps/backend/src/inframeld_backend/access/application/services/human_session_authentication_service.py) and its capability contracts own the exact method/error ordering. The [module architecture](architecture.md) shows where this path fits with CLI and application authentication.
 
@@ -74,7 +54,7 @@ Only a valid provider identity and eligible existing principal reach the later s
 
 ## Capture browser evidence across restoration
 
-**Accepted contract under [ADR-0127](../../../../docs/adr/ADR-0127-fence-human-authentication-evidence-at-restoration.md), not delivered implementation.** Alice's verified browser request can pause while she is suspended and deliberately restored. Identity alone cannot distinguish that earlier evidence from evidence checked after the cutover. The existing version store supplies the local ordering, not a permission snapshot.
+**Implemented credential fence under [ADR-0127](../../../../docs/adr/ADR-0127-fence-human-authentication-evidence-at-restoration.md).** A request carries the installation/version captured before final verification. Later current authorization rejects that evidence if its authoritative binding changes. The existing version store supplies this ordering, not a permission snapshot. The actual suspension/restoration transition remains unfinished.
 
 1. If necessary, discover the provider identity from the supplied cookie. This is not the final verification for the returned context.
 2. Read the current installation/identity/version binding in a short local operation that ends before provider I/O.
@@ -84,7 +64,7 @@ Only a valid provider identity and eligible existing principal reach the later s
 
 Required missing/unavailable state fails closed. No SQL transaction spans provider verification, and no verification retry, new per-call allowance or positive authentication cache follows. [Currentness ownership](eligibility-and-current-authority.md#accepted-browser-currentness) and [record requirements](credential-and-recovery-records.md#restoration-version-transition) own the shared checks and atomic transition.
 
-**Explicitly accepted limit:** a fresh request after cutover may authenticate a Kratos session created late by earlier login work if Kratos currently verifies that session as active, unexpired and for the same identity. This is not proof of its causal generation, password persistence or legitimate-person review. It does not invalidate every old cookie or pending login. Required original cleanup and deliberate security review still apply, and already authorized external effects cannot be recalled. The current identity-only DTO and diagram above do not implement this fence. Provider and human qualification remain unfinished.
+**Explicitly accepted limit:** a fresh request after cutover may authenticate a Kratos session created late by earlier login work if Kratos currently verifies that session as active, unexpired and for the same identity. This is not proof of its causal generation, password persistence or legitimate-person review. It does not invalidate every old cookie or pending login. Required original cleanup and deliberate security review still apply, and already authorized external effects cannot be recalled. The implemented fence applies to each request. Full restoration, suspension-specific provider deletion and human qualification remain unfinished.
 
 <a id="failures-and-changed-state"></a>
 

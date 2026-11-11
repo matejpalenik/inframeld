@@ -26,8 +26,8 @@ from inframeld_backend.access.application.commands.remove_project_member_command
     RemoveProjectMemberCommand,
 )
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
-from inframeld_backend.access.application.dtos.human_oauth_credential_facts_dto import (
-    HumanOAuthCredentialFactsDTO,
+from inframeld_backend.access.application.dtos.human_credential_facts_dto import (
+    HumanCredentialFactsDTO,
 )
 from inframeld_backend.access.application.dtos.project_departure_candidate_dto import (
     ProjectDepartureCandidateDTO,
@@ -115,7 +115,7 @@ async def test_oauth_generation_loss_blocks_replay_before_reservation() -> None:
         FACTS,
         action=replace(
             FACTS.action,
-            oauth_credential_facts=HumanOAuthCredentialFactsDTO(True, HumanCredentialVersion(2)),
+            oauth_credential_facts=HumanCredentialFactsDTO(True, HumanCredentialVersion(2)),
         ),
     )
     with pytest.raises(HumanOAuthCredentialRejectedError):

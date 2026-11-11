@@ -124,7 +124,12 @@ async def seed_project_creator(database: Database) -> ProjectCreationSeedDTO:
         result = await bootstrap_service(session, scenario.binding).bootstrap(scenario.command)
     return ProjectCreationSeedDTO(
         AccessContextDTO(
-            result.recipient_id, MockAuthenticationEvidence.browser(scenario.binding.identity)
+            result.recipient_id,
+            MockAuthenticationEvidence.browser(
+                scenario.binding.identity,
+                installation_id=scenario.binding.installation_id,
+                version=scenario.binding.version,
+            ),
         ),
         result.organization_id,
         result.access_revision,

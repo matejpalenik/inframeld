@@ -91,6 +91,9 @@ from inframeld_backend.access.application.dtos.application_account_action_grants
 from inframeld_backend.access.application.dtos.application_account_grant_target_dto import (
     ApplicationAccountGrantTargetDTO,
 )
+from inframeld_backend.access.application.dtos.browser_session_authentication_dto import (
+    BrowserSessionAuthenticationDTO,
+)
 from inframeld_backend.access.application.dtos.created_project_dto import CreatedProjectDTO
 from inframeld_backend.access.application.dtos.grant_recipient_dto import GrantRecipientDTO
 from inframeld_backend.access.application.dtos.grant_recipients_page_dto import (
@@ -99,14 +102,14 @@ from inframeld_backend.access.application.dtos.grant_recipients_page_dto import 
 from inframeld_backend.access.application.dtos.human_admission_result_dto import (
     HumanAdmissionResultDTO,
 )
+from inframeld_backend.access.application.dtos.human_credential_facts_dto import (
+    HumanCredentialFactsDTO,
+)
 from inframeld_backend.access.application.dtos.human_oauth_consent_details_dto import (
     HumanOAuthConsentDetailsDTO,
 )
 from inframeld_backend.access.application.dtos.human_oauth_credential_binding_dto import (
     HumanOAuthCredentialBindingDTO,
-)
-from inframeld_backend.access.application.dtos.human_oauth_credential_facts_dto import (
-    HumanOAuthCredentialFactsDTO,
 )
 from inframeld_backend.access.application.dtos.my_organization_access_dto import (
     MyOrganizationAccessDTO,
@@ -510,7 +513,14 @@ class MockSDKBrowserAuthenticator(HumanSessionAuthenticator):
         if credential is None or credential.value != "sdk-cookie":
             raise AuthenticationRequiredError()
 
-        return AccessContextDTO(PRINCIPAL, MockAuthenticationEvidence.browser(IDENTITY))
+        return AccessContextDTO(
+            PRINCIPAL,
+            MockAuthenticationEvidence.browser(
+                IDENTITY,
+                installation_id=InstallationId(UUID(int=123)),
+                version=HumanCredentialVersion(1),
+            ),
+        )
 
 
 class MockSDKTokenAuthenticator(HumanAccessTokenAuthenticator):
@@ -1284,8 +1294,11 @@ class MockSDKProjectMembersFacts(ProjectMembersFactsReader):
                     PrincipalStatus.ACTIVE,
                 ),
                 has_pending_recovery=False,
-                oauth_credential_facts=HumanOAuthCredentialFactsDTO(True, HumanCredentialVersion(1))
-                if isinstance(access.authentication_evidence, HumanOAuthCredentialBindingDTO)
+                oauth_credential_facts=HumanCredentialFactsDTO(True, HumanCredentialVersion(1))
+                if isinstance(
+                    access.authentication_evidence,
+                    (BrowserSessionAuthenticationDTO, HumanOAuthCredentialBindingDTO),
+                )
                 else None,
                 project_status=ProjectStatus.ACTIVE,
                 is_project_member=True,
@@ -1342,8 +1355,11 @@ class MockSDKProjectActionGrantsFacts(ProjectActionGrantsFactsReader):
                     PrincipalStatus.ACTIVE,
                 ),
                 has_pending_recovery=False,
-                oauth_credential_facts=HumanOAuthCredentialFactsDTO(True, HumanCredentialVersion(1))
-                if isinstance(access.authentication_evidence, HumanOAuthCredentialBindingDTO)
+                oauth_credential_facts=HumanCredentialFactsDTO(True, HumanCredentialVersion(1))
+                if isinstance(
+                    access.authentication_evidence,
+                    (BrowserSessionAuthenticationDTO, HumanOAuthCredentialBindingDTO),
+                )
                 else None,
                 project_status=ProjectStatus.ACTIVE,
                 is_project_member=True,
@@ -1437,8 +1453,11 @@ class MockSDKMyProjectAccessFacts(MyProjectAccessFactsReader):
                 access.actor_principal_id, organization, PrincipalKind.HUMAN, PrincipalStatus.ACTIVE
             ),
             has_pending_recovery=False,
-            oauth_credential_facts=HumanOAuthCredentialFactsDTO(True, HumanCredentialVersion(1))
-            if isinstance(access.authentication_evidence, HumanOAuthCredentialBindingDTO)
+            oauth_credential_facts=HumanCredentialFactsDTO(True, HumanCredentialVersion(1))
+            if isinstance(
+                access.authentication_evidence,
+                (BrowserSessionAuthenticationDTO, HumanOAuthCredentialBindingDTO),
+            )
             else None,
             project_status=ProjectStatus.ACTIVE,
             is_project_member=True,

@@ -6,6 +6,7 @@ from typing import override
 from uuid import UUID
 
 import pytest
+from tests.support.authentication_evidence import MockAuthenticationEvidence
 from tests.support.mock_project_metadata import ACCESS, ORGANIZATION_ID, PROJECT_ID
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
@@ -21,7 +22,13 @@ from inframeld_backend.access.application.dtos.application_key_metadata_dto impo
 from inframeld_backend.access.application.dtos.application_keys_facts_dto import (
     ApplicationKeysFactsDTO,
 )
+from inframeld_backend.access.application.dtos.human_credential_facts_dto import (
+    HumanCredentialFactsDTO,
+)
 from inframeld_backend.access.application.dtos.project_action_facts_dto import ProjectActionFactsDTO
+from inframeld_backend.access.application.errors.human_oauth_credential_rejected_error import (
+    HumanOAuthCredentialRejectedError,
+)
 from inframeld_backend.access.application.protocols.application_account_facts_reader import (
     ApplicationAccountFactsReader,
 )
@@ -37,10 +44,14 @@ from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.enums.principal_status import PrincipalStatus
 from inframeld_backend.access.domain.enums.project_status import ProjectStatus
 from inframeld_backend.access.domain.value_objects.application_key_id import ApplicationKeyId
+from inframeld_backend.access.domain.value_objects.human_credential_version import (
+    HumanCredentialVersion,
+)
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
 from inframeld_backend.shared.application.errors.application_errors import (
     AccessDeniedError,
+    AuthenticationRequiredError,
     InvalidInputError,
     ResourceNotFoundError,
 )
@@ -66,7 +77,7 @@ FACTS = ApplicationAccountReadFactsDTO(
             ACCESS.actor_principal_id, ORGANIZATION_ID, PrincipalKind.HUMAN, PrincipalStatus.ACTIVE
         ),
         False,
-        None,
+        HumanCredentialFactsDTO(True, HumanCredentialVersion(1)),
         ProjectStatus.ACTIVE,
         True,
         True,
@@ -274,3 +285,24 @@ async def test_wrong_returned_account_and_key_scope_fail_closed(
     facts.keys = (replace(KEYS[0], application_principal_id=PrincipalId(UUID(int=77))),)
     with pytest.raises(RuntimeError):
         await service.list_keys(access=ACCESS, query=ListApplicationKeysQuery(PROJECT_ID, APP))
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("oauth", [False, True])
+async def test_browser_currentness_preserves_the_presented_credential_family(oauth: bool) -> None:
+    """Reject stale evidence before disclosing data, recovering originals or changing authority."""
+    evidence = (
+        MockAuthenticationEvidence.human_oauth() if oauth else MockAuthenticationEvidence.browser()
+    )
+    stale = HumanCredentialFactsDTO(True, HumanCredentialVersion(2))
+    expected = HumanOAuthCredentialRejectedError if oauth else AuthenticationRequiredError
+    facts = MockAccountFacts()
+    facts.facts = replace(FACTS, action=replace(FACTS.action, oauth_credential_facts=stale))
+    with pytest.raises(AuthenticationRequiredError) as caught:
+        await ApplicationAccountReadService(facts).get_account(
+            access=replace(ACCESS, authentication_evidence=evidence),
+            project_id=PROJECT_ID,
+            principal_id=APP,
+        )
+    assert type(caught.value) is expected
+    assert facts.calls == 1

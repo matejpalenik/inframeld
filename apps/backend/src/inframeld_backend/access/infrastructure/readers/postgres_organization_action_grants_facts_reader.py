@@ -7,11 +7,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
+from inframeld_backend.access.application.dtos.browser_session_authentication_dto import (
+    BrowserSessionAuthenticationDTO,
+)
+from inframeld_backend.access.application.dtos.human_credential_facts_dto import (
+    HumanCredentialFactsDTO,
+)
 from inframeld_backend.access.application.dtos.human_oauth_credential_binding_dto import (
     HumanOAuthCredentialBindingDTO,
-)
-from inframeld_backend.access.application.dtos.human_oauth_credential_facts_dto import (
-    HumanOAuthCredentialFactsDTO,
 )
 from inframeld_backend.access.application.dtos.organization_action_grant_assignment_dto import (
     OrganizationActionGrantAssignmentDTO,
@@ -97,12 +100,16 @@ class PostgresOrganizationActionGrantsFactsReader(OrganizationActionGrantsFactsR
         evidence = access.authentication_evidence
         linked = (
             HumanCredentialStateQueries.binding_matches_actor(evidence)
-            if isinstance(evidence, HumanOAuthCredentialBindingDTO)
+            if isinstance(
+                evidence, HumanOAuthCredentialBindingDTO | BrowserSessionAuthenticationDTO
+            )
             else literal(False)
         )
         version = (
             Nullable(HumanCredentialStateQueries.version_for_actor(evidence))
-            if isinstance(evidence, HumanOAuthCredentialBindingDTO)
+            if isinstance(
+                evidence, HumanOAuthCredentialBindingDTO | BrowserSessionAuthenticationDTO
+            )
             else Nullable(literal(None, BigInteger))
         )
         statement = (
@@ -153,13 +160,15 @@ class PostgresOrganizationActionGrantsFactsReader(OrganizationActionGrantsFactsR
                 status=principal.status,
             ),
             actor_has_pending_recovery=pending,
-            actor_oauth_credential_facts=HumanOAuthCredentialFactsDTO(
+            actor_oauth_credential_facts=HumanCredentialFactsDTO(
                 binding_matches_actor=matches,
                 current_version=HumanCredentialVersion(current_version)
                 if current_version is not None
                 else None,
             )
-            if isinstance(evidence, HumanOAuthCredentialBindingDTO)
+            if isinstance(
+                evidence, HumanOAuthCredentialBindingDTO | BrowserSessionAuthenticationDTO
+            )
             else None,
             items=tuple(
                 OrganizationActionGrantAssignmentDTO(

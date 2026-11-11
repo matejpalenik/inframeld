@@ -18,9 +18,6 @@ from inframeld_backend.access.application.dtos.project_grant_target_dto import P
 from inframeld_backend.access.application.enums.my_project_access_item_kind import (
     MyProjectAccessItemKind,
 )
-from inframeld_backend.access.application.errors.human_oauth_credential_rejected_error import (
-    HumanOAuthCredentialRejectedError,
-)
 from inframeld_backend.access.application.protocols.my_project_access_facts_reader import (
     MyProjectAccessFactsReader,
 )
@@ -113,8 +110,9 @@ class MyProjectAccessService(MyProjectAccessReader):
             has_pending_recovery=facts.has_pending_recovery,
             oauth_credential_facts=facts.oauth_credential_facts,
         )
-        if not eligibility.credential_is_current:
-            raise HumanOAuthCredentialRejectedError()
+        PrincipalAccessEvaluationService.require_current_credential(
+            access=access, principal_access=eligibility
+        )
         if facts.actor.kind is not PrincipalKind.HUMAN or not PrincipalAccessPolicy.may_use_product(
             eligibility
         ):

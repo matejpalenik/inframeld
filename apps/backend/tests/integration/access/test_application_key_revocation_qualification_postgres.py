@@ -15,7 +15,6 @@ from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 from tests.support.application_key_scenarios import issue_application_key, revocation_service
-from tests.support.authentication_evidence import MockAuthenticationEvidence
 from tests.support.first_administrator_bootstrap_scenarios import MockBootstrapIdentityVerifier
 from tests.support.project_grant_changes import create_project_grant_change_service
 
@@ -119,6 +118,9 @@ from inframeld_backend.access.infrastructure.readers.postgres_application_authen
 )
 from inframeld_backend.access.infrastructure.readers.postgres_application_key_revocation_facts_reader import (
     PostgresApplicationKeyRevocationFactsReader,
+)
+from inframeld_backend.access.infrastructure.readers.postgres_human_credential_state_reader import (
+    PostgresHumanCredentialStateReader,
 )
 from inframeld_backend.access.infrastructure.readers.postgres_project_action_facts_reader import (
     PostgresProjectActionFactsReader,
@@ -439,8 +441,10 @@ async def test_current_recovery_and_credential_checks_precede_saved_receipt(
             )
         )
     before = await _effects(database, issued, context)
-    with pytest.raises(HumanOAuthCredentialRejectedError if oauth else AccessDeniedError):
+    rejected = HumanOAuthCredentialRejectedError if oauth else AuthenticationRequiredError
+    with pytest.raises(rejected) as error:
         await _revoke(database, access, command, context)
+    assert type(error.value) is rejected
     assert await _effects(database, issued, context) == before
 
 
@@ -709,11 +713,12 @@ async def test_replay_requires_current_revoke_authority_and_never_regrants_it(
     with pytest.raises(AccessDeniedError):
         await _revoke(database, creator, command, context)
     assert await _effects(database, issued, context) == before
+    bob_identity = VerifiedHumanIdentityDTO(authority, IdentitySubject(str(UUID(int=200))))
+    bob_state = await PostgresHumanCredentialStateReader(database).read(bob_identity)
+    assert bob_state.version is not None
     bob_access = AccessContextDTO(
         bob.principal_id,
-        MockAuthenticationEvidence.browser(
-            VerifiedHumanIdentityDTO(authority, IdentitySubject(str(UUID(int=200))))
-        ),
+        BrowserSessionAuthenticationDTO(bob_identity, bob_state.installation_id, bob_state.version),
     )
     async with open_application_account_grant_change(database, fingerprints) as grants:
         await grants.set_grant(

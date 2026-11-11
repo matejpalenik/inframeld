@@ -16,9 +16,6 @@ from inframeld_backend.access.application.dtos.deletion_status_authorization_req
 from inframeld_backend.access.application.dtos.human_oauth_credential_binding_dto import (
     HumanOAuthCredentialBindingDTO,
 )
-from inframeld_backend.access.application.errors.human_oauth_credential_rejected_error import (
-    HumanOAuthCredentialRejectedError,
-)
 from inframeld_backend.access.application.protocols.deletion_recovery_authorizer import (
     DeletionRecoveryAuthorizer,
 )
@@ -75,8 +72,9 @@ class DeletionStatusAuthorizationService(DeletionStatusAuthorizer, DeletionRecov
             has_pending_recovery=facts.has_pending_recovery,
             oauth_credential_facts=facts.oauth_credential_facts,
         )
-        if not eligibility.credential_is_current:
-            raise HumanOAuthCredentialRejectedError()
+        PrincipalAccessEvaluationService.require_current_credential(
+            access=access, principal_access=eligibility
+        )
         if not PrincipalAccessPolicy.may_use_product(eligibility):
             raise AccessDeniedError()
 

@@ -8,11 +8,19 @@ from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
 from pydantic import HttpUrl
 from tests.support.authentication_evidence import MockAuthenticationEvidence
-from tests.support.mock_identity_recovery_block_reader import MockIdentityRecoveryBlockReader
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
+from inframeld_backend.access.application.dtos.human_authentication_state_dto import (
+    HumanAuthenticationStateDTO,
+)
+from inframeld_backend.access.application.dtos.human_credential_state_dto import (
+    HumanCredentialStateDTO,
+)
 from inframeld_backend.access.application.dtos.verified_human_identity_dto import (
     VerifiedHumanIdentityDTO,
+)
+from inframeld_backend.access.application.enums.human_identity_link_state import (
+    HumanIdentityLinkState,
 )
 from inframeld_backend.access.application.protocols.browser_session_verifier import (
     BrowserSessionVerifier,
@@ -20,8 +28,8 @@ from inframeld_backend.access.application.protocols.browser_session_verifier imp
 from inframeld_backend.access.application.protocols.human_access_token_authenticator import (
     HumanAccessTokenAuthenticator,
 )
-from inframeld_backend.access.application.protocols.human_identity_link_reader import (
-    HumanIdentityLinkReader,
+from inframeld_backend.access.application.protocols.human_credential_state_reader import (
+    HumanCredentialStateReader,
 )
 from inframeld_backend.access.application.services.human_session_authentication_service import (
     HumanSessionAuthenticationService,
@@ -35,6 +43,9 @@ from inframeld_backend.access.application.value_objects.human_access_token_crede
 from inframeld_backend.access.domain.entities.principal import Principal
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.enums.principal_status import PrincipalStatus
+from inframeld_backend.access.domain.value_objects.human_credential_version import (
+    HumanCredentialVersion,
+)
 from inframeld_backend.access.domain.value_objects.identity_authority import IdentityAuthority
 from inframeld_backend.access.domain.value_objects.identity_subject import IdentitySubject
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
@@ -50,6 +61,7 @@ from inframeld_backend.shared.application.errors.application_errors import (
     AuthenticationRequiredError,
     DependencyUnavailableError,
 )
+from inframeld_backend.shared.domain.value_objects.installation_id import InstallationId
 from inframeld_backend.shared.http.handlers.error_handlers import register_error_handlers
 from inframeld_backend.shared.http.middleware.request_context_middleware import (
     RequestContextMiddleware,
@@ -79,7 +91,9 @@ class _MockVerifier(BrowserSessionVerifier):
         self.seen_cookies: list[str] = []
 
     @override
-    async def verify(self, credential: BrowserSessionCredential) -> VerifiedHumanIdentityDTO | None:
+    async def verify(
+        self, credential: BrowserSessionCredential, *, timeout_seconds: float | None = None
+    ) -> VerifiedHumanIdentityDTO | None:
         """Record the cookie received by the authentication boundary."""
         self.seen_cookies.append(credential.value)
         if self.failure is not None:
@@ -87,7 +101,7 @@ class _MockVerifier(BrowserSessionVerifier):
         return self.identity
 
 
-class _MockLinkReader(HumanIdentityLinkReader):
+class _MockLinkReader(HumanCredentialStateReader):
     """Resolve a chosen local principal while recording identity lookups."""
 
     def __init__(self, principal_id: PrincipalId | None) -> None:
@@ -96,10 +110,12 @@ class _MockLinkReader(HumanIdentityLinkReader):
         self.seen_identities: list[VerifiedHumanIdentityDTO] = []
 
     @override
-    async def find_principal(self, identity: VerifiedHumanIdentityDTO) -> Principal | None:
+    async def read_authentication_state(
+        self, identity: VerifiedHumanIdentityDTO
+    ) -> HumanAuthenticationStateDTO:
         """Record the exact authority and subject used for local lookup."""
         self.seen_identities.append(identity)
-        return (
+        principal = (
             Principal(
                 self.principal_id,
                 OrganizationId(UUID(int=1)),
@@ -109,6 +125,19 @@ class _MockLinkReader(HumanIdentityLinkReader):
             if self.principal_id is not None
             else None
         )
+        return HumanAuthenticationStateDTO(
+            HumanCredentialStateDTO(
+                InstallationId(UUID(int=123)), identity, HumanCredentialVersion(1), False
+            ),
+            HumanIdentityLinkState.LINKED
+            if principal is not None
+            else HumanIdentityLinkState.UNLINKED,
+            principal,
+        )
+
+    @override
+    async def read(self, identity: VerifiedHumanIdentityDTO) -> HumanCredentialStateDTO:
+        return (await self.read_authentication_state(identity)).credential_state
 
 
 def _test_app(
@@ -122,9 +151,7 @@ def _test_app(
     register_error_handlers(application)
     application.add_middleware(RequestContextMiddleware)
     authenticate = HumanSessionDependency(
-        HumanSessionAuthenticationService(
-            verifier, reader, recovery_block_reader=MockIdentityRecoveryBlockReader()
-        ),
+        HumanSessionAuthenticationService(verifier, reader),
         CSRFProtectionDependency(TRUSTED_ORIGINS),
         access_token_authenticator=bearer,
     )
@@ -179,8 +206,8 @@ def test_valid_session_resolves_local_principal() -> None:
 
     assert response.status_code == 200
     assert response.json() == {"principalId": str(PRINCIPAL_ID.value)}
-    assert verifier.seen_cookies == ["valid-session"]
-    assert reader.seen_identities == [IDENTITY]
+    assert verifier.seen_cookies == ["valid-session", "valid-session"]
+    assert reader.seen_identities == [IDENTITY, IDENTITY]
 
 
 def test_cookie_authenticated_post_requires_csrf_header() -> None:
@@ -189,9 +216,7 @@ def test_cookie_authenticated_post_requires_csrf_header() -> None:
     reader = _MockLinkReader(PRINCIPAL_ID)
     application = _test_app(verifier, reader)
     authenticate = HumanSessionDependency(
-        HumanSessionAuthenticationService(
-            verifier, reader, recovery_block_reader=MockIdentityRecoveryBlockReader()
-        ),
+        HumanSessionAuthenticationService(verifier, reader),
         CSRFProtectionDependency(TRUSTED_ORIGINS),
     )
     changes: list[PrincipalId] = []
@@ -216,9 +241,7 @@ def test_cookie_authenticated_post_rejects_untrusted_origin() -> None:
     reader = _MockLinkReader(PRINCIPAL_ID)
     application = _test_app(verifier, reader)
     authenticate = HumanSessionDependency(
-        HumanSessionAuthenticationService(
-            verifier, reader, recovery_block_reader=MockIdentityRecoveryBlockReader()
-        ),
+        HumanSessionAuthenticationService(verifier, reader),
         CSRFProtectionDependency(TRUSTED_ORIGINS),
     )
     changes: list[PrincipalId] = []
@@ -245,9 +268,7 @@ def test_cookie_authenticated_post_accepts_trusted_origin() -> None:
     reader = _MockLinkReader(PRINCIPAL_ID)
     application = _test_app(verifier, reader)
     authenticate = HumanSessionDependency(
-        HumanSessionAuthenticationService(
-            verifier, reader, recovery_block_reader=MockIdentityRecoveryBlockReader()
-        ),
+        HumanSessionAuthenticationService(verifier, reader),
         CSRFProtectionDependency(TRUSTED_ORIGINS),
     )
     changes: list[PrincipalId] = []

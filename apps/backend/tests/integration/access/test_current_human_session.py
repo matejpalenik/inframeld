@@ -14,6 +14,9 @@ from inframeld_backend.access.application.dtos.verified_human_identity_dto impor
 )
 from inframeld_backend.access.domain.value_objects.identity_authority import IdentityAuthority
 from inframeld_backend.access.infrastructure.settings.kratos_settings import KratosSettings
+from inframeld_backend.access.infrastructure.writers.postgres_human_credential_state_initializer import (
+    PostgresHumanCredentialStateInitializer,
+)
 from inframeld_backend.bootstrap.application_factory import create_app
 from inframeld_backend.bootstrap.application_settings import get_settings
 from inframeld_backend.shared.infrastructure.resources.database import Database
@@ -41,6 +44,11 @@ async def test_current_session_uses_kratos_cookie_and_local_identity_link(
         principal = await MockAccessScenarios.seed_linked_human(
             session, VerifiedHumanIdentityDTO(AUTHORITY, subject)
         )
+
+    state = await PostgresHumanCredentialStateInitializer(database).initialize(
+        VerifiedHumanIdentityDTO(AUTHORITY, subject)
+    )
+    assert state.version is not None
 
     settings = get_settings().model_copy(
         update={

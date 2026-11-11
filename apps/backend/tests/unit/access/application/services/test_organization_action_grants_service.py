@@ -6,6 +6,9 @@ import pytest
 from tests.support.authentication_evidence import MockAuthenticationEvidence
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
+from inframeld_backend.access.application.dtos.human_credential_facts_dto import (
+    HumanCredentialFactsDTO,
+)
 from inframeld_backend.access.application.dtos.organization_action_grant_assignment_dto import (
     OrganizationActionGrantAssignmentDTO,
 )
@@ -14,6 +17,9 @@ from inframeld_backend.access.application.dtos.organization_action_grants_page_f
 )
 from inframeld_backend.access.application.dtos.organization_grant_target_dto import (
     OrganizationGrantTargetDTO,
+)
+from inframeld_backend.access.application.errors.human_oauth_credential_rejected_error import (
+    HumanOAuthCredentialRejectedError,
 )
 from inframeld_backend.access.application.protocols.organization_action_grants_facts_reader import (
     OrganizationActionGrantsFactsReader,
@@ -31,11 +37,15 @@ from inframeld_backend.access.domain.entities.principal import Principal
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.enums.principal_status import PrincipalStatus
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
+from inframeld_backend.access.domain.value_objects.human_credential_version import (
+    HumanCredentialVersion,
+)
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
 from inframeld_backend.shared.application.errors.application_errors import (
     AccessDeniedError,
+    AuthenticationRequiredError,
     InvalidInputError,
     ResourceNotFoundError,
 )
@@ -69,7 +79,7 @@ FACTS = OrganizationActionGrantsPageFactsDTO(
     items=ITEMS,
     actor=ACTOR,
     actor_has_pending_recovery=False,
-    actor_oauth_credential_facts=None,
+    actor_oauth_credential_facts=HumanCredentialFactsDTO(True, HumanCredentialVersion(1)),
 )
 
 
@@ -169,3 +179,21 @@ async def test_reader_cannot_change_assignment_action_or_uuid_order() -> None:
             await OrganizationActionGrantsService(
                 MockGrantFacts(replace(FACTS, items=items))
             ).list_grants(access=ACCESS, query=_query())
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("oauth", [False, True])
+async def test_browser_currentness_preserves_the_presented_credential_family(oauth: bool) -> None:
+    """Reject stale evidence before disclosing data, recovering originals or changing authority."""
+    evidence = (
+        MockAuthenticationEvidence.human_oauth() if oauth else MockAuthenticationEvidence.browser()
+    )
+    stale = HumanCredentialFactsDTO(True, HumanCredentialVersion(2))
+    expected = HumanOAuthCredentialRejectedError if oauth else AuthenticationRequiredError
+    facts = MockGrantFacts(replace(FACTS, actor_oauth_credential_facts=stale))
+    with pytest.raises(AuthenticationRequiredError) as caught:
+        await OrganizationActionGrantsService(facts).list_grants(
+            access=replace(ACCESS, authentication_evidence=evidence), query=_query()
+        )
+    assert type(caught.value) is expected
+    assert facts.calls == [(None, 2)]

@@ -8,8 +8,14 @@ import pytest
 from tests.support.authentication_evidence import MockAuthenticationEvidence
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
+from inframeld_backend.access.application.dtos.human_credential_facts_dto import (
+    HumanCredentialFactsDTO,
+)
 from inframeld_backend.access.application.dtos.operation_lookup_facts_dto import (
     OperationLookupFactsDTO,
+)
+from inframeld_backend.access.application.errors.human_oauth_credential_rejected_error import (
+    HumanOAuthCredentialRejectedError,
 )
 from inframeld_backend.access.application.protocols.operation_lookup_facts_reader import (
     OperationLookupFactsReader,
@@ -22,6 +28,9 @@ from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.enums.principal_status import PrincipalStatus
 from inframeld_backend.access.domain.enums.project_status import ProjectStatus
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
+from inframeld_backend.access.domain.value_objects.human_credential_version import (
+    HumanCredentialVersion,
+)
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
@@ -31,6 +40,7 @@ from inframeld_backend.shared.application.enums.operation_lookup_authority_famil
 )
 from inframeld_backend.shared.application.errors.application_errors import (
     AccessDeniedError,
+    AuthenticationRequiredError,
     DependencyUnavailableError,
     ResourceNotFoundError,
 )
@@ -69,7 +79,7 @@ FACTS = OperationLookupFactsDTO(
     has_exact_action_grant=True,
     can_grant_action=True,
     has_pending_recovery=False,
-    oauth_credential_facts=None,
+    oauth_credential_facts=HumanCredentialFactsDTO(True, HumanCredentialVersion(1)),
 )
 
 
@@ -220,3 +230,20 @@ async def test_other_access_grant_lookup_requires_exact_current_delegation(
         # Use-only and group management never substitute for this exact delegated grant.
         with pytest.raises(AccessDeniedError):
             await service.require_authorization(access=ACCESS, request=query)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("oauth", [False, True])
+async def test_browser_currentness_preserves_the_presented_credential_family(oauth: bool) -> None:
+    """Reject stale evidence before disclosing data, recovering originals or changing authority."""
+    evidence = (
+        MockAuthenticationEvidence.human_oauth() if oauth else MockAuthenticationEvidence.browser()
+    )
+    stale = HumanCredentialFactsDTO(True, HumanCredentialVersion(2))
+    expected = HumanOAuthCredentialRejectedError if oauth else AuthenticationRequiredError
+    reader = MockLookupFacts(replace(FACTS, oauth_credential_facts=stale))
+    with pytest.raises(AuthenticationRequiredError) as caught:
+        await OperationLookupAuthorizationService(reader).require_authorization(
+            access=replace(ACCESS, authentication_evidence=evidence), request=QUERY
+        )
+    assert type(caught.value) is expected

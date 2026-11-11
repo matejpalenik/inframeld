@@ -5,7 +5,11 @@ from uuid import uuid4
 
 import pytest
 from sqlalchemy import update
-from tests.support.access_scenarios import MockAccessScenarios
+from tests.support.access_scenarios import (
+    MockAccessScenarios,
+    MultiProjectAuthorizationSeedDTO,
+    ProjectAuthorizationSeedDTO,
+)
 from tests.support.application_key_scenarios import verified_application_access
 from tests.support.authentication_evidence import MockAuthenticationEvidence
 
@@ -13,11 +17,17 @@ from inframeld_backend.access.application.dtos.access_context_dto import AccessC
 from inframeld_backend.access.application.dtos.application_key_verification_profile_dto import (
     ApplicationKeyVerificationProfileDTO,
 )
+from inframeld_backend.access.application.dtos.browser_session_authentication_dto import (
+    BrowserSessionAuthenticationDTO,
+)
 from inframeld_backend.access.application.dtos.project_action_authorization_request_dto import (
     ProjectActionAuthorizationRequestDTO,
 )
 from inframeld_backend.access.application.dtos.project_action_target_dto import (
     ProjectActionTargetDTO,
+)
+from inframeld_backend.access.application.dtos.verified_human_identity_dto import (
+    VerifiedHumanIdentityDTO,
 )
 from inframeld_backend.access.application.services.action_authorization_service import (
     ActionAuthorizationService,
@@ -31,12 +41,21 @@ from inframeld_backend.access.domain.value_objects.action_id import ActionId
 from inframeld_backend.access.domain.value_objects.application_key_audience import (
     ApplicationKeyAudience,
 )
+from inframeld_backend.access.domain.value_objects.identity_authority import IdentityAuthority
+from inframeld_backend.access.domain.value_objects.identity_subject import IdentitySubject
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
 from inframeld_backend.access.infrastructure.readers.postgres_project_action_facts_reader import (
     PostgresProjectActionFactsReader,
 )
+from inframeld_backend.access.infrastructure.rows.human_identity_link_row import (
+    HumanIdentityLinkRow,
+)
+from inframeld_backend.access.infrastructure.rows.principal_row import PrincipalRow
 from inframeld_backend.access.infrastructure.rows.project_action_grant_row import (
     ProjectActionGrantRow,
+)
+from inframeld_backend.access.infrastructure.writers.postgres_human_credential_state_initializer import (
+    PostgresHumanCredentialStateInitializer,
 )
 from inframeld_backend.shared.application.errors.application_errors import (
     AccessDeniedError,
@@ -53,6 +72,33 @@ APPLICATION_PROFILE = ApplicationKeyVerificationProfileDTO(
 )
 
 
+async def _capture_browser(
+    database: Database, scenario: ProjectAuthorizationSeedDTO | MultiProjectAuthorizationSeedDTO
+) -> AccessContextDTO:
+    identity = VerifiedHumanIdentityDTO(
+        IdentityAuthority("kratos:test"), IdentitySubject(str(uuid4()))
+    )
+    async with database.session() as session, session.begin():
+        principal = await session.get(PrincipalRow, scenario.principal_id.value)
+        assert principal is not None
+        session.add(
+            HumanIdentityLinkRow(
+                authority=identity.authority.value,
+                subject=identity.subject.value,
+                organization_id=principal.organization_id,
+                principal_id=scenario.principal_id.value,
+                principal_kind=PrincipalKind.HUMAN,
+            )
+        )
+    state = await PostgresHumanCredentialStateInitializer(database).initialize(identity)
+    assert state.version is not None
+    access = AccessContextDTO(
+        scenario.principal_id,
+        BrowserSessionAuthenticationDTO(identity, state.installation_id, state.version),
+    )
+    return access
+
+
 @pytest.mark.asyncio
 async def test_allows_member_with_exact_project_action_grant(database: Database) -> None:
     """Allow a current project member whose exact action grant is stored in PostgreSQL."""
@@ -62,13 +108,11 @@ async def test_allows_member_with_exact_project_action_grant(database: Database)
             is_project_member=True,
             has_action_grant=True,
         )
-
+    access = await _capture_browser(database, scenario)
+    async with database.session() as session, session.begin():
         authorizer = ActionAuthorizationService(PostgresProjectActionFactsReader(session))
         authorization = await authorizer.require_authorization(
-            access=AccessContextDTO(
-                actor_principal_id=scenario.principal_id,
-                authentication_evidence=MockAuthenticationEvidence.browser(),
-            ),
+            access=access,
             request=ProjectActionAuthorizationRequestDTO(
                 project_id=scenario.project_id, action_id=scenario.action
             ),
@@ -87,12 +131,10 @@ async def test_hides_project_from_active_nonmember(database: Database) -> None:
             is_project_member=False,
             has_action_grant=False,
         )
+    access = await _capture_browser(database, scenario)
+    async with database.session() as session, session.begin():
         reader = PostgresProjectActionFactsReader(session)
         authorizer = ActionAuthorizationService(reader)
-        access = AccessContextDTO(
-            actor_principal_id=scenario.principal_id,
-            authentication_evidence=MockAuthenticationEvidence.browser(),
-        )
         target = ProjectActionTargetDTO(project_id=scenario.project_id)
 
         with pytest.raises(ResourceNotFoundError):
@@ -115,7 +157,10 @@ async def test_hides_project_from_active_nonmember(database: Database) -> None:
     assert facts.principal.kind is PrincipalKind.HUMAN
     assert facts.principal.status is PrincipalStatus.ACTIVE
     assert facts.has_pending_recovery is False
-    assert facts.oauth_credential_facts is None
+    assert isinstance(access.authentication_evidence, BrowserSessionAuthenticationDTO)
+    assert facts.oauth_credential_facts is not None
+    assert facts.oauth_credential_facts.binding_matches_actor
+    assert facts.oauth_credential_facts.current_version == access.authentication_evidence.version
     assert facts.project_status is ProjectStatus.ACTIVE
     assert facts.is_project_member is False
     assert facts.has_exact_action_grant is False
@@ -130,14 +175,13 @@ async def test_denies_project_member_without_exact_action_grant(database: Databa
             is_project_member=True,
             has_action_grant=False,
         )
+    access = await _capture_browser(database, scenario)
+    async with database.session() as session, session.begin():
         authorizer = ActionAuthorizationService(PostgresProjectActionFactsReader(session))
 
         with pytest.raises(AccessDeniedError):
             await authorizer.require_authorization(
-                access=AccessContextDTO(
-                    actor_principal_id=scenario.principal_id,
-                    authentication_evidence=MockAuthenticationEvidence.browser(),
-                ),
+                access=access,
                 request=ProjectActionAuthorizationRequestDTO(
                     project_id=scenario.project_id, action_id=scenario.action
                 ),
@@ -156,14 +200,13 @@ async def test_hides_suspended_project_member_even_with_an_action_grant(
             has_action_grant=True,
             principal_status=PrincipalStatus.SUSPENDED,
         )
+    access = await _capture_browser(database, scenario)
+    async with database.session() as session, session.begin():
         authorizer = ActionAuthorizationService(PostgresProjectActionFactsReader(session))
 
         with pytest.raises(ResourceNotFoundError):
             await authorizer.require_authorization(
-                access=AccessContextDTO(
-                    actor_principal_id=scenario.principal_id,
-                    authentication_evidence=MockAuthenticationEvidence.browser(),
-                ),
+                access=access,
                 request=ProjectActionAuthorizationRequestDTO(
                     project_id=scenario.project_id, action_id=scenario.action
                 ),
@@ -175,11 +218,9 @@ async def test_project_action_grant_does_not_carry_to_another_project(database: 
     """Keep Alice's exact action grant limited to the project where it was assigned."""
     async with database.session() as session, session.begin():
         scenario = await MockAccessScenarios.seed_multi_project_authorization(session)
+    access = await _capture_browser(database, scenario)
+    async with database.session() as session, session.begin():
         authorizer = ActionAuthorizationService(PostgresProjectActionFactsReader(session))
-        access = AccessContextDTO(
-            actor_principal_id=scenario.principal_id,
-            authentication_evidence=MockAuthenticationEvidence.browser(),
-        )
 
         await authorizer.require_authorization(
             access=access,

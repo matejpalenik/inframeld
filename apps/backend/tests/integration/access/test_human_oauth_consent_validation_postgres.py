@@ -54,9 +54,6 @@ from inframeld_backend.access.http.routes.human_oauth_consent_routes import (
 from inframeld_backend.access.infrastructure.readers.postgres_human_credential_state_reader import (
     PostgresHumanCredentialStateReader,
 )
-from inframeld_backend.access.infrastructure.readers.postgres_identity_recovery_block_reader import (
-    PostgresIdentityRecoveryBlockReader,
-)
 from inframeld_backend.access.infrastructure.rows.human_credential_version_row import (
     HumanCredentialVersionRow,
 )
@@ -98,7 +95,9 @@ class MockInvalidBrowserVerifier(BrowserSessionVerifier):
     calls: list[str]
 
     @override
-    async def verify(self, credential: BrowserSessionCredential) -> VerifiedHumanIdentityDTO | None:
+    async def verify(
+        self, credential: BrowserSessionCredential, *, timeout_seconds: float | None = None
+    ) -> VerifiedHumanIdentityDTO | None:
         self.calls.append("verify")
         return None
 
@@ -141,7 +140,6 @@ async def test_unsupported_approval_creates_no_credential_version(
         MockConsentRequestReader(request, calls),
         MockUnexpectedConsentDecisionWriter(),
         MockInvalidBrowserVerifier(calls),
-        PostgresIdentityRecoveryBlockReader(database),
         credential_state_reader=PostgresHumanCredentialStateReader(database),
         credential_initializer=PostgresHumanCredentialStateInitializer(database),
         authority=IdentityAuthority("kratos:test"),

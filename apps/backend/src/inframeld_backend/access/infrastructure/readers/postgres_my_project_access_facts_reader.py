@@ -27,11 +27,14 @@ from inframeld_backend.access.application.dtos.access_group_grant_target_dto imp
 from inframeld_backend.access.application.dtos.application_account_grant_target_dto import (
     ApplicationAccountGrantTargetDTO,
 )
+from inframeld_backend.access.application.dtos.browser_session_authentication_dto import (
+    BrowserSessionAuthenticationDTO,
+)
+from inframeld_backend.access.application.dtos.human_credential_facts_dto import (
+    HumanCredentialFactsDTO,
+)
 from inframeld_backend.access.application.dtos.human_oauth_credential_binding_dto import (
     HumanOAuthCredentialBindingDTO,
-)
-from inframeld_backend.access.application.dtos.human_oauth_credential_facts_dto import (
-    HumanOAuthCredentialFactsDTO,
 )
 from inframeld_backend.access.application.dtos.my_project_access_facts_dto import (
     MyProjectAccessFactsDTO,
@@ -263,12 +266,16 @@ class PostgresMyProjectAccessFactsReader(MyProjectAccessFactsReader):
         evidence = access.authentication_evidence
         matches = (
             HumanCredentialStateQueries.binding_matches_actor(evidence)
-            if isinstance(evidence, HumanOAuthCredentialBindingDTO)
+            if isinstance(
+                evidence, HumanOAuthCredentialBindingDTO | BrowserSessionAuthenticationDTO
+            )
             else literal(False)
         )
         version = (
             Nullable(HumanCredentialStateQueries.version_for_actor(evidence))
-            if isinstance(evidence, HumanOAuthCredentialBindingDTO)
+            if isinstance(
+                evidence, HumanOAuthCredentialBindingDTO | BrowserSessionAuthenticationDTO
+            )
             else Nullable(literal(None, BigInteger))
         )
         statement = (
@@ -359,13 +366,15 @@ class PostgresMyProjectAccessFactsReader(MyProjectAccessFactsReader):
                 principal.status,
             ),
             has_pending_recovery=recovering,
-            oauth_credential_facts=HumanOAuthCredentialFactsDTO(
+            oauth_credential_facts=HumanCredentialFactsDTO(
                 linked,
                 HumanCredentialVersion(credential_version)
                 if credential_version is not None
                 else None,
             )
-            if isinstance(evidence, HumanOAuthCredentialBindingDTO)
+            if isinstance(
+                evidence, HumanOAuthCredentialBindingDTO | BrowserSessionAuthenticationDTO
+            )
             else None,
             project_status=project.status,
             is_project_member=membership,

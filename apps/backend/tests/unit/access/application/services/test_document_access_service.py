@@ -14,8 +14,8 @@ from inframeld_backend.access.application.dtos.current_document_access_dto impor
 from inframeld_backend.access.application.dtos.document_access_facts_dto import (
     DocumentAccessFactsDTO,
 )
-from inframeld_backend.access.application.dtos.human_oauth_credential_facts_dto import (
-    HumanOAuthCredentialFactsDTO,
+from inframeld_backend.access.application.dtos.human_credential_facts_dto import (
+    HumanCredentialFactsDTO,
 )
 from inframeld_backend.access.application.dtos.selected_document_source_dto import (
     SelectedDocumentSourceDTO,
@@ -65,7 +65,7 @@ FACTS = DocumentAccessFactsDTO(
     ProjectStatus.ACTIVE,
     True,
     False,
-    None,
+    HumanCredentialFactsDTO(True, HumanCredentialVersion(1)),
     frozenset((G, H)),
     frozenset((G,)),
 )
@@ -241,7 +241,7 @@ async def test_stale_oauth_precedes_empty_and_recovery() -> None:
     facts = replace(
         FACTS,
         has_pending_recovery=True,
-        oauth_credential_facts=HumanOAuthCredentialFactsDTO(True, HumanCredentialVersion(2)),
+        oauth_credential_facts=HumanCredentialFactsDTO(True, HumanCredentialVersion(2)),
     )
     service = DocumentAccessService(MockDocumentAccessFactsReader(facts))
     with pytest.raises(HumanOAuthCredentialRejectedError):

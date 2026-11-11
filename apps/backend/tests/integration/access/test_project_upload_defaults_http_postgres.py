@@ -46,9 +46,6 @@ from inframeld_backend.access.infrastructure.readers.postgres_human_credential_s
 from inframeld_backend.access.infrastructure.readers.postgres_human_identity_link_reader import (
     PostgresHumanIdentityLinkReader,
 )
-from inframeld_backend.access.infrastructure.readers.postgres_identity_recovery_block_reader import (
-    PostgresIdentityRecoveryBlockReader,
-)
 from inframeld_backend.access.infrastructure.rows.application_key_row import ApplicationKeyRow
 from inframeld_backend.access.infrastructure.rows.group_action_grant_row import GroupActionGrantRow
 from inframeld_backend.access.infrastructure.rows.group_manager_row import GroupManagerRow
@@ -150,8 +147,7 @@ async def _client(
         links = PostgresHumanIdentityLinkReader(database)
         browser = HumanSessionAuthenticationService(
             ControlledBrowserProof(binding),
-            links,
-            recovery_block_reader=PostgresIdentityRecoveryBlockReader(database),
+            PostgresHumanCredentialStateReader(database),
             provider_timeout_seconds=human_authentication_settings.provider_timeout_seconds,
             total_timeout_seconds=human_authentication_settings.total_timeout_seconds,
         )

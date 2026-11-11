@@ -46,9 +46,6 @@ from inframeld_backend.access.application.dtos.organization_grant_target_dto imp
     OrganizationGrantTargetDTO,
 )
 from inframeld_backend.access.application.dtos.project_grant_target_dto import ProjectGrantTargetDTO
-from inframeld_backend.access.application.errors.human_oauth_credential_rejected_error import (
-    HumanOAuthCredentialRejectedError,
-)
 from inframeld_backend.access.application.protocols.invitation_facts_reader import (
     InvitationFactsReader,
 )
@@ -243,8 +240,9 @@ class InvitationAdministrationService(InvitationIssuer, InvitationRevoker):
             has_pending_recovery=actor.has_pending_recovery,
             oauth_credential_facts=actor.oauth_credential_facts,
         )
-        if not eligibility.credential_is_current:
-            raise HumanOAuthCredentialRejectedError()
+        PrincipalAccessEvaluationService.require_current_credential(
+            access=access, principal_access=eligibility
+        )
         admission_grants = tuple(
             grant
             for grant in actor.grants
@@ -425,8 +423,9 @@ class InvitationAdministrationService(InvitationIssuer, InvitationRevoker):
             has_pending_recovery=actor.has_pending_recovery,
             oauth_credential_facts=actor.oauth_credential_facts,
         )
-        if not eligibility.credential_is_current:
-            raise HumanOAuthCredentialRejectedError()
+        PrincipalAccessEvaluationService.require_current_credential(
+            access=access, principal_access=eligibility
+        )
         if not HumanAdmissionPolicy.may_authorize(
             eligibility,
             has_admit_users=any(
@@ -494,8 +493,9 @@ class InvitationAdministrationService(InvitationIssuer, InvitationRevoker):
                 has_pending_recovery=project.action.has_pending_recovery,
                 oauth_credential_facts=project.action.oauth_credential_facts,
             )
-            if not current.credential_is_current:
-                raise HumanOAuthCredentialRejectedError()
+            PrincipalAccessEvaluationService.require_current_credential(
+                access=access, principal_access=current
+            )
             if not PrincipalAccessPolicy.may_use_product(current):
                 raise AccessDeniedError()
             if not ProjectVisibilityPolicy.may_view_project(

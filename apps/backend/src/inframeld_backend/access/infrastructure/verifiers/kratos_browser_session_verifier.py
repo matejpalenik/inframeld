@@ -57,13 +57,20 @@ class KratosBrowserSessionVerifier(BrowserSessionVerifier):
         self._timeout_seconds = timeout_seconds
 
     @override
-    async def verify(self, credential: BrowserSessionCredential) -> VerifiedHumanIdentityDTO | None:
+    async def verify(
+        self, credential: BrowserSessionCredential, *, timeout_seconds: float | None = None
+    ) -> VerifiedHumanIdentityDTO | None:
         """Ask Kratos for this session and reject inactive, expired, or disabled provider identities."""
+        request_timeout = (
+            self._timeout_seconds
+            if timeout_seconds is None
+            else min(self._timeout_seconds, timeout_seconds)
+        )
         try:
             session = await asyncio.to_thread(
                 self._client.to_session,
                 cookie=f"ory_kratos_session={credential.value}",
-                _request_timeout=self._timeout_seconds,
+                _request_timeout=request_timeout,
             )
         except (UnauthorizedException, ForbiddenException):
             return None

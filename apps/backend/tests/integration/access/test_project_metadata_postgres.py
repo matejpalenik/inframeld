@@ -5,8 +5,8 @@ import os
 
 import pytest
 from sqlalchemy import delete, func, select, update
-from tests.support.authentication_evidence import MockAuthenticationEvidence
 from tests.support.project_metadata_scenarios import (
+    capture_metadata_browser,
     metadata_service,
     seed_another_metadata_project,
     seed_metadata_project,
@@ -15,7 +15,6 @@ from tests.support.project_metadata_scenarios import (
 from inframeld_backend.access.application.commands.update_project_metadata_command import (
     UpdateProjectMetadataCommand,
 )
-from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
 from inframeld_backend.access.infrastructure.rows.access_audit_event_row import AccessAuditEventRow
 from inframeld_backend.access.infrastructure.rows.project_name_reservation_row import (
@@ -57,7 +56,7 @@ async def test_original_metadata_outcome_survives_later_rename_and_retired_name_
     async with database.session() as session, session.begin():
         seed = await seed_metadata_project(session)
         other = await seed_another_metadata_project(session, seed)
-    access = AccessContextDTO(seed.principal_id, MockAuthenticationEvidence.browser())
+    access = await capture_metadata_browser(database, seed)
     original = UpdateProjectMetadataCommand(seed.project_id, 0, ResourceName("support"))
     async with database.session() as session:
         first = await metadata_service(session).update(
@@ -104,7 +103,7 @@ async def test_concurrent_exact_name_collision_commits_one_complete_change(
     async with database.session() as session, session.begin():
         first = await seed_metadata_project(session)
         second = await seed_another_metadata_project(session, first)
-    access = AccessContextDTO(first.principal_id, MockAuthenticationEvidence.browser())
+    access = await capture_metadata_browser(database, first)
 
     async def allocate(seed_id: ProjectId):
         async with database.session() as session:
@@ -153,7 +152,7 @@ async def test_selector_only_change_preserves_legacy_label_in_current_and_origin
         await session.execute(
             update(ProjectRow).where(ProjectRow.id == seed.project_id.value).values(name=legacy)
         )
-    access = AccessContextDTO(seed.principal_id, MockAuthenticationEvidence.browser())
+    access = await capture_metadata_browser(database, seed)
     command = UpdateProjectMetadataCommand(seed.project_id, 0, ResourceName("support"))
     async with database.session() as session:
         result = await metadata_service(session).update(
@@ -182,7 +181,7 @@ async def test_stale_change_and_revoked_replay_cannot_mutate_or_disclose_origina
 
     async with database.session() as session, session.begin():
         seed = await seed_metadata_project(session)
-    access = AccessContextDTO(seed.principal_id, MockAuthenticationEvidence.browser())
+    access = await capture_metadata_browser(database, seed)
     original = UpdateProjectMetadataCommand(seed.project_id, 0, ResourceName("support"))
     async with database.session() as session:
         await metadata_service(session).update(
@@ -255,7 +254,7 @@ async def test_actual_audit_flush_failure_rolls_back_metadata_name_result_and_re
 
     async with database.session() as session, session.begin():
         seed = await seed_metadata_project(session)
-    access = AccessContextDTO(seed.principal_id, MockAuthenticationEvidence.browser())
+    access = await capture_metadata_browser(database, seed)
     async with database.session() as session:
         with pytest.raises(RuntimeError, match="Audit storage failed"):
             await metadata_service(session, MockFailingAudit(session)).update(

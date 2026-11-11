@@ -3,11 +3,17 @@ from dataclasses import dataclass, field
 from typing import override
 from uuid import UUID
 
+from inframeld_backend.access.application.dtos.human_authentication_state_dto import (
+    HumanAuthenticationStateDTO,
+)
 from inframeld_backend.access.application.dtos.human_credential_state_dto import (
     HumanCredentialStateDTO,
 )
 from inframeld_backend.access.application.dtos.verified_human_identity_dto import (
     VerifiedHumanIdentityDTO,
+)
+from inframeld_backend.access.application.enums.human_identity_link_state import (
+    HumanIdentityLinkState,
 )
 from inframeld_backend.access.application.protocols.human_credential_state_initializer import (
     HumanCredentialStateInitializer,
@@ -15,6 +21,7 @@ from inframeld_backend.access.application.protocols.human_credential_state_initi
 from inframeld_backend.access.application.protocols.human_credential_state_reader import (
     HumanCredentialStateReader,
 )
+from inframeld_backend.access.domain.entities.principal import Principal
 from inframeld_backend.access.domain.value_objects.human_credential_version import (
     HumanCredentialVersion,
 )
@@ -36,6 +43,11 @@ class MockHumanCredentialStateReader(HumanCredentialStateReader, HumanCredential
     )
     calls: list[str] = field(default_factory=list[str])
     events: list[str] | None = None
+    link_state: HumanIdentityLinkState = HumanIdentityLinkState.UNLINKED
+    linked_principal: Principal | None = None
+    authentication_snapshots: list[HumanAuthenticationStateDTO] = field(
+        default_factory=list[HumanAuthenticationStateDTO]
+    )
     snapshots: list[HumanCredentialStateDTO] = field(default_factory=list[HumanCredentialStateDTO])
 
     async def _observe(
@@ -65,3 +77,21 @@ class MockHumanCredentialStateReader(HumanCredentialStateReader, HumanCredential
     @override
     async def initialize(self, identity: VerifiedHumanIdentityDTO) -> HumanCredentialStateDTO:
         return await self._observe(identity, "initialize")
+
+    @override
+    async def read_authentication_state(
+        self, identity: VerifiedHumanIdentityDTO
+    ) -> HumanAuthenticationStateDTO:
+        state = await self._observe(identity, "state")
+        if self.authentication_snapshots:
+            return self.authentication_snapshots.pop(0)
+        return HumanAuthenticationStateDTO(state, self.link_state, self.linked_principal)
+
+    @override
+    async def initialize_authentication_state(
+        self, identity: VerifiedHumanIdentityDTO
+    ) -> HumanAuthenticationStateDTO:
+        state = await self._observe(identity, "initialize")
+        if self.authentication_snapshots:
+            return self.authentication_snapshots.pop(0)
+        return HumanAuthenticationStateDTO(state, self.link_state, self.linked_principal)

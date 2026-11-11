@@ -1,5 +1,6 @@
 """Check how SDK-verified Kratos sessions become human identities."""
 
+import asyncio
 from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
 from uuid import UUID
@@ -179,3 +180,39 @@ async def test_kratos_failure_reports_dependency_failure(failure: Exception) -> 
         await KratosBrowserSessionVerifier(frontend, AUTHORITY).verify(
             BrowserSessionCredential(COOKIE)
         )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "configured,remaining,expected",
+    [(5.0, 0.125, 0.125), (2.0, 9.0, 2.0), (0.5, 1.0, 0.5), (5.0, None, 5.0)],
+)
+async def test_remaining_window_caps_the_sdk_network_timeout(
+    configured: float, remaining: float | None, expected: float
+) -> None:
+    """Forward only the caller's remaining provider window, capped by local configuration."""
+    frontend = _frontend()
+    with patch.object(frontend, "to_session", return_value=_session()) as to_session:
+        identity = await KratosBrowserSessionVerifier(
+            frontend, AUTHORITY, timeout_seconds=configured
+        ).verify(BrowserSessionCredential(COOKIE), timeout_seconds=remaining)
+    assert identity == VerifiedHumanIdentityDTO(AUTHORITY, IdentitySubject(str(IDENTITY_ID)))
+    to_session.assert_called_once_with(
+        cookie=f"ory_kratos_session={COOKIE}", _request_timeout=expected
+    )
+
+
+@pytest.mark.asyncio
+async def test_remaining_window_keeps_external_cancellation_visible() -> None:
+    """Do not turn caller cancellation into invalid-session or dependency outcomes."""
+    frontend = _frontend()
+    with (
+        patch.object(frontend, "to_session", side_effect=asyncio.CancelledError) as to_session,
+        pytest.raises(asyncio.CancelledError),
+    ):
+        await KratosBrowserSessionVerifier(frontend, AUTHORITY).verify(
+            BrowserSessionCredential(COOKIE), timeout_seconds=0.125
+        )
+    to_session.assert_called_once_with(
+        cookie=f"ory_kratos_session={COOKIE}", _request_timeout=0.125
+    )

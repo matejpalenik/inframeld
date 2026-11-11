@@ -9,7 +9,6 @@ import pytest
 from sqlalchemy import select, update
 from tests.support.access_group_scenarios import change_group, create_group
 from tests.support.application_account_scenarios import create_account
-from tests.support.authentication_evidence import MockAuthenticationEvidence
 from tests.support.project_action_grant_postgres_scenarios import change_project_grant
 from tests.support.project_creation_scenarios import create_project
 from tests.support.project_membership_postgres_scenarios import (
@@ -42,9 +41,6 @@ from inframeld_backend.access.application.dtos.my_project_access_grant_dto impor
     MyProjectAccessGrantDTO,
 )
 from inframeld_backend.access.application.dtos.project_grant_target_dto import ProjectGrantTargetDTO
-from inframeld_backend.access.application.dtos.verified_human_identity_dto import (
-    VerifiedHumanIdentityDTO,
-)
 from inframeld_backend.access.application.enums.access_group_change_kind import (
     AccessGroupChangeKind,
 )
@@ -78,7 +74,6 @@ from inframeld_backend.access.domain.enums.identity_recovery_cleanup_state impor
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.enums.principal_status import PrincipalStatus
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
-from inframeld_backend.access.domain.value_objects.identity_subject import IdentitySubject
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.infrastructure.rows.human_credential_version_row import (
     HumanCredentialVersionRow,
@@ -141,18 +136,6 @@ class _ReadScope:
 
 def _fingerprints() -> RequestFingerprintService:
     return RequestFingerprintService(RequestFingerprintKey(b"K" * 32))
-
-
-def _bob(scope: _ReadScope) -> AccessContextDTO:
-    return AccessContextDTO(
-        actor_principal_id=scope.seed.bob_id,
-        authentication_evidence=MockAuthenticationEvidence.browser(
-            VerifiedHumanIdentityDTO(
-                authority=scope.seed.actor.binding.identity.authority,
-                subject=IdentitySubject(str(UUID(int=200))),
-            ),
-        ),
-    )
 
 
 async def _scope(database: Database) -> _ReadScope:
@@ -311,7 +294,7 @@ async def test_existing_organization_and_project_own_reads_report_actual_new_use
         can_grant=False,
     )
     async with open_my_organization_access(database) as reader:
-        organization = await reader.read(access=_bob(scope))
+        organization = await reader.read(access=scope.seed.bob_access)
     assert organization.principal_id == scope.seed.bob_id
     assert organization.organization_id == scope.seed.actor.organization_id
     assert organization.access_revision == await _organization_revision(database, scope)
@@ -320,7 +303,7 @@ async def test_existing_organization_and_project_own_reads_report_actual_new_use
     ]
     async with open_my_project_access(database) as reader:
         project = await reader.get_access(
-            access=_bob(scope),
+            access=scope.seed.bob_access,
             query=GetMyProjectAccessQuery(project_id=scope.seed.project.project_id, limit=100),
         )
     assert (
@@ -401,7 +384,7 @@ async def test_organization_stored_grants_page_keeps_suspended_rows_and_current_
         recipient=scope.seed.actor.access.actor_principal_id,
         level=False,
         key="read-org-downgrade-alice",
-        access=_bob(scope),
+        access=scope.seed.bob_access,
     )
     async with open_organization_grant_read(database) as reader:
         with pytest.raises(AccessDeniedError):
@@ -532,7 +515,7 @@ async def test_application_stored_grants_page_keeps_levels_and_rechecks_exact_de
         recipient=scope.seed.actor.access.actor_principal_id,
         level=False,
         key="read-account-alice-use",
-        access=_bob(scope),
+        access=scope.seed.bob_access,
     )
     async with open_application_account_grant_read(database) as reader:
         with pytest.raises(AccessDeniedError):
@@ -705,7 +688,7 @@ async def test_recipient_directory_filters_before_limit_for_actual_scoped_target
             action_id=ActionId("inspect-budget"),
             recipient=scope.seed.actor.access.actor_principal_id,
             can_grant=False,
-            access=_bob(scope),
+            access=scope.seed.bob_access,
         )
     elif kind == "access-group":
         revision = await _project_revision(database, scope)
@@ -741,7 +724,7 @@ async def test_recipient_directory_filters_before_limit_for_actual_scoped_target
             recipient=scope.seed.actor.access.actor_principal_id,
             level=False,
             key="directory-account-alice-use",
-            access=_bob(scope),
+            access=scope.seed.bob_access,
         )
     async with open_project_grant_recipients(database) as reader:
         with pytest.raises(AccessDeniedError):

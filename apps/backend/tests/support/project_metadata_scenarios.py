@@ -4,6 +4,10 @@ from uuid import uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
+from inframeld_backend.access.application.dtos.browser_session_authentication_dto import (
+    BrowserSessionAuthenticationDTO,
+)
 from inframeld_backend.access.application.dtos.human_oauth_credential_binding_dto import (
     HumanOAuthCredentialBindingDTO,
 )
@@ -31,6 +35,8 @@ from inframeld_backend.access.application.services.project_metadata_service impo
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.enums.project_status import ProjectStatus
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
+from inframeld_backend.access.domain.value_objects.identity_authority import IdentityAuthority
+from inframeld_backend.access.domain.value_objects.identity_subject import IdentitySubject
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
 from inframeld_backend.access.infrastructure.readers.postgres_project_metadata_facts_reader import (
     PostgresProjectMetadataFactsReader,
@@ -40,6 +46,9 @@ from inframeld_backend.access.infrastructure.readers.postgres_project_metadata_r
 )
 from inframeld_backend.access.infrastructure.repositories.postgres_project_metadata_repository import (
     PostgresProjectMetadataRepository,
+)
+from inframeld_backend.access.infrastructure.rows.human_identity_link_row import (
+    HumanIdentityLinkRow,
 )
 from inframeld_backend.access.infrastructure.rows.project_action_grant_row import (
     ProjectActionGrantRow,
@@ -106,6 +115,31 @@ async def seed_metadata_project(session: AsyncSession) -> ProjectAuthorizationSe
     await session.flush()
     return ProjectAuthorizationSeedDTO(
         seed.organization_id, seed.principal_id, seed.project_id, ActionId("edit-project-metadata")
+    )
+
+
+async def capture_metadata_browser(
+    database: Database, seed: ProjectAuthorizationSeedDTO
+) -> AccessContextDTO:
+    """Bind the seeded actor to one committed identity before capturing its credential."""
+    identity = VerifiedHumanIdentityDTO(
+        IdentityAuthority("kratos:test"), IdentitySubject(str(uuid4()))
+    )
+    async with database.session() as session, session.begin():
+        session.add(
+            HumanIdentityLinkRow(
+                authority=identity.authority.value,
+                subject=identity.subject.value,
+                organization_id=seed.organization_id.value,
+                principal_id=seed.principal_id.value,
+                principal_kind=PrincipalKind.HUMAN,
+            )
+        )
+    state = await PostgresHumanCredentialStateInitializer(database).initialize(identity)
+    assert state.version is not None
+    return AccessContextDTO(
+        seed.principal_id,
+        BrowserSessionAuthenticationDTO(identity, state.installation_id, state.version),
     )
 
 

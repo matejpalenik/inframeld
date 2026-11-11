@@ -3,13 +3,11 @@
 import asyncio
 import os
 from dataclasses import replace
-from uuid import UUID
 
 import pytest
 from sqlalchemy import event, func, select, update
 from sqlalchemy.orm import Session
 from tests.support.application_account_scenarios import create_account
-from tests.support.authentication_evidence import MockAuthenticationEvidence
 from tests.support.project_membership_postgres_scenarios import (
     MembershipProjectSeedDTO,
     change_membership,
@@ -29,12 +27,8 @@ from inframeld_backend.access.application.dtos.application_account_action_grant_
 from inframeld_backend.access.application.dtos.created_application_account_dto import (
     CreatedApplicationAccountDTO,
 )
-from inframeld_backend.access.application.dtos.verified_human_identity_dto import (
-    VerifiedHumanIdentityDTO,
-)
 from inframeld_backend.access.domain.enums.principal_status import PrincipalStatus
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
-from inframeld_backend.access.domain.value_objects.identity_subject import IdentitySubject
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
 from inframeld_backend.access.infrastructure.rows.access_audit_event_row import AccessAuditEventRow
@@ -189,18 +183,6 @@ async def _remove(
                 seed.project.project_id, target, recipient, action, key, HttpMethod.DELETE
             ),
         )
-
-
-def _bob(seed: MembershipProjectSeedDTO) -> AccessContextDTO:
-    return AccessContextDTO(
-        actor_principal_id=seed.bob_id,
-        authentication_evidence=MockAuthenticationEvidence.browser(
-            VerifiedHumanIdentityDTO(
-                authority=seed.actor.binding.identity.authority,
-                subject=IdentitySubject(str(UUID(int=200))),
-            ),
-        ),
-    )
 
 
 @pytest.mark.parametrize(
@@ -462,7 +444,7 @@ async def test_current_caller_delegation_is_rechecked_before_original_receipt(
         recipient=seed.actor.access.actor_principal_id,
         revision=revision + 1,
         key="bob-removes-alice",
-        access=_bob(seed),
+        access=seed.bob_access,
     )
     with pytest.raises(AccessDeniedError):
         await _set(
@@ -485,7 +467,7 @@ async def test_current_caller_delegation_is_rechecked_before_original_receipt(
             recipient=seed.bob_id,
             revision=revision + 2,
             key="cannot-remove-last",
-            access=_bob(seed),
+            access=seed.bob_access,
         )
 
 
@@ -523,7 +505,7 @@ async def test_concurrent_delegators_reread_current_authority_after_the_project_
             recipient=seed.actor.access.actor_principal_id,
             revision=revision + 1,
             key="bob-removes-alice-race",
-            access=_bob(seed),
+            access=seed.bob_access,
         ),
         return_exceptions=True,
     )
@@ -598,7 +580,7 @@ async def test_generic_application_grant_lookup_requires_current_exact_delegatio
         recipient=seed.actor.access.actor_principal_id,
         revision=revision + 1,
         key="revoke-alice-delegation",
-        access=_bob(seed),
+        access=seed.bob_access,
     )
     await _set(
         database,
@@ -609,7 +591,7 @@ async def test_generic_application_grant_lookup_requires_current_exact_delegatio
         level=False,
         revision=revision + 2,
         key="alice-use-only",
-        access=_bob(seed),
+        access=seed.bob_access,
     )
     async with open_original_operation_lookup(database) as lookup:
         with pytest.raises(AccessDeniedError):

@@ -10,11 +10,11 @@ from inframeld_backend.access.application.commands.repair_project_metadata_autho
     RepairProjectMetadataAuthorityCommand,
 )
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
+from inframeld_backend.access.application.dtos.human_credential_facts_dto import (
+    HumanCredentialFactsDTO,
+)
 from inframeld_backend.access.application.dtos.human_oauth_credential_binding_dto import (
     HumanOAuthCredentialBindingDTO,
-)
-from inframeld_backend.access.application.dtos.human_oauth_credential_facts_dto import (
-    HumanOAuthCredentialFactsDTO,
 )
 from inframeld_backend.access.application.dtos.project_metadata_repair_facts_dto import (
     ProjectMetadataRepairFactsDTO,
@@ -107,7 +107,7 @@ class MockRepairFacts(ProjectMetadataRepairFactsReader):
             access_revision=0,
             is_project_member=True,
             has_pending_recovery=False,
-            oauth_credential_facts=HumanOAuthCredentialFactsDTO(True, HumanCredentialVersion(2)),
+            oauth_credential_facts=HumanCredentialFactsDTO(True, HumanCredentialVersion(2)),
             eligible_grantor_exists=False,
             observed_at=datetime(2030, 1, 1, tzinfo=UTC),
         )
@@ -216,7 +216,7 @@ async def test_provider_active_old_generation_proof_is_rejected_before_completed
     s.save_original()
     s.facts.facts = replace(
         s.facts.facts,
-        oauth_credential_facts=HumanOAuthCredentialFactsDTO(True, HumanCredentialVersion(3)),
+        oauth_credential_facts=HumanCredentialFactsDTO(True, HumanCredentialVersion(3)),
     )
     with pytest.raises(ProjectMetadataMaintenanceError) as failure:
         await s.service.repair(access=ACCESS, command=COMMAND)

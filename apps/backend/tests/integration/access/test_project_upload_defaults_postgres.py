@@ -12,7 +12,6 @@ from sqlalchemy import DateTime, Integer, String, column, delete, event, func, s
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Session
 from tests.support.access_group_scenarios import change_group, delete_group, group_fingerprints
-from tests.support.authentication_evidence import MockAuthenticationEvidence
 from tests.support.project_upload_default_scenarios import (
     UploadDefaultScenario,
     replace_upload_default,
@@ -28,6 +27,9 @@ from inframeld_backend.access.application.commands.set_project_upload_default_co
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
 from inframeld_backend.access.application.dtos.access_group_deletion_result_dto import (
     AccessGroupDeletionResultDTO,
+)
+from inframeld_backend.access.application.dtos.browser_session_authentication_dto import (
+    BrowserSessionAuthenticationDTO,
 )
 from inframeld_backend.access.application.dtos.project_action_authorization_request_dto import (
     ProjectActionAuthorizationRequestDTO,
@@ -63,6 +65,9 @@ from inframeld_backend.access.domain.value_objects.identity_subject import Ident
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
 from inframeld_backend.access.domain.value_objects.upload_audience import UploadAudience
+from inframeld_backend.access.infrastructure.readers.postgres_human_credential_state_reader import (
+    PostgresHumanCredentialStateReader,
+)
 from inframeld_backend.access.infrastructure.readers.postgres_project_action_facts_reader import (
     PostgresProjectActionFactsReader,
 )
@@ -391,13 +396,14 @@ async def test_nonadministrative_admission_projection_does_not_require_manage_de
                 can_grant=False,
             )
         )
+    bob_identity = VerifiedHumanIdentityDTO(
+        scope.actor.binding.identity.authority, IdentitySubject(str(UUID(int=200)))
+    )
+    bob_state = await PostgresHumanCredentialStateReader(database).read(bob_identity)
+    assert bob_state.version is not None
     bob = AccessContextDTO(
         scope.bob_id,
-        MockAuthenticationEvidence.browser(
-            VerifiedHumanIdentityDTO(
-                scope.actor.binding.identity.authority, IdentitySubject(str(UUID(int=200)))
-            )
-        ),
+        BrowserSessionAuthenticationDTO(bob_identity, bob_state.installation_id, bob_state.version),
     )
     async with database.session() as session:
         with pytest.raises(AccessDeniedError):

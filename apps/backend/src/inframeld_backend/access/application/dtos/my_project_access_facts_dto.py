@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
-from inframeld_backend.access.application.dtos.human_oauth_credential_facts_dto import (
-    HumanOAuthCredentialFactsDTO,
+from inframeld_backend.access.application.dtos.human_credential_facts_dto import (
+    HumanCredentialFactsDTO,
 )
 from inframeld_backend.access.application.dtos.my_project_access_grant_dto import (
     MyProjectAccessGrantDTO,
@@ -26,7 +26,7 @@ class MyProjectAccessFactsDTO:
     access_revision: int
     actor: Principal
     has_pending_recovery: bool
-    oauth_credential_facts: HumanOAuthCredentialFactsDTO | None
+    oauth_credential_facts: HumanCredentialFactsDTO | None
     project_status: ProjectStatus
     is_project_member: bool
     items: tuple[MyProjectAccessGrantDTO | MyProjectAccessRelationshipDTO, ...]
