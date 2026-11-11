@@ -32,6 +32,7 @@ export const operations = [
   "removeAccessGroupManager",
   "deleteAccessGroup",
   "createApplicationAccount",
+  "deleteApplicationAccount",
   "getApplicationAccount",
   "resolveApplicationAccount",
   "listApplicationKeys",

@@ -8255,6 +8255,24 @@ pub struct ApplicationAccountCreationRequest {
     ///Constraint: minLength=1, maxLength=63, pattern=`^[a-z](?:[a-z0-9-]*[a-z0-9])?$`
     pub name: String,
 }
+///Describe committed local retirement, preserving the original safe receipt.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ApplicationAccountDeletionResponse {
+    #[serde(rename = "accessBlocked")]
+    pub access_blocked: BooleanConstant<true>,
+    ///Constraint: minimum=1, maximum=9007199254740991
+    #[serde(rename = "accessRevision")]
+    pub access_revision: i64,
+    #[serde(rename = "idempotencyExpiresAt")]
+    pub idempotency_expires_at: chrono::DateTime<chrono::Utc>,
+    ///Constraint: minLength=1, maxLength=128
+    #[serde(rename = "operationId")]
+    pub operation_id: String,
+    #[serde(rename = "principalId")]
+    pub principal_id: uuid::Uuid,
+    #[serde(rename = "projectId")]
+    pub project_id: uuid::Uuid,
+}
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ApplicationKeyRevocationRequest {
     ///Constraint: minimum=0, maximum=9007199254740991

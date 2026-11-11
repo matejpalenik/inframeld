@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
 import { sdkTest } from "../../src/conformance/cases.ts";
 import {
+  assertDispatch,
   assertJsonBody,
   assertSuccess,
   headerValues,
 } from "../../src/conformance/assertions.ts";
+import type { JsonValue } from "../../src/conformance/protocol.ts";
 
 const projectId = "00000000-0000-4000-8000-000000000003";
 const applicationId = "00000000-0000-4000-8000-000000000008";
@@ -408,5 +410,104 @@ sdkTest(
     });
     assert.equal(observation.kind, "sdk-error");
     assert.equal(observation.status, 200);
+  },
+);
+
+const deletionPath = {
+  project_id: projectId,
+  application_principal_id: applicationId,
+};
+const deletionQuery = { expectedAccessRevision: 7 };
+const deletionKey = "sdk-application-account-delete";
+const deletionReceipt = {
+  operationId: deletionKey,
+  idempotencyExpiresAt: "2030-01-01T00:00:00Z",
+  projectId,
+  principalId: applicationId,
+  accessRevision: 8,
+  accessBlocked: true,
+};
+
+function assertDeletionWitness(witness: Record<string, JsonValue>) {
+  assertDispatch(witness, "DELETE", root + "/" + applicationId);
+  assert.deepEqual(
+    [...new URLSearchParams(String(witness.query))],
+    [["expectedAccessRevision", "7"]],
+  );
+  assert.equal(witness.rawBodyBase64, "");
+  assert.ok(
+    witness.headers &&
+      typeof witness.headers === "object" &&
+      !Array.isArray(witness.headers),
+  );
+  assert.equal(witness.headers["idempotency-key"], deletionKey);
+  return witness.headers;
+}
+
+sdkTest(
+  {
+    id: "application-account-delete-browser",
+    operation: "deleteApplicationAccount",
+    outcome: "success",
+  },
+  async ({ call, origin }) => {
+    const { observation, witness } = await call({
+      operation: "deleteApplicationAccount",
+      path: deletionPath,
+      query: deletionQuery,
+      headers: {
+        Cookie: "ory_kratos_session=sdk-cookie",
+        Origin: origin,
+        "X-Inframeld-CSRF": "1",
+        "Idempotency-Key": deletionKey,
+      },
+      timeout: 2000,
+    });
+    assert.deepEqual(assertSuccess(observation, 200), deletionReceipt);
+    const witnessedHeaders = assertDeletionWitness(witness);
+    assert.equal(witnessedHeaders.cookie, "ory_kratos_session=sdk-cookie");
+    assert.equal(witness.origin, origin);
+    assert.equal(witness.csrf, "1");
+    assert.equal(witness.authorization, "");
+    assert.deepEqual(headerValues(observation, "cache-control"), ["no-store"]);
+  },
+);
+
+sdkTest(
+  {
+    id: "application-account-delete-denied-other-human",
+    operation: "deleteApplicationAccount",
+    outcome: "failure",
+  },
+  async ({ call }) => {
+    const authorization = "Bearer sdk-other-human";
+    const { observation, witness } = await call({
+      operation: "deleteApplicationAccount",
+      path: deletionPath,
+      query: deletionQuery,
+      headers: {
+        Authorization: authorization,
+        "Idempotency-Key": deletionKey,
+      },
+      timeout: 2000,
+    });
+    assert.equal(observation.kind, "sdk-error");
+    assert.equal(observation.status, 403);
+    assert.ok(
+      ["generated-model", "generated-schema"].includes(observation.validation),
+    );
+    assert.ok(
+      observation.body &&
+        typeof observation.body === "object" &&
+        !Array.isArray(observation.body),
+    );
+    assert.equal(observation.body.status, 403);
+    assert.equal(observation.body.code, "access_denied");
+    for (const field of Object.keys(deletionReceipt))
+      assert.equal(Object.hasOwn(observation.body, field), false);
+    const witnessedHeaders = assertDeletionWitness(witness);
+    assert.equal(witnessedHeaders.cookie, undefined);
+    assert.equal(witness.authorization, authorization);
+    assert.deepEqual(headerValues(observation, "cache-control"), ["no-store"]);
   },
 );

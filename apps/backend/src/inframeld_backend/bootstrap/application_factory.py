@@ -10,6 +10,9 @@ from ory_kratos_client.api.identity_api import IdentityApi
 from inframeld_backend.access.application.services.application_account_creation_fingerprint_service import (
     ApplicationAccountCreationFingerprintService,
 )
+from inframeld_backend.access.application.services.application_account_deletion_fingerprint_service import (
+    ApplicationAccountDeletionFingerprintService,
+)
 from inframeld_backend.access.application.services.application_key_issuance_fingerprint_service import (
     ApplicationKeyIssuanceFingerprintService,
 )
@@ -149,6 +152,9 @@ from inframeld_backend.access.http.responses.application_account_action_grant_re
 from inframeld_backend.access.http.responses.application_account_creation_response import (
     ApplicationAccountCreationResponse,
 )
+from inframeld_backend.access.http.responses.application_account_deletion_response import (
+    ApplicationAccountDeletionResponse,
+)
 from inframeld_backend.access.http.responses.application_account_metadata_response import (
     ApplicationAccountMetadataResponse,
 )
@@ -215,6 +221,9 @@ from inframeld_backend.access.http.routes.access_group_action_grant_routes impor
 from inframeld_backend.access.http.routes.access_group_routes import create_access_group_router
 from inframeld_backend.access.http.routes.application_account_action_grant_routes import (
     create_application_account_action_grant_router,
+)
+from inframeld_backend.access.http.routes.application_account_deletion_routes import (
+    create_application_account_deletion_router,
 )
 from inframeld_backend.access.http.routes.application_account_routes import (
     create_application_account_router,
@@ -295,6 +304,7 @@ from inframeld_backend.bootstrap.access_group_grant_composition import (
 )
 from inframeld_backend.bootstrap.application_account_composition import (
     open_application_account_creation,
+    open_application_account_deletion,
     open_application_account_read,
 )
 from inframeld_backend.bootstrap.application_account_grant_composition import (
@@ -401,6 +411,9 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
         metadata_fingerprints = ProjectMetadataFingerprintService(request_fingerprints)
         creation_fingerprints = ProjectCreationFingerprintService(request_fingerprints)
         account_fingerprints = ApplicationAccountCreationFingerprintService(request_fingerprints)
+        account_deletion_fingerprints = ApplicationAccountDeletionFingerprintService(
+            request_fingerprints
+        )
         key_issuance_fingerprints = ApplicationKeyIssuanceFingerprintService(request_fingerprints)
         key_revocation_fingerprints = ApplicationKeyRevocationFingerprintService(
             request_fingerprints
@@ -506,6 +519,7 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
                 AccessGroupDeletionResponse,
                 AccessGroupPrincipalsPageResponse,
                 ApplicationAccountCreationResponse,
+                ApplicationAccountDeletionResponse,
                 ApplicationAccountMetadataResponse,
                 ApplicationKeyIssueResponse,
                 ApplicationKeyRevocationResponse,
@@ -638,6 +652,12 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
                 product_access,
                 partial(open_application_account_creation, database, account_fingerprints),
                 partial(open_application_account_read, database),
+            )
+        )
+        application.include_router(
+            create_application_account_deletion_router(
+                product_access,
+                partial(open_application_account_deletion, database, account_deletion_fingerprints),
             )
         )
         application.include_router(

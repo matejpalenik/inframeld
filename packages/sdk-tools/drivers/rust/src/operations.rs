@@ -718,6 +718,22 @@ pub async fn observe(
                 )
                 .await
         ),
+        "deleteApplicationAccount" => observed!(
+            client
+                .delete_application_account(
+                    request.path.as_ref().unwrap()["project_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.path.as_ref().unwrap()["application_principal_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.query.as_ref().unwrap()["expectedAccessRevision"]
+                        .as_i64()
+                        .unwrap(),
+                    &request.headers["Idempotency-Key"]
+                )
+                .await
+        ),
         "getApplicationAccount" => observed!(
             client
                 .get_application_account(

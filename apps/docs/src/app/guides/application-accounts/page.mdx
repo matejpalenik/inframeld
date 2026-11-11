@@ -8,7 +8,7 @@ export const pageMetadata = {
 
 Create SupportBot in your Support Project as a separate identity for an integration. The account belongs to that one Project and starts with no action permissions, document-group memberships or keys. Creating it does not copy your human access.
 
-You receive three permissions to administer this specific account. The account's permissions and its incoming credentials remain separate. This guide covers account creation, explicit key issuance, individual revocation and safe metadata reads. [Application identity authentication](/guides/authenticate-an-application) checks the resulting credential separately. Creation and metadata reads issue no key. Permanent account retirement remains a separate operation without a public procedure here.
+You receive three permissions to administer this specific account. The account's permissions and its incoming credentials remain separate. This guide covers account creation, explicit key issuance, individual revocation, safe metadata reads and permanent retirement. [Application identity authentication](/guides/authenticate-an-application) checks the resulting credential separately. Creation and metadata reads issue no key. [Retire the account](#retire-an-application-account) when it should stop using the Project permanently.
 
 Use [exact action-grant administration](/guides/manage-action-grants) to share one account-administration permission with another eligible human in the Project. Those grants control the human's authority over SupportBot. They do not give SupportBot an action permission, create a key or copy any human access. An application account cannot receive account-administration grants or grant authority.
 
@@ -30,7 +30,7 @@ export PROJECT_ID='00000000-0000-4000-8000-000000000003'
 
 </CodeGroup>
 
-Creation persists the account and its creator's administration grants. For a disposable exercise, use a wholly disposable installation and agree on its operator-supported teardown before creating accounts. This preview provides no public account-retirement procedure.
+Creation persists the account and its creator's administration grants. For a disposable exercise, identify its resources and agree on supported cleanup before creating accounts. [Account retirement](#retire-an-application-account) keeps Project work and historical attribution.
 
 ## Review your Project access
 
@@ -255,7 +255,7 @@ HTTP `201` returns `principalId`, `projectId`, the chosen names and the new Proj
 | ---------------------------- | ----------------------------------------------------------------------------------------------- |
 | `issue-application-keys`     | Issue a key for this account when all current delegation and group-management checks also pass. |
 | `revoke-application-keys`    | Administer key revocation for this account when that separate operation is available.           |
-| `delete-application-account` | Administer retirement of this account when that separate operation is available.                |
+| `delete-application-account` | Retire this exact account and revoke all of its keys.                                           |
 
 These grants belong to your human identity, not SupportBot. They do not administer other accounts or give the bot access to documents or models. Creation saves the account, required Project membership, three creator grants, audit and original result together. A rejected commit leaves none of those partial creation effects.
 
@@ -641,6 +641,38 @@ A current metadata read can show that the key is revoked, but does not prove whi
 
 After revocation commits, new requests through that credential are rejected by current key checks. Revocation does not delete SupportBot, remove its grants or undo committed effects. It cannot recall bytes or external calls already sent. An [already admitted job](/guides/authenticate-an-application#keep-admitted-jobs-separate-from-incoming-credentials) has its own current-account and authority checks rather than automatic cancellation by this credential operation.
 
+## Retire an application account
+
+Retire SupportBot when it should stop using the Project permanently. You must be a currently eligible human member of that Project with permission to use `delete-application-account` on this exact account.
+
+Use the account’s permanent `principalId` as `APPLICATION_PRINCIPAL_ID`. [Read your Project access](/guides/assign-project-grant#read-your-project-access-and-current-revision) and save the reviewed `accessRevision` as `RETIREMENT_ACCESS_REVISION`. Use one ASCII decimal value from `0` through `9007199254740991`, with no leading zero except `0` itself. Choose one opaque `RETIREMENT_KEY` and save it privately with the installation URL, Project and account IDs, the exact `DELETE` route and the reviewed revision before sending the request.
+
+Use the existing human bearer credential from [HTTP setup](/clients/http#call-protected-operations). This sends one request with an empty body and supplies the authorization header through standard input.
+
+<CodeGroup>
+
+```shell
+curl --silent --show-error --fail-with-body --max-time 5 \
+  --request DELETE \
+  --url "${INFRAMELD_URL}/v1/projects/${PROJECT_ID}/application-accounts/${APPLICATION_PRINCIPAL_ID}?expectedAccessRevision=${RETIREMENT_ACCESS_REVISION}" \
+  --header @- <<EOF
+Authorization: Bearer ${INFRAMELD_TOKEN}
+Idempotency-Key: ${RETIREMENT_KEY}
+EOF
+```
+
+</CodeGroup>
+
+A `200` [receipt](/api-reference/models#ApplicationAccountDeletionResponse) confirms that the local changes committed. Its six fields are `operationId`, `idempotencyExpiresAt`, `projectId`, `principalId`, `accessRevision` and `accessBlocked: true`. The expiry is the retained original’s deadline, and the revision belongs to the Project.
+
+Retirement revokes every key and removes received grants, group and Project memberships, and human administration grants targeting the account. Project work, historical attribution and the reserved Name remain. Use the [API reference](/api-reference/projects-and-access#retire-an-application-account) for the exact operation and typed failures.
+
+### Recover an uncertain retirement
+
+If the response is lost or unusable, keep the exact saved request and key. For an explicit same-request recovery attempt, use the same human’s current credential and the original reviewed revision. The server checks current eligibility, membership and exact Delete authority before returning any original result.
+
+Successful retirement can remove your own Delete grant. If replay is denied, the original outcome remains unconfirmed. Keep the saved request for the installation’s supported recovery procedure. The separate [Project deletion status](/guides/read-deletion-status) path applies to Project deletion.
+
 ## Read with a generated client
 
 These complete programs repeat the account-by-ID, exact-Name and key-list reads above. Use the same `PROJECT_ID` and `APPLICATION_PRINCIPAL_ID`, and current Issue or Revoke keys authority. The exact Name is `support-bot`, matching this guide's creation request.
@@ -878,4 +910,4 @@ Supply the original Project ID and request key as well. Lookup does not replace 
 
 For a confirmed stale fresh request, reread and review your Project access before preparing a distinct request. For a confirmed Name conflict, choose a different explicit Name. GET reads are safe to repeat with current credentials and authority, while writes retain their original request meaning.
 
-Browser-cookie POST callers use the installation's actual cookie and Origin configuration and send `X-Inframeld-CSRF: 1`. Do not combine a bearer token and a session cookie. Errors use the shared [Problem Details contract](/api-reference/operations#errors-and-uncertain-effects).
+Browser-cookie writes use the installation's actual cookie and Origin configuration and send `X-Inframeld-CSRF: 1`. Do not combine a bearer token and a session cookie. Errors use the shared [Problem Details contract](/api-reference/operations#errors-and-uncertain-effects).

@@ -118,7 +118,8 @@ async def test_retained_parent_blocks_downgrade_without_erasing_default_history(
         )
     async with database.session() as session:
         assert (
-            await session.scalar(select(AlembicVersionRow.version_num)) == "0031_project_deletion"
+            await session.scalar(select(AlembicVersionRow.version_num))
+            == "0032_application_retirement"
         )
         assert (
             await session.get(ProjectDeletionObligationRow, accepted.obligation_id.value)
@@ -152,7 +153,8 @@ async def test_empty_deletion_downgrade_preserves_actual0030_links_groups_and_hi
     command.upgrade(configuration(temporary_postgres_settings), "head")
     async with database.session() as session:
         assert (
-            await session.scalar(select(AlembicVersionRow.version_num)) == "0031_project_deletion"
+            await session.scalar(select(AlembicVersionRow.version_num))
+            == "0032_application_retirement"
         )
         assert (
             tuple(await session.scalars(select(AccessGroupRow.id).order_by(AccessGroupRow.id)))

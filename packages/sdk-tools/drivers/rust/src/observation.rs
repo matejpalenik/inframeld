@@ -273,6 +273,16 @@ problems!(
     CreateApplicationAccountApiError::Status503
 );
 problems!(
+    DeleteApplicationAccountApiError,
+    DeleteApplicationAccountApiError::Status400,
+    DeleteApplicationAccountApiError::Status401,
+    DeleteApplicationAccountApiError::Status403,
+    DeleteApplicationAccountApiError::Status404,
+    DeleteApplicationAccountApiError::Status409,
+    DeleteApplicationAccountApiError::Status422,
+    DeleteApplicationAccountApiError::Status503
+);
+problems!(
     GetApplicationAccountApiError,
     GetApplicationAccountApiError::Status400,
     GetApplicationAccountApiError::Status401,

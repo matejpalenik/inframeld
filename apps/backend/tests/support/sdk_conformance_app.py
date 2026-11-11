@@ -201,6 +201,9 @@ from inframeld_backend.access.application.protocols.application_account_action_g
 from inframeld_backend.access.application.protocols.application_account_creator import (
     ApplicationAccountCreator,
 )
+from inframeld_backend.access.application.protocols.application_account_deleter import (
+    ApplicationAccountDeleter,
+)
 from inframeld_backend.access.application.protocols.application_account_reader import (
     ApplicationAccountReader,
 )
@@ -347,6 +350,9 @@ from inframeld_backend.access.http.routes.access_group_action_grant_routes impor
 from inframeld_backend.access.http.routes.access_group_routes import create_access_group_router
 from inframeld_backend.access.http.routes.application_account_action_grant_routes import (
     create_application_account_action_grant_router,
+)
+from inframeld_backend.access.http.routes.application_account_deletion_routes import (
+    create_application_account_deletion_router,
 )
 from inframeld_backend.access.http.routes.application_account_routes import (
     create_application_account_router,
@@ -1107,6 +1113,11 @@ async def _open_application_account_creator() -> AsyncGenerator[ApplicationAccou
 
 @asynccontextmanager
 async def _open_application_account_reader() -> AsyncGenerator[ApplicationAccountReader]:
+    yield MockSDKApplicationAccounts()
+
+
+@asynccontextmanager
+async def _open_application_account_deleter() -> AsyncGenerator[ApplicationAccountDeleter]:
     yield MockSDKApplicationAccounts()
 
 
@@ -2013,6 +2024,9 @@ def create_sdk_conformance_app(browser_origin: str | None = None) -> FastAPI:
         create_application_account_router(
             authenticate, _open_application_account_creator, _open_application_account_reader
         )
+    )
+    application.include_router(
+        create_application_account_deletion_router(authenticate, _open_application_account_deleter)
     )
     application.include_router(
         create_application_key_issuance_router(

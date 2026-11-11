@@ -701,6 +701,38 @@ export type ApplicationAccountCreationResponse = {
 };
 
 /**
+ * ApplicationAccountDeletionResponse
+ *
+ * Describe committed local retirement, preserving the original safe receipt.
+ */
+export type ApplicationAccountDeletionResponse = {
+    /**
+     * Accessblocked
+     */
+    accessBlocked: true;
+    /**
+     * Accessrevision
+     */
+    accessRevision: number;
+    /**
+     * Idempotencyexpiresat
+     */
+    idempotencyExpiresAt: string;
+    /**
+     * Operationid
+     */
+    operationId: string;
+    /**
+     * Principalid
+     */
+    principalId: string;
+    /**
+     * Projectid
+     */
+    projectId: string;
+};
+
+/**
  * ApplicationAccountGrantTargetResponse
  */
 export type ApplicationAccountGrantTargetResponse = {
@@ -5118,6 +5150,75 @@ export type ResolveApplicationAccountResponses = {
 };
 
 export type ResolveApplicationAccountResponse = ResolveApplicationAccountResponses[keyof ResolveApplicationAccountResponses];
+
+export type DeleteApplicationAccountData = {
+    body?: never;
+    headers: {
+        /**
+         * Idempotency-Key
+         */
+        'Idempotency-Key': string;
+    };
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Application Principal Id
+         */
+        application_principal_id: string;
+    };
+    query: {
+        /**
+         * Expectedaccessrevision
+         */
+        expectedAccessRevision: number;
+    };
+    url: '/v1/projects/{project_id}/application-accounts/{application_principal_id}';
+};
+
+export type DeleteApplicationAccountErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Operation conflicts with current state
+     */
+    409: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type DeleteApplicationAccountError = DeleteApplicationAccountErrors[keyof DeleteApplicationAccountErrors];
+
+export type DeleteApplicationAccountResponses = {
+    /**
+     * Successful Response
+     */
+    200: ApplicationAccountDeletionResponse;
+};
+
+export type DeleteApplicationAccountResponse = DeleteApplicationAccountResponses[keyof DeleteApplicationAccountResponses];
 
 export type GetApplicationAccountData = {
     body?: never;

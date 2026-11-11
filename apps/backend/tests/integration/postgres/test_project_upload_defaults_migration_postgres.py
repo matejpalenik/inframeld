@@ -205,7 +205,8 @@ async def test_downgrade_refuses_retained_default_or_original(
         command.downgrade(_config(temporary_postgres_settings), "0029_application_key_revocation")
     async with database.session() as session:
         assert (
-            await session.scalar(select(AlembicVersionRow.version_num)) == "0031_project_deletion"
+            await session.scalar(select(AlembicVersionRow.version_num))
+            == "0032_application_retirement"
         )
         if retained == "live-default":
             assert (
@@ -235,6 +236,7 @@ async def test_empty_upgrade_downgrade_preserves_existing_groups(
             )
         ) == set(original_ids)
         assert (
-            await session.scalar(select(AlembicVersionRow.version_num)) == "0031_project_deletion"
+            await session.scalar(select(AlembicVersionRow.version_num))
+            == "0032_application_retirement"
         )
         assert list(await session.scalars(select(ProjectUploadDefaultGroupRow.group_id))) == []
