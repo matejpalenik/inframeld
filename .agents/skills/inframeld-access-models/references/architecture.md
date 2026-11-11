@@ -198,11 +198,13 @@ Alice's recovery block affects authentication, action use and delegation. Adding
 | `IdentityRecovery` | Protect the original flow's independent provider outcomes and local release transition. The application must first check current eligibility and competing obligations. |
 | `IdentityRecoveryRepository` | Load and save an existing checklist within one caller-owned transaction. Preserve original admission metadata and reject conflicting changed saves. |
 
-`ProjectActionFactsDTO` carries the stored `principal`, while `ProjectGrantChangeFactsDTO` carries the stored `actor`. Both also report `has_pending_recovery` and optional `HumanOAuthCredentialFactsDTO`. After loading these observations, the owning service calls `PrincipalAccessEvaluationService.evaluate()` to interpret the authentication evidence and construct `PrincipalAccessPolicyInput`. Operation policies compose that input with membership and exact-grant facts. Readers do not evaluate eligibility, and policies do not import application DTOs or ORM types. [Credential query and policy boundaries](eligibility-and-current-authority.md#credential-query-and-policy-boundaries) explain the full chain.
+`ProjectActionFactsDTO` carries the stored `principal`, while `ProjectGrantChangeFactsDTO` carries the stored `actor`. Both also report `has_pending_recovery` and neutral `HumanCredentialFactsDTO` through the existing `oauth_credential_facts` field. Browser and human OAuth evidence require these current observations. After loading these observations, the owning service calls `PrincipalAccessEvaluationService.evaluate()` to interpret the authentication evidence and construct `PrincipalAccessPolicyInput`. Operation policies compose that input with membership and exact-grant facts. Readers do not evaluate eligibility, and policies do not import application DTOs or ORM types. [Credential query and policy boundaries](eligibility-and-current-authority.md#credential-query-and-policy-boundaries) explain the full chain.
 
 Keep public capabilities specific. `ActionAuthorizer` remains the entry point for ordinary action checks. [`ProjectGrantChangeService`](../../../../apps/backend/src/inframeld_backend/access/application/services/project_grant_change_service.py) reads `ProjectActionGrantManagementFactsDTO`, evaluates current credentials and applies existing policies before reservation or replay. The concrete Organization, group and application-account services do the same for their exact targets. Their transaction-bound authorization scope is not a reusable certificate or a universal authorization engine.
 
 The application operation owns the grant transaction under [ADR-0065](../../../../docs/adr/ADR-0065-application-services-own-write-transactions.md) and supplies its session to transaction-bound adapters. Bootstrap owns opening and closing that request-local session. Lower-level admission and persistence helpers remain caller-transaction bound. Lock acquisition and updates may require several statements. Facts used together should come from a coherent projection where practical, with recovery expressed alongside current membership and grant existence. Shared SQL-expression construction may be factored without performing I/O. Missing installation metadata must remain distinguishable from an absent block.
+
+The [shared Project-actor query](../../../../apps/backend/src/inframeld_backend/access/infrastructure/readers/project_actor_queries.py) retains its seven-field projection, and [its mapper](../../../../apps/backend/src/inframeld_backend/access/infrastructure/mappers/postgres_project_actor_mapper.py) retains existing keyword inputs. The neutral facts type changes the interpretation for both human evidence families, not the original scope or transaction ownership. The narrow credential-state/raw-four path remains separate from [complete authentication/link state](../../../../apps/backend/src/inframeld_backend/access/application/dtos/human_authentication_state_dto.py).
 
 The grant facts reader takes the shared organization lock before the exclusive project lock. Linked recovery admission takes the conflicting exclusive organization lock. Both adapters bound their database work and leave commit or rollback to the caller. [Access](eligibility-and-current-authority.md#shared-principal-eligibility) owns their current five-second deadlines and failure behavior. Provider calls stay outside these transactions.
 
@@ -226,36 +228,22 @@ The [completion facts reader](../../../../apps/backend/src/inframeld_backend/acc
 
 Alice can call the same session route from her browser or CLI. The browser supplies a Kratos cookie. The CLI supplies a human access token in `Authorization: Bearer ...`. The route should return the same local `principalId`, but each credential needs its own verification steps.
 
-```mermaid
----
-title: "Implemented human authentication components"
----
-flowchart TD
-    Route["Session or project-grant route"] --> Dependency["HumanSessionDependency<br/>Choose one credential"]
-    Dependency --> Cookie["HumanSessionAuthenticationService"]
-    Dependency --> Bearer["HumanAccessTokenAuthenticationService"]
-    Cookie --> SessionVerifier["KratosBrowserSessionVerifier<br/>BrowserSessionVerifier protocol"]
-    SessionVerifier --> KratosPublic["Kratos public API<br/>Verify browser session"]
-    Bearer --> TokenVerifier["HydraAccessTokenVerifier<br/>HumanAccessTokenVerifier protocol"]
-    TokenVerifier --> Hydra["Hydra private API<br/>Introspect access token"]
-    Bearer --> IdentityVerifier["KratosHumanIdentityVerifier<br/>HumanIdentityVerifier protocol"]
-    IdentityVerifier --> KratosAdmin["Kratos private API<br/>Check current identity"]
-    Cookie --> Reader["PostgresHumanIdentityLinkReader<br/>HumanIdentityLinkReader protocol"]
-    Bearer --> Reader
-    Reader --> Postgres["PostgreSQL<br/>Independent short read session"]
-    Reader --> Principal["Principal<br/>ID, organization, kind, status"]
-    Cookie --> Policy["HumanAuthenticationPolicy.may_authenticate"]
-    Bearer --> Policy
-    Cookie --> Context["AccessContextDTO<br/>PrincipalId + authentication evidence"]
-    Bearer --> Context
-```
+| Stage | Component or port | Responsibility |
+| --- | --- | --- |
+| Credential selection | `HumanSessionDependency` | Receives a session or Project-grant request and selects the cookie or human bearer service. |
+| Browser verification | `HumanSessionAuthenticationService` and `KratosBrowserSessionVerifier`, implementing `BrowserSessionVerifier` | Verify the browser session through the Kratos public API. |
+| Human bearer verification | `HumanAccessTokenAuthenticationService`, `HydraAccessTokenVerifier` implementing `HumanAccessTokenVerifier`, and `KratosHumanIdentityVerifier` implementing `HumanIdentityVerifier` | Introspect the access token through the Hydra private API, then check the current identity through the Kratos private API. |
+| Browser local facts | `PostgresHumanCredentialStateReader`, implementing `HumanCredentialStateReader` | Read the captured and current authentication state from PostgreSQL in independent short sessions, including the linked principal. |
+| Human bearer local facts | `PostgresHumanIdentityLinkReader`, implementing `HumanIdentityLinkReader` | Read PostgreSQL in an independent short session and return the principal’s ID, Organization, kind and status. |
+| Shared eligibility | `HumanAuthenticationPolicy.may_authenticate` | Both authentication services apply the local human eligibility policy. |
+| Returned context | `AccessContextDTO` | Both services return `PrincipalId` and the exact authentication evidence. |
 
-Arrows show calls or returned data inside one backend. The API boxes represent external provider endpoints, and PostgreSQL is the application database. The services call their adapters in the order below. The diagram does not describe separate business services.
+These collaborators run inside one backend. Provider API endpoints are external, and PostgreSQL is the application database. The captured-browser/current-facts and linked-human consent components are implemented. Full suspension/restoration, provider deletion and cleanup jobs remain separate unfinished work. The services call their adapters in the order below. The table does not describe separate business services.
 
 1. `HumanSessionDependency` reads the original headers and cookie. It rejects repeated or malformed Authorization, a Kratos cookie combined with Authorization, and unsupported credential families before provider verification. A missing credential returns 401 even when providers are not configured. An `ifm_app_` key never reaches Hydra through these human routes.
-2. On the cookie path, `HumanSessionAuthenticationService` calls `KratosBrowserSessionVerifier`. The adapter runs the synchronous SDK call in a worker thread, checks the session and identity state, and returns the verified authority/subject pair.
+2. On the cookie path, `HumanSessionAuthenticationService` discovers the identity through `KratosBrowserSessionVerifier`, reads captured installation/version and complete local-link state, then freshly verifies the same cookie and exact identity. A final local read must preserve that binding and eligible principal. Both provider verifications share the original provider deadline within the unchanged total budget.
 3. On the bearer path, `HumanAccessTokenAuthenticationService` first calls `HydraAccessTokenVerifier`. Private introspection checks token kind, validity and the configured issuer/client/audience/scope. It then calls `KratosHumanIdentityVerifier` to check that the same human identity is currently eligible. Both adapters bound their SDK calls and return application-owned identity values.
-4. After the required provider checks finish, `PostgresHumanIdentityLinkReader` opens a short independent session. It finds the exact identity pair, constructs a `Principal` and closes the session. Concurrent requests share the reader, but each lookup gets its own `AsyncSession`. Provider waits never hold that read session open.
+4. Cookie authentication uses `PostgresHumanCredentialStateReader.read_authentication_state()` for its initial and final coherent observations. Bearer authentication retains `PostgresHumanIdentityLinkReader` and the narrow credential-state read. Each local read uses an independent short session. No session remains open across provider verification.
 5. The selected service applies `HumanAuthenticationPolicy.may_authenticate`. A verified identity still needs an existing active local human. The result is `AccessContextDTO` containing that account's ID and the exact browser-session or OAuth evidence established by authentication. It contains no cached status or permission snapshot.
 6. The session route converts the ID to the existing `CurrentSessionResponse`: `{"principalId": "<uuid>"}`. A business route instead uses that identity to check its current permissions. The project-grant route performs those checks and its change, audit and idempotency work in a short transaction.
 

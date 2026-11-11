@@ -9,11 +9,13 @@ from sqlalchemy import DateTime, Integer, String, column, delete, func, select, 
 from sqlalchemy.dialects.postgresql import ARRAY
 from tests.support.access_scenarios import MockAccessScenarios, ProjectAuthorizationSeedDTO
 from tests.support.application_key_scenarios import seed_application_key
-from tests.support.authentication_evidence import MockAuthenticationEvidence
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
 from inframeld_backend.access.application.dtos.application_key_verification_profile_dto import (
     ApplicationKeyVerificationProfileDTO,
+)
+from inframeld_backend.access.application.dtos.browser_session_authentication_dto import (
+    BrowserSessionAuthenticationDTO,
 )
 from inframeld_backend.access.application.dtos.current_document_access_dto import (
     CurrentDocumentAccessDTO,
@@ -26,6 +28,9 @@ from inframeld_backend.access.application.dtos.identity_recovery_event_dto impor
 )
 from inframeld_backend.access.application.dtos.selected_document_source_dto import (
     SelectedDocumentSourceDTO,
+)
+from inframeld_backend.access.application.dtos.verified_human_identity_dto import (
+    VerifiedHumanIdentityDTO,
 )
 from inframeld_backend.access.application.enums.identity_recovery_event_kind import (
     IdentityRecoveryEventKind,
@@ -56,9 +61,11 @@ from inframeld_backend.access.domain.value_objects.application_key_audience impo
 from inframeld_backend.access.domain.value_objects.document_id import DocumentId
 from inframeld_backend.access.domain.value_objects.document_source_id import DocumentSourceId
 from inframeld_backend.access.domain.value_objects.document_version_id import DocumentVersionId
+from inframeld_backend.access.domain.value_objects.identity_authority import IdentityAuthority
 from inframeld_backend.access.domain.value_objects.identity_recovery_flow_id import (
     IdentityRecoveryFlowId,
 )
+from inframeld_backend.access.domain.value_objects.identity_subject import IdentitySubject
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
 from inframeld_backend.access.infrastructure.readers.postgres_application_authentication_facts_reader import (
     PostgresApplicationAuthenticationFactsReader,
@@ -86,7 +93,7 @@ from inframeld_backend.access.infrastructure.writers.postgres_identity_recovery_
     PostgresIdentityRecoveryAdmissionWriter,
 )
 from inframeld_backend.shared.application.errors.application_errors import (
-    AccessDeniedError,
+    AuthenticationRequiredError,
     DependencyUnavailableError,
     ResourceNotFoundError,
 )
@@ -109,9 +116,21 @@ SELECTED = (SelectedDocumentSourceDTO(SOURCE, True),)
 async def _human(
     database: Database,
 ) -> tuple[ProjectAuthorizationSeedDTO, AccessContextDTO, AccessGroupId, AccessGroupId]:
+    identity = VerifiedHumanIdentityDTO(
+        IdentityAuthority("kratos:test"), IdentitySubject(str(uuid4()))
+    )
     async with database.session() as session, session.begin():
         seed = await MockAccessScenarios.seed_project_authorization(
             session, is_project_member=True, has_action_grant=False
+        )
+        session.add(
+            HumanIdentityLinkRow(
+                authority=identity.authority.value,
+                subject=identity.subject.value,
+                organization_id=seed.organization_id.value,
+                principal_id=seed.principal_id.value,
+                principal_kind=PrincipalKind.HUMAN,
+            )
         )
         member, other = AccessGroupId(uuid4()), AccessGroupId(uuid4())
         session.add_all(
@@ -128,12 +147,13 @@ async def _human(
                 principal_id=seed.principal_id.value,
             )
         )
-    return (
-        seed,
-        AccessContextDTO(seed.principal_id, MockAuthenticationEvidence.browser()),
-        member,
-        other,
+    state = await PostgresHumanCredentialStateInitializer(database).initialize(identity)
+    assert state.version is not None
+    access = AccessContextDTO(
+        seed.principal_id,
+        BrowserSessionAuthenticationDTO(identity, state.installation_id, state.version),
     )
+    return seed, access, member, other
 
 
 async def _query(
@@ -415,29 +435,19 @@ async def test_pending_recovery_is_current_and_blocks_source_disclosure(
     database: Database, credential: str
 ) -> None:
     seed, access, member, _ = await _human(database)
-    identity = MockAuthenticationEvidence.browser().identity
-    async with database.session() as session, session.begin():
-        session.add(
-            HumanIdentityLinkRow(
-                authority=identity.authority.value,
-                subject=identity.subject.value,
-                organization_id=seed.organization_id.value,
-                principal_id=seed.principal_id.value,
-                principal_kind=PrincipalKind.HUMAN,
-            )
-        )
-    state = await PostgresHumanCredentialStateInitializer(database).initialize(identity)
-    assert state.version is not None
+    binding = access.authentication_evidence
+    assert isinstance(binding, BrowserSessionAuthenticationDTO)
+    identity = binding.identity
     if credential == "oauth":
         access = AccessContextDTO(
             seed.principal_id,
-            HumanOAuthCredentialBindingDTO(identity, state.installation_id, state.version),
+            HumanOAuthCredentialBindingDTO(identity, binding.installation_id, binding.version),
         )
     assert await _query(database, access, seed.project_id, frozenset((member,))) == (SOURCE,)
     async with database.session() as session, session.begin():
         await IdentityRecoveryAdmissionService(
             PostgresIdentityRecoveryAdmissionWriter(
-                session, installation_id=state.installation_id, authority=identity.authority
+                session, installation_id=binding.installation_id, authority=identity.authority
             )
         ).admit(
             IdentityRecoveryEventDTO(
@@ -449,10 +459,14 @@ async def test_pending_recovery_is_current_and_blocks_source_disclosure(
             access=access, project_id=seed.project_id, audience_group_ids=frozenset((member,))
         )
         assert facts is not None and facts.has_pending_recovery
-    with pytest.raises(
-        AccessDeniedError if credential == "browser" else HumanOAuthCredentialRejectedError
-    ):
+    rejected = (
+        AuthenticationRequiredError
+        if credential == "browser"
+        else HumanOAuthCredentialRejectedError
+    )
+    with pytest.raises(rejected) as error:
         await _query(database, access, seed.project_id, frozenset((member,)))
+    assert type(error.value) is rejected
 
 
 async def test_foreign_application_scope_does_not_lock_bound_project(database: Database) -> None:

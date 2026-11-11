@@ -12,7 +12,6 @@ from sqlalchemy import Integer, String, column, delete, event, func, select, tab
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Session
 from tests.support.access_scenarios import MockAccessScenarios
-from tests.support.authentication_evidence import MockAuthenticationEvidence
 from tests.support.project_creation_scenarios import (
     assert_created_project,
     create_project,
@@ -27,6 +26,9 @@ from inframeld_backend.access.application.commands.update_project_metadata_comma
     UpdateProjectMetadataCommand,
 )
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
+from inframeld_backend.access.application.dtos.browser_session_authentication_dto import (
+    BrowserSessionAuthenticationDTO,
+)
 from inframeld_backend.access.application.dtos.project_creation_result_dto import (
     ProjectCreationResultDTO,
 )
@@ -64,6 +66,9 @@ from inframeld_backend.access.infrastructure.rows.project_name_reservation_row i
     ProjectNameReservationRow,
 )
 from inframeld_backend.access.infrastructure.rows.project_row import ProjectRow
+from inframeld_backend.access.infrastructure.writers.postgres_human_credential_state_initializer import (
+    PostgresHumanCredentialStateInitializer,
+)
 from inframeld_backend.bootstrap.organization_access_composition import open_my_organization_access
 from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
     IdempotencyContextDTO,
@@ -507,9 +512,14 @@ async def test_current_and_retired_names_conflict_only_within_their_organization
                 can_grant=False,
             )
         )
+    state = await PostgresHumanCredentialStateInitializer(database).initialize(identity)
+    assert state.version is not None
+    access = AccessContextDTO(
+        other.id, BrowserSessionAuthenticationDTO(identity, state.installation_id, state.version)
+    )
     async with database.session() as session:
         result = await creation_service(session).create(
-            access=AccessContextDTO(other.id, MockAuthenticationEvidence.browser(identity)),
+            access=access,
             command=replace(
                 creation_command(seed),
                 organization_id=other.organization_id,

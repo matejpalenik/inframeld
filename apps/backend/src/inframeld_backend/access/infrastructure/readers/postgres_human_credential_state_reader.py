@@ -4,6 +4,9 @@ from typing import override
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.exc import TimeoutError as SqlAlchemyTimeoutError
 
+from inframeld_backend.access.application.dtos.human_authentication_state_dto import (
+    HumanAuthenticationStateDTO,
+)
 from inframeld_backend.access.application.dtos.human_credential_state_dto import (
     HumanCredentialStateDTO,
 )
@@ -37,6 +40,21 @@ class PostgresHumanCredentialStateReader(HumanCredentialStateReader):
             async with asyncio.timeout(5.0), self._database.session() as session:
                 result = await session.execute(HumanCredentialStateQueries.for_identity(identity))
                 return PostgresHumanCredentialStateMapper.to_state(
+                    identity, result.tuples().one_or_none()
+                )
+        except (TimeoutError, OperationalError, SqlAlchemyTimeoutError):
+            raise DependencyUnavailableError() from None
+
+    @override
+    async def read_authentication_state(
+        self, identity: VerifiedHumanIdentityDTO
+    ) -> HumanAuthenticationStateDTO:
+        try:
+            async with asyncio.timeout(5.0), self._database.session() as session:
+                result = await session.execute(
+                    HumanCredentialStateQueries.for_identity_with_principal(identity)
+                )
+                return PostgresHumanCredentialStateMapper.to_authentication_state(
                     identity, result.tuples().one_or_none()
                 )
         except (TimeoutError, OperationalError, SqlAlchemyTimeoutError):

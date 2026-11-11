@@ -20,9 +20,6 @@ from tests.support.mock_application_authenticator import MockApplicationAuthenti
 from tests.support.project_action_grant_postgres_scenarios import change_project_grant
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
-from inframeld_backend.access.application.dtos.verified_human_identity_dto import (
-    VerifiedHumanIdentityDTO,
-)
 from inframeld_backend.access.application.protocols.human_session_authenticator import (
     HumanSessionAuthenticator,
 )
@@ -31,7 +28,6 @@ from inframeld_backend.access.application.value_objects.browser_session_credenti
 )
 from inframeld_backend.access.domain.enums.principal_status import PrincipalStatus
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
-from inframeld_backend.access.domain.value_objects.identity_subject import IdentitySubject
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.http.dependencies.csrf_protection_dependency import (
     CSRFProtectionDependency,
@@ -265,15 +261,7 @@ async def test_retained_post_lookup_preserves_current_delegation_before_known_or
         action_id=ActionId("create-access-groups"),
         can_grant=True,
     )
-    bob = AccessContextDTO(
-        actor_principal_id=seed.bob_id,
-        authentication_evidence=MockAuthenticationEvidence.browser(
-            VerifiedHumanIdentityDTO(
-                authority=seed.actor.binding.identity.authority,
-                subject=IdentitySubject(str(UUID(int=200))),
-            )
-        ),
-    )
+    bob = seed.bob_access
     await change_project_grant(
         database,
         seed,

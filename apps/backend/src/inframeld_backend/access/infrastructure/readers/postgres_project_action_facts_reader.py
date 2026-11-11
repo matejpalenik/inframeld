@@ -1,7 +1,7 @@
 import asyncio
 from typing import final, override
 
-from sqlalchemy import BigInteger, Nullable, String, and_, exists, func, literal, select
+from sqlalchemy import Nullable, String, and_, exists, func, select
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.exc import TimeoutError as SqlAlchemyTimeoutError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,11 +13,8 @@ from inframeld_backend.access.application.dtos.application_key_authentication_dt
 from inframeld_backend.access.application.dtos.application_key_verification_profile_dto import (
     ApplicationKeyVerificationProfileDTO,
 )
-from inframeld_backend.access.application.dtos.human_oauth_credential_binding_dto import (
-    HumanOAuthCredentialBindingDTO,
-)
-from inframeld_backend.access.application.dtos.human_oauth_credential_facts_dto import (
-    HumanOAuthCredentialFactsDTO,
+from inframeld_backend.access.application.dtos.human_credential_facts_dto import (
+    HumanCredentialFactsDTO,
 )
 from inframeld_backend.access.application.dtos.project_action_facts_dto import ProjectActionFactsDTO
 from inframeld_backend.access.application.dtos.project_action_target_dto import (
@@ -133,12 +130,8 @@ class PostgresProjectActionFactsReader(ProjectActionFactsReader):
         )
 
         evidence = access.authentication_evidence
-        if isinstance(evidence, HumanOAuthCredentialBindingDTO):
-            binding_matches_actor = HumanCredentialStateQueries.binding_matches_actor(evidence)
-            credential_version = Nullable(HumanCredentialStateQueries.version_for_actor(evidence))
-        else:
-            binding_matches_actor = literal(False)
-            credential_version = Nullable(literal(None, BigInteger))
+        binding_matches_actor = HumanCredentialStateQueries.binding_matches_actor(evidence)
+        credential_version = Nullable(HumanCredentialStateQueries.version_for_actor(evidence))
 
         statement = (
             select(
@@ -193,15 +186,11 @@ class PostgresProjectActionFactsReader(ProjectActionFactsReader):
         return ProjectActionFactsDTO(
             principal=principal,
             has_pending_recovery=pending_recovery,
-            oauth_credential_facts=(
-                HumanOAuthCredentialFactsDTO(
-                    binding_matches_actor=matches_actor,
-                    current_version=HumanCredentialVersion(current_credential_version)
-                    if current_credential_version is not None
-                    else None,
-                )
-                if isinstance(evidence, HumanOAuthCredentialBindingDTO)
-                else None
+            oauth_credential_facts=HumanCredentialFactsDTO(
+                binding_matches_actor=matches_actor,
+                current_version=HumanCredentialVersion(current_credential_version)
+                if current_credential_version is not None
+                else None,
             ),
             project_status=project_status,
             is_project_member=member,

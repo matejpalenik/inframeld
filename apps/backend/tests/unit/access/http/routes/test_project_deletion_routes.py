@@ -2,6 +2,7 @@
 
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from dataclasses import replace
 from typing import override
 from uuid import UUID
 
@@ -31,6 +32,9 @@ from inframeld_backend.access.application.value_objects.browser_session_credenti
 )
 from inframeld_backend.access.application.value_objects.human_access_token_credential import (
     HumanAccessTokenCredential,
+)
+from inframeld_backend.access.domain.value_objects.human_credential_version import (
+    HumanCredentialVersion,
 )
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
@@ -68,7 +72,16 @@ from inframeld_backend.shared.http.middleware.request_context_middleware import 
 )
 
 PROJECT = ProjectId(UUID(int=3))
-ACCESS = AccessContextDTO(PrincipalId(UUID(int=1)), MockAuthenticationEvidence.browser())
+ACCESS = AccessContextDTO(
+    PrincipalId(UUID(int=1)),
+    MockAuthenticationEvidence.browser(
+        installation_id=InstallationId(UUID(int=2)), version=HumanCredentialVersion(1)
+    ),
+)
+OAUTH_ACCESS = AccessContextDTO(
+    ACCESS.actor_principal_id,
+    replace(MockAuthenticationEvidence.human_oauth(), installation_id=InstallationId(UUID(int=2))),
+)
 PATH = f"/v1/projects/{PROJECT.value}"
 HEADERS = {
     "Cookie": "ory_kratos_session=controlled-cookie",
@@ -85,7 +98,7 @@ class MockAuthenticator(HumanSessionAuthenticator, HumanAccessTokenAuthenticator
     ) -> AccessContextDTO:
         if credential is None:
             raise AuthenticationRequiredError()
-        return ACCESS
+        return OAUTH_ACCESS if isinstance(credential, HumanAccessTokenCredential) else ACCESS
 
 
 class MockDeleter(ProjectDeleter):
@@ -104,7 +117,7 @@ class MockDeleter(ProjectDeleter):
         context: IdempotencyContextDTO,
         request_id: RequestId,
     ) -> ProjectDeletionResultDTO:
-        assert access == ACCESS
+        assert access in (ACCESS, OAUTH_ACCESS)
         self.commands.append(command)
         self.contexts.append(context)
         self.requests.append(request_id)

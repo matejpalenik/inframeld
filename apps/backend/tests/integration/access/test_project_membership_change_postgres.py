@@ -7,7 +7,6 @@ from uuid import UUID, uuid4
 
 import pytest
 from sqlalchemy import delete, func, select, update
-from tests.support.authentication_evidence import MockAuthenticationEvidence
 from tests.support.project_creation_scenarios import create_project
 from tests.support.project_membership_postgres_scenarios import (
     MembershipProjectSeedDTO,
@@ -15,13 +14,8 @@ from tests.support.project_membership_postgres_scenarios import (
     seed_membership_project,
 )
 
-from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
-from inframeld_backend.access.application.dtos.verified_human_identity_dto import (
-    VerifiedHumanIdentityDTO,
-)
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.enums.principal_status import PrincipalStatus
-from inframeld_backend.access.domain.value_objects.identity_subject import IdentitySubject
 from inframeld_backend.access.infrastructure.rows.access_audit_event_row import AccessAuditEventRow
 from inframeld_backend.access.infrastructure.rows.access_group_row import AccessGroupRow
 from inframeld_backend.access.infrastructure.rows.application_account_row import (
@@ -445,14 +439,7 @@ async def test_two_concurrent_departures_cannot_each_rely_on_the_other_remaining
                     can_grant=True,
                 )
             )
-    bob = AccessContextDTO(
-        seed.bob_id,
-        MockAuthenticationEvidence.browser(
-            VerifiedHumanIdentityDTO(
-                seed.actor.binding.identity.authority, IdentitySubject(str(UUID(int=200)))
-            )
-        ),
-    )
+    bob = seed.bob_access
     outcomes = await asyncio.gather(
         change_membership(
             database,

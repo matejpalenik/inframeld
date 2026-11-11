@@ -25,8 +25,8 @@ from inframeld_backend.access.application.dtos.access_group_principal_dto import
 from inframeld_backend.access.application.dtos.access_group_read_facts_dto import (
     AccessGroupReadFactsDTO,
 )
-from inframeld_backend.access.application.dtos.human_oauth_credential_facts_dto import (
-    HumanOAuthCredentialFactsDTO,
+from inframeld_backend.access.application.dtos.human_credential_facts_dto import (
+    HumanCredentialFactsDTO,
 )
 from inframeld_backend.access.application.dtos.project_action_facts_dto import ProjectActionFactsDTO
 from inframeld_backend.access.application.enums.access_group_collection import AccessGroupCollection
@@ -81,7 +81,7 @@ ACTION = ProjectActionFactsDTO(
         ACCESS.actor_principal_id, ORGANIZATION_ID, PrincipalKind.HUMAN, PrincipalStatus.ACTIVE
     ),
     has_pending_recovery=False,
-    oauth_credential_facts=None,
+    oauth_credential_facts=HumanCredentialFactsDTO(True, HumanCredentialVersion(1)),
     project_status=ProjectStatus.ACTIVE,
     is_project_member=True,
     has_exact_action_grant=False,
@@ -221,7 +221,7 @@ async def test_stale_oauth_is_rejected_before_project_visibility_or_recovery(
             ACTION,
             is_project_member=is_project_member,
             has_pending_recovery=True,
-            oauth_credential_facts=HumanOAuthCredentialFactsDTO(
+            oauth_credential_facts=HumanCredentialFactsDTO(
                 binding_matches_actor=True,
                 current_version=HumanCredentialVersion(2),
             ),

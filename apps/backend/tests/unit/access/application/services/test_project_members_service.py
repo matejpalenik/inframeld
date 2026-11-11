@@ -9,8 +9,8 @@ import pytest
 from tests.support.authentication_evidence import MockAuthenticationEvidence
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
-from inframeld_backend.access.application.dtos.human_oauth_credential_facts_dto import (
-    HumanOAuthCredentialFactsDTO,
+from inframeld_backend.access.application.dtos.human_credential_facts_dto import (
+    HumanCredentialFactsDTO,
 )
 from inframeld_backend.access.application.dtos.project_action_facts_dto import ProjectActionFactsDTO
 from inframeld_backend.access.application.dtos.project_member_dto import ProjectMemberDTO
@@ -44,6 +44,7 @@ from inframeld_backend.access.domain.value_objects.principal_id import Principal
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
 from inframeld_backend.shared.application.errors.application_errors import (
     AccessDeniedError,
+    AuthenticationRequiredError,
     DependencyUnavailableError,
     InvalidInputError,
     ResourceNotFoundError,
@@ -67,7 +68,7 @@ MEMBERS = (
 ACTION = ProjectActionFactsDTO(
     principal=ACTOR,
     has_pending_recovery=False,
-    oauth_credential_facts=None,
+    oauth_credential_facts=HumanCredentialFactsDTO(True, HumanCredentialVersion(1)),
     project_status=ProjectStatus.ACTIVE,
     is_project_member=True,
     has_exact_action_grant=True,
@@ -262,13 +263,13 @@ async def test_hidden_project_is_not_disclosed_as_a_missing_action(
 @pytest.mark.parametrize(
     "credential",
     [
-        HumanOAuthCredentialFactsDTO(False, HumanCredentialVersion(1)),
-        HumanOAuthCredentialFactsDTO(True, HumanCredentialVersion(2)),
-        HumanOAuthCredentialFactsDTO(True, None),
+        HumanCredentialFactsDTO(False, HumanCredentialVersion(1)),
+        HumanCredentialFactsDTO(True, HumanCredentialVersion(2)),
+        HumanCredentialFactsDTO(True, None),
     ],
 )
 async def test_stale_oauth_cannot_reuse_a_membership_cursor(
-    credential: HumanOAuthCredentialFactsDTO,
+    credential: HumanCredentialFactsDTO,
 ) -> None:
     access = replace(ACCESS, authentication_evidence=MockAuthenticationEvidence.human_oauth())
     facts = replace(FACTS, action=replace(ACTION, oauth_credential_facts=credential))
@@ -285,7 +286,7 @@ async def test_current_oauth_can_read_the_same_stored_relationships() -> None:
         FACTS,
         action=replace(
             ACTION,
-            oauth_credential_facts=HumanOAuthCredentialFactsDTO(True, HumanCredentialVersion(1)),
+            oauth_credential_facts=HumanCredentialFactsDTO(True, HumanCredentialVersion(1)),
         ),
     )
     page = await ProjectMembersService(MockMembersFacts(facts)).list_members(
@@ -375,3 +376,22 @@ async def test_database_timeout_preserves_diagnostic_cause_and_fails_closed() ->
             access=ACCESS, query=ListProjectMembersQuery(PROJECT)
         )
     assert raised.value.__cause__ is timeout
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("oauth", [False, True])
+async def test_browser_currentness_preserves_the_presented_credential_family(oauth: bool) -> None:
+    """Reject stale evidence before disclosing data, recovering originals or changing authority."""
+    evidence = (
+        MockAuthenticationEvidence.human_oauth() if oauth else MockAuthenticationEvidence.browser()
+    )
+    stale = HumanCredentialFactsDTO(True, HumanCredentialVersion(2))
+    expected = HumanOAuthCredentialRejectedError if oauth else AuthenticationRequiredError
+    reader = MockMembersFacts(replace(FACTS, action=replace(ACTION, oauth_credential_facts=stale)))
+    access = replace(ACCESS, authentication_evidence=evidence)
+    with pytest.raises(AuthenticationRequiredError) as caught:
+        await ProjectMembersService(reader).list_members(
+            access=access, query=ListProjectMembersQuery(PROJECT, 2)
+        )
+    assert type(caught.value) is expected
+    assert reader.calls == [(access, PROJECT, None, 2)]

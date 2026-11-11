@@ -24,13 +24,21 @@ from inframeld_backend.shared.domain.value_objects.installation_id import Instal
 
 _IDENTITY = VerifiedHumanIdentityDTO(IdentityAuthority("kratos:test"), IdentitySubject("alice"))
 
+_INSTALLATION = InstallationId(UUID(int=123))
+_VERSION = HumanCredentialVersion(1)
+
 
 class MockAuthenticationEvidence:
     """Build explicit evidence without issuing credentials or verifying a provider/key."""
 
     @staticmethod
-    def browser(identity: VerifiedHumanIdentityDTO = _IDENTITY) -> BrowserSessionAuthenticationDTO:
-        return BrowserSessionAuthenticationDTO(identity)
+    def browser(
+        identity: VerifiedHumanIdentityDTO = _IDENTITY,
+        *,
+        installation_id: InstallationId = _INSTALLATION,
+        version: HumanCredentialVersion = _VERSION,
+    ) -> BrowserSessionAuthenticationDTO:
+        return BrowserSessionAuthenticationDTO(identity, installation_id, version)
 
     @staticmethod
     def human_oauth(

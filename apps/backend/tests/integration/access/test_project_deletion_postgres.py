@@ -132,6 +132,9 @@ from inframeld_backend.access.infrastructure.verifiers.postgres_application_key_
 from inframeld_backend.access.infrastructure.writers.postgres_application_key_issuance_writer import (
     PostgresApplicationKeyIssuanceWriter,
 )
+from inframeld_backend.access.infrastructure.writers.postgres_human_credential_state_initializer import (
+    PostgresHumanCredentialStateInitializer,
+)
 from inframeld_backend.access.infrastructure.writers.postgres_project_deletion_admission_writer import (
     PostgresProjectDeletionAdmissionWriter,
 )
@@ -968,12 +971,15 @@ async def test_another_eligible_human_cannot_observe_original_initiator_status(
             )
         )
     assert identity is not None
+    verified_identity = VerifiedHumanIdentityDTO(
+        IdentityAuthority(identity.authority), IdentitySubject(identity.subject)
+    )
+    state = await PostgresHumanCredentialStateInitializer(database).initialize(verified_identity)
+    assert state.version is not None
     other = AccessContextDTO(
         deletion_scope.defaults.bob_id,
         MockAuthenticationEvidence.browser(
-            VerifiedHumanIdentityDTO(
-                IdentityAuthority(identity.authority), IdentitySubject(identity.subject)
-            )
+            verified_identity, installation_id=state.installation_id, version=state.version
         ),
     )
     async with database.session() as session, session.begin():

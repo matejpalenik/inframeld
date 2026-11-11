@@ -1,6 +1,6 @@
 # ADR-0127: Fence human authentication evidence at restoration
 
-**Status:** Accepted. Partially supersedes [ADR-0072](ADR-0072-version-human-cli-credentials-across-account-recovery.md) for the credential-version advancement trigger and [ADR-0073](ADR-0073-carry-explicit-authentication-evidence-in-access-contexts.md) for browser evidence and its currentness checks. Existing recovery semantics remain selected. Implementation and qualification are unfinished.
+**Status:** Accepted. Partially supersedes [ADR-0072](ADR-0072-version-human-cli-credentials-across-account-recovery.md) for the credential-version advancement trigger and [ADR-0073](ADR-0073-carry-explicit-authentication-evidence-in-access-contexts.md) for browser evidence and its currentness checks. Existing recovery semantics remain selected. Captured browser evidence, neutral current-facts checks and linked-human consent guards are implemented. The suspension/restoration transactions, provider deletion and cleanup jobs remain unfinished.
 
 **Date:** 2026-11-05
 
@@ -48,7 +48,7 @@ The fence rejects evidence captured before restoration's cutover. Fresh verifica
 
 ## Consequences
 
-Access must deliberately extend browser evidence, currentness observations, consent eligibility and the restoration transaction. It reuses the existing version store and identity coordinator, without a new epoch registry, executor, token hook or credential inventory. The current inspected browser DTO remains identity-only until that implementation is delivered.
+The credential fence uses the existing version store for captured browser evidence, neutral currentness observations and linked-human consent guards. It introduces no new epoch registry, executor, token hook or credential inventory. The actual restoration transaction and its identity coordination remain required unfinished work. This supporting component does not establish suspension-specific provider deletion or job cleanup.
 
 Required qualification covers both crossing orders, stale browser contexts, late OAuth issuance, the explicitly tolerated late-created session, replay-once advancement, rollback, cancellation and uncertain commit. It must also cover newer independent recovery blocks, unchanged other principals and rights removed during the incident. Provider and human qualification remain unrun for this decision. Full #188 stays open, with human work tracked in [#318](https://github.com/matejpalenik/inframeld/issues/318).
 

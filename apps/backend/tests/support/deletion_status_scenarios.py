@@ -146,7 +146,10 @@ class MockDeletionStatusScenarios:
                 )
             )
         await session.flush()
-        access = AccessContextDTO(actor.principal_id, BrowserSessionAuthenticationDTO(identity))
+        access = AccessContextDTO(
+            actor.principal_id,
+            BrowserSessionAuthenticationDTO(identity, installation, HumanCredentialVersion(1)),
+        )
         request = OperationReservationRequestDTO(
             principal_id=actor.principal_id,
             organization_id=actor.organization_id,

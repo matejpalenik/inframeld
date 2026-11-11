@@ -3,11 +3,9 @@
 import os
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
-from uuid import UUID
 
 import pytest
 from sqlalchemy import func, select, update
-from tests.support.authentication_evidence import MockAuthenticationEvidence
 from tests.support.historical_project_grant_scenarios import (
     RetainedProjectGrantPostDTO,
     seed_retained_project_grant_post,
@@ -16,12 +14,7 @@ from tests.support.project_action_grant_postgres_scenarios import (
     change_project_grant,
 )
 
-from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
-from inframeld_backend.access.application.dtos.verified_human_identity_dto import (
-    VerifiedHumanIdentityDTO,
-)
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
-from inframeld_backend.access.domain.value_objects.identity_subject import IdentitySubject
 from inframeld_backend.access.infrastructure.rows.access_audit_event_row import AccessAuditEventRow
 from inframeld_backend.access.infrastructure.rows.project_action_grant_row import (
     ProjectActionGrantRow,
@@ -182,15 +175,7 @@ async def test_retired_post_metadata_requires_current_exact_delegation_and_origi
     await change_project_grant(
         database, seed, revision=2, key="delegate-bob", action_id=ACTION, can_grant=True
     )
-    bob = AccessContextDTO(
-        actor_principal_id=seed.bob_id,
-        authentication_evidence=MockAuthenticationEvidence.browser(
-            VerifiedHumanIdentityDTO(
-                authority=seed.actor.binding.identity.authority,
-                subject=IdentitySubject(str(UUID(int=200))),
-            )
-        ),
-    )
+    bob = seed.bob_access
     async with open_original_operation_lookup(database) as lookup:
         assert isinstance(
             await lookup.lookup(access=bob, query=retained.query), UnresolvedOperationDTO

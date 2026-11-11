@@ -26,8 +26,8 @@ from tests.support.mock_project_upload_defaults import (
 )
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
-from inframeld_backend.access.application.dtos.human_oauth_credential_facts_dto import (
-    HumanOAuthCredentialFactsDTO,
+from inframeld_backend.access.application.dtos.human_credential_facts_dto import (
+    HumanCredentialFactsDTO,
 )
 from inframeld_backend.access.application.dtos.project_upload_audience_dto import (
     ProjectUploadAudienceDTO,
@@ -465,7 +465,7 @@ async def test_stale_human_credential_denies_before_history(setup: Setup) -> Non
         FACTS,
         action=replace(
             FACTS.action,
-            oauth_credential_facts=HumanOAuthCredentialFactsDTO(True, HumanCredentialVersion(2)),
+            oauth_credential_facts=HumanCredentialFactsDTO(True, HumanCredentialVersion(2)),
         ),
     )
     with pytest.raises(HumanOAuthCredentialRejectedError):

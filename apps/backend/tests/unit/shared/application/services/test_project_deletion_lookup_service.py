@@ -6,7 +6,8 @@ from typing import override
 from uuid import UUID
 
 import pytest
-from tests.support.mock_project_metadata import ACCESS, ORGANIZATION_ID, PROJECT_ID
+from tests.support.authentication_evidence import MockAuthenticationEvidence
+from tests.support.mock_project_metadata import ACTOR_ID, ORGANIZATION_ID, PROJECT_ID
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
 from inframeld_backend.access.application.dtos.deletion_recovery_authorization_dto import (
@@ -16,6 +17,9 @@ from inframeld_backend.access.application.protocols.deletion_recovery_authorizer
     DeletionRecoveryAuthorizer,
 )
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
+from inframeld_backend.access.domain.value_objects.human_credential_version import (
+    HumanCredentialVersion,
+)
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.shared.application.dtos.retained_deletion_status_dto import (
     RetainedDeletionStatusDTO,
@@ -53,6 +57,12 @@ from inframeld_backend.shared.application.value_objects.operation_lookup_authori
 )
 from inframeld_backend.shared.domain.value_objects.installation_id import InstallationId
 
+ACCESS = AccessContextDTO(
+    ACTOR_ID,
+    MockAuthenticationEvidence.browser(
+        installation_id=InstallationId(UUID(int=20)), version=HumanCredentialVersion(1)
+    ),
+)
 AUTH = DeletionRecoveryAuthorizationDTO(
     InstallationId(UUID(int=20)), ORGANIZATION_ID, ACCESS.actor_principal_id
 )

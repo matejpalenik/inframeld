@@ -106,7 +106,9 @@ class MockProjectCookieVerifier(BrowserSessionVerifier):
         self._identity = identity
 
     @override
-    async def verify(self, credential: BrowserSessionCredential) -> VerifiedHumanIdentityDTO | None:
+    async def verify(
+        self, credential: BrowserSessionCredential, *, timeout_seconds: float | None = None
+    ) -> VerifiedHumanIdentityDTO | None:
         return self._identity if credential.value == "project-delete-cookie" else None
 
 

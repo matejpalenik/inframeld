@@ -19,9 +19,6 @@ from inframeld_backend.access.application.dtos.organization_access_facts_dto imp
 from inframeld_backend.access.application.dtos.verified_human_identity_dto import (
     VerifiedHumanIdentityDTO,
 )
-from inframeld_backend.access.application.errors.human_oauth_credential_rejected_error import (
-    HumanOAuthCredentialRejectedError,
-)
 from inframeld_backend.access.application.protocols.human_admission_facts_reader import (
     HumanAdmissionFactsReader,
 )
@@ -183,8 +180,9 @@ class HumanAdmissionService(HumanAdmitter):
             has_pending_recovery=facts.has_pending_recovery,
             oauth_credential_facts=facts.oauth_credential_facts,
         )
-        if not eligibility.credential_is_current:
-            raise HumanOAuthCredentialRejectedError()
+        PrincipalAccessEvaluationService.require_current_credential(
+            access=access, principal_access=eligibility
+        )
         if not HumanAdmissionPolicy.may_authorize(
             eligibility,
             has_admit_users=any(

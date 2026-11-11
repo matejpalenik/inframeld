@@ -17,14 +17,17 @@ from inframeld_backend.access.application.dtos.access_context_dto import AccessC
 from inframeld_backend.access.application.dtos.application_key_authentication_dto import (
     ApplicationKeyAuthenticationDTO,
 )
+from inframeld_backend.access.application.dtos.browser_session_authentication_dto import (
+    BrowserSessionAuthenticationDTO,
+)
 from inframeld_backend.access.application.dtos.current_application_session_dto import (
     CurrentApplicationSessionDTO,
 )
+from inframeld_backend.access.application.dtos.human_credential_facts_dto import (
+    HumanCredentialFactsDTO,
+)
 from inframeld_backend.access.application.dtos.human_oauth_credential_binding_dto import (
     HumanOAuthCredentialBindingDTO,
-)
-from inframeld_backend.access.application.dtos.human_oauth_credential_facts_dto import (
-    HumanOAuthCredentialFactsDTO,
 )
 from inframeld_backend.access.application.dtos.operation_lookup_facts_dto import (
     OperationLookupFactsDTO,
@@ -51,6 +54,9 @@ from inframeld_backend.access.domain.entities.principal import Principal
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.enums.principal_status import PrincipalStatus
 from inframeld_backend.access.domain.enums.project_status import ProjectStatus
+from inframeld_backend.access.domain.value_objects.human_credential_version import (
+    HumanCredentialVersion,
+)
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
@@ -121,6 +127,7 @@ class MockHumanAuthentication(HumanSessionAuthenticator, HumanAccessTokenAuthent
 class MockCurrentLookupFacts(OperationLookupFactsReader):
     def __init__(self) -> None:
         self.calls = 0
+        self.current_version = HumanCredentialVersion(1)
 
     @override
     async def read(
@@ -143,10 +150,12 @@ class MockCurrentLookupFacts(OperationLookupFactsReader):
             has_exact_action_grant=True,
             can_grant_action=True,
             has_pending_recovery=False,
-            oauth_credential_facts=HumanOAuthCredentialFactsDTO(
-                binding_matches_actor=True, current_version=evidence.version
+            oauth_credential_facts=HumanCredentialFactsDTO(
+                binding_matches_actor=True, current_version=self.current_version
             )
-            if isinstance(evidence, HumanOAuthCredentialBindingDTO)
+            if isinstance(
+                evidence, HumanOAuthCredentialBindingDTO | BrowserSessionAuthenticationDTO
+            )
             else None,
         )
 
@@ -333,3 +342,23 @@ def test_missing_trusted_profile_is_503_before_database_or_provider_io(
         client.close()
     assert response.status_code == 503 and response.json()["code"] == "dependency_unavailable"
     assert calls == 0
+
+
+@pytest.mark.parametrize("oauth", [False, True])
+def test_stale_human_credential_keeps_its_http_challenge_family(
+    dispatch: DispatchCase, oauth: bool
+) -> None:
+    """A stale browser gets ordinary 401 while OAuth retains its Bearer challenge."""
+    dispatch.facts.current_version = HumanCredentialVersion(2)
+    headers = (
+        {"Authorization": "Bearer human-token"}
+        if oauth
+        else {"Cookie": "ory_kratos_session=cookie", "Origin": ORIGIN, "X-Inframeld-CSRF": "1"}
+    )
+    response = dispatch.client.post("/v1/operations/lookup", json=BODY, headers=headers)
+    assert response.status_code == 401
+    assert response.headers.get("WWW-Authenticate") == (
+        'Bearer realm="inframeld", error="invalid_token"' if oauth else None
+    )
+    assert dispatch.facts.calls == 1 and dispatch.history.calls == 0
+    assert dispatch.application.calls == 0

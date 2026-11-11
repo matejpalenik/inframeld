@@ -106,7 +106,7 @@ async def test_member_with_no_grants_can_discover_revision_in_one_empty_snapshot
             page = await MyProjectAccessService(
                 PostgresMyProjectAccessFactsReader(session)
             ).get_access(
-                access=AccessContextDTO(seed.bob_id, seed.actor.access.authentication_evidence),
+                access=seed.bob_access,
                 query=GetMyProjectAccessQuery(seed.project.project_id),
             )
         finally:
@@ -281,7 +281,7 @@ async def test_cursor_is_bound_to_the_current_principal(database: Database) -> N
     with pytest.raises(InvalidInputError):
         await _read(
             database,
-            AccessContextDTO(seed.bob_id, seed.actor.access.authentication_evidence),
+            seed.bob_access,
             seed.project.project_id,
             cursor=page.next_cursor,
         )

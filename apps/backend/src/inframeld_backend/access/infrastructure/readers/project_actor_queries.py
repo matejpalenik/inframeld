@@ -4,6 +4,9 @@ from sqlalchemy import BigInteger, Nullable, and_, exists, literal, select
 from sqlalchemy.sql import Select
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
+from inframeld_backend.access.application.dtos.browser_session_authentication_dto import (
+    BrowserSessionAuthenticationDTO,
+)
 from inframeld_backend.access.application.dtos.human_oauth_credential_binding_dto import (
     HumanOAuthCredentialBindingDTO,
 )
@@ -62,12 +65,16 @@ class ProjectActorQueries:
         evidence = access.authentication_evidence
         linked = (
             HumanCredentialStateQueries.binding_matches_actor(evidence)
-            if isinstance(evidence, HumanOAuthCredentialBindingDTO)
+            if isinstance(
+                evidence, HumanOAuthCredentialBindingDTO | BrowserSessionAuthenticationDTO
+            )
             else literal(False)
         )
         version = (
             Nullable(HumanCredentialStateQueries.version_for_actor(evidence))
-            if isinstance(evidence, HumanOAuthCredentialBindingDTO)
+            if isinstance(
+                evidence, HumanOAuthCredentialBindingDTO | BrowserSessionAuthenticationDTO
+            )
             else Nullable(literal(None, BigInteger))
         )
         return (

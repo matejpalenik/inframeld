@@ -6,6 +6,12 @@ from typing import override
 from inframeld_backend.access.application.commands.decide_human_oauth_consent_command import (
     DecideHumanOAuthConsentCommand,
 )
+from inframeld_backend.access.application.dtos.human_authentication_state_dto import (
+    HumanAuthenticationStateDTO,
+)
+from inframeld_backend.access.application.dtos.human_credential_state_dto import (
+    HumanCredentialStateDTO,
+)
 from inframeld_backend.access.application.dtos.human_oauth_consent_details_dto import (
     HumanOAuthConsentDetailsDTO,
 )
@@ -21,6 +27,9 @@ from inframeld_backend.access.application.dtos.oauth_consent_continuation_dto im
 from inframeld_backend.access.application.dtos.verified_human_identity_dto import (
     VerifiedHumanIdentityDTO,
 )
+from inframeld_backend.access.application.enums.human_identity_link_state import (
+    HumanIdentityLinkState,
+)
 from inframeld_backend.access.application.enums.oauth_consent_decision import OAuthConsentDecision
 from inframeld_backend.access.application.protocols.browser_session_verifier import (
     BrowserSessionVerifier,
@@ -33,9 +42,6 @@ from inframeld_backend.access.application.protocols.human_credential_state_reade
 )
 from inframeld_backend.access.application.protocols.human_oauth_consent_handler import (
     HumanOAuthConsentHandler,
-)
-from inframeld_backend.access.application.protocols.identity_recovery_block_reader import (
-    IdentityRecoveryBlockReader,
 )
 from inframeld_backend.access.application.protocols.oauth_consent_decision_writer import (
     OAuthConsentDecisionWriter,
@@ -52,8 +58,14 @@ from inframeld_backend.access.application.value_objects.browser_session_credenti
 from inframeld_backend.access.application.value_objects.oauth_consent_challenge import (
     OAuthConsentChallenge,
 )
+from inframeld_backend.access.domain.policies.human_authentication_policy import (
+    HumanAuthenticationPolicy,
+)
 from inframeld_backend.access.domain.policies.human_oauth_consent_policy import (
     HumanOAuthConsentPolicy,
+)
+from inframeld_backend.access.domain.policy_inputs.principal_access_policy_input import (
+    PrincipalAccessPolicyInput,
 )
 from inframeld_backend.access.domain.value_objects.human_api_audience import HumanAPIAudience
 from inframeld_backend.access.domain.value_objects.identity_authority import IdentityAuthority
@@ -70,7 +82,6 @@ class HumanOAuthConsentService(HumanOAuthConsentHandler):
         o_auth_consent_request_reader: OAuthConsentRequestReader,
         o_auth_consent_decision_writer: OAuthConsentDecisionWriter,
         browser_session_verifier: BrowserSessionVerifier,
-        recovery_block_reader: IdentityRecoveryBlockReader,
         *,
         credential_state_reader: HumanCredentialStateReader,
         credential_initializer: HumanCredentialStateInitializer,
@@ -90,7 +101,6 @@ class HumanOAuthConsentService(HumanOAuthConsentHandler):
         self._o_auth_consent_request_reader = o_auth_consent_request_reader
         self._o_auth_consent_decision_writer = o_auth_consent_decision_writer
         self._browser_session_verifier = browser_session_verifier
-        self._recovery_block_reader = recovery_block_reader
         self._authority = authority
         self._api_audience = api_audience
         self._remember_consent_seconds = remember_consent_seconds
@@ -198,7 +208,10 @@ class HumanOAuthConsentService(HumanOAuthConsentHandler):
     ) -> VerifiedHumanIdentityDTO:
         """Bind the browser session to the exact human named by the consent request."""
         identity = await self._provider_call(
-            lambda _timeout: self._browser_session_verifier.verify(credential), deadline
+            lambda timeout: self._browser_session_verifier.verify(
+                credential, timeout_seconds=timeout
+            ),
+            deadline,
         )
         if identity is None:
             raise AuthenticationRequiredError()
@@ -215,7 +228,9 @@ class HumanOAuthConsentService(HumanOAuthConsentHandler):
         """Check consent eligibility without initializing or changing credential state."""
         request = await self._read_supported_request(challenge, deadline)
         identity = await self._verify_browser_identity(credential, request, deadline)
-        blocked = await self._recovery_block_reader.is_blocked(identity)
+        observation = await self._credential_state_reader.read_authentication_state(identity)
+        state = self._require_observation(observation, identity)
+        blocked = state.has_pending_recovery
         if asyncio.get_running_loop().time() >= deadline:
             raise TimeoutError
         if not HumanOAuthConsentPolicy.may_approve(
@@ -236,11 +251,14 @@ class HumanOAuthConsentService(HumanOAuthConsentHandler):
     ) -> tuple[HumanOAuthConsentRequestDTO, HumanOAuthCredentialBindingDTO]:
         """Establish the credential binding required for an approved consent decision."""
         request = await self._read_supported_request(challenge, deadline)
-        initial = await self._credential_initializer.initialize(
-            VerifiedHumanIdentityDTO(self._authority, request.subject)
+        expected = VerifiedHumanIdentityDTO(self._authority, request.subject)
+        initial_observation = await self._credential_initializer.initialize_authentication_state(
+            expected
         )
+        initial = self._require_observation(initial_observation, expected)
         identity = await self._verify_browser_identity(credential, request, deadline)
-        current = await self._credential_state_reader.read(identity)
+        final_observation = await self._credential_state_reader.read_authentication_state(identity)
+        current = self._require_observation(final_observation, identity)
         if (
             initial.identity != identity
             or current.identity != identity
@@ -262,3 +280,27 @@ class HumanOAuthConsentService(HumanOAuthConsentHandler):
         return request, HumanOAuthCredentialBindingDTO(
             identity, initial.installation_id, initial.version
         )
+
+    @staticmethod
+    def _require_observation(
+        observation: HumanAuthenticationStateDTO, identity: VerifiedHumanIdentityDTO
+    ) -> HumanCredentialStateDTO:
+        state = observation.credential_state
+        if state.identity != identity:
+            raise AccessDeniedError()
+        if observation.link_state is HumanIdentityLinkState.INCOHERENT:
+            raise DependencyUnavailableError()
+        if observation.link_state is HumanIdentityLinkState.UNLINKED:
+            if observation.linked_principal is not None:
+                raise DependencyUnavailableError()
+        else:
+            principal = observation.linked_principal
+            if principal is None:
+                raise DependencyUnavailableError()
+            if not HumanAuthenticationPolicy.may_authenticate(
+                PrincipalAccessPolicyInput(principal, state.has_pending_recovery, True)
+            ):
+                raise AccessDeniedError()
+        if state.has_pending_recovery:
+            raise AccessDeniedError()
+        return state

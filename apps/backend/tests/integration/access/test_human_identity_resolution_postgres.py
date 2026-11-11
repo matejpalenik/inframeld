@@ -24,13 +24,16 @@ from inframeld_backend.access.application.value_objects.browser_session_credenti
 from inframeld_backend.access.domain.enums.principal_status import PrincipalStatus
 from inframeld_backend.access.domain.value_objects.identity_authority import IdentityAuthority
 from inframeld_backend.access.domain.value_objects.identity_subject import IdentitySubject
+from inframeld_backend.access.infrastructure.readers.postgres_human_credential_state_reader import (
+    PostgresHumanCredentialStateReader,
+)
 from inframeld_backend.access.infrastructure.readers.postgres_human_identity_link_reader import (
     PostgresHumanIdentityLinkReader,
 )
-from inframeld_backend.access.infrastructure.readers.postgres_identity_recovery_block_reader import (
-    PostgresIdentityRecoveryBlockReader,
-)
 from inframeld_backend.access.infrastructure.rows.principal_row import PrincipalRow
+from inframeld_backend.access.infrastructure.writers.postgres_human_credential_state_initializer import (
+    PostgresHumanCredentialStateInitializer,
+)
 from inframeld_backend.shared.application.errors.application_errors import (
     AccessDeniedError,
 )
@@ -47,7 +50,9 @@ class CredentialSubjectVerifier(BrowserSessionVerifier):
     """Use synthetic credentials as subjects to exercise local persistence concurrently."""
 
     @override
-    async def verify(self, credential: BrowserSessionCredential) -> VerifiedHumanIdentityDTO | None:
+    async def verify(
+        self, credential: BrowserSessionCredential, *, timeout_seconds: float | None = None
+    ) -> VerifiedHumanIdentityDTO | None:
         """Return the exact test identity represented by this synthetic credential."""
         return VerifiedHumanIdentityDTO(AUTHORITY, IdentitySubject(credential.value))
 
@@ -96,17 +101,21 @@ async def test_shared_service_authenticates_concurrent_callers(database: Databas
             await MockAccessScenarios.seed_linked_human(session, identity)
             for identity in identities
         ]
+    initializer = PostgresHumanCredentialStateInitializer(database)
+    for identity in identities:
+        await initializer.initialize(identity)
     service = HumanSessionAuthenticationService(
         CredentialSubjectVerifier(),
-        PostgresHumanIdentityLinkReader(database),
-        recovery_block_reader=PostgresIdentityRecoveryBlockReader(database),
+        PostgresHumanCredentialStateReader(database),
     )
-    contexts = await asyncio.gather(
-        *(
-            service.authenticate(BrowserSessionCredential(identity.subject.value))
+    async with asyncio.TaskGroup() as group:
+        tasks = [
+            group.create_task(
+                service.authenticate(BrowserSessionCredential(identity.subject.value))
+            )
             for identity in identities
-        )
-    )
+        ]
+    contexts = [task.result() for task in tasks]
     assert [context.actor_principal_id for context in contexts] == [
         principal.id for principal in principals
     ]
@@ -118,10 +127,10 @@ async def test_shared_service_reads_account_status_on_each_request(database: Dat
     identity = VerifiedHumanIdentityDTO(AUTHORITY, IdentitySubject(str(uuid4())))
     async with database.session() as session, session.begin():
         principal = await MockAccessScenarios.seed_linked_human(session, identity)
+    await PostgresHumanCredentialStateInitializer(database).initialize(identity)
     service = HumanSessionAuthenticationService(
         CredentialSubjectVerifier(),
-        PostgresHumanIdentityLinkReader(database),
-        recovery_block_reader=PostgresIdentityRecoveryBlockReader(database),
+        PostgresHumanCredentialStateReader(database),
     )
     credential = BrowserSessionCredential(identity.subject.value)
     assert (await service.authenticate(credential)).actor_principal_id == principal.id

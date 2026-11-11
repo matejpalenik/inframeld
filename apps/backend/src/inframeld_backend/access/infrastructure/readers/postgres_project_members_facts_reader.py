@@ -7,11 +7,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
+from inframeld_backend.access.application.dtos.browser_session_authentication_dto import (
+    BrowserSessionAuthenticationDTO,
+)
+from inframeld_backend.access.application.dtos.human_credential_facts_dto import (
+    HumanCredentialFactsDTO,
+)
 from inframeld_backend.access.application.dtos.human_oauth_credential_binding_dto import (
     HumanOAuthCredentialBindingDTO,
-)
-from inframeld_backend.access.application.dtos.human_oauth_credential_facts_dto import (
-    HumanOAuthCredentialFactsDTO,
 )
 from inframeld_backend.access.application.dtos.project_action_facts_dto import ProjectActionFactsDTO
 from inframeld_backend.access.application.dtos.project_member_dto import ProjectMemberDTO
@@ -132,12 +135,16 @@ class PostgresProjectMembersFactsReader(ProjectMembersFactsReader):
         evidence = access.authentication_evidence
         matches_actor = (
             HumanCredentialStateQueries.binding_matches_actor(evidence)
-            if isinstance(evidence, HumanOAuthCredentialBindingDTO)
+            if isinstance(
+                evidence, HumanOAuthCredentialBindingDTO | BrowserSessionAuthenticationDTO
+            )
             else literal(False)
         )
         credential_version = (
             Nullable(HumanCredentialStateQueries.version_for_actor(evidence))
-            if isinstance(evidence, HumanOAuthCredentialBindingDTO)
+            if isinstance(
+                evidence, HumanOAuthCredentialBindingDTO | BrowserSessionAuthenticationDTO
+            )
             else Nullable(literal(None, BigInteger))
         )
         statement = (
@@ -199,10 +206,12 @@ class PostgresProjectMembersFactsReader(ProjectMembersFactsReader):
                     principal.status,
                 ),
                 has_pending_recovery=recovering,
-                oauth_credential_facts=HumanOAuthCredentialFactsDTO(
+                oauth_credential_facts=HumanCredentialFactsDTO(
                     linked, HumanCredentialVersion(version) if version is not None else None
                 )
-                if isinstance(evidence, HumanOAuthCredentialBindingDTO)
+                if isinstance(
+                    evidence, HumanOAuthCredentialBindingDTO | BrowserSessionAuthenticationDTO
+                )
                 else None,
                 project_status=project.status,
                 is_project_member=membership,

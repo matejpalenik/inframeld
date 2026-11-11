@@ -1,6 +1,9 @@
 from abc import abstractmethod
 from typing import Protocol
 
+from inframeld_backend.access.application.dtos.human_authentication_state_dto import (
+    HumanAuthenticationStateDTO,
+)
 from inframeld_backend.access.application.dtos.human_credential_state_dto import (
     HumanCredentialStateDTO,
 )
@@ -20,4 +23,11 @@ class HumanCredentialStateInitializer(Protocol):
     @abstractmethod
     async def initialize(self, identity: VerifiedHumanIdentityDTO) -> HumanCredentialStateDTO:
         """Return current state, refusing a missing version with existing recovery history."""
+        ...
+
+    @abstractmethod
+    async def initialize_authentication_state(
+        self, identity: VerifiedHumanIdentityDTO
+    ) -> HumanAuthenticationStateDTO:
+        """Observe linked-principal and credential facts together before provider work."""
         ...

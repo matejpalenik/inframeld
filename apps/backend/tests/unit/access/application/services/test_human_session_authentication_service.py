@@ -5,22 +5,32 @@ from contextlib import suppress
 from dataclasses import replace
 from enum import StrEnum
 from typing import override
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
+from tests.support.mock_human_credential_state_reader import MockHumanCredentialStateReader
 from tests.support.mock_identity_recovery_block_reader import MockIdentityRecoveryBlockReader
 
 from inframeld_backend.access.application.dtos.browser_session_authentication_dto import (
     BrowserSessionAuthenticationDTO,
 )
+from inframeld_backend.access.application.dtos.human_authentication_state_dto import (
+    HumanAuthenticationStateDTO,
+)
+from inframeld_backend.access.application.dtos.human_credential_state_dto import (
+    HumanCredentialStateDTO,
+)
 from inframeld_backend.access.application.dtos.verified_human_identity_dto import (
     VerifiedHumanIdentityDTO,
+)
+from inframeld_backend.access.application.enums.human_identity_link_state import (
+    HumanIdentityLinkState,
 )
 from inframeld_backend.access.application.protocols.browser_session_verifier import (
     BrowserSessionVerifier,
 )
-from inframeld_backend.access.application.protocols.human_identity_link_reader import (
-    HumanIdentityLinkReader,
+from inframeld_backend.access.application.protocols.human_credential_state_reader import (
+    HumanCredentialStateReader,
 )
 from inframeld_backend.access.application.services.human_session_authentication_service import (
     HumanSessionAuthenticationService,
@@ -31,6 +41,9 @@ from inframeld_backend.access.application.value_objects.browser_session_credenti
 from inframeld_backend.access.domain.entities.principal import Principal
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.enums.principal_status import PrincipalStatus
+from inframeld_backend.access.domain.value_objects.human_credential_version import (
+    HumanCredentialVersion,
+)
 from inframeld_backend.access.domain.value_objects.identity_authority import IdentityAuthority
 from inframeld_backend.access.domain.value_objects.identity_subject import IdentitySubject
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
@@ -40,6 +53,7 @@ from inframeld_backend.shared.application.errors.application_errors import (
     AuthenticationRequiredError,
     DependencyUnavailableError,
 )
+from inframeld_backend.shared.domain.value_objects.installation_id import InstallationId
 
 
 class SettingCase(StrEnum):
@@ -70,29 +84,55 @@ class FixedVerifier(BrowserSessionVerifier):
         self.identity = identity
         self.failure = failure
         self.called = False
+        self.credentials: list[BrowserSessionCredential] = []
+        self.timeouts: list[float | None] = []
+        self.results: list[VerifiedHumanIdentityDTO | None] = []
+        self.delay = 0.0
 
     @override
-    async def verify(self, credential: BrowserSessionCredential) -> VerifiedHumanIdentityDTO | None:
+    async def verify(
+        self, credential: BrowserSessionCredential, *, timeout_seconds: float | None = None
+    ) -> VerifiedHumanIdentityDTO | None:
         """Represent provider verification without performing network I/O."""
         self.called = True
+        self.credentials.append(credential)
+        self.timeouts.append(timeout_seconds)
+        if self.delay:
+            await asyncio.sleep(self.delay)
+        if self.results:
+            return self.results.pop(0)
         if self.failure is not None:
             raise self.failure
         return self.identity
 
 
-class FixedPrincipalReader(HumanIdentityLinkReader):
+class FixedPrincipalReader(HumanCredentialStateReader):
     """Supply linked principal state and record the exact verified identity used."""
 
     def __init__(self, principal: Principal | None = PRINCIPAL) -> None:
         """Choose the local principal returned by the read boundary."""
         self.principal = principal
         self.identity: VerifiedHumanIdentityDTO | None = None
+        self.recovery = MockIdentityRecoveryBlockReader()
 
     @override
-    async def find_principal(self, identity: VerifiedHumanIdentityDTO) -> Principal | None:
-        """Return current local state for the identity supplied by verification."""
+    async def read(self, identity: VerifiedHumanIdentityDTO) -> HumanCredentialStateDTO:
+        return (await self.read_authentication_state(identity)).credential_state
+
+    @override
+    async def read_authentication_state(
+        self, identity: VerifiedHumanIdentityDTO
+    ) -> HumanAuthenticationStateDTO:
         self.identity = identity
-        return self.principal
+        blocked = await self.recovery.is_blocked(identity)
+        return _restoration_snapshot(
+            identity=identity,
+            principal=self.principal,
+            blocked=blocked,
+            link=HumanIdentityLinkState.UNLINKED
+            if self.principal is None
+            else HumanIdentityLinkState.LINKED,
+        )
 
 
 class MockDeadlineBrowserVerifier(BrowserSessionVerifier):
@@ -105,7 +145,9 @@ class MockDeadlineBrowserVerifier(BrowserSessionVerifier):
         self.started = asyncio.Event()
 
     @override
-    async def verify(self, credential: BrowserSessionCredential) -> VerifiedHumanIdentityDTO | None:
+    async def verify(
+        self, credential: BrowserSessionCredential, *, timeout_seconds: float | None = None
+    ) -> VerifiedHumanIdentityDTO | None:
         self.started.set()
         if self.blocked:
             try:
@@ -116,7 +158,7 @@ class MockDeadlineBrowserVerifier(BrowserSessionVerifier):
         return self.result
 
 
-class MockDeadlinePrincipalReader(HumanIdentityLinkReader):
+class MockDeadlinePrincipalReader(HumanCredentialStateReader):
     """Simulate a local read that can outlast the authentication deadline."""
 
     def __init__(self) -> None:
@@ -126,7 +168,9 @@ class MockDeadlinePrincipalReader(HumanIdentityLinkReader):
         self.result: Principal | None = PRINCIPAL
 
     @override
-    async def find_principal(self, identity: VerifiedHumanIdentityDTO) -> Principal | None:
+    async def read_authentication_state(
+        self, identity: VerifiedHumanIdentityDTO
+    ) -> HumanAuthenticationStateDTO:
         self.called = True
         if self.blocked:
             try:
@@ -134,18 +178,30 @@ class MockDeadlinePrincipalReader(HumanIdentityLinkReader):
             except asyncio.CancelledError:
                 if not self.return_after_cancellation:
                     raise
-        return self.result
+        return _restoration_snapshot(
+            identity=identity,
+            principal=self.result,
+            link=HumanIdentityLinkState.UNLINKED
+            if self.result is None
+            else HumanIdentityLinkState.LINKED,
+        )
+
+    @override
+    async def read(self, identity: VerifiedHumanIdentityDTO) -> HumanCredentialStateDTO:
+        return (await self.read_authentication_state(identity)).credential_state
 
 
 @pytest.mark.asyncio
 async def test_valid_identity_resolves_active_local_human() -> None:
     """Carry browser authentication evidence alongside the admitted local actor."""
     reader = FixedPrincipalReader()
-    context = await HumanSessionAuthenticationService(
-        FixedVerifier(), reader, recovery_block_reader=MockIdentityRecoveryBlockReader()
-    ).authenticate(CREDENTIAL)
+    context = await HumanSessionAuthenticationService(FixedVerifier(), reader).authenticate(
+        CREDENTIAL
+    )
     assert context.actor_principal_id == PRINCIPAL.id
-    assert context.authentication_evidence == BrowserSessionAuthenticationDTO(IDENTITY)
+    assert context.authentication_evidence == BrowserSessionAuthenticationDTO(
+        IDENTITY, INSTALLATION, HumanCredentialVersion(1)
+    )
     assert reader.identity == IDENTITY
 
 
@@ -154,9 +210,7 @@ async def test_missing_credential_performs_no_io() -> None:
     """Reject a missing session before contacting either external dependency."""
     verifier, reader = FixedVerifier(), FixedPrincipalReader()
     with pytest.raises(AuthenticationRequiredError):
-        await HumanSessionAuthenticationService(
-            verifier, reader, recovery_block_reader=MockIdentityRecoveryBlockReader()
-        ).authenticate(None)
+        await HumanSessionAuthenticationService(verifier, reader).authenticate(None)
     assert not verifier.called
     assert reader.identity is None
 
@@ -179,7 +233,6 @@ async def test_verified_identity_requires_an_active_local_human(
         await HumanSessionAuthenticationService(
             FixedVerifier(),
             FixedPrincipalReader(principal),
-            recovery_block_reader=MockIdentityRecoveryBlockReader(),
         ).authenticate(CREDENTIAL)
 
 
@@ -188,9 +241,9 @@ async def test_rejected_session_skips_local_lookup() -> None:
     """Require successful provider verification before reading local principal state."""
     reader = FixedPrincipalReader()
     with pytest.raises(AuthenticationRequiredError):
-        await HumanSessionAuthenticationService(
-            FixedVerifier(None), reader, recovery_block_reader=MockIdentityRecoveryBlockReader()
-        ).authenticate(CREDENTIAL)
+        await HumanSessionAuthenticationService(FixedVerifier(None), reader).authenticate(
+            CREDENTIAL
+        )
     assert reader.identity is None
 
 
@@ -202,7 +255,6 @@ async def test_provider_failure_skips_local_lookup() -> None:
         await HumanSessionAuthenticationService(
             FixedVerifier(failure=DependencyUnavailableError()),
             reader,
-            recovery_block_reader=MockIdentityRecoveryBlockReader(),
         ).authenticate(CREDENTIAL)
     assert reader.identity is None
 
@@ -230,7 +282,6 @@ async def test_cookie_provider_wait_uses_the_shorter_limit(
     service = HumanSessionAuthenticationService(
         verifier,
         reader,
-        recovery_block_reader=MockIdentityRecoveryBlockReader(),
         provider_timeout_seconds=provider_seconds,
         total_timeout_seconds=total_seconds,
     )
@@ -252,7 +303,6 @@ async def test_cookie_total_deadline_includes_the_local_read() -> None:
     service = HumanSessionAuthenticationService(
         MockDeadlineBrowserVerifier(),
         reader,
-        recovery_block_reader=MockIdentityRecoveryBlockReader(),
         total_timeout_seconds=0.05,
     )
 
@@ -278,7 +328,6 @@ async def test_cookie_late_provider_result_cannot_decide_authentication(
     service = HumanSessionAuthenticationService(
         verifier,
         reader,
-        recovery_block_reader=MockIdentityRecoveryBlockReader(),
         provider_timeout_seconds=0.05,
     )
 
@@ -302,7 +351,6 @@ async def test_cookie_late_local_result_cannot_decide_admission(
     service = HumanSessionAuthenticationService(
         MockDeadlineBrowserVerifier(),
         reader,
-        recovery_block_reader=MockIdentityRecoveryBlockReader(),
         total_timeout_seconds=0.05,
     )
 
@@ -317,9 +365,7 @@ async def test_external_cancellation_remains_cancellation() -> None:
     verifier = MockDeadlineBrowserVerifier()
     verifier.blocked = True
     reader = MockDeadlinePrincipalReader()
-    service = HumanSessionAuthenticationService(
-        verifier, reader, recovery_block_reader=MockIdentityRecoveryBlockReader()
-    )
+    service = HumanSessionAuthenticationService(verifier, reader)
 
     task = asyncio.create_task(service.authenticate(CREDENTIAL))
     try:
@@ -351,7 +397,6 @@ def test_cookie_service_rejects_invalid_timeout_arguments(
         HumanSessionAuthenticationService(
             MockDeadlineBrowserVerifier(),
             MockDeadlinePrincipalReader(),
-            recovery_block_reader=MockIdentityRecoveryBlockReader(),
             provider_timeout_seconds=seconds if setting == "provider" else 5.0,
             total_timeout_seconds=seconds if setting == SettingCase.TOTAL else 10.0,
         )
@@ -361,10 +406,8 @@ def test_cookie_service_rejects_invalid_timeout_arguments(
 async def test_cookie_rechecks_recovery_without_clearing_suspension() -> None:
     """A released block restores eligibility only while the human remains active."""
     reader = FixedPrincipalReader()
-    recovery = MockIdentityRecoveryBlockReader()
-    service = HumanSessionAuthenticationService(
-        FixedVerifier(), reader, recovery_block_reader=recovery
-    )
+    recovery = reader.recovery
+    service = HumanSessionAuthenticationService(FixedVerifier(), reader)
 
     assert (await service.authenticate(CREDENTIAL)).actor_principal_id == PRINCIPAL.id
 
@@ -379,7 +422,7 @@ async def test_cookie_rechecks_recovery_without_clearing_suspension() -> None:
     with pytest.raises(AccessDeniedError):
         await service.authenticate(CREDENTIAL)
 
-    assert recovery.identities == [IDENTITY] * 4
+    assert recovery.identities == [IDENTITY] * 6
 
 
 @pytest.mark.asyncio
@@ -391,9 +434,9 @@ async def test_cookie_recovery_failure_preserves_its_category(
     recovery = MockIdentityRecoveryBlockReader()
     failure = failure_type()
     recovery.failure = failure
-    service = HumanSessionAuthenticationService(
-        FixedVerifier(), FixedPrincipalReader(), recovery_block_reader=recovery
-    )
+    reader = FixedPrincipalReader()
+    reader.recovery = recovery
+    service = HumanSessionAuthenticationService(FixedVerifier(), reader)
     expected = DependencyUnavailableError if failure_type is TimeoutError else failure_type
 
     with pytest.raises(expected) as caught:
@@ -416,10 +459,11 @@ async def test_cookie_total_deadline_includes_recovery_read(
     recovery.stall = True
     recovery.return_after_cancellation = return_after_cancellation
     recovery.result = result
+    reader = FixedPrincipalReader()
+    reader.recovery = recovery
     service = HumanSessionAuthenticationService(
         FixedVerifier(),
-        FixedPrincipalReader(),
-        recovery_block_reader=recovery,
+        reader,
         total_timeout_seconds=0.02,
     )
 
@@ -436,12 +480,11 @@ async def test_cookie_total_deadline_includes_recovery_read(
 async def test_cookie_rejection_before_admission_skips_recovery_read(
     stage: Stage,
 ) -> None:
-    """Read recovery state only after a credential resolves to a local principal."""
+    """Missing credentials skip all local facts, while unlinked identities observe coherent facts."""
     recovery = MockIdentityRecoveryBlockReader()
     service = HumanSessionAuthenticationService(
         FixedVerifier(None if stage == "provider" else IDENTITY),
         FixedPrincipalReader(None if stage == Stage.LOCAL_LINK else PRINCIPAL),
-        recovery_block_reader=recovery,
     )
     expected = AccessDeniedError if stage == Stage.LOCAL_LINK else AuthenticationRequiredError
 
@@ -449,3 +492,162 @@ async def test_cookie_rejection_before_admission_skips_recovery_read(
         await service.authenticate(None if stage == Stage.MISSING_CREDENTIAL else CREDENTIAL)
 
     assert recovery.identities == []
+
+
+INSTALLATION = InstallationId(UUID(int=123))
+
+
+def _restoration_snapshot(
+    *,
+    version: int | None = 1,
+    principal: Principal | None = PRINCIPAL,
+    blocked: bool = False,
+    identity: VerifiedHumanIdentityDTO = IDENTITY,
+    installation: InstallationId = INSTALLATION,
+    link: HumanIdentityLinkState = HumanIdentityLinkState.LINKED,
+) -> HumanAuthenticationStateDTO:
+    return HumanAuthenticationStateDTO(
+        HumanCredentialStateDTO(
+            installation,
+            identity,
+            HumanCredentialVersion(version) if version is not None else None,
+            blocked,
+        ),
+        link,
+        principal,
+    )
+
+
+@pytest.mark.asyncio
+async def test_restoration_browser_returns_captured_version_only_after_final_verification() -> None:
+    reader = MockHumanCredentialStateReader(
+        link_state=HumanIdentityLinkState.LINKED, linked_principal=PRINCIPAL
+    )
+    verifier = FixedVerifier()
+    result = await HumanSessionAuthenticationService(verifier, reader).authenticate(CREDENTIAL)
+    assert result.actor_principal_id == PRINCIPAL.id
+    assert result.authentication_evidence == BrowserSessionAuthenticationDTO(
+        IDENTITY, INSTALLATION, HumanCredentialVersion(1)
+    )
+    assert reader.calls == ["state", "state"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "change",
+    [
+        "version",
+        "installation",
+        "identity",
+        "unlinked",
+        "incoherent",
+        "missing-version",
+        "suspended",
+        "recovery",
+    ],
+)
+async def test_restoration_browser_rejects_changed_or_ineligible_final_state(change: str) -> None:
+    final = _restoration_snapshot()
+    if change == "version":
+        final = _restoration_snapshot(version=2)
+    elif change == "installation":
+        final = _restoration_snapshot(installation=InstallationId(UUID(int=999)))
+    elif change == "identity":
+        final = _restoration_snapshot(
+            identity=VerifiedHumanIdentityDTO(IDENTITY.authority, IdentitySubject("bob"))
+        )
+    elif change == "unlinked":
+        final = _restoration_snapshot(principal=None, link=HumanIdentityLinkState.UNLINKED)
+    elif change == "incoherent":
+        final = _restoration_snapshot(principal=None, link=HumanIdentityLinkState.INCOHERENT)
+    elif change == "missing-version":
+        final = _restoration_snapshot(version=None)
+    elif change == "suspended":
+        final = _restoration_snapshot(
+            principal=replace(PRINCIPAL, status=PrincipalStatus.SUSPENDED)
+        )
+    else:
+        final = _restoration_snapshot(blocked=True)
+    reader = MockHumanCredentialStateReader(
+        authentication_snapshots=[_restoration_snapshot(), final]
+    )
+    expected = (
+        AuthenticationRequiredError
+        if change in {"version", "installation", "identity"}
+        else DependencyUnavailableError
+        if change in {"incoherent", "missing-version"}
+        else AccessDeniedError
+    )
+    with pytest.raises(expected):
+        await HumanSessionAuthenticationService(FixedVerifier(), reader).authenticate(CREDENTIAL)
+    assert reader.calls == ["state", "state"]
+
+
+@pytest.mark.asyncio
+async def test_restoration_browser_unadmitted_identity_does_not_initialize_state() -> None:
+    reader = MockHumanCredentialStateReader(version=None)
+    with pytest.raises(AccessDeniedError):
+        await HumanSessionAuthenticationService(FixedVerifier(), reader).authenticate(CREDENTIAL)
+    assert reader.calls == ["state"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "final_identity", [None, VerifiedHumanIdentityDTO(IDENTITY.authority, IdentitySubject("other"))]
+)
+async def test_restoration_browser_final_verification_cannot_change_identity(
+    final_identity: VerifiedHumanIdentityDTO | None,
+) -> None:
+    reader = MockHumanCredentialStateReader(
+        link_state=HumanIdentityLinkState.LINKED, linked_principal=PRINCIPAL
+    )
+    verifier = FixedVerifier()
+    verifier.results = [IDENTITY, final_identity]
+    with pytest.raises(AuthenticationRequiredError):
+        await HumanSessionAuthenticationService(verifier, reader).authenticate(CREDENTIAL)
+    assert verifier.credentials == [CREDENTIAL, CREDENTIAL]
+    assert reader.calls == ["state"]
+
+
+@pytest.mark.asyncio
+async def test_restoration_browser_verifications_share_one_provider_deadline() -> None:
+    reader = MockHumanCredentialStateReader(
+        link_state=HumanIdentityLinkState.LINKED, linked_principal=PRINCIPAL
+    )
+    verifier = FixedVerifier()
+    verifier.delay = 0.03
+    async with asyncio.timeout(0.3):
+        with pytest.raises(DependencyUnavailableError):
+            await HumanSessionAuthenticationService(
+                verifier, reader, provider_timeout_seconds=0.05
+            ).authenticate(CREDENTIAL)
+    assert len(verifier.timeouts) == 2
+    assert verifier.timeouts[0] is not None and verifier.timeouts[1] is not None
+    assert 0 < verifier.timeouts[1] < verifier.timeouts[0] <= 0.05
+    assert reader.calls == ["state"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("state", ["suspended", "recovery", "incoherent", "missing-version"])
+async def test_restoration_browser_initial_denial_never_gets_reverified(state: str) -> None:
+    snapshot = _restoration_snapshot()
+    if state == "suspended":
+        snapshot = _restoration_snapshot(
+            principal=replace(PRINCIPAL, status=PrincipalStatus.SUSPENDED)
+        )
+    elif state == "recovery":
+        snapshot = _restoration_snapshot(blocked=True)
+    elif state == "incoherent":
+        snapshot = _restoration_snapshot(link=HumanIdentityLinkState.INCOHERENT, principal=None)
+    else:
+        snapshot = _restoration_snapshot(version=None)
+    reader = MockHumanCredentialStateReader(authentication_snapshots=[snapshot])
+    verifier = FixedVerifier()
+    with pytest.raises(
+        DependencyUnavailableError
+        if state in {"incoherent", "missing-version"}
+        else AccessDeniedError
+    ):
+        await HumanSessionAuthenticationService(verifier, reader).authenticate(CREDENTIAL)
+    assert len(verifier.credentials) == 1
+    assert reader.calls == ["state"]

@@ -15,8 +15,8 @@ from inframeld_backend.access.application.commands.delete_project_command import
     DeleteProjectCommand,
 )
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
-from inframeld_backend.access.application.dtos.human_oauth_credential_facts_dto import (
-    HumanOAuthCredentialFactsDTO,
+from inframeld_backend.access.application.dtos.human_credential_facts_dto import (
+    HumanCredentialFactsDTO,
 )
 from inframeld_backend.access.application.dtos.project_action_authorization_dto import (
     ProjectActionAuthorizationDTO,
@@ -117,7 +117,12 @@ INSTALLATION = InstallationId(UUID(int=1))
 ORGANIZATION = OrganizationId(UUID(int=2))
 PROJECT = ProjectId(UUID(int=3))
 ACTOR = PrincipalId(UUID(int=4))
-ACCESS = AccessContextDTO(ACTOR, MockAuthenticationEvidence.browser())
+ACCESS = AccessContextDTO(
+    ACTOR,
+    MockAuthenticationEvidence.browser(
+        installation_id=INSTALLATION, version=HumanCredentialVersion(1)
+    ),
+)
 COMMAND = DeleteProjectCommand(PROJECT, 7)
 CONTEXT = IdempotencyContextDTO(
     HttpMethod.DELETE, f"/v1/projects/{PROJECT.value}", IdempotencyKey("delete-original")
@@ -135,7 +140,7 @@ FACTS = ProjectDeletionFactsDTO(
     ProjectActionFactsDTO(
         principal=Principal(ACTOR, ORGANIZATION, PrincipalKind.HUMAN, PrincipalStatus.ACTIVE),
         has_pending_recovery=False,
-        oauth_credential_facts=None,
+        oauth_credential_facts=HumanCredentialFactsDTO(True, HumanCredentialVersion(1)),
         project_status=ProjectStatus.ACTIVE,
         is_project_member=True,
         has_exact_action_grant=True,
@@ -602,12 +607,14 @@ async def test_application_caller_is_denied_before_history_without_key_fact_fall
 @pytest.mark.asyncio
 async def test_changed_human_credential_generation_rejects_before_history() -> None:
     scenario = DeletionScenario()
-    oauth_access = AccessContextDTO(ACTOR, MockAuthenticationEvidence.human_oauth())
+    oauth_access = AccessContextDTO(
+        ACTOR, replace(MockAuthenticationEvidence.human_oauth(), installation_id=INSTALLATION)
+    )
     scenario.facts.result = replace(
         FACTS,
         action=replace(
             FACTS.action,
-            oauth_credential_facts=HumanOAuthCredentialFactsDTO(True, HumanCredentialVersion(2)),
+            oauth_credential_facts=HumanCredentialFactsDTO(True, HumanCredentialVersion(2)),
         ),
     )
     scenario.idempotency.result = REPLAY

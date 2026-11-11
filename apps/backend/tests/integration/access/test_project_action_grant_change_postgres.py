@@ -12,7 +12,6 @@ from tests.support.project_action_grant_postgres_scenarios import (
 )
 from tests.support.project_membership_postgres_scenarios import change_membership
 
-from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
 from inframeld_backend.access.application.enums.identity_recovery_event_kind import (
     IdentityRecoveryEventKind,
 )
@@ -290,7 +289,6 @@ async def test_last_exact_grantor_cannot_remove_own_delegation(database: Databas
             removing=True,
             recipient=seed.actor.access.actor_principal_id,
         )
-    bob = AccessContextDTO(seed.bob_id, seed.actor.access.authentication_evidence)
     with pytest.raises(ConflictError):
         await change_project_grant(
             database,
@@ -299,5 +297,5 @@ async def test_last_exact_grantor_cannot_remove_own_delegation(database: Databas
             key="bob-strands",
             removing=True,
             recipient=seed.bob_id,
-            access=bob,
+            access=seed.bob_access,
         )

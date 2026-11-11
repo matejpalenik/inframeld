@@ -26,8 +26,8 @@ from inframeld_backend.access.application.dtos.application_account_grant_target_
 from inframeld_backend.access.application.dtos.application_key_authentication_dto import (
     ApplicationKeyAuthenticationDTO,
 )
-from inframeld_backend.access.application.dtos.human_oauth_credential_facts_dto import (
-    HumanOAuthCredentialFactsDTO,
+from inframeld_backend.access.application.dtos.human_credential_facts_dto import (
+    HumanCredentialFactsDTO,
 )
 from inframeld_backend.access.application.dtos.invitation_action_grant_intent_dto import (
     InvitationActionGrantIntentDTO,
@@ -125,6 +125,7 @@ from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.enums.operation_replay_kind import OperationReplayKind
 from inframeld_backend.shared.application.errors.application_errors import (
     AccessDeniedError,
+    AuthenticationRequiredError,
     ConflictError,
     DependencyUnavailableError,
     InvalidInputError,
@@ -192,7 +193,7 @@ ACTOR = OrganizationAccessFactsDTO(
     access_revision=7,
     grants=(OrganizationActionGrantDTO(action_id=ActionId("admit-users"), can_grant=True),),
     has_pending_recovery=False,
-    oauth_credential_facts=None,
+    oauth_credential_facts=HumanCredentialFactsDTO(True, HumanCredentialVersion(1)),
 )
 ASSIGNMENT = InvitationAssignmentFactsDTO(
     intent=ADMISSION,
@@ -458,7 +459,7 @@ async def test_stale_oauth_generation_prevents_history_disclosure() -> None:
         FACTS,
         actor=replace(
             ACTOR,
-            oauth_credential_facts=HumanOAuthCredentialFactsDTO(
+            oauth_credential_facts=HumanCredentialFactsDTO(
                 binding_matches_actor=True, current_version=HumanCredentialVersion(2)
             ),
         ),
@@ -573,7 +574,7 @@ def _project_observation(
         action=ProjectActionFactsDTO(
             principal=ALICE,
             has_pending_recovery=False,
-            oauth_credential_facts=None,
+            oauth_credential_facts=HumanCredentialFactsDTO(True, HumanCredentialVersion(1)),
             project_status=ProjectStatus.ACTIVE,
             is_project_member=member,
             has_exact_action_grant=has_action,
@@ -934,7 +935,7 @@ async def test_revocation_requires_current_oauth_evidence_before_original() -> N
         s.facts.revocation,
         actor=replace(
             ACTOR,
-            oauth_credential_facts=HumanOAuthCredentialFactsDTO(
+            oauth_credential_facts=HumanCredentialFactsDTO(
                 binding_matches_actor=True, current_version=HumanCredentialVersion(2)
             ),
         ),
@@ -1035,3 +1036,56 @@ def test_revocation_accepts_zero_as_a_review_to_be_compared_with_current_state()
         ).expected_access_revision
         == 0
     )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("oauth", [False, True])
+@pytest.mark.parametrize("operation", ["issue", "revoke", "project"])
+async def test_browser_currentness_preserves_the_presented_credential_family(
+    oauth: bool, operation: str
+) -> None:
+    """Reject stale evidence before disclosing data, recovering originals or changing authority."""
+    evidence = (
+        MockAuthenticationEvidence.human_oauth() if oauth else MockAuthenticationEvidence.browser()
+    )
+    stale = HumanCredentialFactsDTO(True, HumanCredentialVersion(2))
+    expected = HumanOAuthCredentialRejectedError if oauth else AuthenticationRequiredError
+    scenario = _Scenario()
+    access = replace(ACCESS, authentication_evidence=evidence)
+    command = COMMAND
+    if operation == "revoke":
+        assert scenario.facts.revocation is not None
+        scenario.facts.revocation = replace(
+            scenario.facts.revocation, actor=replace(ACTOR, oauth_credential_facts=stale)
+        )
+    elif operation == "project":
+        command = _with_intent(
+            scenario, InvitationProjectMembershipIntentDTO(project_id=PROJECT), project=True
+        )
+        assert scenario.facts.value is not None
+        observed = scenario.facts.value.assignments[0]
+        assert observed.project is not None
+        observed = replace(
+            observed,
+            project=replace(
+                observed.project,
+                action=replace(observed.project.action, oauth_credential_facts=stale),
+            ),
+        )
+        scenario.facts.value = replace(scenario.facts.value, assignments=(observed,))
+    else:
+        scenario.facts.value = replace(FACTS, actor=replace(ACTOR, oauth_credential_facts=stale))
+    with pytest.raises(AuthenticationRequiredError) as caught:
+        if operation == "revoke":
+            await scenario.service.revoke(
+                access=access, command=REVOKE_COMMAND, context=REVOKE_CONTEXT
+            )
+        else:
+            await scenario.service.issue(access=access, command=command, context=CONTEXT)
+    assert type(caught.value) is expected
+    assert (
+        "reserve" not in scenario.events
+        and "original" not in scenario.events
+        and "revoke_original" not in scenario.events
+    )
+    assert scenario.writer.saved is None

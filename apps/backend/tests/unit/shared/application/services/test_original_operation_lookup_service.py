@@ -16,6 +16,9 @@ from inframeld_backend.access.application.protocols.operation_lookup_authorizer 
     OperationLookupAuthorizer,
 )
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
+from inframeld_backend.access.domain.value_objects.human_credential_version import (
+    HumanCredentialVersion,
+)
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
@@ -75,7 +78,12 @@ from inframeld_backend.shared.application.value_objects.operation_lookup_authori
 )
 from inframeld_backend.shared.domain.value_objects.installation_id import InstallationId
 
-ACCESS = AccessContextDTO(PrincipalId(UUID(int=1)), MockAuthenticationEvidence.browser())
+ACCESS = AccessContextDTO(
+    PrincipalId(UUID(int=1)),
+    MockAuthenticationEvidence.browser(
+        installation_id=InstallationId(UUID(int=2)), version=HumanCredentialVersion(1)
+    ),
+)
 QUERY = LookupOriginalOperationQuery(
     InstallationId(UUID(int=2)),
     OrganizationId(UUID(int=3)),

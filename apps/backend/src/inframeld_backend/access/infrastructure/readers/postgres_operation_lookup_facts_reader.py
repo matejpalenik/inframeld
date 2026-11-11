@@ -9,11 +9,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
+from inframeld_backend.access.application.dtos.browser_session_authentication_dto import (
+    BrowserSessionAuthenticationDTO,
+)
+from inframeld_backend.access.application.dtos.human_credential_facts_dto import (
+    HumanCredentialFactsDTO,
+)
 from inframeld_backend.access.application.dtos.human_oauth_credential_binding_dto import (
     HumanOAuthCredentialBindingDTO,
-)
-from inframeld_backend.access.application.dtos.human_oauth_credential_facts_dto import (
-    HumanOAuthCredentialFactsDTO,
 )
 from inframeld_backend.access.application.dtos.operation_lookup_facts_dto import (
     OperationLookupFactsDTO,
@@ -178,7 +181,7 @@ class PostgresOperationLookupFactsReader(OperationLookupFactsReader):
             .correlate(PrincipalRow)
         )
         evidence = access.authentication_evidence
-        if isinstance(evidence, HumanOAuthCredentialBindingDTO):
+        if isinstance(evidence, HumanOAuthCredentialBindingDTO | BrowserSessionAuthenticationDTO):
             binding_matches = HumanCredentialStateQueries.binding_matches_actor(evidence)
             version = Nullable(HumanCredentialStateQueries.version_for_actor(evidence))
         else:
@@ -240,10 +243,12 @@ class PostgresOperationLookupFactsReader(OperationLookupFactsReader):
             has_exact_action_grant=use,
             can_grant_action=delegation,
             has_pending_recovery=blocked,
-            oauth_credential_facts=HumanOAuthCredentialFactsDTO(
+            oauth_credential_facts=HumanCredentialFactsDTO(
                 matches,
                 HumanCredentialVersion(current_version) if current_version is not None else None,
             )
-            if isinstance(evidence, HumanOAuthCredentialBindingDTO)
+            if isinstance(
+                evidence, HumanOAuthCredentialBindingDTO | BrowserSessionAuthenticationDTO
+            )
             else None,
         )

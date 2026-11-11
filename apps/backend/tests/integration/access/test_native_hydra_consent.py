@@ -609,8 +609,8 @@ async def _record_test_cleanup(database: Database, event: IdentityRecoveryEventD
 async def test_browser_verification_cannot_cross_recovery_completion(
     database: Database, temporary_postgres_settings: DatabaseSettings, initially_blocked: bool
 ) -> None:
-    """A verified browser result cannot inherit a new version or outlive its observed block."""
-    from unittest.mock import patch
+    """Reject pending recovery before verification and version changes during verification."""
+    from unittest.mock import AsyncMock, patch
 
     from inframeld_backend.access.application.value_objects.browser_session_credential import (
         BrowserSessionCredential,
@@ -627,15 +627,27 @@ async def test_browser_verification_cannot_cross_recovery_completion(
         database, temporary_postgres_settings, human_authentication=authentication
     ) as scenario:
         pending = await scenario.begin()
-        event = await scenario.admit_recovery() if initially_blocked else None
+        if initially_blocked:
+            await scenario.admit_recovery()
+            verify = AsyncMock()
+            with patch.object(KratosBrowserSessionVerifier, "verify", new=verify):
+                response = await scenario.decide(pending)
+            assert response.status_code == 403
+            assert response.json()["code"] == "access_denied"
+            verify.assert_not_awaited()
+            return
+
         arrived = asyncio.Event()
         release = asyncio.Event()
         original = KratosBrowserSessionVerifier.verify
 
         async def paused(
-            self: KratosBrowserSessionVerifier, credential: BrowserSessionCredential
+            self: KratosBrowserSessionVerifier,
+            credential: BrowserSessionCredential,
+            *,
+            timeout_seconds: float | None = None,
         ) -> VerifiedHumanIdentityDTO | None:
-            identity = await original(self, credential)
+            identity = await original(self, credential, timeout_seconds=timeout_seconds)
             arrived.set()
             async with asyncio.timeout(15):
                 await release.wait()
@@ -646,8 +658,7 @@ async def test_browser_verification_cannot_cross_recovery_completion(
             try:
                 async with asyncio.timeout(10):
                     await arrived.wait()
-                if event is None:
-                    event = await scenario.admit_recovery()
+                event = await scenario.admit_recovery()
                 # Test-controlled outcomes isolate state ordering, not provider cleanup.
                 await _record_test_cleanup(database, event)
                 release.set()

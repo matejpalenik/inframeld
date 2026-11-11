@@ -9,8 +9,8 @@ from tests.support.application_key_scenarios import current_key_facts
 from tests.support.authentication_evidence import MockAuthenticationEvidence
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
-from inframeld_backend.access.application.dtos.human_oauth_credential_facts_dto import (
-    HumanOAuthCredentialFactsDTO,
+from inframeld_backend.access.application.dtos.human_credential_facts_dto import (
+    HumanCredentialFactsDTO,
 )
 from inframeld_backend.access.application.dtos.project_action_authorization_dto import (
     ProjectActionAuthorizationDTO,
@@ -64,7 +64,7 @@ PRINCIPAL = Principal(
 ALLOWED_FACTS = ProjectActionFactsDTO(
     principal=PRINCIPAL,
     has_pending_recovery=False,
-    oauth_credential_facts=None,
+    oauth_credential_facts=HumanCredentialFactsDTO(True, HumanCredentialVersion(1)),
     project_status=ProjectStatus.ACTIVE,
     is_project_member=True,
     has_exact_action_grant=True,
@@ -228,7 +228,7 @@ async def test_stale_credentials_are_rejected_before_authority_can_be_reused(
     stale = replace(
         ALLOWED_FACTS,
         is_project_member=visible,
-        oauth_credential_facts=HumanOAuthCredentialFactsDTO(
+        oauth_credential_facts=HumanCredentialFactsDTO(
             binding_matches_actor=binding_matches_actor,
             current_version=HumanCredentialVersion(version) if version is not None else None,
         ),

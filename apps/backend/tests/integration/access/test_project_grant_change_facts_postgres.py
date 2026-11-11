@@ -102,7 +102,9 @@ async def test_reads_exact_current_grant_level(
     assert facts is not None
 
     assert facts.actor.id == scenario.principal_id
-    assert facts.oauth_credential_facts is None
+    assert facts.oauth_credential_facts is not None
+    assert not facts.oauth_credential_facts.binding_matches_actor
+    assert facts.oauth_credential_facts.current_version is None
     assert facts.recipient is not None
     assert facts.recipient.id == recipient_id
     assert facts.project_status is ProjectStatus.ACTIVE
