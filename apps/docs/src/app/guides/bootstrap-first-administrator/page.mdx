@@ -233,8 +233,11 @@ facts, not raw provider responses, child output, arguments or credentials.
 If the response is missing, malformed, interrupted or unknown, keep the **exact
 original request meaning and operation ID**, installation and identity binding.
 An explicit recovery preserves that original request and trusted binding and
-uses fresh browser proof for the same person. The backend can return the original
-receipt without recreating removed grants or performing another fresh claim.
+uses fresh browser proof for the same person. Current proof and eligibility checks
+still apply. The backend returns a matching committed receipt and preserves
+subsequent grant removals. If the original attempt did not commit and the
+first-claim checks still pass, recovery can complete the first claim under the
+same operation ID.
 There is no automatic repeat or HTTP original-operation lookup for this host
 command.
 
