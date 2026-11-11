@@ -8,6 +8,40 @@ import { withResources } from "../../../src/system/process.ts";
 import { withinDeadline } from "../../../src/system/deadline.ts";
 import { fixtureDiagnostic } from "./fixture-diagnostics.ts";
 
+/** Read the uncertain receipt while the independent fixture owner publishes it. */
+export async function readDeniedUncertainReceipt(
+  work: string,
+  deadline: number,
+  readReceipt: () => Promise<string> = () =>
+    readFile(join(work, "uncertain.json"), "utf8"),
+): Promise<string> {
+  let missing: Error | undefined;
+  while (performance.now() < deadline) {
+    try {
+      const receipt = await withinDeadline(
+        readReceipt(),
+        Math.max(0, deadline - performance.now()),
+      );
+      if (performance.now() >= deadline) break;
+      return receipt;
+    } catch (error) {
+      if (!(
+        error instanceof Error &&
+        "code" in error &&
+        error.code === "ENOENT"
+      ))
+        throw error;
+      missing = error;
+    }
+    const remaining = deadline - performance.now();
+    if (remaining > 0)
+      await new Promise((resolve) =>
+        setTimeout(resolve, Math.min(25, remaining)),
+      );
+  }
+  throw missing ?? new Error("Uncertain fixture receipt deadline exceeded");
+}
+
 /** Await the independent waiter's receipt. This never qualifies denied production cleanup. */
 export async function withDeniedFixtureRecovery(
   work: string,

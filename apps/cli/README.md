@@ -1,6 +1,6 @@
 # Inframeld CLI foundation
 
-The Rust `inframeld` executable provides offline help/version and credential-free `target add`, `target use` and `target show`. Help and version require no services, configuration or credentials. Registration validates public HTTPS discovery, while selection and readback use local state. Login, account/Project selection and other product commands remain separate delivery work. Full #158 and #159 remain open. The [common automation contract](../../.agents/skills/inframeld-application-contracts/references/cli-output-and-automation.md) is accepted design. Its offline version consumer is described below, while progress, queries, lists and mutations still need their owning executable integrations.
+The Rust `inframeld` executable provides offline help/version and credential-free `target add`, `target use` and `target show`. Help and version require no services, configuration or credentials. Registration validates public HTTPS discovery, while selection and readback use local state. The separate `auth bootstrap-first-administrator` command acquires fresh browser proof for one reviewed host-authorized first claim. Saved login, account/Project selection and other product commands remain separate delivery work. Full #158 and #159 remain open. The [common automation contract](../../.agents/skills/inframeld-application-contracts/references/cli-output-and-automation.md) is accepted design. Its offline version consumer is described below, while progress, queries, lists and mutations still need their owning executable integrations.
 
 ```sh
 inframeld --help
@@ -244,6 +244,25 @@ XDG_CONFIG_HOME="$style_config_root" target/debug/inframeld target use dev
 A confirmed changed save shows Before/Now from the mutation's locked observation. Preview does not reserve that state. Repeated, unknown or unconfirmed observations do not gain a colored completed-change claim. After uncertainty, use the existing readback procedure before another save. Once the change is confirmed, restore the prepared original preference with `XDG_CONFIG_HOME="$style_config_root" target/debug/inframeld target use prod`, then unset `style_config_root`. Do not delete a prepared root you did not create.
 
 `--plain`, `--no-color`, nonempty `NO_COLOR`, `TERM=dumb` or non-terminal stdout disables this styling. `CLICOLOR_FORCE=1` overrides none of those vetoes. Empty `NO_COLOR` alone is not a veto, and `--no-input` does not disable styling. Help/version and JSON/JSONL remain unstyled. See the [target output reference](../docs/src/app/clients/cli/target-reference/page.mdx) for interpretation. Record any actual TTY exercise separately from the operator-configured HTTPS walkthrough and human acceptance in #185.
+
+## Bootstrap the first administrator
+
+Use the [first-administrator guide](../docs/src/app/guides/bootstrap-first-administrator/page.mdx) for the three trusted operator files, preview, explicit browser attempt and exact original-request recovery:
+
+```sh
+inframeld auth bootstrap-first-administrator \
+  --host-context /absolute/operator/first-administrator/host-context.json \
+  --request /absolute/operator/first-administrator/request.json \
+  --exec-spec /absolute/operator/first-administrator/exec-spec.json
+```
+
+This command requires an independently initialized installation and trusted host authority. The proof-free request has eight fields, revision zero and no responsibility or supplied credential. All three regular, non-symlink files are bounded to 64 KiB and snapshotted before effects. No target registration or email address supplies host or recipient authority. #27 owns usable integration of this proof producer with the existing private bootstrap consumer. Migration 0003 already initializes the installation UUID. Trusted operator inspection of authoritative host/database state, the reviewed signed-in candidate and the actual deployment/exec route supplies the inputs. A new initializer or context exporter is not a prerequisite. Private starters remain #349 and first-answer setup #166.
+
+Execution requires terminal stdin without `--no-input`. Noninteractive execution fails with usage exit 2 before files or human effects. `--json` changes reporting, not input policy. `--target` is rejected before file reads. Help and `--dry-run` remain available without interaction. The dry run validates all three files and provided bindings, shows only safe public destinations and outgoing data categories, and labels host execution and backend state unverified. It starts no discovery, browser or claim.
+
+Human output gives safe proof-stage or maintenance/backend classifications and cleanup facts. Machine data retains typed original-receipt, current-session, failure and cleanup observations. Missing output is unknown. An explicit recovery must preserve the original request meaning and operation ID and obtain fresh proof for the same person. A current invocation that did not dispatch says nothing about an earlier original outcome. There is no automatic resubmission, HTTP claim lookup, saved login, Project or starter creation.
+
+The maintained private HTTPS/Chromium profile passed real-provider proof, a pristine first claim, original replay after grant removal and competing-identity denials through the installed consumer, with independent SQL checks. It uses the protected browser bridge. This does not qualify ordinary SystemBrowser dispatch, public interactive-terminal or signal behavior, additional platforms or packaged ingress. The complete manual procedure, engineering dry run and human first-install acceptance remain unready in [#185](https://github.com/matejpalenik/inframeld/issues/185) before v1. Required software qualification remains #350 engineering work. Historical repair qualification below retains its separate scope.
 
 ## Human recipient-proof acquisition boundary
 

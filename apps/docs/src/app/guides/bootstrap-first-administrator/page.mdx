@@ -1,0 +1,260 @@
+export const pageMetadata = {
+  title: "Bootstrap the first administrator",
+  description:
+    "Use independently trusted host authority and fresh browser proof for one first-administrator claim.",
+}
+
+# Bootstrap the first administrator
+
+Use this command when you operate an initialized, unclaimed installation and have
+reviewed who should become its first administrator. For example, Alice signs in
+through the installation's account site while you authorize the claim through
+its trusted host. Her browser proof identifies Alice. Your host access authorizes
+the change.
+
+The command creates Alice's local admission and four explicit Organization
+permissions: admit users, suspend users, restore users and create Projects. It
+allows her to use and grant each of those exact actions. It creates no Project
+or starter resources and saves no CLI login.
+
+## Establish the trusted inputs
+
+Use a CLI built from source containing this command. Follow
+[CLI installation](/get-started/install-cli) for the source-build path. The
+installation operator must supply and independently verify:
+
+- The initialized installation's authoritative UUID and existing trusted
+  host/container execution route to its installed `inframeld-maintenance`
+  consumer.
+- The exact public HTTPS API URL, Hydra issuer, `inframeld-cli` registration and
+  required public CA certificates or explicit credential-free proxy.
+- Alice's exact verified Kratos identity UUID. This differs from the local
+  principal ID created by admission. An email address is not an identity binding.
+- A compatible backend with its required migrations explicitly applied and its
+  database, private provider and fingerprint-key configuration already prepared.
+
+These values must come from reviewed installation state and the trusted identity
+setup. Target discovery, a saved target label or the JSON files below cannot
+establish host authority. The command compares discovery with the supplied
+binding. It does not initialize an installation, provision the OAuth client or
+discover which person should become administrator.
+
+The normal database migration initializes the installation UUID once. Use
+trusted operator inspection of the existing host/database state and deployment
+configuration to prepare the protected record and verify the maintenance route.
+If you cannot establish that authoritative binding or reach the intended
+installed consumer, resolve that problem before claiming. Do not replace the
+existing identity with database seeds, copied cookies or a manually constructed
+token.
+
+Alice can use the [account site](/guides/account-and-consent) to sign in. Its
+**Signed-in identity** identifies the provider account. Independently compare
+that exact UUID with your trusted candidate binding. Local Inframeld admission
+is not a prerequisite for this first claim. For a fresh claim, the backend checks her current identity and eligibility and
+rejects a previously claimed or non-pristine installation.
+
+## Prepare three protected files
+
+Keep the files in an operator-controlled directory with mode `0700`, using
+regular files with mode `0600`. Each file must be at most 65,536 bytes. Symlinks,
+unknown or duplicate fields, and a second JSON value are rejected. All three
+files are read and validated before discovery, browser or host-command effects,
+including during a dry run.
+
+The following are complete JSON templates, not installation defaults. Replace
+every example UUID and host path with the independently reviewed value. Keep
+tokens, cookies, passwords and authorization codes out of these files.
+
+Save `/absolute/operator/first-administrator/host-context.json`:
+
+<CodeGroup>
+
+```json
+{
+  "schemaVersion": 1,
+  "api": "https://api.example.com",
+  "issuer": "https://identity.example.com/",
+  "clientId": "inframeld-cli",
+  "installationId": "00000000-0000-4000-8000-000000000001",
+  "expectedIdentityId": "00000000-0000-4000-8000-000000000002",
+  "certificateAuthorities": []
+}
+```
+
+</CodeGroup>
+
+Preserve the issuer's exact spelling and trailing slash. An empty
+`certificateAuthorities` array uses platform trust. For a private CA, provide its
+actual public PEM text, with at most 16 array entries. An optional `proxy` must
+follow the CLI's credential-free proxy URL rules. Ambient proxy variables are
+not adopted.
+
+Save `/absolute/operator/first-administrator/request.json`:
+
+<CodeGroup>
+
+```json
+{
+  "schemaVersion": 1,
+  "mode": "bootstrap-first-administrator",
+  "expectedInstallationId": "00000000-0000-4000-8000-000000000001",
+  "operationId": "alice-first-administrator-01",
+  "operatorLabel": "installation-operator",
+  "reason": "Appoint the reviewed first administrator",
+  "expectedAccessRevision": 0,
+  "expectedIdentityId": "00000000-0000-4000-8000-000000000002"
+}
+```
+
+</CodeGroup>
+
+These eight fields are the complete proof-free request. The installation and
+identity UUIDs must match `host-context.json`. The reviewed Access revision is
+exactly `0`. Choose an original `operationId` and keep it with this request.
+`operationId` and `operatorLabel` are nonblank and at most 128 Unicode code points
+each. `reason` is nonblank and at most 512. Do not add `responsibility` or
+`identityProof`.
+
+Save `/absolute/operator/first-administrator/exec-spec.json`. This template uses
+the existing non-PTY Compose transport. Replace the executable, Compose file and
+explicit environment with the verified host's actual values:
+
+<CodeGroup>
+
+```json
+{
+  "program": "/absolute/path/to/podman",
+  "args": [
+    "compose",
+    "-f",
+    "/absolute/path/to/inframeld/compose.dev.yaml",
+    "exec",
+    "-T",
+    "backend",
+    "inframeld-maintenance"
+  ],
+  "environment": {
+    "HOME": "/absolute/operator/home",
+    "PATH": "/absolute/operator/bin:/usr/bin:/bin",
+    "XDG_RUNTIME_DIR": "/absolute/operator/runtime"
+  }
+}
+```
+
+</CodeGroup>
+
+The CLI launches `program` directly with these arguments and only this explicit
+environment. Review the actual Compose provider and installed consumer. Use no
+shell or PTY and put no proof in arguments or environment variables. The backend
+retains its own private configuration. A syntactically valid descriptor does not
+prove that it reaches the intended host or can execute successfully.
+
+`program` must be absolute and at most 8,192 encoded bytes. `args` allows at most
+256 strings of at most 8,192 bytes each. `environment` defaults to an empty map
+with at most 64 unique names. Names must be nonempty and contain neither `=` nor
+NUL. Arguments and environment values must contain no NUL.
+
+## Review without starting the claim
+
+From any working directory with this CLI on `PATH`, inspect the prepared files:
+
+<CodeGroup>
+
+```shell
+inframeld auth bootstrap-first-administrator \
+  --host-context /absolute/operator/first-administrator/host-context.json \
+  --request /absolute/operator/first-administrator/request.json \
+  --exec-spec /absolute/operator/first-administrator/exec-spec.json \
+  --dry-run
+```
+
+</CodeGroup>
+
+The preview shows the **provided** installation and identity IDs, original
+operation ID, API, issuer and optional proxy. It checks the local file contracts
+and matching bindings. It describes host execution as
+`operator-controlled-unverified` and provider endpoint paths as unresolved until
+discovery. It describes four outgoing data categories: public API identity and
+HTTP metadata, OAuth transaction data, transient credentials and the reviewed
+host request. It prints neither the execution arguments nor environment.
+
+No discovery, browser flow or host claim runs. Backend eligibility, pristine
+state and current admission remain unverified. `--dry-run` and `--help` work
+without interactive input. A dry run still needs all three valid files.
+
+## Make one explicit attempt
+
+Run from an interactive terminal without `--no-input`:
+
+<CodeGroup>
+
+```shell
+inframeld auth bootstrap-first-administrator \
+  --host-context /absolute/operator/first-administrator/host-context.json \
+  --request /absolute/operator/first-administrator/request.json \
+  --exec-spec /absolute/operator/first-administrator/exec-spec.json
+```
+
+</CodeGroup>
+
+Execution with `--no-input` or non-terminal stdin exits `2` before reading the
+files or starting discovery, browser or claim effects. `--json` changes reporting,
+not this input policy. `--target` conflicts with this host-context command and is
+rejected before files or effects. No selected target supplies host authority.
+
+Check the installation and Alice's identity in the browser before approving.
+Denying browser consent does not dispatch a claim. The CLI verifies the callback
+and token binding, then passes fresh proof directly to the installed consumer's
+protected stdin. It never prints the proof. The backend verifies the current
+same person and installation before committing or returning an original result.
+
+## Read the result and preserve uncertainty
+
+Ordinary output separates the original claim, current API-session observation,
+maintenance failure and backend classification, process cleanup, and cleanup of
+new transient credentials. A confirmed claim returns the original principal and
+Access revision `1` in its receipt. That historical receipt does not establish
+today's permissions. A current admitted session is a separate observation, and
+neither result creates a saved CLI login.
+
+Add `--json` when you need the typed receipt and observations. After handoff,
+`data.maintenance` contains the effect, failure and process-cleanup facts,
+`data.currentSession` contains the separate current observation, and
+`data.credentialCleanup` reports new-credential cleanup. A proof-stage failure
+instead carries its safe `kind`, `resourceCleanup` and `credentialCleanup` in
+`data`. Missing or incomplete output cannot establish a result.
+
+Exit `0` requires a matching committed receipt with no maintenance failure and
+confirmed process and new-credential cleanup. A nonzero exit can accompany an
+already committed claim. Preserve that receipt and address the reported cleanup
+without starting another claim. Failure output exposes safe stage and cleanup
+facts, not raw provider responses, child output, arguments or credentials.
+
+If the response is missing, malformed, interrupted or unknown, keep the **exact
+original request meaning and operation ID**, installation and identity binding.
+An explicit recovery preserves that original request and trusted binding and
+uses fresh browser proof for the same person. Current proof and eligibility checks
+still apply. The backend returns a matching committed receipt and preserves
+subsequent grant removals. If the original attempt did not commit and the
+first-claim checks still pass, recovery can complete the first claim under the
+same operation ID.
+There is no automatic repeat or HTTP original-operation lookup for this host
+command.
+
+A failure before dispatch establishes only that **this invocation** did not send
+the host claim. During original recovery it does not prove that the earlier
+attempt had no effect. Do not choose a new operation ID or switch people to
+resolve missing output.
+
+Process cleanup, transient credential revocation and backend commit are separate
+facts. Revoking the new credentials does not undo the claim, and unconfirmed
+cleanup does not prove those credentials are gone. The independent browser may
+outlive the CLI. The first Ctrl-C requests bounded cleanup. A second Ctrl-C exits
+immediately and may leave no final cleanup report. Preserve uncertainty after
+SIGINT, SIGTERM or output failure.
+
+For machine results and exit handling, see
+[CLI JSON output and automation](/clients/cli/automation). Continue with
+[Projects and access](/guides/projects-and-access) only after establishing current
+admission and permissions. A first-administrator receipt alone is not a complete
+installation or first-answer workflow.

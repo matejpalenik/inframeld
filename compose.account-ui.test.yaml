@@ -421,6 +421,62 @@ services:
       - --browser-bridge
       - /run/account-proof/denied-bridge/browser.sock
 
+  bootstrap-first-driver:
+    <<: *proof-driver
+    command:
+      - --mode
+      - bootstrap-first-administrator
+      - --host-context
+      - /run/account-secrets/bootstrap-first/host.json
+      - --request
+      - /run/account-secrets/bootstrap-first/request.json
+      - --exec-spec
+      - /run/account-secrets/bootstrap-first/exec.json
+      - --browser-bridge
+      - /run/account-proof/bootstrap-first/browser.sock
+
+  bootstrap-replay-driver:
+    <<: *proof-driver
+    command:
+      - --mode
+      - bootstrap-first-administrator
+      - --host-context
+      - /run/account-secrets/bootstrap-first/host.json
+      - --request
+      - /run/account-secrets/bootstrap-first/request.json
+      - --exec-spec
+      - /run/account-secrets/bootstrap-first/exec.json
+      - --browser-bridge
+      - /run/account-proof/bootstrap-replay/browser.sock
+
+  bootstrap-competing-driver:
+    <<: *proof-driver
+    command:
+      - --mode
+      - bootstrap-first-administrator
+      - --host-context
+      - /run/account-secrets/bootstrap-competing/host.json
+      - --request
+      - /run/account-secrets/bootstrap-competing/request.json
+      - --exec-spec
+      - /run/account-secrets/bootstrap-competing/exec.json
+      - --browser-bridge
+      - /run/account-proof/bootstrap-competing/browser.sock
+
+  bootstrap-reused-driver:
+    <<: *proof-driver
+    command:
+      - --mode
+      - bootstrap-first-administrator
+      - --host-context
+      - /run/account-secrets/bootstrap-reused/host.json
+      - --request
+      - /run/account-secrets/bootstrap-reused/request.json
+      - --exec-spec
+      - /run/account-secrets/bootstrap-reused/exec.json
+      - --browser-bridge
+      - /run/account-proof/bootstrap-reused/browser.sock
+
 networks:
   default:
     internal: true
