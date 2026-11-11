@@ -13,7 +13,6 @@ from tests.support.project_action_grant_postgres_scenarios import (
     seed_project_grant_recipients,
 )
 
-from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
 from inframeld_backend.access.application.dtos.project_action_grant_change_result_dto import (
     ProjectActionGrantChangeResultDTO,
 )
@@ -233,7 +232,7 @@ async def test_concurrent_delegators_cannot_both_remove_their_responsibility(
             key="bob-leaves",
             removing=True,
             recipient=seed.bob_id,
-            access=AccessContextDTO(seed.bob_id, seed.actor.access.authentication_evidence),
+            access=seed.bob_access,
         ),
         return_exceptions=True,
     )

@@ -25,6 +25,9 @@ from inframeld_backend.shared.application.dtos.business_operation_artifact_origi
     BusinessOperationArtifactOriginDTO,
 )
 from inframeld_backend.shared.application.dtos.product_job_binding_dto import ProductJobBindingDTO
+from inframeld_backend.shared.application.dtos.project_deletion_job_binding_dto import (
+    ProjectDeletionJobBindingDTO,
+)
 from inframeld_backend.shared.application.dtos.unadmitted_staging_artifact_origin_dto import (
     UnadmittedStagingArtifactOriginDTO,
 )
@@ -34,13 +37,20 @@ from inframeld_backend.shared.application.value_objects.artifact_attempt_id impo
 from inframeld_backend.shared.application.value_objects.artifact_cleanup_obligation_id import (
     ArtifactCleanupObligationId,
 )
+from inframeld_backend.shared.application.value_objects.idempotency_key import IdempotencyKey
 from inframeld_backend.shared.application.value_objects.operation_id import OperationId
+from inframeld_backend.shared.application.value_objects.request_fingerprint import (
+    RequestFingerprint,
+)
 from inframeld_backend.shared.application.value_objects.request_id import RequestId
 from inframeld_backend.shared.domain.value_objects.installation_id import InstallationId
 from inframeld_backend.shared.infrastructure.rows.artifact_cleanup_obligation_row import (
     ArtifactCleanupObligationRow,
 )
 from inframeld_backend.shared.infrastructure.rows.durable_job_row import DurableJobRow
+from inframeld_backend.shared.infrastructure.rows.project_deletion_obligation_row import (
+    ProjectDeletionObligationRow,
+)
 
 
 class PostgresJobBindingMapper:
@@ -80,6 +90,7 @@ class PostgresJobBindingMapper:
     def product(row: DurableJobRow) -> ProductJobBindingDTO:
         if (
             row.binding_kind != "product"
+            or row.deletion_obligation_id is not None
             or row.cleanup_obligation_id is not None
             or row.operation_id is None
             or row.principal_id is None
@@ -119,4 +130,20 @@ class PostgresJobBindingMapper:
         )
         return ProductJobBindingDTO(
             OperationId(row.operation_id), RequestId(row.request_id), authority
+        )
+
+    @staticmethod
+    def project_deletion(row: ProjectDeletionObligationRow) -> ProjectDeletionJobBindingDTO:
+        return ProjectDeletionJobBindingDTO(
+            row.id,
+            OperationId(row.operation_id),
+            RequestId(row.request_id),
+            InstallationId(row.installation_id),
+            row.organization_id,
+            row.project_id,
+            row.initiator_principal_id,
+            IdempotencyKey(row.request_key),
+            RequestFingerprint(row.request_fingerprint),
+            row.before_access_revision,
+            row.access_revision,
         )

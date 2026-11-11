@@ -1556,6 +1556,8 @@ pub enum OperationLookupAuthorityFamily {
     ApplicationAccountGrantRead,
     #[serde(rename = "access_group_deletion")]
     AccessGroupDeletion,
+    #[serde(rename = "project_deletion")]
+    ProjectDeletion,
 }
 impl OperationLookupAuthorityFamily {
     pub fn as_str(&self) -> &'static str {
@@ -1567,6 +1569,7 @@ impl OperationLookupAuthorityFamily {
             Self::AccessGroupGrantRead => "access_group_grant_read",
             Self::ApplicationAccountGrantRead => "application_account_grant_read",
             Self::AccessGroupDeletion => "access_group_deletion",
+            Self::ProjectDeletion => "project_deletion",
         }
     }
 }
@@ -8252,6 +8255,24 @@ pub struct ApplicationAccountCreationRequest {
     ///Constraint: minLength=1, maxLength=63, pattern=`^[a-z](?:[a-z0-9-]*[a-z0-9])?$`
     pub name: String,
 }
+///Describe committed local retirement, preserving the original safe receipt.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ApplicationAccountDeletionResponse {
+    #[serde(rename = "accessBlocked")]
+    pub access_blocked: BooleanConstant<true>,
+    ///Constraint: minimum=1, maximum=9007199254740991
+    #[serde(rename = "accessRevision")]
+    pub access_revision: i64,
+    #[serde(rename = "idempotencyExpiresAt")]
+    pub idempotency_expires_at: chrono::DateTime<chrono::Utc>,
+    ///Constraint: minLength=1, maxLength=128
+    #[serde(rename = "operationId")]
+    pub operation_id: String,
+    #[serde(rename = "principalId")]
+    pub principal_id: uuid::Uuid,
+    #[serde(rename = "projectId")]
+    pub project_id: uuid::Uuid,
+}
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ApplicationKeyRevocationRequest {
     ///Constraint: minimum=0, maximum=9007199254740991
@@ -8478,6 +8499,27 @@ pub struct ProjectCreationRequest {
     #[serde(rename = "organizationId")]
     pub organization_id: uuid::Uuid,
 }
+///Expose original admission, never internal execution or physical progress.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ProjectDeletionAdmissionResponse {
+    #[serde(rename = "accessBlocked")]
+    pub access_blocked: BooleanConstant<true>,
+    ///Constraint: minimum=0, maximum=9007199254740991
+    #[serde(rename = "accessRevision")]
+    pub access_revision: i64,
+    #[serde(rename = "admissionConfirmed")]
+    pub admission_confirmed: BooleanConstant<true>,
+    #[serde(
+        rename = "idempotencyExpiresAt",
+        deserialize_with = "presence_serde::required_nullable"
+    )]
+    pub idempotency_expires_at: Option<chrono::DateTime<chrono::Utc>>,
+    ///Constraint: minLength=1, maxLength=128
+    #[serde(rename = "operationId")]
+    pub operation_id: String,
+    #[serde(rename = "projectId")]
+    pub project_id: uuid::Uuid,
+}
 ///Report original removal, independently of a later rejoin.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ProjectMembershipRemovalResponse {
@@ -8650,6 +8692,52 @@ pub struct ProjectNameResolutionResponse {
     #[serde(rename = "organizationId")]
     pub organization_id: uuid::Uuid,
     ///Permanent Project identity, preserved through rename.
+    #[serde(rename = "projectId")]
+    pub project_id: uuid::Uuid,
+}
+///Retain the original resulting audience without disclosing its before snapshot.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ProjectUploadDefaultChangeResponse {
+    ///Project Access revision of this current read or immutable original result.
+    ///Constraint: minimum=0, maximum=9007199254740991
+    #[serde(rename = "accessRevision")]
+    pub access_revision: i64,
+    ///Original resulting audience. A later GET may show a different current default.
+    ///Constraint: minItems=1
+    #[serde(rename = "groupIds")]
+    pub group_ids: Vec<String>,
+    ///Original replay deadline, unchanged by recovery.
+    #[serde(rename = "idempotencyExpiresAt")]
+    pub idempotency_expires_at: chrono::DateTime<chrono::Utc>,
+    ///Original operation identity, retained across exact-request recovery.
+    #[serde(rename = "operationId")]
+    pub operation_id: String,
+    ///Exact Project whose saved future-upload audience is represented.
+    #[serde(rename = "projectId")]
+    pub project_id: uuid::Uuid,
+}
+///Replace the complete future-upload audience at an explicitly reviewed revision.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ProjectUploadDefaultRequest {
+    ///Current Project Access revision reviewed for this complete replacement. A fresh no-op still requires this revision.
+    ///Constraint: minimum=0, maximum=9007199254740991
+    #[serde(rename = "expectedAccessRevision")]
+    pub expected_access_revision: i64,
+    ///Complete nonempty same-Project audience. Every current and proposed group requires current management.
+    ///Constraint: minItems=1
+    #[serde(rename = "groupIds")]
+    pub group_ids: Vec<String>,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ProjectUploadDefaultResponse {
+    ///Project Access revision of this current read or immutable original result.
+    ///Constraint: minimum=0, maximum=9007199254740991
+    #[serde(rename = "accessRevision")]
+    pub access_revision: i64,
+    ///UUID-sorted saved audience, or null only when this valid Project has no saved default.
+    #[serde(rename = "groupIds", deserialize_with = "presence_serde::required_nullable")]
+    pub group_ids: Option<Vec<String>>,
+    ///Exact Project whose saved future-upload audience is represented.
     #[serde(rename = "projectId")]
     pub project_id: uuid::Uuid,
 }

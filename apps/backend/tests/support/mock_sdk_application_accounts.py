@@ -7,9 +7,18 @@ from uuid import UUID
 from inframeld_backend.access.application.commands.create_application_account_command import (
     CreateApplicationAccountCommand,
 )
+from inframeld_backend.access.application.commands.delete_application_account_command import (
+    DeleteApplicationAccountCommand,
+)
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
 from inframeld_backend.access.application.dtos.application_account_creation_result_dto import (
     ApplicationAccountCreationResultDTO,
+)
+from inframeld_backend.access.application.dtos.application_account_deletion_record_dto import (
+    ApplicationAccountDeletionRecordDTO,
+)
+from inframeld_backend.access.application.dtos.application_account_deletion_result_dto import (
+    ApplicationAccountDeletionResultDTO,
 )
 from inframeld_backend.access.application.dtos.application_account_metadata_dto import (
     ApplicationAccountMetadataDTO,
@@ -25,6 +34,9 @@ from inframeld_backend.access.application.dtos.created_application_account_dto i
 )
 from inframeld_backend.access.application.protocols.application_account_creator import (
     ApplicationAccountCreator,
+)
+from inframeld_backend.access.application.protocols.application_account_deleter import (
+    ApplicationAccountDeleter,
 )
 from inframeld_backend.access.application.protocols.application_account_reader import (
     ApplicationAccountReader,
@@ -45,20 +57,25 @@ from inframeld_backend.shared.application.dtos.completed_synchronous_operation_d
 from inframeld_backend.shared.application.dtos.idempotency_context_dto import IdempotencyContextDTO
 from inframeld_backend.shared.application.enums.operation_replay_kind import OperationReplayKind
 from inframeld_backend.shared.application.errors.application_errors import (
+    AccessDeniedError,
     ConflictError,
     InvalidInputError,
     ResourceNotFoundError,
 )
 from inframeld_backend.shared.application.value_objects.operation_id import OperationId
+from inframeld_backend.shared.domain.value_objects.installation_id import InstallationId
 from inframeld_backend.shared.domain.value_objects.resource_name import ResourceName
 
+_CREATOR = PrincipalId(UUID("00000000-0000-4000-8000-000000000001"))
 _PROJECT = ProjectId(UUID("00000000-0000-4000-8000-000000000003"))
 _APP = PrincipalId(UUID("00000000-0000-4000-8000-000000000008"))
 _EXISTING = PrincipalId(UUID("00000000-0000-4000-8000-000000000009"))
 _NOW = datetime(2030, 1, 1, tzinfo=UTC)
 
 
-class MockSDKApplicationAccounts(ApplicationAccountCreator, ApplicationAccountReader):
+class MockSDKApplicationAccounts(
+    ApplicationAccountCreator, ApplicationAccountReader, ApplicationAccountDeleter
+):
     @override
     async def create(
         self,
@@ -95,6 +112,37 @@ class MockSDKApplicationAccounts(ApplicationAccountCreator, ApplicationAccountRe
                         "delete-application-account",
                     )
                 ),
+            ),
+            operation,
+        )
+
+    @override
+    async def delete(
+        self,
+        *,
+        access: AccessContextDTO,
+        command: DeleteApplicationAccountCommand,
+        context: IdempotencyContextDTO,
+    ) -> ApplicationAccountDeletionResultDTO:
+        if access.actor_principal_id != _CREATOR:
+            raise AccessDeniedError()
+        if command.project_id != _PROJECT or command.application_principal_id != _APP:
+            raise ResourceNotFoundError()
+        operation = CompletedSynchronousOperationDTO(
+            OperationId("sdk-application-account-delete"),
+            True,
+            OperationReplayKind.SAFE_RESULT,
+            _NOW,
+        )
+        return ApplicationAccountDeletionResultDTO(
+            ApplicationAccountDeletionRecordDTO(
+                operation.operation_id,
+                InstallationId(UUID(int=123)),
+                OrganizationId(UUID("00000000-0000-4000-8000-000000000002")),
+                command.project_id,
+                access.actor_principal_id,
+                command.application_principal_id,
+                command.expected_access_revision + 1,
             ),
             operation,
         )

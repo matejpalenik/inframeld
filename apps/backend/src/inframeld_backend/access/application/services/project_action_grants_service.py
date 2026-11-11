@@ -5,9 +5,6 @@ from inframeld_backend.access.application.dtos.access_context_dto import AccessC
 from inframeld_backend.access.application.dtos.project_action_grants_page_dto import (
     ProjectActionGrantsPageDTO,
 )
-from inframeld_backend.access.application.errors.human_oauth_credential_rejected_error import (
-    HumanOAuthCredentialRejectedError,
-)
 from inframeld_backend.access.application.protocols.project_action_grants_facts_reader import (
     ProjectActionGrantsFactsReader,
 )
@@ -100,8 +97,9 @@ class ProjectActionGrantsService(ProjectActionGrantsReader):
             has_pending_recovery=action.has_pending_recovery,
             oauth_credential_facts=action.oauth_credential_facts,
         )
-        if not eligibility.credential_is_current:
-            raise HumanOAuthCredentialRejectedError()
+        PrincipalAccessEvaluationService.require_current_credential(
+            access=access, principal_access=eligibility
+        )
 
         if (
             action.principal.kind is not PrincipalKind.HUMAN

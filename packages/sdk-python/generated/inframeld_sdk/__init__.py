@@ -56,6 +56,7 @@ __all__ = [
     "ApplicationAccountActionGrantResponse",
     "ApplicationAccountCreationRequest",
     "ApplicationAccountCreationResponse",
+    "ApplicationAccountDeletionResponse",
     "ApplicationAccountGrantTargetResponse",
     "ApplicationAccountMetadataResponse",
     "ApplicationKeyAdapter",
@@ -149,6 +150,7 @@ __all__ = [
     "ProjectActionGrantResponse",
     "ProjectCreationRequest",
     "ProjectCreationResponse",
+    "ProjectDeletionAdmissionResponse",
     "ProjectGrantTargetResponse",
     "ProjectMemberResponse",
     "ProjectMembersPageResponse",
@@ -159,6 +161,9 @@ __all__ = [
     "ProjectMetadataResponse",
     "ProjectMetadataUpdateRequest",
     "ProjectNameResolutionResponse",
+    "ProjectUploadDefaultChangeResponse",
+    "ProjectUploadDefaultRequest",
+    "ProjectUploadDefaultResponse",
     "ProtectedResourceMetadataResponse",
     "RecoveryRequiredOperationLookupResponse",
     "RetainedDeletionStatusResponse",
@@ -213,6 +218,7 @@ from inframeld_sdk.models.application_account_action_grant_request import Applic
 from inframeld_sdk.models.application_account_action_grant_response import ApplicationAccountActionGrantResponse as ApplicationAccountActionGrantResponse
 from inframeld_sdk.models.application_account_creation_request import ApplicationAccountCreationRequest as ApplicationAccountCreationRequest
 from inframeld_sdk.models.application_account_creation_response import ApplicationAccountCreationResponse as ApplicationAccountCreationResponse
+from inframeld_sdk.models.application_account_deletion_response import ApplicationAccountDeletionResponse as ApplicationAccountDeletionResponse
 from inframeld_sdk.models.application_account_grant_target_response import ApplicationAccountGrantTargetResponse as ApplicationAccountGrantTargetResponse
 from inframeld_sdk.models.application_account_metadata_response import ApplicationAccountMetadataResponse as ApplicationAccountMetadataResponse
 from inframeld_sdk.models.application_key_adapter import ApplicationKeyAdapter as ApplicationKeyAdapter
@@ -306,6 +312,7 @@ from inframeld_sdk.models.project_action_grant_request import ProjectActionGrant
 from inframeld_sdk.models.project_action_grant_response import ProjectActionGrantResponse as ProjectActionGrantResponse
 from inframeld_sdk.models.project_creation_request import ProjectCreationRequest as ProjectCreationRequest
 from inframeld_sdk.models.project_creation_response import ProjectCreationResponse as ProjectCreationResponse
+from inframeld_sdk.models.project_deletion_admission_response import ProjectDeletionAdmissionResponse as ProjectDeletionAdmissionResponse
 from inframeld_sdk.models.project_grant_target_response import ProjectGrantTargetResponse as ProjectGrantTargetResponse
 from inframeld_sdk.models.project_member_response import ProjectMemberResponse as ProjectMemberResponse
 from inframeld_sdk.models.project_members_page_response import ProjectMembersPageResponse as ProjectMembersPageResponse
@@ -316,6 +323,9 @@ from inframeld_sdk.models.project_metadata_change_response import ProjectMetadat
 from inframeld_sdk.models.project_metadata_response import ProjectMetadataResponse as ProjectMetadataResponse
 from inframeld_sdk.models.project_metadata_update_request import ProjectMetadataUpdateRequest as ProjectMetadataUpdateRequest
 from inframeld_sdk.models.project_name_resolution_response import ProjectNameResolutionResponse as ProjectNameResolutionResponse
+from inframeld_sdk.models.project_upload_default_change_response import ProjectUploadDefaultChangeResponse as ProjectUploadDefaultChangeResponse
+from inframeld_sdk.models.project_upload_default_request import ProjectUploadDefaultRequest as ProjectUploadDefaultRequest
+from inframeld_sdk.models.project_upload_default_response import ProjectUploadDefaultResponse as ProjectUploadDefaultResponse
 from inframeld_sdk.models.protected_resource_metadata_response import ProtectedResourceMetadataResponse as ProtectedResourceMetadataResponse
 from inframeld_sdk.models.recovery_required_operation_lookup_response import RecoveryRequiredOperationLookupResponse as RecoveryRequiredOperationLookupResponse
 from inframeld_sdk.models.retained_deletion_status_response import RetainedDeletionStatusResponse as RetainedDeletionStatusResponse

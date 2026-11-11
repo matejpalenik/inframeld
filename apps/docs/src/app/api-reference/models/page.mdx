@@ -195,6 +195,14 @@ Records the original application principal ID, Project, names, Access revision a
 
 <ApiSchema name="ApplicationAccountCreationResponse" />
 
+<a id="ApplicationAccountDeletionResponse" />
+
+## ApplicationAccountDeletionResponse
+
+The committed retirement receipt contains the original operation ID, non-null retention expiry, Project ID, application principal ID, Project Access revision and `accessBlocked: true`. [Retire an application account](/guides/application-accounts#retire-an-application-account) explains current authority and how to preserve an uncertain request.
+
+<ApiSchema name="ApplicationAccountDeletionResponse" />
+
 <a id="ApplicationAccountMetadataResponse" />
 
 ## ApplicationAccountMetadataResponse
@@ -665,6 +673,8 @@ Identifies one actual own group membership or management relationship by `access
 
 ## OperationLookupAuthorityFamily
 
+`project_deletion` is lookup-only, paired with `delete-project` and the original concrete Project DELETE route. It permits only the original eligible human’s content-free retained status, without recreating ordinary Project authority.
+
 <ApiSchema name="OperationLookupAuthorityFamily" />
 
 <a id="OperationLookupAuthorityRequest" />
@@ -677,7 +687,7 @@ Identifies one actual own group membership or management relationship by `access
 
 ## OperationLookupResponse
 
-Includes the content-free retained deletion-status alternative for the closed access-group deletion family. Ordinary completed-operation metadata and a retained group deletion observation have different meanings. [Group recovery](/guides/recover-original-request#recover-an-access-group-change) explains the boundary.
+Includes the content-free retained deletion-status alternative for the closed Project and access-group deletion families. It is distinct from ordinary completed-operation metadata or a full deletion receipt. [Project recovery](/guides/recover-original-request#read-a-known-project-deletion-operation) and [group recovery](/guides/recover-original-request#recover-an-access-group-change) preserve their separate authority and lifecycle.
 
 <ApiSchema name="OperationLookupResponse" />
 
@@ -899,6 +909,14 @@ A bounded page of stored memberships and the current Project Access revision. A 
 
 <ApiSchema name="ProjectMetadataChangeResponse" />
 
+<a id="ProjectDeletionAdmissionResponse" />
+
+## ProjectDeletionAdmissionResponse
+
+The closed original `202` admission result. `admissionConfirmed` and `accessBlocked` are literal true. The original Access revision and required nullable idempotency expiry do not describe current cleanup progress or the separate retained-status expiry. No job ID or physical-completion field is exposed.
+
+<ApiSchema name="ProjectDeletionAdmissionResponse" />
+
 <a id="ProjectMetadataResponse" />
 
 ## ProjectMetadataResponse
@@ -928,6 +946,30 @@ The former POST request export has retired. Preserve an original request as evid
 ## ProjectUseOnlyGrantResponse
 
 The former POST response export has retired. Historical operation metadata retains its original outcome and expiry. It supplies no current assignment or permission to dispatch PUT.
+
+<a id="ProjectUploadDefaultChangeResponse" />
+
+## ProjectUploadDefaultChangeResponse
+
+The immutable resulting audience and revision for the original PUT, with its operation ID and unchanged replay expiry. It contains no previous-audience snapshot. A current GET can report a later set.
+
+<ApiSchema name="ProjectUploadDefaultChangeResponse" />
+
+<a id="ProjectUploadDefaultRequest" />
+
+## ProjectUploadDefaultRequest
+
+The complete nonempty audience and explicitly reviewed safe-integer Project Access revision. Omitted, null, empty or duplicate group inputs cannot select a reset. A fresh equal-set request still needs the current revision.
+
+<ApiSchema name="ProjectUploadDefaultRequest" />
+
+<a id="ProjectUploadDefaultResponse" />
+
+## ProjectUploadDefaultResponse
+
+Current Project ID, Access revision and the UUID-sorted audience. Required `groupIds` is null only when the valid Project has no configured default.
+
+<ApiSchema name="ProjectUploadDefaultResponse" />
 
 <a id="ProtectedResourceMetadataResponse" />
 

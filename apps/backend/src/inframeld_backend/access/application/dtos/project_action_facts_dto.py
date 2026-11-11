@@ -3,8 +3,8 @@ from dataclasses import dataclass
 from inframeld_backend.access.application.dtos.application_key_current_facts_dto import (
     ApplicationKeyCurrentFactsDTO,
 )
-from inframeld_backend.access.application.dtos.human_oauth_credential_facts_dto import (
-    HumanOAuthCredentialFactsDTO,
+from inframeld_backend.access.application.dtos.human_credential_facts_dto import (
+    HumanCredentialFactsDTO,
 )
 from inframeld_backend.access.domain.entities.principal import Principal
 from inframeld_backend.access.domain.enums.project_status import ProjectStatus
@@ -20,7 +20,7 @@ class ProjectActionFactsDTO:
 
     principal: Principal
     has_pending_recovery: bool
-    oauth_credential_facts: HumanOAuthCredentialFactsDTO | None
+    oauth_credential_facts: HumanCredentialFactsDTO | None
     project_status: ProjectStatus
     is_project_member: bool
     has_exact_action_grant: bool

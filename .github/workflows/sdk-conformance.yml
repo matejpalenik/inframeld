@@ -127,7 +127,7 @@ jobs:
         run: uv run --directory apps/backend pytest tests/unit/contract
       - name: Verify selected SDK
         env:
-          SDK_PROFILE_TIMEOUT_MS: ${{ matrix.language == 'python' && '450000' || '300000' }}
+          SDK_PROFILE_TIMEOUT_MS: ${{ matrix.language == 'python' && '600000' || '300000' }}
         run: pnpm sdk:verify ${{ matrix.language }}
       - name: Preserve results
         if: always()

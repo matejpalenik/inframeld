@@ -17,7 +17,8 @@ use serde::{Deserialize, Serialize};
 use tokio::time::Instant;
 
 use super::recipient_proof::{
-    InvalidReceipt, MaintenanceErrorCode, RecipientProof, RepairReceipt, RepairRequest,
+    BootstrapProof, BootstrapReceipt, BootstrapRequest, InvalidReceipt, MaintenanceErrorCode,
+    RecipientProof, RepairReceipt, RepairRequest,
 };
 
 /// A trusted host's direct argv descriptor, separate from the recipient's proof.
@@ -103,13 +104,13 @@ impl std::fmt::Debug for ExecutionSpec {
 /// A local process outcome cannot substitute for an original after-commit receipt.
 #[derive(Debug, Serialize)]
 #[serde(tag = "status", rename_all = "kebab-case")]
-pub enum MaintenanceEffect {
+pub enum MaintenanceEffect<R = RepairReceipt> {
     /// No protected maintenance process was started.
     NotStarted,
     /// The exact request and verified principal match an after-commit receipt.
     Committed {
         /// Original bound receipt, independent of subsequent local cleanup.
-        receipt: Box<RepairReceipt>,
+        receipt: Box<R>,
     },
     /// The transport ended without proving whether the backend committed.
     Unknown {
@@ -153,9 +154,9 @@ pub enum HandoffFailure {
 /// Keep committed facts, process failure and cleanup uncertainty separate.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct HandoffOutcome {
+pub struct HandoffOutcome<R = RepairReceipt> {
     /// Receipt evidence or original-operation uncertainty.
-    pub effect: MaintenanceEffect,
+    pub effect: MaintenanceEffect<R>,
     /// Observed termination, group retirement, reaping and stream completion.
     pub process_cleanup: CleanupStatus,
     /// A transport failure may accompany an already proven commit.
@@ -233,9 +234,9 @@ impl ProcessBudgets {
 /// Retain the immutable proof-free values while adding the opaque token only in memory.
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-struct ProtectedRequest<'a> {
+struct ProtectedRequest<'a, R> {
     #[serde(flatten)]
-    request: &'a RepairRequest,
+    request: &'a R,
     identity_proof: IdentityProof<'a>,
 }
 #[derive(Serialize)]
@@ -275,6 +276,78 @@ async fn handoff_with_budgets(
         Ok(input) if input.len() <= 65_536 => Zeroizing::new(input),
         _ => return not_started(HandoffFailure::InvalidBinding),
     };
+    handoff_protected(
+        execution,
+        &input,
+        &request.operation_id,
+        |bytes| request.validate_receipt(bytes, proof.principal_id),
+        deadline,
+        cancellation,
+        budgets,
+    )
+    .await
+}
+
+/// Use the same protected process owner with a proof that requires no prior admission.
+pub(super) async fn handoff_bootstrap(
+    execution: &ExecutionSpec,
+    request: &BootstrapRequest,
+    proof: &BootstrapProof,
+    deadline: Instant,
+    cancellation: impl Future<Output = ()>,
+) -> HandoffOutcome<BootstrapReceipt> {
+    let invalid = || HandoffOutcome {
+        effect: MaintenanceEffect::NotStarted,
+        process_cleanup: CleanupStatus::NotNeeded,
+        failure: Some(HandoffFailure::InvalidBinding),
+        child_status: ChildStatus::Unobserved,
+        backend_error: None,
+    };
+    if proof.installation_id != request.expected_installation_id
+        || proof.identity_id != request.expected_identity_id
+    {
+        return invalid();
+    }
+    let input = match serde_json::to_vec(&ProtectedRequest {
+        request,
+        identity_proof: IdentityProof {
+            kind: "hydra-access-token",
+            access_token: &proof.access_token,
+        },
+    }) {
+        Ok(input) if input.len() <= 65_536 => Zeroizing::new(input),
+        _ => return invalid(),
+    };
+    handoff_protected(
+        execution,
+        &input,
+        &request.operation_id,
+        |bytes| request.validate_receipt(bytes),
+        deadline,
+        cancellation,
+        ProcessBudgets::maintenance(),
+    )
+    .await
+}
+
+/// A single process lifecycle preserves either receipt type without changing its meaning.
+#[allow(clippy::too_many_arguments)]
+async fn handoff_protected<R>(
+    execution: &ExecutionSpec,
+    input: &[u8],
+    operation_id: &str,
+    validate: impl FnOnce(&[u8]) -> Result<R, InvalidReceipt>,
+    deadline: Instant,
+    cancellation: impl Future<Output = ()>,
+    budgets: ProcessBudgets,
+) -> HandoffOutcome<R> {
+    let not_started = |failure| HandoffOutcome {
+        effect: MaintenanceEffect::NotStarted,
+        process_cleanup: CleanupStatus::NotNeeded,
+        failure: Some(failure),
+        child_status: ChildStatus::Unobserved,
+        backend_error: None,
+    };
     if Instant::now() >= deadline {
         return not_started(HandoffFailure::TimedOut);
     }
@@ -291,7 +364,7 @@ async fn handoff_with_budgets(
     };
     let operation_deadline = deadline.min(Instant::now() + budgets.execution);
     let mut failure = {
-        let operation = process.run(&input, operation_deadline, budgets.stdin);
+        let operation = process.run(input, operation_deadline, budgets.stdin);
         tokio::pin!(operation);
         tokio::select! {
             biased;
@@ -303,7 +376,7 @@ async fn handoff_with_budgets(
     let confirmed = process.finalize(budgets.term, budgets.kill).await;
     let (receipt, backend_error) =
         if process.stdout.complete && !process.stdout.overflow && !process.stdout.failed {
-            match request.validate_receipt(&process.stdout.bytes, proof.principal_id) {
+            match validate(&process.stdout.bytes) {
                 Ok(receipt) => (Some(receipt), None),
                 Err(InvalidReceipt::Backend { code }) => (None, Some(code)),
                 Err(InvalidReceipt::Unavailable) => (None, None),
@@ -320,7 +393,7 @@ async fn handoff_with_budgets(
             failure = Some(HandoffFailure::Output);
         }
         MaintenanceEffect::Unknown {
-            operation_id: request.operation_id.clone(),
+            operation_id: operation_id.to_owned(),
         }
     };
     HandoffOutcome {

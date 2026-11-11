@@ -25,6 +25,9 @@ from inframeld_backend.access.application.dtos.application_account_creation_fact
 from inframeld_backend.access.application.dtos.created_application_account_dto import (
     CreatedApplicationAccountDTO,
 )
+from inframeld_backend.access.application.dtos.human_credential_facts_dto import (
+    HumanCredentialFactsDTO,
+)
 from inframeld_backend.access.application.dtos.project_action_facts_dto import ProjectActionFactsDTO
 from inframeld_backend.access.application.protocols.application_account_creation_facts_reader import (
     ApplicationAccountCreationFactsReader,
@@ -46,6 +49,9 @@ from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.enums.principal_status import PrincipalStatus
 from inframeld_backend.access.domain.enums.project_status import ProjectStatus
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
+from inframeld_backend.access.domain.value_objects.human_credential_version import (
+    HumanCredentialVersion,
+)
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
@@ -107,7 +113,7 @@ FACTS = ApplicationAccountCreationFactsDTO(
             ACCESS.actor_principal_id, ORGANIZATION_ID, PrincipalKind.HUMAN, PrincipalStatus.ACTIVE
         ),
         False,
-        None,
+        HumanCredentialFactsDTO(True, HumanCredentialVersion(1)),
         ProjectStatus.ACTIVE,
         True,
         True,

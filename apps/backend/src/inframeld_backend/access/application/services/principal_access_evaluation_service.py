@@ -10,11 +10,11 @@ from inframeld_backend.access.application.dtos.application_key_current_facts_dto
 from inframeld_backend.access.application.dtos.browser_session_authentication_dto import (
     BrowserSessionAuthenticationDTO,
 )
+from inframeld_backend.access.application.dtos.human_credential_facts_dto import (
+    HumanCredentialFactsDTO,
+)
 from inframeld_backend.access.application.dtos.human_oauth_credential_binding_dto import (
     HumanOAuthCredentialBindingDTO,
-)
-from inframeld_backend.access.application.dtos.human_oauth_credential_facts_dto import (
-    HumanOAuthCredentialFactsDTO,
 )
 from inframeld_backend.access.application.errors.application_key_credential_rejected_error import (
     ApplicationKeyCredentialRejectedError,
@@ -31,7 +31,10 @@ from inframeld_backend.access.domain.policies.human_credential_policy import Hum
 from inframeld_backend.access.domain.policy_inputs.principal_access_policy_input import (
     PrincipalAccessPolicyInput,
 )
-from inframeld_backend.shared.application.errors.application_errors import AccessDeniedError
+from inframeld_backend.shared.application.errors.application_errors import (
+    AccessDeniedError,
+    AuthenticationRequiredError,
+)
 
 
 class PrincipalAccessEvaluationService:
@@ -47,7 +50,7 @@ class PrincipalAccessEvaluationService:
         access: AccessContextDTO,
         principal: Principal,
         has_pending_recovery: bool,
-        oauth_credential_facts: HumanOAuthCredentialFactsDTO | None,
+        oauth_credential_facts: HumanCredentialFactsDTO | None,
         application_key_facts: ApplicationKeyCurrentFactsDTO | None = None,
     ) -> PrincipalAccessPolicyInput:
         evidence = access.authentication_evidence
@@ -61,15 +64,20 @@ class PrincipalAccessEvaluationService:
         if principal.kind is not expected_kind:
             raise RuntimeError("Authentication evidence does not match the principal kind.")
 
-        if isinstance(evidence, HumanOAuthCredentialBindingDTO):
+        if isinstance(evidence, (HumanOAuthCredentialBindingDTO, BrowserSessionAuthenticationDTO)):
             if oauth_credential_facts is None:
-                raise RuntimeError("Human OAuth evidence requires current credential facts.")
+                family = (
+                    "Browser"
+                    if isinstance(evidence, BrowserSessionAuthenticationDTO)
+                    else "Human OAuth"
+                )
+                raise RuntimeError(f"{family} evidence requires current credential facts.")
             credential_is_current = HumanCredentialPolicy.is_current_for_actor(
                 binding_matches_actor=oauth_credential_facts.binding_matches_actor,
                 presented_version=evidence.version,
                 current_version=oauth_credential_facts.current_version,
             )
-        elif isinstance(evidence, ApplicationKeyAuthenticationDTO):
+        else:
             if application_key_facts is None:
                 raise RuntimeError("Application key evidence requires current key facts.")
             facts = application_key_facts
@@ -87,8 +95,6 @@ class PrincipalAccessEvaluationService:
                 expires_at=facts.expires_at,
                 revoked_at=facts.revoked_at,
             )
-        else:
-            credential_is_current = True
 
         return PrincipalAccessPolicyInput(
             principal=principal,
@@ -104,6 +110,8 @@ class PrincipalAccessEvaluationService:
         if not principal_access.credential_is_current:
             if isinstance(access.authentication_evidence, ApplicationKeyAuthenticationDTO):
                 raise ApplicationKeyCredentialRejectedError()
+            if isinstance(access.authentication_evidence, BrowserSessionAuthenticationDTO):
+                raise AuthenticationRequiredError()
             raise HumanOAuthCredentialRejectedError()
 
     @staticmethod

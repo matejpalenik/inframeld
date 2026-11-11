@@ -2,13 +2,12 @@
 
 import os
 from datetime import UTC, datetime, timedelta
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import httpx2
 import pytest
 from sqlalchemy import delete, func, select, update
 from tests.support.access_group_scenarios import create_group, delete_group, group_http_application
-from tests.support.authentication_evidence import MockAuthenticationEvidence
 from tests.support.project_creation_scenarios import create_project, seed_project_creator
 from tests.support.project_membership_postgres_scenarios import (
     change_membership,
@@ -16,10 +15,6 @@ from tests.support.project_membership_postgres_scenarios import (
 )
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
-from inframeld_backend.access.application.dtos.verified_human_identity_dto import (
-    VerifiedHumanIdentityDTO,
-)
-from inframeld_backend.access.domain.value_objects.identity_subject import IdentitySubject
 from inframeld_backend.access.infrastructure.rows.group_action_grant_row import GroupActionGrantRow
 from inframeld_backend.access.infrastructure.rows.human_credential_version_row import (
     HumanCredentialVersionRow,
@@ -375,14 +370,7 @@ async def test_current_eligible_noninitiator_cannot_read_either_retained_entry(
     seed = await seed_membership_project(database)
     group = (await create_group(database, seed.actor.access, seed.project.project_id)).group
     removed = await delete_group(database, seed.actor.access, group, 2)
-    bob = AccessContextDTO(
-        seed.bob_id,
-        MockAuthenticationEvidence.browser(
-            VerifiedHumanIdentityDTO(
-                seed.actor.binding.identity.authority, IdentitySubject(str(UUID(int=200)))
-            )
-        ),
-    )
+    bob = seed.bob_access
     app = group_http_application(database, bob, bob)
     installed = await PostgresInstallationIdentityReader(database).read()
     body = {

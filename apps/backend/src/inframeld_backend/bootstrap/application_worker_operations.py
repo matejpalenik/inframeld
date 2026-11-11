@@ -7,11 +7,23 @@ from sqlalchemy.exc import InterfaceError, OperationalError
 from sqlalchemy.exc import TimeoutError as SqlAlchemyTimeoutError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from inframeld_backend.access.application.protocols.project_deletion_shutdown import (
+    ProjectDeletionShutdown,
+)
 from inframeld_backend.access.application.services.admitted_work_authorization_service import (
     AdmittedWorkAuthorizationService,
 )
+from inframeld_backend.access.application.services.project_deletion_shutdown_service import (
+    ProjectDeletionShutdownService,
+)
 from inframeld_backend.access.infrastructure.readers.postgres_admitted_work_facts_reader import (
     PostgresAdmittedWorkFactsReader,
+)
+from inframeld_backend.access.infrastructure.writers.postgres_project_application_shutdown_effects_writer import (
+    PostgresProjectApplicationShutdownEffectsWriter,
+)
+from inframeld_backend.access.infrastructure.writers.postgres_project_deletion_shutdown_writer import (
+    PostgresProjectDeletionShutdownWriter,
 )
 from inframeld_backend.shared.application.dtos.artifact_attempt_dto import ArtifactAttemptDTO
 from inframeld_backend.shared.application.dtos.artifact_cleanup_job_binding_dto import (
@@ -20,6 +32,9 @@ from inframeld_backend.shared.application.dtos.artifact_cleanup_job_binding_dto 
 from inframeld_backend.shared.application.dtos.artifact_scope_dto import ArtifactScopeDTO
 from inframeld_backend.shared.application.dtos.job_attempt_context_dto import JobAttemptContextDTO
 from inframeld_backend.shared.application.dtos.job_effect_binding_dto import JobEffectBindingDTO
+from inframeld_backend.shared.application.dtos.project_deletion_job_binding_dto import (
+    ProjectDeletionJobBindingDTO,
+)
 from inframeld_backend.shared.application.errors.application_errors import (
     DependencyUnavailableError,
 )
@@ -46,6 +61,12 @@ from inframeld_backend.shared.application.services.job_checkpoint_service import
 from inframeld_backend.shared.application.services.job_effect_observation_service import (
     JobEffectObservationService,
 )
+from inframeld_backend.shared.application.services.project_deletion_checkpoint_service import (
+    ProjectDeletionCheckpointService,
+)
+from inframeld_backend.shared.application.services.project_deletion_job_authorization_service import (
+    ProjectDeletionJobAuthorizationService,
+)
 from inframeld_backend.shared.application.value_objects.artifact_attempt_id import ArtifactAttemptId
 from inframeld_backend.shared.application.value_objects.job_effect_id import JobEffectId
 from inframeld_backend.shared.infrastructure.readers.postgres_artifact_cleanup_facts_reader import (
@@ -53,6 +74,9 @@ from inframeld_backend.shared.infrastructure.readers.postgres_artifact_cleanup_f
 )
 from inframeld_backend.shared.infrastructure.readers.postgres_artifact_cleanup_target_reader import (
     PostgresArtifactCleanupTargetReader,
+)
+from inframeld_backend.shared.infrastructure.readers.postgres_project_deletion_job_facts_reader import (
+    PostgresProjectDeletionJobFactsReader,
 )
 from inframeld_backend.shared.infrastructure.repositories.postgres_job_store import PostgresJobStore
 from inframeld_backend.shared.infrastructure.resources.database import Database
@@ -63,7 +87,7 @@ from inframeld_backend.shared.infrastructure.settings.job_settings import JobSet
 
 
 class ApplicationWorkerOperations(
-    JobCheckpoints, ArtifactCleanupPreparer, JobEffectObservationRecorder
+    JobCheckpoints, ArtifactCleanupPreparer, JobEffectObservationRecorder, ProjectDeletionShutdown
 ):
     """Close each protected SQL session before returning to the handler or native-call gate."""
 
@@ -92,7 +116,16 @@ class ApplicationWorkerOperations(
         async with self._session() as session:
             transactions = SqlAlchemyTransactionManager(session)
             jobs = PostgresJobStore(session)
-            if isinstance(context.binding, ArtifactCleanupJobBindingDTO):
+            if isinstance(context.binding, ProjectDeletionJobBindingDTO):
+                yield ProjectDeletionCheckpointService(
+                    transactions,
+                    jobs,
+                    ProjectDeletionJobAuthorizationService(
+                        PostgresProjectDeletionJobFactsReader(session)
+                    ),
+                    lease_seconds=self._settings.lease_seconds,
+                )
+            elif isinstance(context.binding, ArtifactCleanupJobBindingDTO):
                 yield ArtifactCleanupCheckpointService(
                     transactions,
                     jobs,
@@ -198,3 +231,20 @@ class ApplicationWorkerOperations(
     async def fail(self, context: JobAttemptContextDTO) -> None:
         async with self._open(context) as operation:
             await operation.fail(context)
+
+    @override
+    async def shutdown(self, context: JobAttemptContextDTO) -> None:
+        if self._stopped.is_set():
+            raise JobWorkerStoppingError()
+        async with self._session() as session:
+            await ProjectDeletionShutdownService(
+                transaction_manager=SqlAlchemyTransactionManager(session),
+                project_deletion_shutdown_writer=PostgresProjectDeletionShutdownWriter(session),
+                project_deletion_job_authorizer=ProjectDeletionJobAuthorizationService(
+                    PostgresProjectDeletionJobFactsReader(session)
+                ),
+                job_store=PostgresJobStore(session),
+                application_shutdown_effects_writer=PostgresProjectApplicationShutdownEffectsWriter(
+                    session
+                ),
+            ).shutdown(context)

@@ -78,9 +78,6 @@ from inframeld_backend.access.infrastructure.readers.postgres_human_credential_s
 from inframeld_backend.access.infrastructure.readers.postgres_human_identity_link_reader import (
     PostgresHumanIdentityLinkReader,
 )
-from inframeld_backend.access.infrastructure.readers.postgres_identity_recovery_block_reader import (
-    PostgresIdentityRecoveryBlockReader,
-)
 from inframeld_backend.access.infrastructure.rows.access_audit_event_row import AccessAuditEventRow
 from inframeld_backend.access.infrastructure.rows.human_identity_link_row import (
     HumanIdentityLinkRow,
@@ -224,7 +221,9 @@ class MockBrowserVerifier(BrowserSessionVerifier):
         self.calls = 0
 
     @override
-    async def verify(self, credential: BrowserSessionCredential) -> VerifiedHumanIdentityDTO | None:
+    async def verify(
+        self, credential: BrowserSessionCredential, *, timeout_seconds: float | None = None
+    ) -> VerifiedHumanIdentityDTO | None:
         self.calls += 1
         return IDENTITY if credential == COOKIE else None
 
@@ -236,13 +235,13 @@ class GrantScenario:
         # Keep TestClient's connections separate from the async fixture's pool.
         api_database = Database(settings)
         reader = PostgresHumanIdentityLinkReader(api_database)
-        recovery_block_reader = PostgresIdentityRecoveryBlockReader(api_database)
+
         self.token = MockTokenVerifier(api_database)
         self.identity = MockIdentityVerifier()
         self.browser = MockBrowserVerifier()
 
         cookie_authenticator = HumanSessionAuthenticationService(
-            self.browser, reader, recovery_block_reader=recovery_block_reader
+            self.browser, PostgresHumanCredentialStateReader(api_database)
         )
         bearer_authenticator = HumanAccessTokenAuthenticationService(
             self.token,
@@ -465,7 +464,7 @@ async def test_authorized_human_can_save_a_project_grant(
     assert state.access_revision == 1
     assert scenario.token.calls == (1 if credential_kind == CredentialKind.BEARER else 0)
     assert scenario.identity.calls == (1 if credential_kind == CredentialKind.BEARER else 0)
-    assert scenario.browser.calls == (1 if credential_kind == CredentialKind.COOKIE else 0)
+    assert scenario.browser.calls == (2 if credential_kind == CredentialKind.COOKIE else 0)
 
 
 @pytest.mark.asyncio
@@ -623,7 +622,7 @@ async def test_cookie_write_requires_csrf_protection(
     assert response.json()["code"] == "access_denied"
     assert scenario.token.calls == 0
     assert scenario.identity.calls == 0
-    assert scenario.browser.calls == 1
+    assert scenario.browser.calls == 2
     assert await _read_state(database, grant_seed) == before
 
 

@@ -107,6 +107,7 @@ class AccountUIRunner:
         self.runtime = os.environ.get("INFRAMELD_CONTAINER_RUNTIME", "docker")
         self.project = ""
         self.recipient_proof = False
+        self.bootstrap_proof = False
 
     def _stop_phase(self, phase: _Phase) -> bool:
         """Stop and reconcile only the process group retained by this runner."""
@@ -250,7 +251,9 @@ class AccountUIRunner:
             "INFRAMELD_ACCOUNT_WEB_CONTEXT": str(self.directory / "web-context"),
             "INFRAMELD_ACCOUNT_PROOF_IMAGE": f"localhost/{self.project}-proof:check",
             "INFRAMELD_ACCOUNT_PROOF_CONTEXT": str(self.directory / "proof-context"),
-            "INFRAMELD_ACCOUNT_PROOF_MODE": "1" if self.recipient_proof else "0",
+            "INFRAMELD_ACCOUNT_PROOF_MODE": "bootstrap"
+            if self.bootstrap_proof
+            else ("1" if self.recipient_proof else "0"),
         }
 
     def _run_phase(
@@ -321,6 +324,7 @@ class AccountUIRunner:
             "startup_stack",
             "cleanup_stack",
             "recipient_proof_stack",
+            "bootstrap_proof_stack",
             "prepare_contexts",
             "build_stack",
             "account_browser_stack",
@@ -363,7 +367,7 @@ account_compose=("$account_runtime" compose -p "$account_project" -f "$account_c
             (
                 "prepare",
                 self._shell("prepare_contexts")
-                if self.recipient_proof
+                if self.recipient_proof or self.bootstrap_proof
                 else [
                     sys.executable,
                     str(self.root / "apps/web/tests/fixtures/prepare_build_context.py"),
@@ -378,7 +382,7 @@ account_compose=("$account_runtime" compose -p "$account_project" -f "$account_c
             (
                 "build",
                 self._shell("build_stack")
-                if self.recipient_proof
+                if self.recipient_proof or self.bootstrap_proof
                 else [
                     self.runtime,
                     "compose",
@@ -395,8 +399,10 @@ account_compose=("$account_runtime" compose -p "$account_project" -f "$account_c
             ("startup", self._shell("startup_stack"), 180),
             (
                 "browser",
-                self._shell("recipient_proof_stack")
-                if self.recipient_proof
+                self._shell("bootstrap_proof_stack")
+                if self.bootstrap_proof
+                else self._shell("recipient_proof_stack")
+                if self.recipient_proof or self.bootstrap_proof
                 else self._shell("account_browser_stack"),
                 300,
             ),
@@ -424,7 +430,7 @@ account_compose=("$account_runtime" compose -p "$account_project" -f "$account_c
             "volume_baseline_complete": str(self.volume_baseline_complete).lower(),
             "cleanup": cleanup_state,
         }
-        if self.recipient_proof:
+        if self.recipient_proof or self.bootstrap_proof:
             values.update(
                 proof_image=environment["INFRAMELD_ACCOUNT_PROOF_IMAGE"],
                 proof_context=environment["INFRAMELD_ACCOUNT_PROOF_CONTEXT"],
@@ -433,14 +439,24 @@ account_compose=("$account_runtime" compose -p "$account_project" -f "$account_c
             "".join(f"{key}={value}\n" for key, value in values.items())
         )
 
+    def _select_mode(self, arguments: list[str]) -> bool:
+        if arguments not in (
+            ["--login-only"],
+            ["--recipient-proof"],
+            ["--bootstrap-proof"],
+        ):
+            return False
+        self.recipient_proof = arguments == ["--recipient-proof"]
+        self.bootstrap_proof = arguments == ["--bootstrap-proof"]
+        return True
+
     def run(self, arguments: list[str]) -> int:
-        if arguments not in (["--login-only"], ["--recipient-proof"]):
+        if not self._select_mode(arguments):
             print(
-                "Usage: scripts/test-account-ui.sh --login-only | --recipient-proof",
+                "Usage: scripts/test-account-ui.sh --login-only | --recipient-proof | --bootstrap-proof",
                 file=sys.stderr,
             )
             return 2
-        self.recipient_proof = arguments == ["--recipient-proof"]
         supported = sys.version_info >= (3, 13) and all(
             hasattr(os, name)
             for name in ("waitid", "WNOWAIT", "P_PID", "WEXITED", "WNOHANG", "killpg")
@@ -514,8 +530,10 @@ account_compose=("$account_runtime" compose -p "$account_project" -f "$account_c
                         status = 1
                     else:
                         print(
-                            "Native recipient-proof checks passed. Cleanup confirmed."
-                            if self.recipient_proof
+                            "Native bootstrap proof checks passed. Cleanup confirmed."
+                            if self.bootstrap_proof
+                            else "Native recipient-proof checks passed. Cleanup confirmed."
+                            if self.recipient_proof or self.bootstrap_proof
                             else "Native account navigation checks passed. Cleanup confirmed. "
                             "Combined Rust recipient-proof qualification is still pending."
                         )

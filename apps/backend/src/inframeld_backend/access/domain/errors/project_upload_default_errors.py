@@ -1,0 +1,2 @@
+class ProjectUploadDefaultStaleRevisionError(Exception):
+    pass

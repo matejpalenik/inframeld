@@ -4,9 +4,6 @@ from inframeld_backend.access.application.dtos.access_context_dto import AccessC
 from inframeld_backend.access.application.dtos.project_creation_authorization_dto import (
     ProjectCreationAuthorizationDTO,
 )
-from inframeld_backend.access.application.errors.human_oauth_credential_rejected_error import (
-    HumanOAuthCredentialRejectedError,
-)
 from inframeld_backend.access.application.protocols.organization_access_facts_reader import (
     OrganizationAccessFactsReader,
 )
@@ -50,8 +47,9 @@ class ProjectCreationAuthorizationService(ProjectCreationAuthorizer):
             has_pending_recovery=facts.has_pending_recovery,
             oauth_credential_facts=facts.oauth_credential_facts,
         )
-        if not eligibility.credential_is_current:
-            raise HumanOAuthCredentialRejectedError()
+        PrincipalAccessEvaluationService.require_current_credential(
+            access=access, principal_access=eligibility
+        )
         if not ProjectCreationPolicy.may_create(
             eligibility,
             has_create_projects=any(

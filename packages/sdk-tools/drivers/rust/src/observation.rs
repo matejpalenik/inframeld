@@ -25,6 +25,28 @@ macro_rules! problems {
     };
 }
 problems!(
+    GetProjectUploadDefaultsApiError,
+    GetProjectUploadDefaultsApiError::Status400,
+    GetProjectUploadDefaultsApiError::Status401,
+    GetProjectUploadDefaultsApiError::Status403,
+    GetProjectUploadDefaultsApiError::Status404,
+    GetProjectUploadDefaultsApiError::Status409,
+    GetProjectUploadDefaultsApiError::Status422,
+    GetProjectUploadDefaultsApiError::Status503
+);
+problems!(
+    SetProjectUploadDefaultsApiError,
+    SetProjectUploadDefaultsApiError::Status400,
+    SetProjectUploadDefaultsApiError::Status401,
+    SetProjectUploadDefaultsApiError::Status403,
+    SetProjectUploadDefaultsApiError::Status404,
+    SetProjectUploadDefaultsApiError::Status409,
+    SetProjectUploadDefaultsApiError::Status413,
+    SetProjectUploadDefaultsApiError::Status415,
+    SetProjectUploadDefaultsApiError::Status422,
+    SetProjectUploadDefaultsApiError::Status503
+);
+problems!(
     RevokeApplicationKeyApiError,
     RevokeApplicationKeyApiError::Status400,
     RevokeApplicationKeyApiError::Status401,
@@ -219,6 +241,16 @@ problems!(
     RemoveAccessGroupManagerApiError::Status503
 );
 problems!(
+    DeleteProjectApiError,
+    DeleteProjectApiError::Status400,
+    DeleteProjectApiError::Status401,
+    DeleteProjectApiError::Status403,
+    DeleteProjectApiError::Status404,
+    DeleteProjectApiError::Status409,
+    DeleteProjectApiError::Status422,
+    DeleteProjectApiError::Status503
+);
+problems!(
     DeleteAccessGroupApiError,
     DeleteAccessGroupApiError::Status400,
     DeleteAccessGroupApiError::Status401,
@@ -239,6 +271,16 @@ problems!(
     CreateApplicationAccountApiError::Status415,
     CreateApplicationAccountApiError::Status422,
     CreateApplicationAccountApiError::Status503
+);
+problems!(
+    DeleteApplicationAccountApiError,
+    DeleteApplicationAccountApiError::Status400,
+    DeleteApplicationAccountApiError::Status401,
+    DeleteApplicationAccountApiError::Status403,
+    DeleteApplicationAccountApiError::Status404,
+    DeleteApplicationAccountApiError::Status409,
+    DeleteApplicationAccountApiError::Status422,
+    DeleteApplicationAccountApiError::Status503
 );
 problems!(
     GetApplicationAccountApiError,

@@ -25,6 +25,8 @@ const globalVolumes =
   args[0] === "volume" && args[1] === "ls" && !args.includes("--filter")
 const startup = process.env.ACCOUNT_PROBE_STARTUP === "true"
 const proof = process.env.ACCOUNT_PROBE_PROOF ?? ""
+const bootstrap = process.env.ACCOUNT_PROBE_BOOTSTRAP === "true"
+const driverService = bootstrap ? "bootstrap-first-driver" : "proof-driver"
 const operationIndex = args.findIndex((arg) =>
   ["up", "run", "exec"].includes(arg)
 )
@@ -38,6 +40,10 @@ const proofServices = [
   "browser-tests",
   "proof-driver",
   "proof-denied-driver",
+  "bootstrap-first-driver",
+  "bootstrap-replay-driver",
+  "bootstrap-competing-driver",
+  "bootstrap-reused-driver",
 ]
 const lookupService =
   args[0] === "ps"
@@ -119,9 +125,12 @@ if (naturalDescendant) {
     args.includes("logs") ||
     proofServices.includes(lookupService) ||
     (operation === "up" &&
-      ["browser-tests", "proof-driver", "proof-denied-driver"].includes(
-        service
-      )) ||
+      [
+        "browser-tests",
+        "proof-driver",
+        "proof-denied-driver",
+        "bootstrap-first-driver",
+      ].includes(service)) ||
     (operation === "exec" &&
       (args.includes("verify-proof-result") ||
         args.includes("verify-denied-result") ||
@@ -257,7 +266,7 @@ if (naturalDescendant) {
                       ? "browser-tests"
                       : isDenied
                         ? "proof-denied-driver"
-                        : "proof-driver",
+                        : driverService,
             },
           },
           HostConfig: {
@@ -276,17 +285,31 @@ if (naturalDescendant) {
                       : `container:${backend}`,
           },
           State: {
-            Status: status,
-            ExitCode: isDenied
-              ? proof === "denied-wrong-exit"
-                ? 0
-                : 1
-              : isBrowser && proof === "browser-failed"
-                ? 8
-                : id === driver &&
-                    ["driver-failed", "driver-logs-failed"].includes(proof)
-                  ? 7
-                  : 0,
+            Status:
+              isBackend && proof === "inspect-initialized"
+                ? "initialized"
+                : isBackend && proof === "inspect-hostile"
+                  ? "PRIVATE_INSPECT_SENTINEL_350\nhostile-secret-value"
+                  : status,
+            ExitCode:
+              isBackend && proof === "inspect-exit-negative"
+                ? -1
+                : isBackend && proof === "inspect-exit-overflow"
+                  ? 256
+                  : isBackend && proof === "inspect-hostile"
+                    ? "PRIVATE_INSPECT_SENTINEL_350\nhostile-secret-value"
+                    : isDenied
+                      ? proof === "denied-wrong-exit"
+                        ? 0
+                        : 1
+                      : isBrowser && proof === "browser-failed"
+                        ? 8
+                        : id === driver &&
+                            ["driver-failed", "driver-logs-failed"].includes(
+                              proof
+                            )
+                          ? 7
+                          : 0,
             Health: {
               Status: isBackend
                 ? "absent"
@@ -326,7 +349,7 @@ if (naturalDescendant) {
           ? 1
           : proof === "second-readiness-failed"
             ? 17
-            : state.negativeVerified
+            : bootstrap || state.negativeVerified
               ? 0
               : 10
     } else if (args.includes("verify-denied-result")) {

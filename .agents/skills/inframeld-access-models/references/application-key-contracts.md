@@ -2,7 +2,7 @@
 
 Alice issues SupportBot a key and loses the response. The first successful delivery can contain the secret. A safe replay contains metadata only. The key’s public identifier is not proof of validity or current authority.
 
-> **Status:** Safe metadata reads, application-key authentication and strict issuance are implemented. Individual revocation is implemented through the registered route and safe original-result storage. Native OpenAPI and the three selected generated clients cover that operation and its actual models. Deployment and human qualification remain separate. Permanent retirement remains #233 work. Metadata reads do not issue credentials.
+> **Status:** Safe metadata reads, application-key authentication and strict issuance are implemented. Individual revocation is implemented through the registered route and safe original-result storage. Native OpenAPI and the three selected generated clients cover that operation and its actual models. Deployment and human qualification remain separate. [Permanent account retirement](application-keys.md#retiring-supportbot-does-not-delete-its-work) has its own registered operation and retained result. Metadata reads do not issue credentials.
 
 <a id="application-key-contract"></a>
 
@@ -57,7 +57,7 @@ Unknown commit or response state never authorizes automatic redispatch, another 
 
 The [PostgreSQL reader](../../../../apps/backend/src/inframeld_backend/access/infrastructure/readers/postgres_application_account_facts_reader.py) observes current caller facts, exact account binding and safe metadata in one statement. Its explicit key projection never fetches the verifier, audience or original secret. Lists include retained expired/revoked records, ordered by key UUID, with default 25 and limit 1–100. An endpoint-owned opaque cursor binds installation, Organization, Project, account principal and UUID position. Each continuation is a fresh authorized observation, not a snapshot or authority token. Empty continuations retain the authorization header. Invalid or incompatible cursors return `invalid_input` 422.
 
-The native `ApplicationKeyMetadataResponse` has exactly the documented safe fields. There is no secret retrieval endpoint. Account create/get/exact-Name inspection follows [the owning workflow](application-keys.md#implemented-application-account-creation). Issuance, full verification and individual revocation are implemented. Account retirement remains #233 work.
+The native `ApplicationKeyMetadataResponse` has exactly the documented safe fields. There is no secret retrieval endpoint. Account create/get/exact-Name inspection follows [the owning workflow](application-keys.md#implemented-application-account-creation). Issuance, full verification and individual revocation are implemented. [Account retirement](application-keys.md#retiring-supportbot-does-not-delete-its-work) revokes every key through its separate authorized operation.
 
 ## Typed response alternatives
 

@@ -81,6 +81,130 @@ def write_proof_inputs(
         raise
 
 
+def write_bootstrap_inputs(
+    directory: Path,
+    *,
+    installation_id: UUID,
+    identity_id: UUID,
+    certificate_authority: str,
+    environment: dict[str, str],
+    operation_id: str = "native-bootstrap-original",
+) -> None:
+    """Freeze proof-free intent under the same private file bounds as repair."""
+    directory.mkdir(mode=0o700)
+    request = {
+        "schemaVersion": 1,
+        "mode": "bootstrap-first-administrator",
+        "expectedInstallationId": str(installation_id),
+        "operationId": operation_id,
+        "operatorLabel": "Private native fixture",
+        "reason": "Reviewed first admission",
+        "expectedAccessRevision": 0,
+        "expectedIdentityId": str(identity_id),
+    }
+    files: dict[str, object] = {
+        "request.json": request,
+        "host.json": {
+            "schemaVersion": 1,
+            "api": "https://inframeld.account.test:8443",
+            "issuer": "https://hydra.account.test:8443/",
+            "clientId": "inframeld-cli",
+            "installationId": str(installation_id),
+            "expectedIdentityId": str(identity_id),
+            "certificateAuthorities": [certificate_authority],
+            "proxy": None,
+        },
+        "exec.json": {
+            "program": "/opt/backend/.venv/bin/inframeld-maintenance",
+            "args": [],
+            "environment": environment,
+        },
+    }
+    for name, value in files.items():
+        raw = json.dumps(value).encode()
+        if len(raw) > 65_536:
+            raise ValueError("Private input exceeded its bound.")
+        descriptor = os.open(
+            directory / name,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+            0o600,
+        )
+        with os.fdopen(descriptor, "wb") as output:
+            os.fchmod(output.fileno(), 0o600)
+            output.write(raw)
+
+
+def validate_bootstrap_result(
+    raw: bytes, request: dict[str, object], expected_code: str | None = None
+) -> dict[str, object] | None:
+    """Check the existing public envelope, original receipt and separate cleanup facts."""
+    if len(raw) > 65_536:
+        raise ValueError("Bootstrap output exceeded its bound.")
+    envelope = _object(
+        json.loads(raw, object_pairs_hook=_unique),
+        {"schemaVersion", "mode", "outcome", "data", "error", "warnings"},
+    )
+    if (
+        envelope["schemaVersion"] != 1
+        or envelope["mode"] != "execute"
+        or envelope["warnings"] != []
+    ):
+        raise ValueError("Unexpected bootstrap envelope.")
+    data = _object(
+        envelope["data"],
+        {"maintenance", "currentSession", "credentialCleanup", "consumerErrorCode"},
+    )
+    maintenance = _object(data["maintenance"], {"effect", "processCleanup", "failure"})
+    if data["credentialCleanup"] != "confirmed" or maintenance["processCleanup"] != "confirmed":
+        raise ValueError("Bootstrap cleanup is not confirmed.")
+    if expected_code is not None:
+        if expected_code not in {"already_bootstrapped", "idempotency_key_reused"}:
+            raise ValueError("Unsupported controlled denial.")
+        error = _object(envelope["error"], {"source", "code", "message"})
+        if (
+            envelope["outcome"] != "uncertain"
+            or error["source"] != "cli"
+            or error["code"] != "bootstrap_unconfirmed"
+            or data["consumerErrorCode"] != expected_code
+            or maintenance["failure"] != "exit"
+            or maintenance["effect"]
+            != {"status": "unknown", "operation_id": request["operationId"]}
+        ):
+            raise ValueError("The exact consumer denial was not established.")
+        return None
+    effect = _object(maintenance["effect"], {"status", "receipt"})
+    receipt = _object(
+        effect["receipt"],
+        {
+            "schemaVersion",
+            "mode",
+            "operationId",
+            "installationId",
+            "principalId",
+            "accessRevision",
+            "outcome",
+        },
+    )
+    if (
+        envelope["outcome"] != "succeeded"
+        or envelope["error"] is not None
+        or data["consumerErrorCode"] is not None
+        or maintenance["failure"] is not None
+        or effect["status"] != "committed"
+        or receipt["schemaVersion"] != 1
+        or receipt["mode"] != "bootstrap-first-administrator"
+        or receipt["outcome"] != "bootstrapped"
+        or receipt["operationId"] != request["operationId"]
+        or receipt["installationId"] != request["expectedInstallationId"]
+        or type(receipt["accessRevision"]) is not int
+        or receipt["accessRevision"] != 1
+        or data["currentSession"] != {"status": "admitted", "principalId": receipt["principalId"]}
+    ):
+        raise ValueError("The original claim/session result does not match.")
+    UUID(str(receipt["principalId"]))
+    return receipt
+
+
 def _unique(pairs: list[tuple[str, object]]) -> dict[str, object]:
     """Reject duplicate fixture fields so the independently observed result has one meaning."""
     result: dict[str, object] = {}
@@ -447,9 +571,10 @@ def read_account_results() -> tuple[list[dict[str, object]], UUID]:
         raise ValueError("The fixed account observations exceeded their bound.")
     observations: list[dict[str, object]] = []
     for line in raw.splitlines():
-        value = json.loads(line, object_pairs_hook=_unique)
-        if not isinstance(value, dict):
+        parsed: object = json.loads(line, object_pairs_hook=_unique)
+        if not isinstance(parsed, dict):
             raise ValueError("Each account observation must be an object.")
+        value = cast("dict[str, object]", parsed)
         if value.get("kind") == "invitation":
             fields = {
                 "kind",
@@ -488,7 +613,9 @@ def read_account_results() -> tuple[list[dict[str, object]], UUID]:
 
 
 async def verify_account_results(
-    configured: ApplicationSettings, observations: list[dict[str, object]], issuer_id: UUID
+    configured: ApplicationSettings,
+    observations: list[dict[str, object]],
+    issuer_id: UUID,
 ) -> None:
     """Check durable effects independently of the browser's UI and original replay."""
     from datetime import datetime, timedelta
@@ -649,12 +776,201 @@ async def verify_account_results(
                     assert membership.assigned_by_principal_id == issuer_id
                     group = await session.get(
                         GroupMembershipRow,
-                        (project_id, UUID(str(observation["accessGroupId"])), principal_id),
+                        (
+                            project_id,
+                            UUID(str(observation["accessGroupId"])),
+                            principal_id,
+                        ),
                     )
                     assert group is not None
                     assert group.assigned_by_principal_id == issuer_id
     finally:
         await database.shutdown()
+
+
+def validate_bootstrap_identity_links(
+    links: list[tuple[str, str, UUID]], expected: tuple[str, str, UUID] | None
+) -> None:
+    """Require the complete native identity-link set, including absence of aliases."""
+    if links != ([] if expected is None else [expected]):
+        raise ValueError("The complete bootstrap identity-link set disagrees.")
+
+
+async def bootstrap_database(
+    configured: ApplicationSettings,
+    stage: str,
+    receipt: dict[str, object] | None = None,
+) -> UUID:
+    """Independently inspect only this disposable installation and its exact claim."""
+    from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
+    from inframeld_backend.access.domain.enums.principal_status import PrincipalStatus
+    from inframeld_backend.access.infrastructure.rows.access_audit_event_row import (
+        AccessAuditEventRow,
+    )
+    from inframeld_backend.access.infrastructure.rows.first_administrator_bootstrap_receipt_row import (
+        FirstAdministratorBootstrapReceiptRow,
+    )
+    from inframeld_backend.access.infrastructure.rows.host_maintenance_receipt_row import (
+        HostMaintenanceReceiptRow,
+    )
+    from inframeld_backend.access.infrastructure.rows.human_identity_link_row import (
+        HumanIdentityLinkRow,
+    )
+    from inframeld_backend.access.infrastructure.rows.organization_action_grant_row import (
+        OrganizationActionGrantRow,
+    )
+    from inframeld_backend.access.infrastructure.rows.organization_row import (
+        OrganizationRow,
+    )
+    from inframeld_backend.access.infrastructure.rows.principal_row import PrincipalRow
+    from inframeld_backend.access.infrastructure.rows.project_row import ProjectRow
+    from inframeld_backend.shared.infrastructure.readers.postgres_installation_identity_reader import (
+        PostgresInstallationIdentityReader,
+    )
+    from inframeld_backend.shared.infrastructure.resources.database import Database
+    from sqlalchemy import func, select
+
+    database = Database(configured.database)
+    await database.startup()
+    try:
+        installation = (await PostgresInstallationIdentityReader(database).read()).value
+        async with database.session() as session:
+            links = (await session.scalars(select(HumanIdentityLinkRow))).all()
+            principals = (await session.scalars(select(PrincipalRow))).all()
+            organizations = (await session.scalars(select(OrganizationRow))).all()
+            grants = (await session.scalars(select(OrganizationActionGrantRow))).all()
+            claims = (await session.scalars(select(FirstAdministratorBootstrapReceiptRow))).all()
+            originals = (await session.scalars(select(HostMaintenanceReceiptRow))).all()
+            audits = (await session.scalars(select(AccessAuditEventRow))).all()
+            projects = await session.scalar(select(func.count()).select_from(ProjectRow))
+            if projects != 0:
+                raise RuntimeError("Bootstrap created a Project or starter scope.")
+            if stage == "pristine":
+                validate_bootstrap_identity_links(
+                    [(link.authority, link.subject, link.principal_id) for link in links], None
+                )
+                if principals or organizations or grants or claims or originals or audits:
+                    raise RuntimeError("The installation is not pristine.")
+                return installation
+            if (
+                len(principals) != 1
+                or len(organizations) != 1
+                or len(claims) != 1
+                or len(originals) != 1
+                or len(audits) != 1
+            ):
+                raise RuntimeError("The exact atomic bootstrap effects are missing.")
+            principal, organization, claim, original, audit = (
+                principals[0],
+                organizations[0],
+                claims[0],
+                originals[0],
+                audits[0],
+            )
+            subject = UUID(
+                json.loads(
+                    await asyncio.to_thread(Path("/run/account-fixture/human.json").read_bytes)
+                )["subject"]
+            )
+            validate_bootstrap_identity_links(
+                [(link.authority, link.subject, link.principal_id) for link in links],
+                ("kratos:account-ui-test", str(subject), principal.id),
+            )
+            link = links[0]
+            if (
+                principal.kind != PrincipalKind.HUMAN
+                or principal.status != PrincipalStatus.ACTIVE
+                or principal.organization_id != organization.id
+                or organization.access_revision != 1
+                or claim.installation_id != installation
+                or claim.expected_identity_id != subject
+                or claim.recipient_id != principal.id
+                or claim.organization_id != organization.id
+                or claim.before_revision != 0
+                or claim.after_revision != 1
+                or original.operator_request_id != "native-bootstrap-original"
+                or original.subject != str(subject)
+                or original.authority != "kratos:account-ui-test"
+                or original.outcome != "bootstrapped"
+                or audit.event_type != "first_administrator_bootstrapped"
+                or audit.affected_principal_id != principal.id
+                or link.organization_id != organization.id
+                or link.principal_kind != PrincipalKind.HUMAN
+            ):
+                raise RuntimeError("Bootstrap identity/revision/audit binding disagrees.")
+            if receipt is not None and (
+                receipt["principalId"] != str(principal.id)
+                or receipt["installationId"] != str(installation)
+                or receipt["accessRevision"] != claim.after_revision
+            ):
+                raise RuntimeError("The original receipt disagrees with durable state.")
+            expected = {
+                "admit-users",
+                "suspend-users",
+                "restore-users",
+                "create-projects",
+            }
+            if stage in {"first", "remove"}:
+                if (
+                    len(grants) != 4
+                    or {grant.action for grant in grants} != expected
+                    or any(
+                        grant.organization_id != organization.id
+                        or grant.recipient_principal_id != principal.id
+                        or grant.recipient_kind != PrincipalKind.HUMAN
+                        or not grant.can_grant
+                        for grant in grants
+                    )
+                ):
+                    raise RuntimeError("The four exact Organization assignments disagree.")
+                if stage == "remove":
+                    for grant in grants:
+                        await session.delete(grant)
+                    await session.commit()
+            elif grants:
+                raise RuntimeError("Original replay or rejection recreated removed grants.")
+            return installation
+    finally:
+        await database.shutdown()
+
+
+def prepare_bootstrap_fixture(configured: ApplicationSettings) -> None:
+    """Use migrated singleton and provider fixtures without claiming business authority."""
+    installation = asyncio.run(bootstrap_database(configured, "pristine"))
+    names = (
+        "PYTHONPATH",
+        "INFRAMELD_ENVIRONMENT",
+        "INFRAMELD_LOG_LEVEL",
+        "INFRAMELD_DATABASE__HOST",
+        "INFRAMELD_DATABASE__NAME",
+        "INFRAMELD_DATABASE__USER",
+        "INFRAMELD_DATABASE__PASSWORD",
+        "INFRAMELD_REQUEST_FINGERPRINT__KEY_FILE",
+        "INFRAMELD_KRATOS__PUBLIC_URL",
+        "INFRAMELD_KRATOS__ADMIN_URL",
+        "INFRAMELD_KRATOS__AUTHORITY",
+        "INFRAMELD_HYDRA__ADMIN_URL",
+        "INFRAMELD_HYDRA__PUBLIC_URL",
+        "INFRAMELD_HYDRA__ISSUER",
+        "INFRAMELD_HYDRA__API_AUDIENCE",
+    )
+    environment = {name: os.environ[name] for name in names}
+    for folder, identity_file, operation in [
+        ("first", "human", "native-bootstrap-original"),
+        ("competing", "switch", "native-bootstrap-competing"),
+        ("reused", "switch", "native-bootstrap-original"),
+    ]:
+        identity = UUID(
+            json.loads(Path(f"/run/account-fixture/{identity_file}.json").read_bytes())["subject"]
+        )
+        write_bootstrap_inputs(
+            Path(f"/run/account-secrets/bootstrap-{folder}"),
+            installation_id=installation,
+            identity_id=identity,
+            certificate_authority=Path("/run/account-trust/ca.pem").read_text(),
+            environment=environment,
+            operation_id=operation,
+        )
 
 
 def main() -> None:
@@ -667,9 +983,12 @@ def main() -> None:
         run_migrations(configured.database)
     elif sys.argv[1:] == ["seed"]:
         subject = UUID(json.loads(Path("/run/account-fixture/human.json").read_text())["subject"])
-        identifiers = asyncio.run(seed(configured, subject))
-        if identifiers is not None:
-            prepare_proof_inputs(identifiers, subject)
+        if os.getenv("INFRAMELD_ACCOUNT_PROOF_MODE") == "bootstrap":
+            prepare_bootstrap_fixture(configured)
+        else:
+            identifiers = asyncio.run(seed(configured, subject))
+            if identifiers is not None:
+                prepare_proof_inputs(identifiers, subject)
         prepare_navigation(configured)
     elif sys.argv[1:] == ["serve"]:
         import uvicorn
@@ -682,6 +1001,37 @@ def main() -> None:
             access_log=False,
             log_level="warning",
         )
+    elif (
+        len(sys.argv) == 2
+        and sys.argv[1].startswith("bootstrap-")
+        and os.getenv("INFRAMELD_ACCOUNT_PROOF_MODE") == "bootstrap"
+    ):
+        stage = sys.argv[1].removeprefix("bootstrap-")
+        if stage not in {
+            "pristine",
+            "first",
+            "remove",
+            "replay",
+            "competing",
+            "reused",
+        }:
+            raise ValueError("Unknown bootstrap fixture stage.")
+        receipt = None
+        if stage not in {"pristine", "remove"}:
+            folder = "first" if stage in {"first", "replay"} else stage
+            request = cast(
+                "dict[str, object]",
+                json.loads(
+                    Path(f"/run/account-secrets/bootstrap-{folder}/request.json").read_bytes()
+                ),
+            )
+            code = {
+                "competing": "already_bootstrapped",
+                "reused": "idempotency_key_reused",
+            }.get(stage)
+            receipt = validate_bootstrap_result(sys.stdin.buffer.read(65_537), request, code)
+        asyncio.run(bootstrap_database(configured, stage, receipt))
+        print(f"Independent bootstrap {stage} effects verified.")
     elif (
         sys.argv[1:] == ["verify-account-result"]
         and os.getenv("INFRAMELD_ACCOUNT_PROOF_MODE") != "1"

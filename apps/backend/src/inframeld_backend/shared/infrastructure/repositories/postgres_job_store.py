@@ -27,6 +27,9 @@ from inframeld_backend.shared.application.dtos.job_effect_observation_dto import
 )
 from inframeld_backend.shared.application.dtos.job_snapshot_dto import JobSnapshotDTO
 from inframeld_backend.shared.application.dtos.product_job_binding_dto import ProductJobBindingDTO
+from inframeld_backend.shared.application.dtos.project_deletion_job_binding_dto import (
+    ProjectDeletionJobBindingDTO,
+)
 from inframeld_backend.shared.application.enums.job_effect_action import JobEffectAction
 from inframeld_backend.shared.application.enums.job_effect_observation_kind import (
     JobEffectObservationKind,
@@ -41,6 +44,9 @@ from inframeld_backend.shared.application.errors.job_errors import (
     JobQueueFullError,
 )
 from inframeld_backend.shared.application.protocols.job_store import JobStore
+from inframeld_backend.shared.application.services.project_deletion_job_authorization_service import (
+    ProjectDeletionJobAuthorizationService,
+)
 from inframeld_backend.shared.application.value_objects.artifact_attempt_id import ArtifactAttemptId
 from inframeld_backend.shared.application.value_objects.artifact_content_digest import (
     ArtifactContentDigest,
@@ -56,6 +62,9 @@ from inframeld_backend.shared.domain.enums.job_status import JobStatus
 from inframeld_backend.shared.domain.value_objects.installation_id import InstallationId
 from inframeld_backend.shared.infrastructure.mappers.postgres_job_binding_mapper import (
     PostgresJobBindingMapper,
+)
+from inframeld_backend.shared.infrastructure.readers.postgres_project_deletion_job_facts_reader import (
+    PostgresProjectDeletionJobFactsReader,
 )
 from inframeld_backend.shared.infrastructure.rows.application_job_queue_row import (
     ApplicationJobQueueRow,
@@ -74,6 +83,9 @@ from inframeld_backend.shared.infrastructure.rows.durable_job_effect_row import 
 from inframeld_backend.shared.infrastructure.rows.durable_job_row import DurableJobRow
 from inframeld_backend.shared.infrastructure.rows.idempotency_reservation_row import (
     IdempotencyReservationRow,
+)
+from inframeld_backend.shared.infrastructure.rows.project_deletion_obligation_row import (
+    ProjectDeletionObligationRow,
 )
 
 
@@ -241,6 +253,8 @@ class PostgresJobStore(JobStore):
     def _effect_fingerprint(binding: JobEffectBindingDTO) -> bytes:
         """Bind exact typed meaning without using mutable job state as replacement input."""
         context = binding.context
+        if isinstance(context.binding, ProjectDeletionJobBindingDTO):
+            raise ConflictError("Project deletion does not authorize artifact effects.")
         parts = [
             b"inframeld-job-effect-v1",
             binding.effect_id.value.bytes,
@@ -867,6 +881,12 @@ class PostgresJobStore(JobStore):
         if reason is not None and len(reason) > 100:
             raise ValueError("A job outcome reason must be bounded.")
         binding = (await self._snapshot(row, now)).binding
+        if isinstance(binding, ProjectDeletionJobBindingDTO):
+            facts = await ProjectDeletionJobAuthorizationService(
+                PostgresProjectDeletionJobFactsReader(self._session)
+            ).require_current(JobId(row.id), binding)
+            if status is JobStatus.SUCCEEDED and facts.shutdown_completed_at is None:
+                raise ConflictError("The original local shutdown is not confirmed.")
         await self._end_attempt(row, now, reason)
         row.status, row.reason, row.terminal_at = status.value, reason, now
         row.fence = row.worker_id = row.lease_expires_at = None
@@ -884,7 +904,7 @@ class PostgresJobStore(JobStore):
                         expires_at=now + timedelta(hours=24)
                     )
                 )
-        else:
+        elif isinstance(binding, ArtifactCleanupJobBindingDTO):
             obligation = await self._session.scalar(
                 select(ArtifactCleanupObligationRow)
                 .where(ArtifactCleanupObligationRow.id == binding.obligation_id.value)
@@ -900,7 +920,7 @@ class PostgresJobStore(JobStore):
 
     async def _snapshot(self, row: DurableJobRow, now: datetime) -> JobSnapshotDTO:
         """Reconstruct job state and its original authority from persisted facts."""
-        binding: ProductJobBindingDTO | ArtifactCleanupJobBindingDTO
+        binding: ProductJobBindingDTO | ArtifactCleanupJobBindingDTO | ProjectDeletionJobBindingDTO
         if row.binding_kind == "product":
             binding = PostgresJobBindingMapper.product(row)
         elif row.binding_kind == "artifact_cleanup" and row.cleanup_obligation_id is not None:
@@ -910,6 +930,7 @@ class PostgresJobStore(JobStore):
             if obligation is None or any(
                 value is not None
                 for value in (
+                    row.deletion_obligation_id,
                     row.operation_id,
                     row.principal_id,
                     row.principal_kind,
@@ -928,6 +949,18 @@ class PostgresJobStore(JobStore):
                 binding.origin.request_id.value,
             ):
                 raise ConflictError("The original cleanup job scope is inconsistent.")
+        elif row.binding_kind == "project_deletion" and row.deletion_obligation_id is not None:
+            parent = await self._session.get(
+                ProjectDeletionObligationRow, row.deletion_obligation_id, populate_existing=True
+            )
+            if parent is None or parent.job_id != row.id:
+                raise ConflictError("The original Project-deletion parent is unavailable.")
+            binding = PostgresJobBindingMapper.project_deletion(parent)
+            facts = await ProjectDeletionJobAuthorizationService(
+                PostgresProjectDeletionJobFactsReader(self._session)
+            ).require_current(JobId(row.id), binding)
+            if facts.payload != JobPayload(row.payload_kind, row.payload_version, row.payload):
+                raise ConflictError("The original deletion child payload changed.")
         else:
             raise ConflictError("The original job binding kind is unsupported.")
         return JobSnapshotDTO(

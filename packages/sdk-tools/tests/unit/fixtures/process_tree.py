@@ -184,7 +184,8 @@ def main() -> None:
         owner.os.killpg = deny_signal
         code = owner.main()
         work = Path(marker).parent
-        (work / "uncertain.json").write_text(
+        pending = work / "uncertain.json.tmp"
+        pending.write_text(
             json.dumps(
                 {
                     "unknown": True,
@@ -194,6 +195,7 @@ def main() -> None:
                 }
             )
         )
+        pending.replace(work / "uncertain.json")
         # Production signalling has ended. This fixture remains the sole waiter,
         # and reaps its finite child after the later safety fuse without signals.
         for child in children:

@@ -17,8 +17,8 @@ from inframeld_backend.access.application.dtos.deletion_status_authorization_req
 from inframeld_backend.access.application.dtos.deletion_status_facts_dto import (
     DeletionStatusFactsDTO,
 )
-from inframeld_backend.access.application.dtos.human_oauth_credential_facts_dto import (
-    HumanOAuthCredentialFactsDTO,
+from inframeld_backend.access.application.dtos.human_credential_facts_dto import (
+    HumanCredentialFactsDTO,
 )
 from inframeld_backend.access.application.errors.human_oauth_credential_rejected_error import (
     HumanOAuthCredentialRejectedError,
@@ -39,6 +39,7 @@ from inframeld_backend.access.domain.value_objects.organization_id import Organi
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.shared.application.errors.application_errors import (
     AccessDeniedError,
+    AuthenticationRequiredError,
     DependencyUnavailableError,
 )
 from inframeld_backend.shared.application.value_objects.operation_id import OperationId
@@ -52,7 +53,12 @@ ACTOR = Principal(
 )
 ACCESS = AccessContextDTO(ACTOR.id, MockAuthenticationEvidence.browser())
 REQUEST = DeletionStatusAuthorizationRequestDTO(OperationId("original-deletion"))
-FACTS = DeletionStatusFactsDTO(InstallationId(UUID(int=3)), ACTOR, False, None)
+FACTS = DeletionStatusFactsDTO(
+    InstallationId(UUID(int=3)),
+    ACTOR,
+    False,
+    HumanCredentialFactsDTO(True, HumanCredentialVersion(1)),
+)
 
 
 class MockDeletionFacts(DeletionStatusFactsReader):
@@ -121,13 +127,13 @@ async def test_facts_for_another_principal_are_a_contract_failure() -> None:
 @pytest.mark.parametrize(
     "oauth_facts",
     [
-        HumanOAuthCredentialFactsDTO(False, HumanCredentialVersion(1)),
-        HumanOAuthCredentialFactsDTO(True, None),
-        HumanOAuthCredentialFactsDTO(True, HumanCredentialVersion(2)),
+        HumanCredentialFactsDTO(False, HumanCredentialVersion(1)),
+        HumanCredentialFactsDTO(True, None),
+        HumanCredentialFactsDTO(True, HumanCredentialVersion(2)),
     ],
 )
 async def test_stale_or_mismatched_oauth_is_rejected_before_product_eligibility(
-    oauth_facts: HumanOAuthCredentialFactsDTO,
+    oauth_facts: HumanCredentialFactsDTO,
 ) -> None:
     access = replace(ACCESS, authentication_evidence=MockAuthenticationEvidence.human_oauth())
     facts = replace(FACTS, has_pending_recovery=True, oauth_credential_facts=oauth_facts)
@@ -141,7 +147,7 @@ async def test_stale_or_mismatched_oauth_is_rejected_before_product_eligibility(
 async def test_current_oauth_uses_the_same_original_principal_scope() -> None:
     access = replace(ACCESS, authentication_evidence=MockAuthenticationEvidence.human_oauth())
     facts = replace(
-        FACTS, oauth_credential_facts=HumanOAuthCredentialFactsDTO(True, HumanCredentialVersion(1))
+        FACTS, oauth_credential_facts=HumanCredentialFactsDTO(True, HumanCredentialVersion(1))
     )
     result = await DeletionStatusAuthorizationService(
         MockDeletionFacts(facts)
@@ -154,9 +160,9 @@ async def test_current_oauth_uses_the_same_original_principal_scope() -> None:
 async def test_missing_oauth_facts_are_not_treated_as_current() -> None:
     access = replace(ACCESS, authentication_evidence=MockAuthenticationEvidence.human_oauth())
     with pytest.raises(RuntimeError, match="OAuth evidence"):
-        await DeletionStatusAuthorizationService(MockDeletionFacts()).require_authorization(
-            access=access, request=REQUEST
-        )
+        await DeletionStatusAuthorizationService(
+            MockDeletionFacts(replace(FACTS, oauth_credential_facts=None))
+        ).require_authorization(access=access, request=REQUEST)
 
 
 @pytest.mark.asyncio
@@ -178,3 +184,22 @@ async def test_unavailable_current_facts_are_not_missing_history() -> None:
         await DeletionStatusAuthorizationService(reader).require_authorization(
             access=ACCESS, request=REQUEST
         )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("oauth", [False, True])
+async def test_browser_currentness_preserves_the_presented_credential_family(oauth: bool) -> None:
+    """Reject stale evidence before disclosing data, recovering originals or changing authority."""
+    evidence = (
+        MockAuthenticationEvidence.human_oauth() if oauth else MockAuthenticationEvidence.browser()
+    )
+    stale = HumanCredentialFactsDTO(True, HumanCredentialVersion(2))
+    expected = HumanOAuthCredentialRejectedError if oauth else AuthenticationRequiredError
+    reader = MockDeletionFacts(replace(FACTS, oauth_credential_facts=stale))
+    access = replace(ACCESS, authentication_evidence=evidence)
+    with pytest.raises(AuthenticationRequiredError) as caught:
+        await DeletionStatusAuthorizationService(reader).require_authorization(
+            access=access, request=REQUEST
+        )
+    assert type(caught.value) is expected
+    assert reader.calls == [access]

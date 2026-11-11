@@ -13,8 +13,8 @@ from inframeld_backend.access.application.dtos.access_group_grant_target_dto imp
 from inframeld_backend.access.application.dtos.application_account_grant_target_dto import (
     ApplicationAccountGrantTargetDTO,
 )
-from inframeld_backend.access.application.dtos.human_oauth_credential_facts_dto import (
-    HumanOAuthCredentialFactsDTO,
+from inframeld_backend.access.application.dtos.human_credential_facts_dto import (
+    HumanCredentialFactsDTO,
 )
 from inframeld_backend.access.application.dtos.my_project_access_facts_dto import (
     MyProjectAccessFactsDTO,
@@ -61,6 +61,7 @@ from inframeld_backend.access.domain.value_objects.principal_id import Principal
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
 from inframeld_backend.shared.application.errors.application_errors import (
     AccessDeniedError,
+    AuthenticationRequiredError,
     DependencyUnavailableError,
     InvalidInputError,
     ResourceNotFoundError,
@@ -94,7 +95,7 @@ FACTS = MyProjectAccessFactsDTO(
     access_revision=7,
     actor=ACTOR,
     has_pending_recovery=False,
-    oauth_credential_facts=None,
+    oauth_credential_facts=HumanCredentialFactsDTO(True, HumanCredentialVersion(1)),
     project_status=ProjectStatus.ACTIVE,
     is_project_member=True,
     items=(*GRANTS, MEMBERSHIP, MANAGEMENT),
@@ -179,7 +180,7 @@ async def test_current_oauth_evidence_is_rechecked_without_membership_management
         replace(
             FACTS,
             items=(),
-            oauth_credential_facts=HumanOAuthCredentialFactsDTO(True, HumanCredentialVersion(1)),
+            oauth_credential_facts=HumanCredentialFactsDTO(True, HumanCredentialVersion(1)),
         )
     )
     service = MyProjectAccessService(facts)
@@ -189,7 +190,7 @@ async def test_current_oauth_evidence_is_rechecked_without_membership_management
     facts.result = replace(
         FACTS,
         items=(),
-        oauth_credential_facts=HumanOAuthCredentialFactsDTO(True, HumanCredentialVersion(2)),
+        oauth_credential_facts=HumanCredentialFactsDTO(True, HumanCredentialVersion(2)),
     )
     with pytest.raises(HumanOAuthCredentialRejectedError):
         await service.get_access(access=access, query=GetMyProjectAccessQuery(PROJECT))
@@ -334,3 +335,22 @@ async def test_dependency_failure_is_safe_and_cancellation_remains_cancellation(
     with pytest.raises(asyncio.CancelledError) as raised:
         await service.get_access(access=ACCESS, query=GetMyProjectAccessQuery(PROJECT))
     assert raised.value is cancelled
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("oauth", [False, True])
+async def test_browser_currentness_preserves_the_presented_credential_family(oauth: bool) -> None:
+    """Reject stale evidence before disclosing data, recovering originals or changing authority."""
+    evidence = (
+        MockAuthenticationEvidence.human_oauth() if oauth else MockAuthenticationEvidence.browser()
+    )
+    stale = HumanCredentialFactsDTO(True, HumanCredentialVersion(2))
+    expected = HumanOAuthCredentialRejectedError if oauth else AuthenticationRequiredError
+    reader = MockOwnAccessFacts(replace(FACTS, oauth_credential_facts=stale))
+    with pytest.raises(AuthenticationRequiredError) as caught:
+        await MyProjectAccessService(reader).get_access(
+            access=replace(ACCESS, authentication_evidence=evidence),
+            query=GetMyProjectAccessQuery(PROJECT, 4),
+        )
+    assert type(caught.value) is expected
+    assert reader.calls == [(ACTOR.id, PROJECT, None, 4)]

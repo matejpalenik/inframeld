@@ -3,6 +3,9 @@ from typing import override
 from inframeld_backend.access.application.protocols.admitted_work_authorizer import (
     AdmittedWorkAuthorizer,
 )
+from inframeld_backend.shared.application.dtos.artifact_cleanup_job_binding_dto import (
+    ArtifactCleanupJobBindingDTO,
+)
 from inframeld_backend.shared.application.dtos.job_continuation_eligibility_dto import (
     JobContinuationEligibilityDTO,
 )
@@ -11,6 +14,9 @@ from inframeld_backend.shared.application.dtos.job_effect_observation_dto import
 )
 from inframeld_backend.shared.application.dtos.job_snapshot_dto import JobSnapshotDTO
 from inframeld_backend.shared.application.dtos.product_job_binding_dto import ProductJobBindingDTO
+from inframeld_backend.shared.application.dtos.project_deletion_job_binding_dto import (
+    ProjectDeletionJobBindingDTO,
+)
 from inframeld_backend.shared.application.enums.job_continuation_disposition import (
     JobContinuationDisposition as Disposition,
 )
@@ -20,6 +26,7 @@ from inframeld_backend.shared.application.enums.job_effect_observation_kind impo
 from inframeld_backend.shared.application.errors.application_errors import (
     AccessDeniedError,
     ConflictError,
+    DependencyUnavailableError,
 )
 from inframeld_backend.shared.application.protocols.artifact_cleanup_authorizer import (
     ArtifactCleanupAuthorizer,
@@ -28,6 +35,9 @@ from inframeld_backend.shared.application.protocols.job_continuation_eligibility
     JobContinuationEligibility,
 )
 from inframeld_backend.shared.application.protocols.job_store import JobStore
+from inframeld_backend.shared.application.protocols.project_deletion_job_authorizer import (
+    ProjectDeletionJobAuthorizer,
+)
 from inframeld_backend.shared.domain.enums.job_status import JobStatus
 
 
@@ -39,26 +49,46 @@ class JobContinuationEligibilityService(JobContinuationEligibility):
         artifact_cleanup_authorizer: ArtifactCleanupAuthorizer,
         *,
         supported_payloads: tuple[tuple[str, int], ...],
+        project_deletion_job_authorizer: ProjectDeletionJobAuthorizer | None = None,
     ) -> None:
         self._job_store = job_store
         self._admitted_work_authorizer = admitted_work_authorizer
         self._artifact_cleanup_authorizer = artifact_cleanup_authorizer
         self._supported_payloads = supported_payloads
+        self._project_deletion_job_authorizer = project_deletion_job_authorizer
 
     @override
     async def assess_in_transaction(self, job: JobSnapshotDTO) -> JobContinuationEligibilityDTO:
         authority_changed = False
         complete = False
         try:
-            if isinstance(job.binding, ProductJobBindingDTO):
-                await self._admitted_work_authorizer.require_current(job.binding.authority)
-            else:
-                facts = await self._artifact_cleanup_authorizer.require_current(
-                    job.job_id, job.binding
-                )
-                if facts.binding != job.binding or facts.job_id != job.job_id:
-                    raise ConflictError("Cleanup observations changed the original binding.")
-                complete = facts.physically_complete
+            match job.binding:
+                case ProductJobBindingDTO():
+                    await self._admitted_work_authorizer.require_current(job.binding.authority)
+                case ProjectDeletionJobBindingDTO():
+                    if self._project_deletion_job_authorizer is None:
+                        raise DependencyUnavailableError(
+                            "Project deletion obligation validation is not configured."
+                        )
+                    deletion = await self._project_deletion_job_authorizer.require_current(
+                        job.job_id, job.binding
+                    )
+                    if (
+                        deletion.binding != job.binding
+                        or deletion.job_id != job.job_id
+                        or deletion.payload != job.payload
+                    ):
+                        raise ConflictError("Deletion observations changed the original binding.")
+                    complete = deletion.shutdown_completed_at is not None
+                case ArtifactCleanupJobBindingDTO():
+                    facts = await self._artifact_cleanup_authorizer.require_current(
+                        job.job_id, job.binding
+                    )
+                    if facts.binding != job.binding or facts.job_id != job.job_id:
+                        raise ConflictError("Cleanup observations changed the original binding.")
+                    complete = facts.physically_complete
+                case _:
+                    raise ConflictError("The original job binding is unsupported.")
         except AccessDeniedError:
             authority_changed = True
         if job.status is not JobStatus.RUNNING or (
@@ -70,6 +100,10 @@ class JobContinuationEligibilityService(JobContinuationEligibility):
 
         observation = None
         if job.pending_effect is not None:
+            if isinstance(job.binding, ProjectDeletionJobBindingDTO):
+                return JobContinuationEligibilityDTO(
+                    job, Disposition.NOT_ESTABLISHED, "unknown_external_effect"
+                )
             observation = await self._job_store.pending_observation(job)
             if not self._matches(job, observation):
                 return JobContinuationEligibilityDTO(
@@ -88,7 +122,11 @@ class JobContinuationEligibilityService(JobContinuationEligibility):
         elif isinstance(job.binding, ProductJobBindingDTO) and job.cancel_requested:
             reason = "cancellation_requested"
         elif complete:
-            reason = "cleanup_already_complete"
+            reason = (
+                "project_shutdown_already_complete"
+                if isinstance(job.binding, ProjectDeletionJobBindingDTO)
+                else "cleanup_already_complete"
+            )
         elif job.attempt >= 3:
             reason = "attempt_budget_exhausted"
         elif job.work_deadline is None or job.work_deadline <= job.observed_at:

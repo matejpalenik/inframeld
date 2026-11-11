@@ -18,6 +18,9 @@ from inframeld_backend.access.application.dtos.action_grantor_repair_responsibil
 from inframeld_backend.access.application.dtos.application_account_grant_target_dto import (
     ApplicationAccountGrantTargetDTO,
 )
+from inframeld_backend.access.application.dtos.browser_session_authentication_dto import (
+    BrowserSessionAuthenticationDTO,
+)
 from inframeld_backend.access.application.dtos.group_manager_repair_responsibility_dto import (
     GroupManagerRepairResponsibilityDTO,
 )
@@ -79,6 +82,9 @@ from inframeld_backend.access.infrastructure.rows.application_action_grant_row i
 from inframeld_backend.access.infrastructure.rows.group_action_grant_row import GroupActionGrantRow
 from inframeld_backend.access.infrastructure.rows.group_manager_row import GroupManagerRow
 from inframeld_backend.access.infrastructure.rows.group_membership_row import GroupMembershipRow
+from inframeld_backend.access.infrastructure.rows.human_identity_link_row import (
+    HumanIdentityLinkRow,
+)
 from inframeld_backend.access.infrastructure.rows.project_action_grant_row import (
     ProjectActionGrantRow,
 )
@@ -150,6 +156,31 @@ async def seed_metadata_project(session: AsyncSession) -> ProjectAuthorizationSe
     await session.flush()
     return ProjectAuthorizationSeedDTO(
         seed.organization_id, seed.principal_id, seed.project_id, ActionId("edit-project-metadata")
+    )
+
+
+async def capture_metadata_browser(
+    database: Database, seed: ProjectAuthorizationSeedDTO
+) -> AccessContextDTO:
+    """Bind the seeded actor to one committed identity before capturing its credential."""
+    identity = VerifiedHumanIdentityDTO(
+        IdentityAuthority("kratos:test"), IdentitySubject(str(uuid4()))
+    )
+    async with database.session() as session, session.begin():
+        session.add(
+            HumanIdentityLinkRow(
+                authority=identity.authority.value,
+                subject=identity.subject.value,
+                organization_id=seed.organization_id.value,
+                principal_id=seed.principal_id.value,
+                principal_kind=PrincipalKind.HUMAN,
+            )
+        )
+    state = await PostgresHumanCredentialStateInitializer(database).initialize(identity)
+    assert state.version is not None
+    return AccessContextDTO(
+        seed.principal_id,
+        BrowserSessionAuthenticationDTO(identity, state.installation_id, state.version),
     )
 
 

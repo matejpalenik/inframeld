@@ -23,7 +23,9 @@ from run_account_ui import (
 
 
 class DevelopmentBuildStorageTests(unittest.TestCase):
-    def test_absolute_floor_checks_each_filesystem_without_an_extra_allowance(self) -> None:
+    def test_absolute_floor_checks_each_filesystem_without_an_extra_allowance(
+        self,
+    ) -> None:
         floor = 20 * 1024**3
         for host, engine, admitted in (
             (floor, floor, True),
@@ -599,6 +601,120 @@ class ProofInputTests(unittest.TestCase):
         changed["accessToken"] = "synthetic-secret"
         with self.assertRaises(ValueError):
             validator(json.dumps(changed).encode(), self.intent(), UUID(int=4))
+
+
+class BootstrapFixtureTests(ProofInputTests):
+    def test_bootstrap_rejects_every_additional_identity_alias(self):
+        from uuid import UUID
+
+        validate = self.functions()["validate_bootstrap_identity_links"]
+        expected = ("kratos:account-ui-test", str(UUID(int=2)), UUID(int=4))
+        validate([], None)
+        validate([expected], expected)
+        for links, original in [
+            ([expected], None),
+            ([], expected),
+            ([expected, (expected[0], str(UUID(int=3)), expected[2])], expected),
+            ([("other-authority", expected[1], expected[2])], expected),
+            ([(expected[0], expected[1], UUID(int=99))], expected),
+        ]:
+            with self.subTest(links=links, original=original), self.assertRaises(ValueError):
+                validate(links, original)
+
+    def test_bootstrap_mode_is_closed_and_selects_its_private_profile(self):
+        runner = AccountUIRunner(
+            Path(__file__).resolve().parents[1], directory=Path("/private/fixture")
+        )
+        self.assertTrue(runner._select_mode(["--bootstrap-proof"]))
+        self.assertEqual(runner._environment()["INFRAMELD_ACCOUNT_PROOF_MODE"], "bootstrap")
+        self.assertFalse(runner._select_mode(["--bootstrap-proof", "--login-only"]))
+
+    def test_bootstrap_input_has_exact_original_eight_fields_and_no_admission_seed(
+        self,
+    ):
+        from uuid import UUID
+
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary) / "bootstrap"
+            self.functions()["write_bootstrap_inputs"](
+                directory,
+                installation_id=UUID(int=1),
+                identity_id=UUID(int=2),
+                certificate_authority="public-ca",
+                environment={"PRIVATE_TEST": "private"},
+            )
+            request = json.loads((directory / "request.json").read_bytes())
+            self.assertEqual(len(request), 8)
+            self.assertEqual(request["mode"], "bootstrap-first-administrator")
+            self.assertEqual(request["expectedAccessRevision"], 0)
+            self.assertNotIn("responsibility", request)
+            self.assertNotIn("identityProof", request)
+            self.assertEqual(directory.stat().st_mode & 0o777, 0o700)
+            for path in directory.iterdir():
+                self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+
+    def test_bootstrap_receipt_and_closed_denial_codes_keep_original_meaning(self):
+        request = self.intent()
+        request.pop("responsibility")
+        request.update(mode="bootstrap-first-administrator", expectedAccessRevision=0)
+        receipt = {
+            "schemaVersion": 1,
+            "mode": request["mode"],
+            "operationId": request["operationId"],
+            "installationId": request["expectedInstallationId"],
+            "principalId": "00000000-0000-0000-0000-000000000004",
+            "accessRevision": 1,
+            "outcome": "bootstrapped",
+        }
+        value = {
+            "schemaVersion": 1,
+            "mode": "execute",
+            "outcome": "succeeded",
+            "error": None,
+            "warnings": [],
+            "data": {
+                "maintenance": {
+                    "effect": {"status": "committed", "receipt": receipt},
+                    "processCleanup": "confirmed",
+                    "failure": None,
+                },
+                "currentSession": {
+                    "status": "admitted",
+                    "principalId": receipt["principalId"],
+                },
+                "credentialCleanup": "confirmed",
+                "consumerErrorCode": None,
+            },
+        }
+        validate = self.functions()["validate_bootstrap_result"]
+        self.assertEqual(validate(json.dumps(value).encode(), request), receipt)
+        for field, new in [
+            ("operationId", "other"),
+            ("accessRevision", 2),
+            ("mode", "repair-stranded-authority"),
+        ]:
+            bad = json.loads(json.dumps(value))
+            bad["data"]["maintenance"]["effect"]["receipt"][field] = new
+            with self.assertRaises(ValueError):
+                validate(json.dumps(bad).encode(), request)
+        for code in ["already_bootstrapped", "idempotency_key_reused"]:
+            bad = json.loads(json.dumps(value))
+            bad.update(
+                outcome="uncertain",
+                error={
+                    "source": "cli",
+                    "code": "bootstrap_unconfirmed",
+                    "message": "safe",
+                },
+            )
+            bad["data"].update(consumerErrorCode=code, currentSession={"status": "unavailable"})
+            bad["data"]["maintenance"].update(
+                effect={"status": "unknown", "operation_id": request["operationId"]},
+                failure="exit",
+            )
+            self.assertIsNone(validate(json.dumps(bad).encode(), request, code))
+            with self.assertRaises(ValueError):
+                validate(json.dumps(bad).encode(), request, "unexpected")
 
 
 if __name__ == "__main__":

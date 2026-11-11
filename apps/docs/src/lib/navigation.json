@@ -93,6 +93,10 @@
         "href": "/guides/projects-and-access",
         "children": [
           {
+            "title": "Bootstrap the first administrator",
+            "href": "/guides/bootstrap-first-administrator"
+          },
+          {
             "title": "Manage your account and consent",
             "href": "/guides/account-and-consent"
           },
@@ -119,6 +123,10 @@
           {
             "title": "Manage access-group members and managers",
             "href": "/guides/manage-access-groups"
+          },
+          {
+            "title": "Delete a Project",
+            "href": "/guides/delete-project"
           }
         ]
       },

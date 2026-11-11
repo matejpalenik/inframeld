@@ -161,6 +161,16 @@ const calls = {
       },
       query: call.query as sdk.RemoveAccessGroupManagerData["query"],
     }),
+  deleteProject: (client: Client, call: SdkCall) =>
+    sdk.deleteProject({
+      ...options(client, call),
+      path: call.path as sdk.DeleteProjectData["path"],
+      query: call.query as sdk.DeleteProjectData["query"],
+      headers: {
+        ...call.headers,
+        "Idempotency-Key": call.headers["Idempotency-Key"]!,
+      },
+    }),
   deleteAccessGroup: (client: Client, call: SdkCall) =>
     sdk.deleteAccessGroup({
       ...options(client, call),
@@ -322,6 +332,16 @@ const calls = {
       },
       body: call.body as sdk.CreateApplicationAccountData["body"],
     }),
+  deleteApplicationAccount: (client: Client, call: SdkCall) =>
+    sdk.deleteApplicationAccount({
+      ...options(client, call),
+      path: call.path as sdk.DeleteApplicationAccountData["path"],
+      query: call.query as sdk.DeleteApplicationAccountData["query"],
+      headers: {
+        ...call.headers,
+        "Idempotency-Key": call.headers["Idempotency-Key"]!,
+      },
+    }),
   getApplicationAccount: (client: Client, call: SdkCall) =>
     sdk.getApplicationAccount({
       ...options(client, call),
@@ -367,6 +387,21 @@ const calls = {
     sdk.resolveProjectName({
       ...options(client, call),
       path: call.path as { name: string },
+    }),
+  getProjectUploadDefaults: (client: Client, call: SdkCall) =>
+    sdk.getProjectUploadDefaults({
+      ...options(client, call),
+      path: call.path as sdk.GetProjectUploadDefaultsData["path"],
+    }),
+  setProjectUploadDefaults: (client: Client, call: SdkCall) =>
+    sdk.setProjectUploadDefaults({
+      ...options(client, call),
+      path: call.path as sdk.SetProjectUploadDefaultsData["path"],
+      headers: {
+        ...call.headers,
+        "Idempotency-Key": call.headers["Idempotency-Key"]!,
+      },
+      body: call.body as sdk.SetProjectUploadDefaultsData["body"],
     }),
   getProjectMetadata: (client: Client, call: SdkCall) =>
     sdk.getProjectMetadata({

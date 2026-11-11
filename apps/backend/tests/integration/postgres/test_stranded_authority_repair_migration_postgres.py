@@ -185,11 +185,11 @@ async def test_retained_broader_original_refuses_destructive_downgrade(
     broader_original: StrandedAuthorityRepairResultDTO,
 ) -> None:
     with pytest.raises(RuntimeError, match="Retained stranded-authority repair originals"):
-        command.downgrade(_config(temporary_postgres_settings), "0029_application_key_revocation")
+        command.downgrade(_config(temporary_postgres_settings), "0032_application_retirement")
     async with database.session() as session:
         assert (
             await session.scalar(select(AlembicVersionRow.version_num))
-            == "0030_stranded_authority_repair"
+            == "0033_stranded_authority_repair"
         )
         row = await session.get(
             StrandedAuthorityRepairReceiptRow,
@@ -231,11 +231,11 @@ async def test_empty_broader_history_round_trip_preserves_legacy_metadata_origin
         assert stored is not None
         fingerprint = stored.request_fingerprint
     for _ in range(2):
-        command.downgrade(_config(temporary_postgres_settings), "0029_application_key_revocation")
+        command.downgrade(_config(temporary_postgres_settings), "0032_application_retirement")
         async with database.session() as session:
             assert (
                 await session.scalar(select(AlembicVersionRow.version_num))
-                == "0029_application_key_revocation"
+                == "0032_application_retirement"
             )
         command.upgrade(_config(temporary_postgres_settings), "head")
         async with database.session() as session:
@@ -251,5 +251,5 @@ async def test_empty_broader_history_round_trip_preserves_legacy_metadata_origin
             assert stored is not None and stored.request_fingerprint == fingerprint
             assert (
                 await session.scalar(select(AlembicVersionRow.version_num))
-                == "0030_stranded_authority_repair"
+                == "0033_stranded_authority_repair"
             )

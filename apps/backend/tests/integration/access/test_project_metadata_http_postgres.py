@@ -13,6 +13,7 @@ from sqlalchemy import delete, update
 from tests.support.authentication_evidence import MockAuthenticationEvidence
 from tests.support.mock_application_authenticator import MockApplicationAuthenticator
 from tests.support.project_metadata_scenarios import (
+    capture_metadata_browser,
     seed_another_metadata_project,
     seed_metadata_project,
 )
@@ -74,17 +75,17 @@ HEADERS = {
 
 
 class MockMetadataHttpAuthenticator(HumanSessionAuthenticator):
-    def __init__(self, actor: PrincipalId) -> None:
+    def __init__(self, actor: AccessContextDTO) -> None:
         self._actor = actor
 
     @override
     async def authenticate(self, credential: BrowserSessionCredential | None) -> AccessContextDTO:
         if credential is None or credential.value != "metadata-session":
             raise AuthenticationRequiredError()
-        return AccessContextDTO(self._actor, MockAuthenticationEvidence.browser())
+        return self._actor
 
 
-def application(database: Database, actor: PrincipalId) -> FastAPI:
+def application(database: Database, actor: AccessContextDTO) -> FastAPI:
     app = FastAPI()
     register_error_handlers(app)
     fingerprints = ProjectMetadataFingerprintService(
@@ -122,7 +123,8 @@ async def test_http_allocates_legacy_selector_and_recovers_original_id_after_ren
         await session.execute(
             update(ProjectRow).where(ProjectRow.id == seed.project_id.value).values(name=legacy)
         )
-    app = application(database, seed.principal_id)
+    access = await capture_metadata_browser(database, seed)
+    app = application(database, access)
     url = f"/v1/projects/{seed.project_id.value}/metadata"
     async with httpx2.AsyncClient(
         transport=httpx2.ASGITransport(app=app), base_url="https://api.test", headers=HEADERS
@@ -177,7 +179,8 @@ async def test_duplicate_labels_do_not_select_and_current_authority_guards_repla
             .where(ProjectRow.id.in_((seed.project_id.value, other.project_id.value)))
             .values(name="same")
         )
-    app = application(database, seed.principal_id)
+    access = await capture_metadata_browser(database, seed)
+    app = application(database, access)
     url = f"/v1/projects/{seed.project_id.value}/metadata"
     async with httpx2.AsyncClient(
         transport=httpx2.ASGITransport(app=app), base_url="https://api.test", headers=HEADERS
@@ -232,7 +235,8 @@ async def test_retired_name_guidance_never_discloses_identity_after_visibility_l
 
     async with database.session() as session, session.begin():
         seed = await seed_metadata_project(session)
-    app = application(database, seed.principal_id)
+    access = await capture_metadata_browser(database, seed)
+    app = application(database, access)
     async with httpx2.AsyncClient(
         transport=httpx2.ASGITransport(app=app), base_url="https://api.test", headers=HEADERS
     ) as client:
@@ -247,7 +251,7 @@ async def test_retired_name_guidance_never_discloses_identity_after_visibility_l
                 headers={"Idempotency-Key": "rename"},
             )
         ).status_code == 200
-    actor = seed.principal_id
+    lookup_seed = seed
     async with database.session() as session, session.begin():
         if restriction == "membership":
             await session.execute(
@@ -269,13 +273,15 @@ async def test_retired_name_guidance_never_discloses_identity_after_visibility_l
         elif restriction == "suspended-human":
             await session.execute(
                 update(PrincipalRow)
-                .where(PrincipalRow.id == actor.value)
+                .where(PrincipalRow.id == seed.principal_id.value)
                 .values(status=PrincipalStatus.SUSPENDED)
             )
         else:
-            actor = (await seed_metadata_project(session)).principal_id
+            lookup_seed = await seed_metadata_project(session)
+    if lookup_seed is not seed:
+        access = await capture_metadata_browser(database, lookup_seed)
     async with httpx2.AsyncClient(
-        transport=httpx2.ASGITransport(app=application(database, actor)),
+        transport=httpx2.ASGITransport(app=application(database, access)),
         base_url="https://api.test",
         headers=HEADERS,
     ) as client:

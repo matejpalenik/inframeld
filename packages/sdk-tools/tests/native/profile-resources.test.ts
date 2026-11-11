@@ -13,7 +13,10 @@ import { join } from "node:path";
 import test from "node:test";
 import type { CommandObservation } from "../../src/system/process.ts";
 import { setTimeout as delay } from "node:timers/promises";
-import { withDeniedFixtureRecovery } from "./fixtures/denied-cleanup.ts";
+import {
+  readDeniedUncertainReceipt,
+  withDeniedFixtureRecovery,
+} from "./fixtures/denied-cleanup.ts";
 import childProcess, { execFile, type SpawnOptions } from "node:child_process";
 import { syncBuiltinESMExports } from "node:module";
 import { fileURLToPath } from "node:url";
@@ -489,9 +492,9 @@ test(
           },
         );
         check = "SDK_DENIED_UNCERTAIN_READ";
-        const uncertainText = await readFile(
-          join(work, "uncertain.json"),
-          "utf8",
+        const uncertainText = await readDeniedUncertainReceipt(
+          work,
+          Math.min(testDeadline, began + 45000),
         );
         check = "SDK_DENIED_UNCERTAIN_JSON";
         const uncertainValue: unknown = JSON.parse(uncertainText);

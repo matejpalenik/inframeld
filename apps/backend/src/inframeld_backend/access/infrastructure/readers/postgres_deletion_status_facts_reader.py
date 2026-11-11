@@ -7,14 +7,17 @@ from sqlalchemy.exc import TimeoutError as SqlAlchemyTimeoutError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
+from inframeld_backend.access.application.dtos.browser_session_authentication_dto import (
+    BrowserSessionAuthenticationDTO,
+)
 from inframeld_backend.access.application.dtos.deletion_status_facts_dto import (
     DeletionStatusFactsDTO,
 )
+from inframeld_backend.access.application.dtos.human_credential_facts_dto import (
+    HumanCredentialFactsDTO,
+)
 from inframeld_backend.access.application.dtos.human_oauth_credential_binding_dto import (
     HumanOAuthCredentialBindingDTO,
-)
-from inframeld_backend.access.application.dtos.human_oauth_credential_facts_dto import (
-    HumanOAuthCredentialFactsDTO,
 )
 from inframeld_backend.access.application.protocols.deletion_status_facts_reader import (
     DeletionStatusFactsReader,
@@ -108,7 +111,7 @@ class PostgresDeletionStatusFactsReader(DeletionStatusFactsReader):
             .correlate(PrincipalRow)
         )
         evidence = access.authentication_evidence
-        if isinstance(evidence, HumanOAuthCredentialBindingDTO):
+        if isinstance(evidence, HumanOAuthCredentialBindingDTO | BrowserSessionAuthenticationDTO):
             matches_actor = HumanCredentialStateQueries.binding_matches_actor(evidence)
             version = Nullable(HumanCredentialStateQueries.version_for_actor(evidence))
         else:
@@ -138,13 +141,15 @@ class PostgresDeletionStatusFactsReader(DeletionStatusFactsReader):
                 ),
                 has_pending_recovery=pending,
                 oauth_credential_facts=(
-                    HumanOAuthCredentialFactsDTO(
+                    HumanCredentialFactsDTO(
                         binding_matches_actor=binding_matches,
                         current_version=HumanCredentialVersion(current_version)
                         if current_version is not None
                         else None,
                     )
-                    if isinstance(evidence, HumanOAuthCredentialBindingDTO)
+                    if isinstance(
+                        evidence, HumanOAuthCredentialBindingDTO | BrowserSessionAuthenticationDTO
+                    )
                     else None
                 ),
             )

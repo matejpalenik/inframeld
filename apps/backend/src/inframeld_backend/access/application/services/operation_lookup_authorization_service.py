@@ -4,9 +4,6 @@ from inframeld_backend.access.application.dtos.access_context_dto import AccessC
 from inframeld_backend.access.application.dtos.operation_lookup_authorization_dto import (
     OperationLookupAuthorizationDTO,
 )
-from inframeld_backend.access.application.errors.human_oauth_credential_rejected_error import (
-    HumanOAuthCredentialRejectedError,
-)
 from inframeld_backend.access.application.protocols.operation_lookup_authorizer import (
     OperationLookupAuthorizer,
 )
@@ -65,8 +62,9 @@ class OperationLookupAuthorizationService(OperationLookupAuthorizer):
             has_pending_recovery=facts.has_pending_recovery,
             oauth_credential_facts=facts.oauth_credential_facts,
         )
-        if not eligibility.credential_is_current:
-            raise HumanOAuthCredentialRejectedError()
+        PrincipalAccessEvaluationService.require_current_credential(
+            access=access, principal_access=eligibility
+        )
 
         if request.project_id is not None:
             if facts.project_status is None:

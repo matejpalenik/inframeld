@@ -22,8 +22,8 @@ from inframeld_backend.access.application.dtos.deletion_status_authorization_dto
 from inframeld_backend.access.application.dtos.deletion_status_facts_dto import (
     DeletionStatusFactsDTO,
 )
-from inframeld_backend.access.application.dtos.human_oauth_credential_facts_dto import (
-    HumanOAuthCredentialFactsDTO,
+from inframeld_backend.access.application.dtos.human_credential_facts_dto import (
+    HumanCredentialFactsDTO,
 )
 from inframeld_backend.access.application.protocols.deletion_status_facts_reader import (
     DeletionStatusFactsReader,
@@ -177,7 +177,7 @@ class Scenario:
             BINDING.installation_id,
             ACTOR,
             False,
-            HumanOAuthCredentialFactsDTO(True, HumanCredentialVersion(1)),
+            HumanCredentialFactsDTO(True, HumanCredentialVersion(1)),
         )
         self.observation: DeletionStatusObservationDTO | None = ACTIVE
         self.events: list[str] = []
@@ -462,7 +462,7 @@ def test_stale_oauth_generation_retains_the_existing_invalid_token_challenge() -
     scenario = Scenario()
     scenario.facts = replace(
         scenario.facts,
-        oauth_credential_facts=HumanOAuthCredentialFactsDTO(True, HumanCredentialVersion(2)),
+        oauth_credential_facts=HumanCredentialFactsDTO(True, HumanCredentialVersion(2)),
     )
     with TestClient(app_for(scenario), raise_server_exceptions=False) as client:
         response = client.get(PATH, params={"operationId": OPERATION.value}, headers=BEARER)

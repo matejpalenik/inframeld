@@ -13,6 +13,9 @@ from inframeld_backend.shared.application.dtos.job_effect_observation_dto import
     JobEffectObservationDTO,
 )
 from inframeld_backend.shared.application.dtos.product_job_binding_dto import ProductJobBindingDTO
+from inframeld_backend.shared.application.dtos.project_deletion_job_binding_dto import (
+    ProjectDeletionJobBindingDTO,
+)
 from inframeld_backend.shared.application.enums.job_effect_action import JobEffectAction
 from inframeld_backend.shared.application.errors.application_errors import ConflictError
 from inframeld_backend.shared.application.errors.job_errors import JobStoppedError
@@ -138,6 +141,8 @@ class JobEffectObservationService(JobEffectObservationRecorder):
         ):
             raise ConflictError("The original artifact expectation is incomplete.")
         context = binding.context
+        if isinstance(context.binding, ProjectDeletionJobBindingDTO):
+            raise ConflictError("Project deletion does not authorize artifact effects.")
         if isinstance(context.binding, ProductJobBindingDTO):
             authority = context.binding.authority
             if (authority.installation_id, authority.organization_id, authority.project_id) != (

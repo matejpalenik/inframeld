@@ -6,8 +6,8 @@ import pytest
 from tests.support.authentication_evidence import MockAuthenticationEvidence
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
-from inframeld_backend.access.application.dtos.human_oauth_credential_facts_dto import (
-    HumanOAuthCredentialFactsDTO,
+from inframeld_backend.access.application.dtos.human_credential_facts_dto import (
+    HumanCredentialFactsDTO,
 )
 from inframeld_backend.access.application.dtos.organization_access_facts_dto import (
     OrganizationAccessFactsDTO,
@@ -35,6 +35,7 @@ from inframeld_backend.access.domain.value_objects.organization_id import Organi
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.shared.application.errors.application_errors import (
     AccessDeniedError,
+    AuthenticationRequiredError,
     ResourceNotFoundError,
 )
 
@@ -62,7 +63,9 @@ async def test_eligible_human_reads_empty_assignments_without_create_projects_pe
         PrincipalKind.HUMAN,
         PrincipalStatus.ACTIVE,
     )
-    facts = OrganizationAccessFactsDTO(principal, 7, (), False, None)
+    facts = OrganizationAccessFactsDTO(
+        principal, 7, (), False, HumanCredentialFactsDTO(True, HumanCredentialVersion(1))
+    )
     result = await MyOrganizationAccessService(MockOrganizationFacts(facts)).read(
         access=AccessContextDTO(principal.id, MockAuthenticationEvidence.browser())
     )
@@ -84,7 +87,7 @@ def facts() -> OrganizationAccessFactsDTO:
         7,
         (),
         False,
-        None,
+        HumanCredentialFactsDTO(True, HumanCredentialVersion(1)),
     )
 
 
@@ -137,7 +140,7 @@ async def test_oauth_rechecks_current_generation_and_actor_binding(
 ) -> None:
     changed = replace(
         facts,
-        oauth_credential_facts=HumanOAuthCredentialFactsDTO(
+        oauth_credential_facts=HumanCredentialFactsDTO(
             current != HumanCredentialVersion(1), current
         ),
     )
@@ -152,7 +155,7 @@ async def test_current_oauth_evidence_can_observe_empty_grants(
     facts: OrganizationAccessFactsDTO,
 ) -> None:
     changed = replace(
-        facts, oauth_credential_facts=HumanOAuthCredentialFactsDTO(True, HumanCredentialVersion(1))
+        facts, oauth_credential_facts=HumanCredentialFactsDTO(True, HumanCredentialVersion(1))
     )
     result = await MyOrganizationAccessService(MockOrganizationFacts(changed)).read(
         access=AccessContextDTO(facts.principal.id, MockAuthenticationEvidence.human_oauth())
@@ -169,3 +172,22 @@ async def test_absent_or_wrong_actor_facts_cannot_disclose_another_organization(
         await MyOrganizationAccessService(MockOrganizationFacts(None)).read(access=access)
     with pytest.raises(RuntimeError):
         await MyOrganizationAccessService(MockOrganizationFacts(facts)).read(access=access)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("oauth", [False, True])
+async def test_browser_currentness_preserves_the_presented_credential_family(
+    oauth: bool, facts: OrganizationAccessFactsDTO
+) -> None:
+    """Reject stale evidence before disclosing data, recovering originals or changing authority."""
+    evidence = (
+        MockAuthenticationEvidence.human_oauth() if oauth else MockAuthenticationEvidence.browser()
+    )
+    stale = HumanCredentialFactsDTO(True, HumanCredentialVersion(2))
+    expected = HumanOAuthCredentialRejectedError if oauth else AuthenticationRequiredError
+    observed = replace(facts, oauth_credential_facts=stale)
+    with pytest.raises(AuthenticationRequiredError) as caught:
+        await MyOrganizationAccessService(MockOrganizationFacts(observed)).read(
+            access=AccessContextDTO(facts.principal.id, evidence)
+        )
+    assert type(caught.value) is expected

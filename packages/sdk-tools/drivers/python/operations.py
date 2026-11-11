@@ -36,6 +36,7 @@ from inframeld_sdk.models.project_action_grant_request import ProjectActionGrant
 from inframeld_sdk.models.project_creation_request import ProjectCreationRequest
 from inframeld_sdk.models.project_membership_request import ProjectMembershipRequest
 from inframeld_sdk.models.project_metadata_update_request import ProjectMetadataUpdateRequest
+from inframeld_sdk.models.project_upload_default_request import ProjectUploadDefaultRequest
 from inframeld_sdk_fixtures.api.default_api import DefaultApi
 from inframeld_sdk_fixtures.models.contract_fixture_payload import ContractFixturePayload
 from observations import NativeResponse
@@ -569,6 +570,28 @@ async def create_application_account_async(clients: Clients, call: Call) -> Nati
         application_account_creation_request=ApplicationAccountCreationRequest.model_validate(
             call.body
         ),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+def delete_application_account_sync(clients: Clients, call: Call) -> NativeResponse:
+    return AccessApi(clients.production).delete_application_account_sync_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        application_principal_id=UUID(call.path["application_principal_id"]),
+        expected_access_revision=integer(call.query["expectedAccessRevision"]),
+        idempotency_key=call.headers["Idempotency-Key"],
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def delete_application_account_async(clients: Clients, call: Call) -> NativeResponse:
+    return await AccessApi(clients.production).delete_application_account_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        application_principal_id=UUID(call.path["application_principal_id"]),
+        expected_access_revision=integer(call.query["expectedAccessRevision"]),
+        idempotency_key=call.headers["Idempotency-Key"],
         _headers=call.headers,
         _request_timeout=call.timeout / 1000,
     )
@@ -1181,6 +1204,26 @@ async def remove_access_group_manager_async(clients: Clients, call: Call) -> Nat
     )
 
 
+def delete_project_sync(clients: Clients, call: Call) -> NativeResponse:
+    return AccessApi(clients.production).delete_project_sync_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        expected_access_revision=integer(call.query["expectedAccessRevision"]),
+        idempotency_key=call.headers["Idempotency-Key"],
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def delete_project_async(clients: Clients, call: Call) -> NativeResponse:
+    return await AccessApi(clients.production).delete_project_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        expected_access_revision=integer(call.query["expectedAccessRevision"]),
+        idempotency_key=call.headers["Idempotency-Key"],
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
 def delete_access_group_sync(clients: Clients, call: Call) -> NativeResponse:
     return AccessApi(clients.production).delete_access_group_sync_with_http_info(
         project_id=UUID(call.path["project_id"]),
@@ -1339,7 +1382,49 @@ async def activate_invitation_async(clients: Clients, call: Call) -> NativeRespo
     )
 
 
+def get_project_upload_defaults_sync(clients: Clients, call: Call) -> NativeResponse:
+    return AccessApi(clients.production).get_project_upload_defaults_sync_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def get_project_upload_defaults_async(clients: Clients, call: Call) -> NativeResponse:
+    return await AccessApi(clients.production).get_project_upload_defaults_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+def set_project_upload_defaults_sync(clients: Clients, call: Call) -> NativeResponse:
+    return AccessApi(clients.production).set_project_upload_defaults_sync_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        idempotency_key=call.headers["Idempotency-Key"],
+        project_upload_default_request=ProjectUploadDefaultRequest.model_validate(call.body),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def set_project_upload_defaults_async(clients: Clients, call: Call) -> NativeResponse:
+    return await AccessApi(clients.production).set_project_upload_defaults_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        idempotency_key=call.headers["Idempotency-Key"],
+        project_upload_default_request=ProjectUploadDefaultRequest.model_validate(call.body),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
 BINDINGS: dict[Operation, Binding] = {
+    Operation.GET_PROJECT_UPLOAD_DEFAULTS: Binding(
+        get_project_upload_defaults_sync, get_project_upload_defaults_async
+    ),
+    Operation.SET_PROJECT_UPLOAD_DEFAULTS: Binding(
+        set_project_upload_defaults_sync, set_project_upload_defaults_async
+    ),
     Operation.REVOKE_APPLICATION_KEY: Binding(
         revoke_application_key_sync, revoke_application_key_async
     ),
@@ -1401,9 +1486,13 @@ BINDINGS: dict[Operation, Binding] = {
     Operation.REMOVE_ACCESS_GROUP_MANAGER: Binding(
         remove_access_group_manager_sync, remove_access_group_manager_async
     ),
+    Operation.DELETE_PROJECT: Binding(delete_project_sync, delete_project_async),
     Operation.DELETE_ACCESS_GROUP: Binding(delete_access_group_sync, delete_access_group_async),
     Operation.CREATE_APPLICATION_ACCOUNT: Binding(
         create_application_account_sync, create_application_account_async
+    ),
+    Operation.DELETE_APPLICATION_ACCOUNT: Binding(
+        delete_application_account_sync, delete_application_account_async
     ),
     Operation.GET_APPLICATION_ACCOUNT: Binding(
         get_application_account_sync, get_application_account_async

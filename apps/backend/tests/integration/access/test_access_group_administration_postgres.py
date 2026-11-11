@@ -3,7 +3,6 @@
 import asyncio
 import os
 from dataclasses import replace
-from uuid import UUID
 
 import pytest
 from sqlalchemy import Integer, String, column, delete, func, select, table, update
@@ -18,7 +17,6 @@ from tests.support.access_group_scenarios import (
     group_creation_service,
 )
 from tests.support.application_account_scenarios import create_account
-from tests.support.authentication_evidence import MockAuthenticationEvidence
 from tests.support.project_creation_scenarios import create_project, seed_project_creator
 from tests.support.project_membership_postgres_scenarios import (
     MembershipProjectSeedDTO,
@@ -26,15 +24,11 @@ from tests.support.project_membership_postgres_scenarios import (
     seed_membership_project,
 )
 
-from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
 from inframeld_backend.access.application.dtos.access_group_relationship_result_dto import (
     AccessGroupRelationshipResultDTO,
 )
 from inframeld_backend.access.application.dtos.created_access_group_dto import CreatedAccessGroupDTO
 from inframeld_backend.access.application.dtos.deleted_access_group_dto import DeletedAccessGroupDTO
-from inframeld_backend.access.application.dtos.verified_human_identity_dto import (
-    VerifiedHumanIdentityDTO,
-)
 from inframeld_backend.access.application.enums.access_group_change_kind import (
     AccessGroupChangeKind,
 )
@@ -50,7 +44,6 @@ from inframeld_backend.access.domain.enums.principal_status import PrincipalStat
 from inframeld_backend.access.domain.value_objects.access_group_relationships import (
     AccessGroupRelationships,
 )
-from inframeld_backend.access.domain.value_objects.identity_subject import IdentitySubject
 from inframeld_backend.access.infrastructure.rows.access_group_deletion_result_row import (
     AccessGroupDeletionResultRow,
 )
@@ -139,17 +132,6 @@ async def _seed_group(database: Database) -> tuple[MembershipProjectSeedDTO, Cre
     seed = await seed_membership_project(database)
     await change_membership(database, seed, revision=1, key="join-bob")
     return seed, (await create_group(database, seed.actor.access, seed.project.project_id, 2)).group
-
-
-def _bob_access(seed: MembershipProjectSeedDTO) -> AccessContextDTO:
-    return AccessContextDTO(
-        seed.bob_id,
-        MockAuthenticationEvidence.browser(
-            VerifiedHumanIdentityDTO(
-                seed.actor.binding.identity.authority, IdentitySubject(str(UUID(int=200)))
-            )
-        ),
-    )
 
 
 async def test_exact_name_collision_rolls_back_and_names_are_project_scoped(
@@ -343,7 +325,7 @@ async def test_group_metadata_visibility_does_not_grant_management_or_page_inven
     database: Database,
 ) -> None:
     seed, group = await _seed_group(database)
-    bob = _bob_access(seed)
+    bob = seed.bob_access
     async with open_access_group_read(database) as reader:
         with pytest.raises(ResourceNotFoundError):
             await reader.inspect(access=bob, project_id=group.project_id, selector=group.group_id)
@@ -386,7 +368,7 @@ async def test_unsupported_stored_group_action_does_not_reveal_id_or_exact_name_
     database: Database,
 ) -> None:
     seed, group = await _seed_group(database)
-    bob = _bob_access(seed)
+    bob = seed.bob_access
     async with database.session() as session, session.begin():
         session.add(
             GroupActionGrantRow(
@@ -434,7 +416,7 @@ async def test_member_removal_removes_management_and_replay_requires_current_man
         3,
         "appoint-bob",
     )
-    bob = _bob_access(seed)
+    bob = seed.bob_access
     added = await change_group(
         database, bob, group, seed.bob_id, AccessGroupChangeKind.ADD_MEMBER, 4, "bob-noop"
     )
@@ -533,7 +515,7 @@ async def test_two_manager_departures_serialize_and_fresh_retry_keeps_the_last_m
         3,
         "appoint-bob",
     )
-    alice, bob = seed.actor.access, _bob_access(seed)
+    alice, bob = seed.actor.access, seed.bob_access
     results = await asyncio.gather(
         change_group(
             database,
@@ -636,7 +618,7 @@ async def test_member_pages_recheck_management_and_exact_cursor_scope(database: 
     async with open_access_group_read(database) as reader:
         with pytest.raises(AccessDeniedError):
             await reader.list_principals(
-                access=_bob_access(seed),
+                access=seed.bob_access,
                 query=ListAccessGroupPrincipalsQuery(
                     group.project_id,
                     group.group_id,

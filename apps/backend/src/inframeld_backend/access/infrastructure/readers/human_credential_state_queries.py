@@ -12,6 +12,9 @@ from sqlalchemy import (
 )
 from sqlalchemy.sql.selectable import Exists, ScalarSelect
 
+from inframeld_backend.access.application.dtos.browser_session_authentication_dto import (
+    BrowserSessionAuthenticationDTO,
+)
 from inframeld_backend.access.application.dtos.human_oauth_credential_binding_dto import (
     HumanOAuthCredentialBindingDTO,
 )
@@ -143,7 +146,35 @@ class HumanCredentialStateQueries:
         )
 
     @staticmethod
-    def binding_matches_actor(binding: HumanOAuthCredentialBindingDTO) -> Exists:
+    def for_identity_with_principal(
+        identity: VerifiedHumanIdentityDTO,
+    ) -> Select[
+        tuple[UUID, int | None, bool, bool, HumanIdentityLinkRow | None, PrincipalRow | None]
+    ]:
+        """Observe the narrow state prefix and exact optional link/principal together."""
+        return (
+            HumanCredentialStateQueries.for_identity(identity)
+            .add_columns(Nullable(HumanIdentityLinkRow), Nullable(PrincipalRow))
+            .outerjoin_from(
+                InstallationIdentityRow,
+                HumanIdentityLinkRow,
+                and_(
+                    HumanIdentityLinkRow.authority == identity.authority.value,
+                    HumanIdentityLinkRow.subject == identity.subject.value,
+                ),
+            )
+            .outerjoin_from(
+                HumanIdentityLinkRow,
+                PrincipalRow,
+                PrincipalRow.id == HumanIdentityLinkRow.principal_id,
+            )
+            .execution_options(populate_existing=True, autoflush=False)
+        )
+
+    @staticmethod
+    def binding_matches_actor(
+        binding: HumanOAuthCredentialBindingDTO | BrowserSessionAuthenticationDTO,
+    ) -> Exists:
         """Match the current installation and identity link to the outer principal."""
         return (
             select(InstallationIdentityRow.installation_id)
@@ -154,7 +185,9 @@ class HumanCredentialStateQueries:
         )
 
     @staticmethod
-    def version_for_actor(binding: HumanOAuthCredentialBindingDTO) -> ScalarSelect[int]:
+    def version_for_actor(
+        binding: HumanOAuthCredentialBindingDTO | BrowserSessionAuthenticationDTO,
+    ) -> ScalarSelect[int]:
         """Select the matching actor binding's version, which may be absent in storage."""
         return (
             select(HumanCredentialVersionRow.version)
@@ -178,7 +211,7 @@ class HumanCredentialStateQueries:
 
     @staticmethod
     def _actor_binding_conditions(
-        binding: HumanOAuthCredentialBindingDTO,
+        binding: HumanOAuthCredentialBindingDTO | BrowserSessionAuthenticationDTO,
     ) -> tuple[ColumnElement[bool], ...]:
         """Bind credential queries to the admitted human authority, subject and version."""
         return (

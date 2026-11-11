@@ -14,7 +14,9 @@ use hyper::{Request, Response, body::Incoming, service::service_fn};
 use hyper_util::rt::TokioIo;
 use inframeld_cli::{
     auth::{
-        flow::{AuthorizationReady, BrowserLaunchError, BrowserLauncher, HostContext, repair},
+        flow::{
+            AuthorizationReady, BrowserLaunchError, BrowserLauncher, HostContext, bootstrap, repair,
+        },
         maintenance_handoff::{CleanupStatus, ExecutionSpec, MaintenanceEffect},
     },
     discovery::DiscoveryOptions,
@@ -60,6 +62,7 @@ enum ProviderBehavior {
     SessionUnavailable,
     TokenOversize,
     TokenRedirect,
+    DiscoveryStalled,
 }
 
 struct State {
@@ -72,6 +75,7 @@ struct State {
     challenge: String,
     redirect: String,
     calls: BTreeMap<String, usize>,
+    routes: Vec<String>,
 }
 
 // Keep this fixture's closed protocol routes and rejection scenarios together.
@@ -88,7 +92,12 @@ async fn response(request: Request<Incoming>, state: &Mutex<State>) -> Response<
     let delay = {
         let mut state = state.lock().unwrap();
         *state.calls.entry(path.clone()).or_default() += 1;
-        if path == "/issuer/revoke" {
+        state.routes.push(path.clone());
+        if path == "/.well-known/oauth-protected-resource/missing"
+            && matches!(state.behavior, ProviderBehavior::DiscoveryStalled)
+        {
+            Some(Duration::from_secs(6))
+        } else if path == "/issuer/revoke" {
             match state.behavior {
                 ProviderBehavior::AccessRevocationStalled => Some(Duration::from_secs(6)),
                 ProviderBehavior::SlowRefreshRevocationRejected => Some(Duration::from_secs(3)),
@@ -333,6 +342,7 @@ async fn response(request: Request<Incoming>, state: &Mutex<State>) -> Response<
 struct Provider {
     base: String,
     ca: reqwest::Certificate,
+    ca_pem: String,
     state: Arc<Mutex<State>>,
     stop: Option<oneshot::Sender<()>>,
     task: Option<JoinHandle<()>>,
@@ -375,6 +385,7 @@ impl Provider {
             challenge: String::new(),
             redirect: String::new(),
             calls: BTreeMap::new(),
+            routes: Vec::new(),
         }));
         let (stop, mut stopping) = oneshot::channel();
         let serving = state.clone();
@@ -399,6 +410,7 @@ impl Provider {
         Self {
             base,
             ca,
+            ca_pem: certificate.pem(),
             state,
             stop: Some(stop),
             task: Some(task),
@@ -524,6 +536,292 @@ print(json.dumps({'schemaVersion':1,'mode':request['mode'],'operationId':request
     )
     .unwrap();
     (directory, spec)
+}
+
+fn bootstrap_request() -> Vec<u8> {
+    let mut value: serde_json::Value = serde_json::from_slice(&request()).unwrap();
+    value["mode"] = serde_json::json!("bootstrap-first-administrator");
+    value["expectedAccessRevision"] = serde_json::json!(0);
+    value.as_object_mut().unwrap().remove("responsibility");
+    serde_json::to_vec(&value).unwrap()
+}
+
+fn bootstrap_execution() -> (tempfile::TempDir, ExecutionSpec) {
+    let (directory, execution) = execution();
+    std::fs::write(directory.path().join("maintenance.py"), r"import json, sys
+request=json.load(sys.stdin)
+assert len(request)==9
+assert request['identityProof']=={'kind':'hydra-access-token','accessToken':'synthetic-access-token'}
+assert request['mode']=='bootstrap-first-administrator'
+assert request['expectedAccessRevision']==0
+assert 'responsibility' not in request
+print(json.dumps({'schemaVersion':1,'mode':request['mode'],'operationId':request['operationId'],'installationId':request['expectedInstallationId'],'principalId':'00000000-0000-0000-0000-00000000000a','accessRevision':1,'outcome':'bootstrapped'}))
+").unwrap();
+    (directory, execution)
+}
+
+#[tokio::test]
+async fn bootstrap_claim_accepts_verified_unadmitted_identity_without_preclaim_session() {
+    let provider = Provider::start().await;
+    provider.state.lock().unwrap().behavior = ProviderBehavior::SessionDenied;
+    let (_directory, execution) = bootstrap_execution();
+    let outcome = bootstrap(
+        &provider.host(),
+        &bootstrap_request(),
+        &execution,
+        &mut browser(&provider),
+        false,
+        std::future::pending(),
+    )
+    .await;
+    let calls = provider.state.lock().unwrap().calls.clone();
+    provider.finish().await;
+    assert_eq!(calls.get("/api/v1/session"), None);
+    assert_eq!(calls.get("/issuer/token"), Some(&1));
+    assert_eq!(calls.get("/issuer/revoke"), Some(&1));
+    assert!(
+        outcome.is_ok(),
+        "verified unadmitted bootstrap must reach the host claim"
+    );
+    let outcome = outcome.unwrap();
+    assert!(matches!(
+        outcome.maintenance.effect,
+        MaintenanceEffect::Committed { .. }
+    ));
+    assert_eq!(
+        outcome.maintenance.process_cleanup,
+        CleanupStatus::Confirmed
+    );
+    assert_eq!(outcome.credential_cleanup, CleanupStatus::Confirmed);
+}
+
+#[tokio::test]
+async fn bootstrap_current_admission_does_not_replace_a_missing_original_receipt() {
+    use inframeld_cli::auth::flow::SessionObservation;
+    let provider = Provider::start().await;
+    let (directory, execution) = bootstrap_execution();
+    std::fs::write(directory.path().join("maintenance.py"),
+        "import json, sys\nrequest=json.load(sys.stdin)\nassert request['identityProof']['kind']=='hydra-access-token'\n").unwrap();
+    let outcome = bootstrap(
+        &provider.host(),
+        &bootstrap_request(),
+        &execution,
+        &mut browser(&provider),
+        true,
+        std::future::pending(),
+    )
+    .await
+    .unwrap();
+    let routes = provider.state.lock().unwrap().routes.clone();
+    provider.finish().await;
+    assert!(matches!(outcome.maintenance.effect,
+        MaintenanceEffect::Unknown { ref operation_id } if operation_id == "original-operation"));
+    assert!(matches!(outcome.current_session,
+        SessionObservation::Admitted { principal_id } if principal_id == Uuid::from_u128(10)));
+    let safe = serde_json::to_value(&outcome).unwrap();
+    assert_eq!(safe["maintenance"]["effect"]["status"], "unknown");
+    assert_eq!(
+        safe["currentSession"]["principalId"],
+        Uuid::from_u128(10).to_string()
+    );
+    assert!(!safe.to_string().contains("synthetic-access-token"));
+    assert!(!format!("{outcome:?}").contains("synthetic-access-token"));
+    assert_eq!(
+        outcome.maintenance.process_cleanup,
+        CleanupStatus::Confirmed
+    );
+    assert_eq!(outcome.credential_cleanup, CleanupStatus::Confirmed);
+    assert!(
+        routes
+            .iter()
+            .position(|path| path == "/api/v1/session")
+            .unwrap()
+            < routes
+                .iter()
+                .position(|path| path == "/issuer/revoke")
+                .unwrap()
+    );
+}
+
+#[tokio::test]
+async fn bootstrap_receipt_survives_an_unavailable_postclaim_session() {
+    use inframeld_cli::auth::flow::SessionObservation;
+    let provider = Provider::start().await;
+    provider.state.lock().unwrap().behavior = ProviderBehavior::SessionUnavailable;
+    let (_directory, execution) = bootstrap_execution();
+    let result = bootstrap(
+        &provider.host(),
+        &bootstrap_request(),
+        &execution,
+        &mut browser(&provider),
+        true,
+        std::future::pending(),
+    )
+    .await
+    .unwrap();
+    let routes = provider.state.lock().unwrap().routes.clone();
+    provider.finish().await;
+    assert!(matches!(
+        result.maintenance.effect,
+        MaintenanceEffect::Committed { .. }
+    ));
+    assert_eq!(result.current_session, SessionObservation::Unavailable);
+    assert_eq!(result.credential_cleanup, CleanupStatus::Confirmed);
+    assert_eq!(
+        routes
+            .iter()
+            .filter(|path| *path == "/api/v1/session")
+            .count(),
+        1
+    );
+    assert!(
+        routes
+            .iter()
+            .position(|path| path == "/api/v1/session")
+            .unwrap()
+            < routes
+                .iter()
+                .position(|path| path == "/issuer/revoke")
+                .unwrap()
+    );
+}
+
+#[tokio::test]
+async fn bootstrap_original_recovery_acquires_fresh_proof_for_the_exact_same_request() {
+    let provider = Provider::start().await;
+    let (directory, execution) = bootstrap_execution();
+    let original = bootstrap_request();
+    let script = directory.path().join("maintenance.py");
+    let marker = directory.path().join("original-meaning.json");
+    let original_script = std::fs::read_to_string(&script).unwrap();
+    let witness = format!(
+        r"
+from pathlib import Path
+original=Path({})
+meaning={{k:v for k,v in request.items() if k!='identityProof'}}
+if original.exists():
+    assert json.loads(original.read_text())==meaning
+else:
+    original.write_text(json.dumps(meaning))
+",
+        serde_json::to_string(marker.to_str().unwrap()).unwrap()
+    );
+    std::fs::write(
+        &script,
+        original_script.replace(
+            "assert len(request)==9",
+            &format!("{witness}\nassert len(request)==9"),
+        ),
+    )
+    .unwrap();
+    for _ in 0..2 {
+        let result = bootstrap(
+            &provider.host(),
+            &original,
+            &execution,
+            &mut browser(&provider),
+            false,
+            std::future::pending(),
+        )
+        .await
+        .unwrap();
+        assert!(matches!(
+            result.maintenance.effect,
+            MaintenanceEffect::Committed { .. }
+        ));
+        assert_eq!(result.credential_cleanup, CleanupStatus::Confirmed);
+    }
+    let calls = provider.state.lock().unwrap().calls.clone();
+    provider.finish().await;
+    assert_eq!(calls.get("/issuer/token"), Some(&2));
+    assert_eq!(calls.get("/issuer/revoke"), Some(&2));
+    assert_eq!(calls.get("/api/v1/session"), None);
+    let retained = std::fs::read_to_string(marker).unwrap();
+    assert!(!retained.contains("accessToken"));
+    assert!(!retained.contains("synthetic-access-token"));
+}
+
+#[tokio::test]
+async fn bootstrap_rejects_wrong_person_and_denial_before_host_submission() {
+    use inframeld_cli::auth::flow::FailureKind;
+    for behavior in [ProviderBehavior::WrongSubject, ProviderBehavior::Denied] {
+        let provider = Provider::start().await;
+        provider.state.lock().unwrap().behavior = behavior;
+        let (directory, execution) = bootstrap_execution();
+        let script = directory.path().join("maintenance.py");
+        let marker = directory.path().join("started");
+        let body = std::fs::read_to_string(&script).unwrap();
+        std::fs::write(
+            &script,
+            format!(
+                "open({},'w').write('started')\n{body}",
+                serde_json::to_string(marker.to_str().unwrap()).unwrap()
+            ),
+        )
+        .unwrap();
+        let result = bootstrap(
+            &provider.host(),
+            &bootstrap_request(),
+            &execution,
+            &mut browser(&provider),
+            false,
+            std::future::pending(),
+        )
+        .await
+        .unwrap_err();
+        let calls = provider.state.lock().unwrap().calls.clone();
+        provider.finish().await;
+        assert!(!marker.exists());
+        assert_eq!(calls.get("/api/v1/session"), None);
+        if let ProviderBehavior::WrongSubject = behavior {
+            assert_eq!(result.kind, FailureKind::Identity);
+            assert_eq!(calls.get("/issuer/revoke"), Some(&1));
+        } else {
+            assert_eq!(result.kind, FailureKind::Denied);
+            assert_eq!(calls.get("/issuer/token"), None);
+        }
+    }
+}
+
+#[tokio::test]
+async fn bootstrap_rejects_misbound_or_repair_intent_before_discovery() {
+    use inframeld_cli::auth::flow::FailureKind;
+    let provider = Provider::start().await;
+    let (_directory, execution) = bootstrap_execution();
+    for (field, value) in [
+        (
+            "expectedInstallationId",
+            serde_json::json!(Uuid::from_u128(99)),
+        ),
+        ("expectedIdentityId", serde_json::json!(Uuid::from_u128(99))),
+    ] {
+        let mut request: serde_json::Value = serde_json::from_slice(&bootstrap_request()).unwrap();
+        request[field] = value;
+        let result = bootstrap(
+            &provider.host(),
+            &serde_json::to_vec(&request).unwrap(),
+            &execution,
+            &mut browser(&provider),
+            false,
+            std::future::pending(),
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(result.kind, FailureKind::Binding);
+    }
+    let result = bootstrap(
+        &provider.host(),
+        &request(),
+        &execution,
+        &mut browser(&provider),
+        false,
+        std::future::pending(),
+    )
+    .await
+    .unwrap_err();
+    assert_eq!(result.kind, FailureKind::InvalidRequest);
+    assert!(provider.state.lock().unwrap().calls.is_empty());
+    provider.finish().await;
 }
 
 #[tokio::test]
@@ -1032,4 +1330,296 @@ async fn recipient_diagnostic_refresh_rejection_does_not_restart_the_shared_clea
     assert_eq!(error.credential_cleanup, CleanupStatus::Unconfirmed);
     assert_eq!(calls.get("/issuer/revoke"), Some(&2));
     assert!(elapsed >= Duration::from_secs(5) && elapsed < Duration::from_secs(6));
+}
+
+#[tokio::test]
+async fn public_bootstrap_noninteractive_execution_starts_no_discovery_browser_or_claim() {
+    let provider = Provider::start().await;
+    let directory = tempfile::tempdir().unwrap();
+    let host = directory.path().join("host.json");
+    let request = directory.path().join("request.json");
+    let execution = directory.path().join("execution.json");
+    std::fs::write(&host,serde_json::to_vec(&serde_json::json!({"schemaVersion":1,
+        "api":format!("{}/missing",provider.base),"issuer":format!("{}/issuer/",provider.base),
+        "clientId":"inframeld-cli","installationId":Uuid::from_u128(1),"expectedIdentityId":Uuid::from_u128(2),
+        "certificateAuthorities":[provider.ca_pem]})).unwrap()).unwrap();
+    std::fs::write(&request, bootstrap_request()).unwrap();
+    std::fs::write(
+        &execution,
+        br#"{"program":"/this-must-not-start","args":[],"environment":{}}"#,
+    )
+    .unwrap();
+    let arguments = vec![
+        "inframeld".to_owned(),
+        "auth".into(),
+        "bootstrap-first-administrator".into(),
+        "--json".into(),
+        "--no-input".into(),
+        "--host-context".into(),
+        host.to_str().unwrap().into(),
+        "--request".into(),
+        request.to_str().unwrap().into(),
+        "--exec-spec".into(),
+        execution.to_str().unwrap().into(),
+    ];
+    let (exit, output, diagnostics) = tokio::task::spawn_blocking(move || {
+        let mut output = Vec::new();
+        let mut diagnostics = Vec::new();
+        let exit = inframeld_cli::run(arguments, &mut output, &mut diagnostics, false).unwrap();
+        (exit, output, diagnostics)
+    })
+    .await
+    .unwrap();
+    let calls = provider.state.lock().unwrap().calls.clone();
+    provider.finish().await;
+    // Public noninteractive browser proof is rejected before all effects. The
+    // existing controlled operation tests retain transport-failure coverage.
+    assert_eq!(exit, 2);
+    let result: serde_json::Value = serde_json::from_slice(&output).unwrap();
+    assert_eq!(result.as_object().unwrap().len(), 6);
+    assert_eq!(result["outcome"], "failed");
+    assert_eq!(result["error"]["code"], "interaction_required");
+    assert_eq!(result["data"], serde_json::Value::Null);
+    assert!(calls.is_empty());
+    for path in [
+        "/issuer/token",
+        "/issuer/authorize",
+        "/api/v1/session",
+        "/issuer/revoke",
+    ] {
+        assert_eq!(calls.get(path), None);
+    }
+    assert!(!String::from_utf8_lossy(&output).contains("synthetic-access-token"));
+    assert!(
+        String::from_utf8(diagnostics)
+            .unwrap()
+            .contains("interactive input")
+    );
+}
+
+// Keep the same direct child and sole waiter as the executable process tests.
+// Keep this one child and sole waiter together through failure and finalization.
+#[allow(clippy::too_many_lines)]
+fn public_tty_process(
+    arguments: Vec<String>,
+    state: &Mutex<State>,
+    signal: Option<nix::sys::signal::Signal>,
+    after_spawn: Result<(), &'static str>,
+) -> Result<std::process::Output, (Vec<std::io::Error>, Option<std::process::ExitStatus>)> {
+    use std::process::{Command as ProcessCommand, Stdio};
+    let python = ProcessCommand::new("python3")
+        .args(["-c", "import sys; print(sys.executable)"])
+        .output()
+        .unwrap();
+    assert!(python.status.success());
+    let python = String::from_utf8(python.stdout).unwrap();
+    // Only fd setup precedes exec. Python is replaced, not kept as a second
+    // process or waiter. The master must survive exec until this CLI exits.
+    let setup = r"import os, sys
+master, slave = os.openpty()
+os.dup2(slave, 0, inheritable=True)
+if slave != 0:
+    os.close(slave)
+os.set_inheritable(master, True)
+os.execv(sys.argv[1], sys.argv[1:])
+";
+    let mut child = ProcessCommand::new(python.trim())
+        .args(["-c", setup, env!("CARGO_BIN_EXE_inframeld")])
+        .args(arguments)
+        .env_clear()
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    let cutoff = std::time::Instant::now() + Duration::from_secs(5);
+    let mut sent = false;
+    let mut ownership_known = true;
+    let operation = (|| -> std::io::Result<()> {
+        after_spawn.map_err(std::io::Error::other)?;
+        loop {
+            match child.try_wait() {
+                Ok(Some(_)) => break,
+                Ok(None) => {}
+                Err(error) => {
+                    ownership_known = false;
+                    return Err(error);
+                }
+            }
+            if let Some(signal) = signal
+                && !sent
+            {
+                let ready = state
+                    .lock()
+                    .map_err(|_| std::io::Error::other("controlled provider state is poisoned"))?
+                    .calls
+                    .contains_key("/.well-known/oauth-protected-resource/missing");
+                if ready {
+                    let pid = i32::try_from(child.id()).map_err(std::io::Error::other)?;
+                    nix::sys::signal::kill(nix::unistd::Pid::from_raw(pid), signal)
+                        .map_err(|error| std::io::Error::from_raw_os_error(error as i32))?;
+                    sent = true;
+                }
+            }
+            if std::time::Instant::now() >= cutoff {
+                return Err(std::io::Error::other(
+                    "the controlled public child exceeded its existing test wait",
+                ));
+            }
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        if signal.is_some() && !sent {
+            return Err(std::io::Error::other(
+                "the controlled signal boundary was not reached",
+            ));
+        }
+        Ok(())
+    })();
+    let mut errors: Vec<_> = operation.err().into_iter().collect();
+    // No assertion can unwind past this owner. An uncertain wait never grants
+    // permission to signal a numeric PID that may no longer be ours.
+    let killed = !errors.is_empty()
+        && ownership_known
+        && child.kill().map_err(|error| errors.push(error)).is_ok();
+    let waited = if !ownership_known {
+        None
+    } else if !errors.is_empty() && !killed {
+        child
+            .try_wait()
+            .map_err(|error| errors.push(error))
+            .ok()
+            .flatten()
+    } else {
+        child.wait().map_err(|error| errors.push(error)).ok()
+    };
+    // These scenarios finish before browser dispatch, so no descendant can
+    // retain the pipes. Wait/reap completes before bounded-output assertions.
+    let output = if waited.is_some() {
+        child
+            .wait_with_output()
+            .map_err(|error| errors.push(error))
+            .ok()
+    } else {
+        errors.push(std::io::Error::other("owned child cleanup is unconfirmed"));
+        None
+    };
+    if output
+        .as_ref()
+        .is_some_and(|output| output.stdout.len() > 16_384 || output.stderr.len() > 4_096)
+    {
+        errors.push(std::io::Error::other(
+            "the controlled public output exceeded its existing bound",
+        ));
+    }
+    match output {
+        Some(output) if errors.is_empty() => Ok(output),
+        _ => Err((errors, waited)),
+    }
+}
+
+#[tokio::test]
+async fn real_public_tty_entry_and_signals_preserve_policy_and_fixed_outcomes() {
+    use nix::sys::signal::Signal;
+    for (signal, no_input, expected) in [
+        (None, false, 1),
+        (None, true, 2),
+        (Some(Signal::SIGINT), false, 130),
+        (Some(Signal::SIGTERM), false, 143),
+    ] {
+        let provider = Provider::start().await;
+        if signal.is_some() {
+            provider.state.lock().unwrap().behavior = ProviderBehavior::DiscoveryStalled;
+        }
+        let directory = tempfile::tempdir().unwrap();
+        let host = directory.path().join("host.json");
+        let request = directory.path().join("request.json");
+        let execution = directory.path().join("execution.json");
+        std::fs::write(&host,serde_json::to_vec(&serde_json::json!({"schemaVersion":1,
+            "api":format!("{}/missing",provider.base),"issuer":format!("{}/issuer/",provider.base),
+            "clientId":"inframeld-cli","installationId":Uuid::from_u128(1),"expectedIdentityId":Uuid::from_u128(2),
+            "certificateAuthorities":[provider.ca_pem]})).unwrap()).unwrap();
+        std::fs::write(&request, bootstrap_request()).unwrap();
+        std::fs::write(
+            &execution,
+            br#"{"program":"/must-not-start","args":[],"environment":{}}"#,
+        )
+        .unwrap();
+        let mut arguments = vec![
+            "auth".into(),
+            "bootstrap-first-administrator".into(),
+            "--json".into(),
+            "--host-context".into(),
+            host.to_str().unwrap().into(),
+            "--request".into(),
+            request.to_str().unwrap().into(),
+            "--exec-spec".into(),
+            execution.to_str().unwrap().into(),
+        ];
+        if no_input {
+            arguments.push("--no-input".into());
+        }
+        let state = provider.state.clone();
+        let output = tokio::task::spawn_blocking(move || {
+            public_tty_process(arguments, &state, signal, Ok(()))
+        })
+        .await
+        .unwrap()
+        .unwrap();
+        let calls = provider.state.lock().unwrap().calls.clone();
+        provider.finish().await;
+        assert_eq!(output.status.code(), Some(expected));
+        let result: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(result.as_object().unwrap().len(), 6);
+        if no_input {
+            assert_eq!(result["error"]["code"], "interaction_required");
+            assert!(calls.is_empty());
+        } else {
+            assert_eq!(
+                calls.get("/.well-known/oauth-protected-resource/missing"),
+                Some(&1)
+            );
+            if signal.is_some() {
+                assert_eq!(result["outcome"], "interrupted");
+                assert_eq!(result["data"]["kind"], "cancelled");
+            } else {
+                assert_eq!(result["data"]["kind"], "discovery");
+            }
+            assert_eq!(result["data"]["resourceCleanup"], "not-needed");
+            assert_eq!(result["data"]["credentialCleanup"], "not-needed");
+        }
+        for path in [
+            "/issuer/token",
+            "/issuer/authorize",
+            "/api/v1/session",
+            "/issuer/revoke",
+        ] {
+            assert_eq!(calls.get(path), None);
+        }
+        assert!(!String::from_utf8_lossy(&output.stdout).contains("synthetic-access-token"));
+    }
+}
+
+#[tokio::test]
+async fn public_tty_child_is_finalized_before_reporting_controlled_failure() {
+    use std::os::unix::process::ExitStatusExt as _;
+    let provider = Provider::start().await;
+    let state = provider.state.clone();
+    let result = tokio::task::spawn_blocking(move || {
+        public_tty_process(
+            vec!["version".into()],
+            &state,
+            None,
+            Err("controlled after-spawn failure"),
+        )
+    })
+    .await
+    .unwrap();
+    provider.finish().await;
+    let (errors, status) = result.unwrap_err();
+    assert_eq!(
+        errors.first().map(ToString::to_string),
+        Some("controlled after-spawn failure".into())
+    );
+    let status = status.unwrap();
+    assert!(status.success() || status.signal() == Some(nix::libc::SIGKILL));
 }

@@ -15,9 +15,6 @@ from inframeld_backend.access.application.dtos.organization_action_grant_change_
 from inframeld_backend.access.application.dtos.organization_grant_management_facts_dto import (
     OrganizationGrantManagementFactsDTO,
 )
-from inframeld_backend.access.application.errors.human_oauth_credential_rejected_error import (
-    HumanOAuthCredentialRejectedError,
-)
 from inframeld_backend.access.application.protocols.organization_action_grant_changer import (
     OrganizationActionGrantChanger,
 )
@@ -172,8 +169,9 @@ class OrganizationActionGrantChangeService(OrganizationActionGrantChanger):
                     has_pending_recovery=facts.actor_has_pending_recovery,
                     oauth_credential_facts=facts.actor_oauth_credential_facts,
                 )
-                if not eligibility.credential_is_current:
-                    raise HumanOAuthCredentialRejectedError()
+                PrincipalAccessEvaluationService.require_current_credential(
+                    access=access, principal_access=eligibility
+                )
                 if not OrganizationGrantPolicy.may_manage(
                     actor_access=eligibility, can_grant_action=facts.actor_can_grant
                 ):

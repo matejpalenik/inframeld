@@ -30,6 +30,9 @@ from tests.support.spending_scenarios import wait_for_database_lock
 from inframeld_backend.access.application.commands.delete_access_group_command import (
     DeleteAccessGroupCommand,
 )
+from inframeld_backend.access.application.commands.delete_application_account_command import (
+    DeleteApplicationAccountCommand,
+)
 from inframeld_backend.access.application.commands.repair_stranded_authority_command import (
     RepairStrandedAuthorityCommand,
 )
@@ -68,6 +71,9 @@ from inframeld_backend.access.application.enums.stranded_authority_maintenance_e
 from inframeld_backend.access.application.errors.stranded_authority_maintenance_error import (
     StrandedAuthorityMaintenanceError,
 )
+from inframeld_backend.access.application.services.application_account_deletion_fingerprint_service import (
+    ApplicationAccountDeletionFingerprintService,
+)
 from inframeld_backend.access.application.services.principal_access_evaluation_service import (
     PrincipalAccessEvaluationService,
 )
@@ -90,6 +96,9 @@ from inframeld_backend.access.infrastructure.resources.postgres_identity_coordin
 )
 from inframeld_backend.access.infrastructure.rows.access_audit_event_row import AccessAuditEventRow
 from inframeld_backend.access.infrastructure.rows.access_group_row import AccessGroupRow
+from inframeld_backend.access.infrastructure.rows.application_account_row import (
+    ApplicationAccountRow,
+)
 from inframeld_backend.access.infrastructure.rows.application_action_grant_row import (
     ApplicationActionGrantRow,
 )
@@ -128,6 +137,9 @@ from inframeld_backend.access.infrastructure.writers.postgres_stranded_authority
     PostgresStrandedAuthorityRepairWriter,
 )
 from inframeld_backend.bootstrap.access_group_composition import open_access_group_deletion
+from inframeld_backend.bootstrap.application_account_composition import (
+    open_application_account_deletion,
+)
 from inframeld_backend.shared.application.dtos.idempotency_context_dto import IdempotencyContextDTO
 from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.services.request_fingerprint_service import (
@@ -210,19 +222,8 @@ async def _authorized_group_original(
         )
         == 0
     )
-    facts = StrandedAuthorityRepairFactsDTO(
-        observed.installation_id,
-        observed.recipient,
-        responsibility,
-        observed.project_status,
-        observed.access_revision,
-        observed.is_project_member,
-        observed.has_pending_recovery,
-        observed.oauth_credential_facts,
-        False,
-        True,
-        observed.observed_at,
-    )
+    assert observed.target_exists and observed.target_accepts_assignment
+    facts = replace(observed, eligible_grantor_exists=False)
     result = StrandedAuthorityRepairResultDTO(
         request.operation_id,
         request.expected_installation_id,
@@ -462,6 +463,95 @@ async def test_repair_replays_original_after_exact_assignment_removal_without_re
                 access=access, command=replace(request, reason="Different reviewed intent")
             )
         assert failure.value.code is Code.KEY_REUSED
+
+
+async def test_retirement_preserves_repair_original_and_blocks_fresh_assignment(
+    database: Database,
+) -> None:
+    access, request, _ = await seed_stranded_repair_target(database, "application-account")
+    responsibility = request.responsibility
+    assert isinstance(responsibility, ActionGrantorRepairResponsibilityDTO)
+    target = responsibility.target
+    assert isinstance(target, ApplicationAccountGrantTargetDTO)
+    project_id = target.project_id.value
+    principal_id = target.application_principal_id.value
+    async with database.session() as session:
+        original = await stranded_repair_service(session).repair(access=access, command=request)
+
+    fingerprints = ApplicationAccountDeletionFingerprintService(
+        RequestFingerprintService(RequestFingerprintKey(b"r" * 32))
+    )
+    async with open_application_account_deletion(database, fingerprints) as retirement:
+        retired = await retirement.delete(
+            access=access,
+            command=DeleteApplicationAccountCommand(
+                target.project_id, target.application_principal_id, original.access_revision
+            ),
+            context=IdempotencyContextDTO(
+                HttpMethod.DELETE,
+                f"/v1/projects/{project_id}/application-accounts/{principal_id}",
+                IdempotencyKey("retire-repaired-application"),
+            ),
+        )
+    assert retired.original.access_revision == original.access_revision + 1
+
+    refreshed = replace(
+        request, identity_proof=HumanAccessTokenCredential("fresh-same-human-proof")
+    )
+    async with database.session() as session:
+        replay = await stranded_repair_service(session).repair(access=access, command=refreshed)
+    assert replay == original
+
+    fresh = replace(
+        refreshed,
+        operation_id=OperationId("repair-after-retirement"),
+        expected_access_revision=retired.original.access_revision,
+    )
+    async with database.session() as session:
+        with pytest.raises(StrandedAuthorityMaintenanceError) as failure:
+            await stranded_repair_service(session).repair(access=access, command=fresh)
+        assert failure.value.code is Code.NOT_STRANDED
+
+    async with database.session() as session, session.begin():
+        account = await session.get(ApplicationAccountRow, principal_id)
+        assert account is not None and account.project_id == project_id
+        principal = await session.get(PrincipalRow, principal_id)
+        assert principal is not None and principal.status is PrincipalStatus.RETIRED
+        project = await session.get(ProjectRow, project_id)
+        assert project is not None and project.access_revision == retired.original.access_revision
+        assert await session.get(ProjectMembershipRow, (project_id, principal_id)) is None
+        assert (
+            await session.scalar(
+                select(ApplicationActionGrantRow.application_principal_id).where(
+                    ApplicationActionGrantRow.project_id == project_id,
+                    ApplicationActionGrantRow.application_principal_id == principal_id,
+                )
+            )
+            is None
+        )
+        reader = PostgresStrandedAuthorityRepairFactsReader(session)
+        retained = await reader.receipt(
+            installation_id=request.expected_installation_id, operation_id=request.operation_id
+        )
+        assert retained is not None and retained.result == original
+        assert (
+            await reader.receipt(
+                installation_id=fresh.expected_installation_id, operation_id=fresh.operation_id
+            )
+            is None
+        )
+        assert (
+            await session.scalar(
+                select(func.count())
+                .select_from(AccessAuditEventRow)
+                .where(
+                    AccessAuditEventRow.project_id == project_id,
+                    AccessAuditEventRow.target_id == principal_id,
+                    AccessAuditEventRow.event_type == "stranded_authority_repaired",
+                )
+            )
+            == 1
+        )
 
 
 async def test_current_group_manager_prevents_document_action_repair_without_explicit_grant(

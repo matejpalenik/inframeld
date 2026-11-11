@@ -4,12 +4,16 @@ import asyncio
 from dataclasses import dataclass, field, replace
 from enum import StrEnum
 from typing import override
+from uuid import UUID
 
 import pytest
 from tests.support.mock_human_credential_state_reader import MockHumanCredentialStateReader
 
 from inframeld_backend.access.application.commands.decide_human_oauth_consent_command import (
     DecideHumanOAuthConsentCommand,
+)
+from inframeld_backend.access.application.dtos.human_authentication_state_dto import (
+    HumanAuthenticationStateDTO,
 )
 from inframeld_backend.access.application.dtos.human_credential_state_dto import (
     HumanCredentialStateDTO,
@@ -29,12 +33,12 @@ from inframeld_backend.access.application.dtos.oauth_consent_continuation_dto im
 from inframeld_backend.access.application.dtos.verified_human_identity_dto import (
     VerifiedHumanIdentityDTO,
 )
+from inframeld_backend.access.application.enums.human_identity_link_state import (
+    HumanIdentityLinkState,
+)
 from inframeld_backend.access.application.enums.oauth_consent_decision import OAuthConsentDecision
 from inframeld_backend.access.application.protocols.browser_session_verifier import (
     BrowserSessionVerifier,
-)
-from inframeld_backend.access.application.protocols.identity_recovery_block_reader import (
-    IdentityRecoveryBlockReader,
 )
 from inframeld_backend.access.application.protocols.oauth_consent_decision_writer import (
     OAuthConsentDecisionWriter,
@@ -55,13 +59,18 @@ from inframeld_backend.access.application.value_objects.oauth_client_id import O
 from inframeld_backend.access.application.value_objects.oauth_consent_challenge import (
     OAuthConsentChallenge,
 )
+from inframeld_backend.access.domain.entities.principal import Principal
 from inframeld_backend.access.domain.enums.human_oauth_scope import HumanOAuthScope
+from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
+from inframeld_backend.access.domain.enums.principal_status import PrincipalStatus
 from inframeld_backend.access.domain.value_objects.human_api_audience import HumanAPIAudience
 from inframeld_backend.access.domain.value_objects.human_credential_version import (
     HumanCredentialVersion,
 )
 from inframeld_backend.access.domain.value_objects.identity_authority import IdentityAuthority
 from inframeld_backend.access.domain.value_objects.identity_subject import IdentitySubject
+from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
+from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.shared.application.errors.application_errors import (
     AccessDeniedError,
     AuthenticationRequiredError,
@@ -126,30 +135,14 @@ class MockBrowserVerifier(BrowserSessionVerifier):
     wait: bool = False
 
     @override
-    async def verify(self, credential: BrowserSessionCredential) -> VerifiedHumanIdentityDTO | None:
+    async def verify(
+        self, credential: BrowserSessionCredential, *, timeout_seconds: float | None = None
+    ) -> VerifiedHumanIdentityDTO | None:
         assert credential is COOKIE
         self.calls.append("verify")
         if self.wait:
             await asyncio.Event().wait()
         return self.identity
-
-
-@dataclass
-class MockRecoveryBlocks(IdentityRecoveryBlockReader):
-    calls: list[str]
-    blocked: bool = False
-    error: Exception | None = None
-    wait: bool = False
-
-    @override
-    async def is_blocked(self, identity: VerifiedHumanIdentityDTO) -> bool:
-        assert identity is IDENTITY
-        self.calls.append("block")
-        if self.wait:
-            await asyncio.Event().wait()
-        if self.error:
-            raise self.error
-        return self.blocked
 
 
 @dataclass
@@ -202,14 +195,12 @@ class MockConsentScenario:
         self.calls: list[str] = []
         self.reader = MockConsentRequestReader(self.calls)
         self.verifier = MockBrowserVerifier(self.calls)
-        self.blocks = MockRecoveryBlocks(self.calls)
         self.writer = MockConsentDecisionWriter(self.calls)
         self.states = MockHumanCredentialStateReader(events=self.calls)
         self.service = HumanOAuthConsentService(
             self.reader,
             self.writer,
             self.verifier,
-            self.blocks,
             credential_state_reader=self.states,
             credential_initializer=self.states,
             authority=AUTHORITY,
@@ -295,7 +286,7 @@ async def test_deny_returns_only_the_provider_continuation() -> None:
     assert result is CONTINUATION
     assert scenario.calls == ["read", "verify", "block", "deny"]
     assert not scenario.writer.remembered
-    assert not scenario.states.calls
+    assert "initialize" not in scenario.states.calls
 
 
 @pytest.mark.asyncio
@@ -327,7 +318,6 @@ async def test_rejected_requests_cannot_approve_or_reject_someone_elses_consent(
             IdentityAuthority("other"), IDENTITY.subject
         )
     elif failure == "recovery":
-        scenario.blocks.blocked = True
         scenario.states.result = True
     elif failure == "client":
         scenario.reader.request = replace(REQUEST, client_id=OAuthClientId("other-client"))
@@ -381,18 +371,17 @@ async def test_unsupported_access_stops_before_browser_checks_or_state_initializ
             await scenario.allow()
 
     assert scenario.calls == ["read"]
-    assert not scenario.states.calls
+    assert "initialize" not in scenario.states.calls
 
 
 @pytest.mark.asyncio
 async def test_inspection_does_not_authorize_a_later_decision_after_recovery_starts() -> None:
     scenario = MockConsentScenario()
     await scenario.inspect()
-    scenario.blocks.blocked = True
     scenario.states.result = True
     with pytest.raises(AccessDeniedError):
         await scenario.allow()
-    assert scenario.calls == ["read", "verify", "block", "read", "initialize", "verify", "block"]
+    assert scenario.calls == ["read", "verify", "block", "read", "initialize"]
 
 
 @pytest.mark.asyncio
@@ -450,16 +439,16 @@ async def test_read_only_checks_fail_without_initializing_or_submitting_a_decisi
 ) -> None:
     scenario = MockConsentScenario(total_timeout_seconds=0.01)
     if failure == "unavailable":
-        scenario.blocks.error = DependencyUnavailableError()
+        scenario.states.failure = DependencyUnavailableError()
     else:
-        scenario.blocks.wait = True
+        scenario.states.stall = True
     with pytest.raises(DependencyUnavailableError):
         if operation == "inspect":
             await scenario.inspect()
         else:
             await scenario.deny()
     assert scenario.calls == ["read", "verify", "block"]
-    assert not scenario.states.calls
+    assert "initialize" not in scenario.states.calls
 
 
 @pytest.mark.asyncio
@@ -535,9 +524,9 @@ async def test_allow_rejects_security_state_crossing_browser_verification(change
 async def test_allow_passes_the_captured_binding_and_inspection_never_initializes() -> None:
     scenario = MockConsentScenario()
     await scenario.inspect()
-    assert not scenario.states.calls
+    assert "initialize" not in scenario.states.calls
     await scenario.allow()
-    assert scenario.states.calls == ["initialize", "state"]
+    assert scenario.states.calls == ["state", "initialize", "state"]
     assert scenario.writer.bindings == [
         HumanOAuthCredentialBindingDTO(
             IDENTITY, scenario.states.installation_id, HumanCredentialVersion(1)
@@ -561,3 +550,67 @@ async def test_initialization_is_included_in_the_total_deadline() -> None:
     with pytest.raises(DependencyUnavailableError):
         await scenario.allow()
     assert scenario.calls == ["read", "initialize"]
+
+
+CONSENT_PRINCIPAL = Principal(
+    PrincipalId(UUID(int=8)),
+    OrganizationId(UUID(int=9)),
+    PrincipalKind.HUMAN,
+    PrincipalStatus.ACTIVE,
+)
+
+
+def _restoration_consent_state(
+    scenario: MockConsentScenario,
+    *,
+    status: PrincipalStatus = PrincipalStatus.ACTIVE,
+    incoherent: bool = False,
+    version: int = 1,
+) -> HumanAuthenticationStateDTO:
+    return HumanAuthenticationStateDTO(
+        HumanCredentialStateDTO(
+            scenario.states.installation_id, IDENTITY, HumanCredentialVersion(version), False
+        ),
+        HumanIdentityLinkState.INCOHERENT if incoherent else HumanIdentityLinkState.LINKED,
+        None if incoherent else replace(CONSENT_PRINCIPAL, status=status),
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("when", ["initial", "final"])
+@pytest.mark.parametrize("state", ["suspended", "retired", "incoherent"])
+async def test_restoration_consent_rechecks_linked_humans_at_both_observations(
+    when: str, state: str
+) -> None:
+    scenario = MockConsentScenario()
+    good = _restoration_consent_state(scenario)
+    bad = _restoration_consent_state(
+        scenario,
+        status=PrincipalStatus.SUSPENDED if state == "suspended" else PrincipalStatus.RETIRED,
+        incoherent=state == "incoherent",
+    )
+    scenario.states.authentication_snapshots = [bad, good] if when == "initial" else [good, bad]
+    with pytest.raises(DependencyUnavailableError if state == "incoherent" else AccessDeniedError):
+        await scenario.allow()
+    assert not scenario.writer.bindings
+
+
+@pytest.mark.asyncio
+async def test_restoration_consent_never_restamps_approval_with_a_newer_version() -> None:
+    scenario = MockConsentScenario()
+    scenario.states.authentication_snapshots = [
+        _restoration_consent_state(scenario),
+        _restoration_consent_state(scenario, version=2),
+    ]
+    with pytest.raises(AccessDeniedError):
+        await scenario.allow()
+    assert not scenario.writer.bindings
+
+
+@pytest.mark.asyncio
+async def test_restoration_consent_preserves_genuinely_unadmitted_approval() -> None:
+    scenario = MockConsentScenario()
+    assert await scenario.allow() is CONTINUATION
+    assert scenario.writer.bindings[0].version == HumanCredentialVersion(1)
+    assert scenario.states.link_state is HumanIdentityLinkState.UNLINKED
+    assert scenario.states.linked_principal is None

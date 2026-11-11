@@ -16,9 +16,6 @@ from inframeld_backend.access.application.dtos.access_group_action_grant_change_
 from inframeld_backend.access.application.dtos.access_group_grant_management_facts_dto import (
     AccessGroupGrantManagementFactsDTO,
 )
-from inframeld_backend.access.application.errors.human_oauth_credential_rejected_error import (
-    HumanOAuthCredentialRejectedError,
-)
 from inframeld_backend.access.application.protocols.access_group_action_grant_changer import (
     AccessGroupActionGrantChanger,
 )
@@ -191,8 +188,9 @@ class AccessGroupActionGrantChangeService(AccessGroupActionGrantChanger):
                     has_pending_recovery=facts.actor.has_pending_recovery,
                     oauth_credential_facts=facts.actor.oauth_credential_facts,
                 )
-                if not eligibility.credential_is_current:
-                    raise HumanOAuthCredentialRejectedError()
+                PrincipalAccessEvaluationService.require_current_credential(
+                    access=access, principal_access=eligibility
+                )
                 if (
                     facts.actor.principal.kind is not PrincipalKind.HUMAN
                     or not PrincipalAccessPolicy.may_use_product(eligibility)

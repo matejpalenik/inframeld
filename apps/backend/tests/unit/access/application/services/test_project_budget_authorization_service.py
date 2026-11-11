@@ -13,8 +13,8 @@ from tests.support.application_key_scenarios import current_key_facts
 from tests.support.authentication_evidence import MockAuthenticationEvidence
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
-from inframeld_backend.access.application.dtos.human_oauth_credential_facts_dto import (
-    HumanOAuthCredentialFactsDTO,
+from inframeld_backend.access.application.dtos.human_credential_facts_dto import (
+    HumanCredentialFactsDTO,
 )
 from inframeld_backend.access.application.dtos.project_action_authorization_dto import (
     ProjectActionAuthorizationDTO,
@@ -62,7 +62,7 @@ HUMAN_ACCESS = AccessContextDTO(ACTOR_ID, MockAuthenticationEvidence.browser())
 CURRENT_FACTS = ProjectActionFactsDTO(
     principal=HUMAN,
     has_pending_recovery=False,
-    oauth_credential_facts=None,
+    oauth_credential_facts=HumanCredentialFactsDTO(True, HumanCredentialVersion(1)),
     project_status=ProjectStatus.ACTIVE,
     is_project_member=True,
     has_exact_action_grant=True,
@@ -205,7 +205,7 @@ async def test_stale_oauth_evidence_is_rejected_before_hidden_scope_disclosure()
         replace(
             CURRENT_FACTS,
             is_project_member=False,
-            oauth_credential_facts=HumanOAuthCredentialFactsDTO(
+            oauth_credential_facts=HumanCredentialFactsDTO(
                 binding_matches_actor=True, current_version=HumanCredentialVersion(2)
             ),
         )
@@ -225,7 +225,7 @@ async def test_current_oauth_evidence_can_manage_with_current_authority() -> Non
     reader = MockProjectActionFactsReader(
         replace(
             CURRENT_FACTS,
-            oauth_credential_facts=HumanOAuthCredentialFactsDTO(
+            oauth_credential_facts=HumanCredentialFactsDTO(
                 binding_matches_actor=True, current_version=evidence.version
             ),
         )

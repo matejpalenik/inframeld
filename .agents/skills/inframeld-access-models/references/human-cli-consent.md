@@ -24,45 +24,15 @@ The narrowly scoped credential-state initializer may commit metadata before brow
 
 ## Login and approval across the boundary
 
-**Accepted end-to-end target with inspected backend consent.** The sequence groups protocol details for readability. The complete CLI/account-UI path remains unfinished, and the checks below do not establish a universal issuance fence. The diagram retains the inspected version/recovery checks. The accepted linked-human restoration checks below are an additional, unimplemented extension.
+**Accepted end-to-end target with inspected backend consent.** The sequence groups protocol details for readability. The complete CLI/account-UI path remains unfinished, and the checks below do not establish a universal issuance fence. The consent service applies linked-human guards alongside version and recovery checks. The full suspension/restoration lifecycle remains unfinished.
 
-```mermaid
----
-title: "Human CLI login - accepted target and inspected consent"
----
-sequenceDiagram
-    actor Alice
-    participant CLI as Rust CLI
-    participant Browser as System browser and account UI
-    participant Kratos as Kratos native login
-    participant Hydra as Hydra OAuth
-    participant Consent as Access consent service
-    participant State as Local credential-state capabilities
-    Alice->>CLI: Start human login
-    CLI->>Browser: Open trusted installation flow with state and PKCE
-    Browser->>Kratos: Human sign-in through native Hydra integration
-    Kratos->>Hydra: Verified subject and provider-session binding
-    Hydra-->>Browser: Consent challenge
-    Browser->>Consent: Inspect or decide with current browser cookie
-    Consent->>Hydra: Read fresh challenge and validate requested client/access
-    alt Inspection or denial
-        Note over Consent,State: Read-only checks, no state initialization or approval
-        Consent-->>Browser: Inspection data or checked denial continuation
-    else Approval
-        Consent->>State: Capture or initialize credential version in bounded transaction
-        Note over State: Close metadata transaction before provider I/O
-        Consent->>Kratos: Verify browser identity and matching subject
-        Consent->>State: Reread version and recovery block
-        Note over Consent: Require unchanged unblocked observations and binding
-        Consent->>Hydra: Approve exact access with checked binding
-        Hydra-->>Browser: Checked public continuation and authorization code
-        Browser-->>CLI: Exact issuer-bound loopback callback
-        CLI->>CLI: Check receiving URI, state and issuer association
-        Note over CLI,Hydra: Apply association checks to success and OAuth errors before exchange
-        CLI->>Hydra: Exchange code with PKCE and identical attempt redirect URI
-        Hydra-->>CLI: Installation/account-bound credentials
-    end
-```
+1. Alice starts human login in the Rust CLI. The CLI opens the trusted installation flow in the system browser/account UI with state and PKCE. Kratos native login supplies Hydra with the verified subject and provider-session binding.
+2. Hydra returns a consent challenge to the browser. The browser asks the Access consent service to inspect or decide using the current browser cookie.
+3. The consent service reads the fresh Hydra challenge and validates the requested client and access.
+4. For inspection or denial, the service performs read-only checks without state initialization or approval. It returns inspection data or a checked denial continuation to the browser.
+5. For approval, local credential-state capabilities capture version, recovery and complete local-link facts. The metadata transaction closes before provider I/O. The consent service verifies the browser identity and matching Kratos subject, then rereads those local facts. Both observations must be eligible and preserve the original binding.
+6. The consent service asks Hydra to approve the exact access with that checked binding. Hydra returns the checked public continuation and authorization code through the browser to the exact issuer-bound CLI loopback callback.
+7. The CLI checks the receiving URI, state and issuer association for both success and OAuth errors before any exchange. On successful approval or a checked permitted continuation, it exchanges the code with Hydra using PKCE and the identical attempt redirect URI, receiving installation/account-bound credentials.
 
 The grouped read-only branch includes browser/subject and recovery checks before display or denial. It does not approve a login. The credential exchange is conditional on successful approval or checked permitted continuation. Consent supplies no local account, project grant or recovery-block release authority. [The inspected service](../../../../apps/backend/src/inframeld_backend/access/application/services/human_oauth_consent_service.py) retains the exact early-validation, capture and reread ordering.
 
@@ -70,9 +40,9 @@ The grouped read-only branch includes browser/subject and recovery checks before
 
 ## Check linked humans across restoration
 
-**Accepted under [ADR-0127](../../../../docs/adr/ADR-0127-fence-human-authentication-evidence-at-restoration.md), not current implemented consent behavior.** Keep genuinely unadmitted identity consent, subject to existing exact identity/installation, version/history and recovery-block checks. No local link is different from a linked human whose required facts are missing or incoherent. Neither case permits automatic account creation or fallback identity matching.
+**Accepted under [ADR-0127](../../../../docs/adr/ADR-0127-fence-human-authentication-evidence-at-restoration.md).** Genuinely unadmitted identity consent remains supported under exact identity/installation, version/history and recovery-block checks. The richer authentication-state read distinguishes a truly absent local link from linked suspension/retirement and incoherent required state. Neither case permits automatic admission or fallback identity matching.
 
-For a linked human, both initial and final approval observations must reject `SUSPENDED`, `RETIRED` and incoherent linkage as well as independent recovery blocking. An initially blocked attempt stays denied even if restoration or completion clears that block during browser verification. Only unchanged, eligible observations for the exact captured identity/installation/version can reach allowance. The current credential-state projection observes version and recovery blocking, so these linked-status checks remain implementation work.
+For a linked human, both initial and final approval observations must reject `SUSPENDED`, `RETIRED` and incoherent linkage as well as independent recovery blocking. An initially blocked attempt stays denied even if restoration or completion clears that block during browser verification. Only unchanged, eligible observations for the exact captured identity/installation/version can reach allowance. The consent service reads complete authentication and link state before and after verification. It distinguishes missing required linked facts from an unadmitted identity. Full restoration, provider deletion and job cleanup remain outside this component.
 
 An approval already sent to Hydra can finish late. It must retain the original captured OAuth version, never today's replacement version. After restoration advances that version, Inframeld rejects the old binding even if Hydra still considers it active. This does not drain every issuance or establish a session's causal generation. [Browser evidence](browser-sessions.md#restoration-evidence-cutover) owns final same-cookie verification, its shared provider/total deadlines and the explicitly accepted late-created Kratos-session limit. No provider wait holds SQL open, and no new consent allowance or automatic retry is introduced.
 

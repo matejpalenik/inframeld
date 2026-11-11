@@ -7,6 +7,9 @@ from tests.support.application_key_scenarios import current_key_facts
 from tests.support.authentication_evidence import MockAuthenticationEvidence
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
+from inframeld_backend.access.application.dtos.human_credential_facts_dto import (
+    HumanCredentialFactsDTO,
+)
 from inframeld_backend.access.application.dtos.project_action_facts_dto import ProjectActionFactsDTO
 from inframeld_backend.access.application.dtos.project_metadata_authorization_facts_dto import (
     ProjectMetadataAuthorizationFactsDTO,
@@ -24,6 +27,9 @@ from inframeld_backend.access.domain.entities.principal import Principal
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.enums.principal_status import PrincipalStatus
 from inframeld_backend.access.domain.enums.project_status import ProjectStatus
+from inframeld_backend.access.domain.value_objects.human_credential_version import (
+    HumanCredentialVersion,
+)
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
@@ -54,7 +60,7 @@ class MockMetadataFacts(ProjectMetadataFactsReader):
             ProjectActionFactsDTO(
                 principal=actor,
                 has_pending_recovery=False,
-                oauth_credential_facts=None,
+                oauth_credential_facts=HumanCredentialFactsDTO(True, HumanCredentialVersion(1)),
                 project_status=ProjectStatus.ACTIVE,
                 is_project_member=True,
                 has_exact_action_grant=granted,

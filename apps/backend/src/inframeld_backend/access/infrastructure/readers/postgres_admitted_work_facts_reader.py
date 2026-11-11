@@ -8,8 +8,8 @@ from inframeld_backend.access.application.dtos.admitted_work_authority_dto impor
     AdmittedWorkAuthorityDTO,
 )
 from inframeld_backend.access.application.dtos.admitted_work_facts_dto import AdmittedWorkFactsDTO
-from inframeld_backend.access.application.dtos.human_oauth_credential_facts_dto import (
-    HumanOAuthCredentialFactsDTO,
+from inframeld_backend.access.application.dtos.human_credential_facts_dto import (
+    HumanCredentialFactsDTO,
 )
 from inframeld_backend.access.application.protocols.admitted_work_facts_reader import (
     AdmittedWorkFactsReader,
@@ -179,7 +179,7 @@ class PostgresAdmittedWorkFactsReader(AdmittedWorkFactsReader):
             is_project_member=is_member,
             has_exact_action_grant=has_grant,
             has_pending_recovery=pending,
-            human_generation=HumanOAuthCredentialFactsDTO(
+            human_generation=HumanCredentialFactsDTO(
                 binding_matches,
                 HumanCredentialVersion(current_version) if current_version is not None else None,
             )

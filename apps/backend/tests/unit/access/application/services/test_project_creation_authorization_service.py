@@ -6,11 +6,17 @@ import pytest
 from tests.support.authentication_evidence import MockAuthenticationEvidence
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
+from inframeld_backend.access.application.dtos.human_credential_facts_dto import (
+    HumanCredentialFactsDTO,
+)
 from inframeld_backend.access.application.dtos.organization_access_facts_dto import (
     OrganizationAccessFactsDTO,
 )
 from inframeld_backend.access.application.dtos.organization_action_grant_dto import (
     OrganizationActionGrantDTO,
+)
+from inframeld_backend.access.application.errors.human_oauth_credential_rejected_error import (
+    HumanOAuthCredentialRejectedError,
 )
 from inframeld_backend.access.application.protocols.organization_access_facts_reader import (
     OrganizationAccessFactsReader,
@@ -22,10 +28,14 @@ from inframeld_backend.access.domain.entities.principal import Principal
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.enums.principal_status import PrincipalStatus
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
+from inframeld_backend.access.domain.value_objects.human_credential_version import (
+    HumanCredentialVersion,
+)
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.shared.application.errors.application_errors import (
     AccessDeniedError,
+    AuthenticationRequiredError,
     ResourceNotFoundError,
 )
 
@@ -59,7 +69,7 @@ def facts() -> OrganizationAccessFactsDTO:
         7,
         (OrganizationActionGrantDTO(ActionId("create-projects"), False),),
         False,
-        None,
+        HumanCredentialFactsDTO(True, HumanCredentialVersion(1)),
     )
 
 
@@ -130,3 +140,24 @@ async def test_scope_is_matched_before_returning_any_authorization(
             access=replace(access, actor_principal_id=PrincipalId(UUID(int=9))),
             organization_id=facts.principal.organization_id,
         )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("oauth", [False, True])
+async def test_browser_currentness_preserves_the_presented_credential_family(
+    oauth: bool, facts: OrganizationAccessFactsDTO
+) -> None:
+    """Reject stale evidence before disclosing data, recovering originals or changing authority."""
+    evidence = (
+        MockAuthenticationEvidence.human_oauth() if oauth else MockAuthenticationEvidence.browser()
+    )
+    stale = HumanCredentialFactsDTO(True, HumanCredentialVersion(2))
+    expected = HumanOAuthCredentialRejectedError if oauth else AuthenticationRequiredError
+    reader = MockCreationFacts(replace(facts, oauth_credential_facts=stale))
+    with pytest.raises(AuthenticationRequiredError) as caught:
+        await ProjectCreationAuthorizationService(reader).require_creation(
+            access=AccessContextDTO(facts.principal.id, evidence),
+            organization_id=facts.principal.organization_id,
+        )
+    assert type(caught.value) is expected
+    assert reader.locked == [facts.principal.organization_id]

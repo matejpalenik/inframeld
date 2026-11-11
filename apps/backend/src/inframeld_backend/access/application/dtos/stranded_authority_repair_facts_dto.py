@@ -7,8 +7,8 @@ from inframeld_backend.access.application.dtos.action_grantor_repair_responsibil
 from inframeld_backend.access.application.dtos.group_manager_repair_responsibility_dto import (
     GroupManagerRepairResponsibilityDTO,
 )
-from inframeld_backend.access.application.dtos.human_oauth_credential_facts_dto import (
-    HumanOAuthCredentialFactsDTO,
+from inframeld_backend.access.application.dtos.human_credential_facts_dto import (
+    HumanCredentialFactsDTO,
 )
 from inframeld_backend.access.domain.entities.principal import Principal
 from inframeld_backend.access.domain.enums.project_status import ProjectStatus
@@ -24,7 +24,8 @@ class StrandedAuthorityRepairFactsDTO:
     access_revision: int
     is_project_member: bool
     has_pending_recovery: bool
-    oauth_credential_facts: HumanOAuthCredentialFactsDTO
+    oauth_credential_facts: HumanCredentialFactsDTO
     eligible_grantor_exists: bool | None
     target_exists: bool
+    target_accepts_assignment: bool
     observed_at: datetime

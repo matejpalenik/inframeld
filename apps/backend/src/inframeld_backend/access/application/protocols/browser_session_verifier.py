@@ -13,7 +13,9 @@ class BrowserSessionVerifier(Protocol):
     """Establish external identity before the application considers local access."""
 
     @abstractmethod
-    async def verify(self, credential: BrowserSessionCredential) -> VerifiedHumanIdentityDTO | None:
+    async def verify(
+        self, credential: BrowserSessionCredential, *, timeout_seconds: float | None = None
+    ) -> VerifiedHumanIdentityDTO | None:
         """Verify the untrusted credential with the identity provider.
 
         Return its verified source and subject, or None for a rejected session.

@@ -12,7 +12,6 @@ from sqlalchemy import ARRAY, Integer, delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from tests.support.access_scenarios import MockAccessScenarios, ProjectAuthorizationSeedDTO
 from tests.support.application_key_scenarios import verified_application_access
-from tests.support.authentication_evidence import MockAuthenticationEvidence
 from tests.support.project_grant_changes import create_project_grant_change_service
 
 from inframeld_backend.access.application.commands.set_project_action_grant_command import (
@@ -24,6 +23,9 @@ from inframeld_backend.access.application.dtos.access_action_grant_changed_audit
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
 from inframeld_backend.access.application.dtos.application_key_verification_profile_dto import (
     ApplicationKeyVerificationProfileDTO,
+)
+from inframeld_backend.access.application.dtos.browser_session_authentication_dto import (
+    BrowserSessionAuthenticationDTO,
 )
 from inframeld_backend.access.application.dtos.identity_recovery_event_dto import (
     IdentityRecoveryEventDTO,
@@ -87,6 +89,9 @@ from inframeld_backend.access.infrastructure.readers.postgres_project_grant_chan
     PostgresProjectGrantChangeFactsReader,
 )
 from inframeld_backend.access.infrastructure.rows.access_audit_event_row import AccessAuditEventRow
+from inframeld_backend.access.infrastructure.rows.human_credential_version_row import (
+    HumanCredentialVersionRow,
+)
 from inframeld_backend.access.infrastructure.rows.human_identity_link_row import (
     HumanIdentityLinkRow,
 )
@@ -102,6 +107,9 @@ from inframeld_backend.access.infrastructure.rows.project_membership_row import 
 from inframeld_backend.access.infrastructure.rows.project_row import ProjectRow
 from inframeld_backend.access.infrastructure.writers.postgres_audit_event_writer import (
     PostgresAuditEventWriter,
+)
+from inframeld_backend.access.infrastructure.writers.postgres_human_credential_state_initializer import (
+    PostgresHumanCredentialStateInitializer,
 )
 from inframeld_backend.access.infrastructure.writers.postgres_identity_recovery_admission_writer import (
     PostgresIdentityRecoveryAdmissionWriter,
@@ -121,7 +129,7 @@ from inframeld_backend.shared.application.dtos.new_operation_reservation_dto imp
 from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.enums.operation_replay_kind import OperationReplayKind
 from inframeld_backend.shared.application.errors.application_errors import (
-    AccessDeniedError,
+    AuthenticationRequiredError,
     DependencyUnavailableError,
 )
 from inframeld_backend.shared.application.protocols.operation_idempotency import (
@@ -160,6 +168,7 @@ class RecoveryAuthorizationScenarioDTO:
     identity: VerifiedHumanIdentityDTO
     installation_id: InstallationId
     recipient_id: PrincipalId
+    access: AccessContextDTO
 
 
 @dataclass(frozen=True, slots=True)
@@ -176,7 +185,6 @@ async def scenario(database: Database) -> RecoveryAuthorizationScenarioDTO:
         IdentityAuthority("kratos:test"),
         IdentitySubject(str(uuid4())),
     )
-    installation_id = await PostgresInstallationIdentityReader(database).read()
     recipient_id = PrincipalId(uuid4())
 
     async with database.session() as session, session.begin():
@@ -228,11 +236,18 @@ async def scenario(database: Database) -> RecoveryAuthorizationScenarioDTO:
             ]
         )
 
+    state = await PostgresHumanCredentialStateInitializer(database).initialize(identity)
+    assert state.version is not None
+    access = AccessContextDTO(
+        seed.principal_id,
+        BrowserSessionAuthenticationDTO(identity, state.installation_id, state.version),
+    )
     return RecoveryAuthorizationScenarioDTO(
         seed,
         identity,
-        installation_id,
+        state.installation_id,
         recipient_id,
+        access,
     )
 
 
@@ -272,10 +287,7 @@ async def _set_use_only(
         audit_events=audit_events,
         idempotency=idempotency,
     ).set_action_grant(
-        access=access
-        or AccessContextDTO(
-            scenario.seed.principal_id, authentication_evidence=MockAuthenticationEvidence.browser()
-        ),
+        access=access or scenario.access,
         context=IdempotencyContextDTO(
             method=HttpMethod.PUT,
             requested_route=f"/v1/projects/{scenario.seed.project_id.value}/grants/{scenario.recipient_id.value}/{ACTION.value}",
@@ -444,9 +456,7 @@ async def test_existing_context_rechecks_recovery_inside_authorization(
     scenario: RecoveryAuthorizationScenarioDTO,
 ) -> None:
     """A context created before recovery must not preserve old action eligibility."""
-    access = AccessContextDTO(
-        scenario.seed.principal_id, authentication_evidence=MockAuthenticationEvidence.browser()
-    )
+    access = scenario.access
 
     async with database.session() as session, session.begin():
         authorizer = ActionAuthorizationService(PostgresProjectActionFactsReader(session))
@@ -464,13 +474,14 @@ async def test_existing_context_rechecks_recovery_inside_authorization(
         async with database.session() as recovery_session, recovery_session.begin():
             await _admit(recovery_session, scenario)
 
-        with pytest.raises(AccessDeniedError):
+        with pytest.raises(AuthenticationRequiredError) as error:
             await authorizer.require_authorization(
                 access=access,
                 request=ProjectActionAuthorizationRequestDTO(
                     project_id=target.project_id, action_id=ACTION
                 ),
             )
+        assert type(error.value) is AuthenticationRequiredError
 
 
 @pytest.mark.asyncio
@@ -489,9 +500,10 @@ async def test_recovery_denies_new_grants_and_saved_replays(
         await _admit(session, scenario)
 
     for key in (KEY, IdempotencyKey("another-grant-request")):
-        with pytest.raises(AccessDeniedError):
+        with pytest.raises(AuthenticationRequiredError) as error:
             async with database.session() as session:
                 await _set_use_only(session, scenario, key=key)
+        assert type(error.value) is AuthenticationRequiredError
 
     assert await _effects(database, scenario) == before
 
@@ -514,7 +526,8 @@ async def test_recovery_committing_first_denies_the_waiting_grant(
                         session, pid_ready=pid_ready
                     ),
                 )
-        except AccessDeniedError:
+        except AuthenticationRequiredError as error:
+            assert type(error) is AuthenticationRequiredError
             return False
 
         return True
@@ -569,13 +582,14 @@ async def test_grant_committing_first_finishes_before_recovery_admission(
 
     assert await _effects(database, scenario) == GrantEffectsDTO(1, 1, 1, 1)
 
-    with pytest.raises(AccessDeniedError):
+    with pytest.raises(AuthenticationRequiredError) as error:
         async with database.session() as session:
             await _set_use_only(
                 session,
                 scenario,
                 key=IdempotencyKey("after-recovery"),
             )
+    assert type(error.value) is AuthenticationRequiredError
 
     assert await _effects(database, scenario) == GrantEffectsDTO(1, 1, 1, 1)
 
@@ -707,6 +721,13 @@ async def test_missing_installation_metadata_cannot_allow_authorization(
 ) -> None:
     """Missing installation metadata must not be mistaken for an absent block."""
     async with database.session() as session, session.begin():
+        await session.execute(
+            delete(HumanCredentialVersionRow).where(
+                HumanCredentialVersionRow.installation_id == scenario.installation_id.value,
+                HumanCredentialVersionRow.authority == scenario.identity.authority.value,
+                HumanCredentialVersionRow.subject == scenario.identity.subject.value,
+            )
+        )
         await session.execute(delete(InstallationIdentityRow))
 
     with pytest.raises(DependencyUnavailableError):
@@ -714,10 +735,7 @@ async def test_missing_installation_metadata_cannot_allow_authorization(
             await ActionAuthorizationService(
                 PostgresProjectActionFactsReader(session)
             ).require_authorization(
-                access=AccessContextDTO(
-                    scenario.seed.principal_id,
-                    authentication_evidence=MockAuthenticationEvidence.browser(),
-                ),
+                access=scenario.access,
                 request=ProjectActionAuthorizationRequestDTO(
                     project_id=scenario.seed.project_id, action_id=ACTION
                 ),
@@ -855,9 +873,6 @@ async def test_captured_credential_cannot_resume_after_recovery_release(
     )
     from inframeld_backend.access.application.services.project_operation_admission_service import (
         ProjectOperationAdmissionService,
-    )
-    from inframeld_backend.access.infrastructure.writers.postgres_human_credential_state_initializer import (
-        PostgresHumanCredentialStateInitializer,
     )
     from inframeld_backend.shared.application.value_objects.request_fingerprint import (
         RequestFingerprint,

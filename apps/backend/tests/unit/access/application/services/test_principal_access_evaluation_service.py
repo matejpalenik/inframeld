@@ -12,11 +12,11 @@ from inframeld_backend.access.application.dtos.application_key_authentication_dt
 from inframeld_backend.access.application.dtos.browser_session_authentication_dto import (
     BrowserSessionAuthenticationDTO,
 )
+from inframeld_backend.access.application.dtos.human_credential_facts_dto import (
+    HumanCredentialFactsDTO,
+)
 from inframeld_backend.access.application.dtos.human_oauth_credential_binding_dto import (
     HumanOAuthCredentialBindingDTO,
-)
-from inframeld_backend.access.application.dtos.human_oauth_credential_facts_dto import (
-    HumanOAuthCredentialFactsDTO,
 )
 from inframeld_backend.access.application.services.principal_access_evaluation_service import (
     PrincipalAccessEvaluationService,
@@ -57,7 +57,7 @@ def test_oauth_requires_a_matching_actor_and_exact_current_version(
         access=AccessContextDTO(PRINCIPAL.id, OAUTH),
         principal=PRINCIPAL,
         has_pending_recovery=True,
-        oauth_credential_facts=HumanOAuthCredentialFactsDTO(
+        oauth_credential_facts=HumanCredentialFactsDTO(
             binding_matches_actor=binding_matches_actor,
             current_version=HumanCredentialVersion(version) if version is not None else None,
         ),
@@ -73,19 +73,19 @@ def test_oauth_requires_a_matching_actor_and_exact_current_version(
     [(BROWSER, PrincipalKind.HUMAN)],
 )
 @pytest.mark.parametrize("pending_recovery", [False, True])
-def test_other_families_do_not_require_an_oauth_generation(
+def test_current_browser_generation_does_not_replace_account_or_recovery_checks(
     evidence: BrowserSessionAuthenticationDTO | ApplicationKeyAuthenticationDTO,
     kind: PrincipalKind,
     pending_recovery: bool,
 ) -> None:
-    """Currentness is inapplicable here and does not verify the session or key."""
+    """A current binding does not clear suspension or an independent recovery block."""
     principal = replace(PRINCIPAL, kind=kind, status=PrincipalStatus.SUSPENDED)
 
     result = PrincipalAccessEvaluationService.evaluate(
         access=AccessContextDTO(principal.id, evidence),
         principal=principal,
         has_pending_recovery=pending_recovery,
-        oauth_credential_facts=None,
+        oauth_credential_facts=HumanCredentialFactsDTO(True, HumanCredentialVersion(1)),
     )
 
     assert result.principal is principal
@@ -184,3 +184,45 @@ def test_application_expiry_equality_is_not_current() -> None:
         application_key_facts=replace(facts, expires_at=facts.checked_at),
     )
     assert not result.credential_is_current
+
+
+@pytest.mark.parametrize("matches", [False, True])
+@pytest.mark.parametrize("version", [None, 1, 2])
+def test_restoration_browser_requires_current_actor_version(
+    matches: bool, version: int | None
+) -> None:
+    result = PrincipalAccessEvaluationService.evaluate(
+        access=AccessContextDTO(PRINCIPAL.id, BROWSER),
+        principal=PRINCIPAL,
+        has_pending_recovery=False,
+        oauth_credential_facts=HumanCredentialFactsDTO(
+            matches, HumanCredentialVersion(version) if version is not None else None
+        ),
+    )
+    assert result.credential_is_current is (matches and version == 1)
+
+
+def test_restoration_browser_missing_current_facts_is_not_current() -> None:
+    with pytest.raises(RuntimeError, match="Browser.*facts"):
+        PrincipalAccessEvaluationService.evaluate(
+            access=AccessContextDTO(PRINCIPAL.id, BROWSER),
+            principal=PRINCIPAL,
+            has_pending_recovery=False,
+            oauth_credential_facts=None,
+        )
+
+
+def test_restoration_stale_browser_has_no_oauth_error_family() -> None:
+    from inframeld_backend.access.domain.policy_inputs.principal_access_policy_input import (
+        PrincipalAccessPolicyInput,
+    )
+    from inframeld_backend.shared.application.errors.application_errors import (
+        AuthenticationRequiredError,
+    )
+
+    with pytest.raises(AuthenticationRequiredError) as caught:
+        PrincipalAccessEvaluationService.require_current_credential(
+            access=AccessContextDTO(PRINCIPAL.id, BROWSER),
+            principal_access=PrincipalAccessPolicyInput(PRINCIPAL, False, False),
+        )
+    assert type(caught.value) is AuthenticationRequiredError

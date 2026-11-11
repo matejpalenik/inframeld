@@ -166,6 +166,8 @@ class StrandedAuthorityRepairService(StrandedAuthorityRepairer):
             return self._replay(recorded, facts, command, identity, fingerprint)
         if facts.access_revision != command.expected_access_revision:
             raise StrandedAuthorityMaintenanceError(code.STALE_REVISION)
+        if not facts.target_accepts_assignment:
+            raise StrandedAuthorityMaintenanceError(code.NOT_STRANDED)
         if facts.eligible_grantor_exists is None:
             raise StrandedAuthorityMaintenanceError(code.DEPENDENCY_UNAVAILABLE)
         if not StrandedAuthorityRepairPolicy.may_assign(

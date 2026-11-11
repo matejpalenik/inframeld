@@ -27,3 +27,7 @@ import "./access-groups.ts";
 import "./access-action-grants.ts";
 
 import "./invitations.ts";
+
+import "./project-upload-defaults.ts";
+
+import "./project-deletion.ts";

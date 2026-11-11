@@ -20,11 +20,11 @@ from inframeld_backend.access.application.dtos.application_account_grant_target_
 from inframeld_backend.access.application.dtos.group_manager_repair_responsibility_dto import (
     GroupManagerRepairResponsibilityDTO,
 )
+from inframeld_backend.access.application.dtos.human_credential_facts_dto import (
+    HumanCredentialFactsDTO,
+)
 from inframeld_backend.access.application.dtos.human_oauth_credential_binding_dto import (
     HumanOAuthCredentialBindingDTO,
-)
-from inframeld_backend.access.application.dtos.human_oauth_credential_facts_dto import (
-    HumanOAuthCredentialFactsDTO,
 )
 from inframeld_backend.access.application.dtos.organization_grant_target_dto import (
     OrganizationGrantTargetDTO,
@@ -214,11 +214,11 @@ class PostgresStrandedAuthorityRepairFactsReader(StrandedAuthorityRepairFactsRea
                     actor.status,
                 )
                 member = False
-                oauth = HumanOAuthCredentialFactsDTO(
+                oauth = HumanCredentialFactsDTO(
                     linked, HumanCredentialVersion(version) if version is not None else None
                 )
                 status = None
-                target_exists = True
+                target_exists, target_accepts_assignment = True, True
             else:
                 project = await self._session.scalar(
                     select(ProjectRow)
@@ -271,7 +271,9 @@ class PostgresStrandedAuthorityRepairFactsReader(StrandedAuthorityRepairFactsRea
                 oauth = current.oauth_credential_facts
                 status = current.project_status
                 revision = project.access_revision
-                target_exists = await self._target_exists(command, OrganizationId(organization))
+                target_exists, target_accepts_assignment = await self._target_facts(
+                    command, OrganizationId(organization)
+                )
             if (
                 principal.kind is not PrincipalKind.HUMAN
                 or principal.organization_id.value != organization
@@ -296,12 +298,14 @@ class PostgresStrandedAuthorityRepairFactsReader(StrandedAuthorityRepairFactsRea
                 oauth,
                 grantor,
                 target_exists,
+                target_accepts_assignment,
                 observed_at,
             )
 
-    async def _target_exists(
+    async def _target_facts(
         self, command: RepairStrandedAuthorityCommand, organization: OrganizationId
-    ) -> bool:
+    ) -> tuple[bool, bool]:
+        """Separate a retained target from eligibility for a new assignment."""
         responsibility = command.responsibility
         if isinstance(responsibility, GroupManagerRepairResponsibilityDTO):
             project, group = responsibility.project_id, responsibility.access_group_id
@@ -309,25 +313,35 @@ class PostgresStrandedAuthorityRepairFactsReader(StrandedAuthorityRepairFactsRea
             project, group = responsibility.target.project_id, responsibility.target.access_group_id
         elif isinstance(responsibility.target, ApplicationAccountGrantTargetDTO):
             target = responsibility.target
-            return bool(
-                await self._session.scalar(
-                    select(
-                        exists().where(
-                            ApplicationAccountRow.project_id == target.project_id.value,
-                            ApplicationAccountRow.organization_id == organization.value,
-                            ApplicationAccountRow.principal_id
-                            == target.application_principal_id.value,
-                            ApplicationAccountRow.principal_kind == PrincipalKind.APPLICATION,
-                            ApplicationAccountRow.organization_id == PrincipalRow.organization_id,
-                            ApplicationAccountRow.principal_id == PrincipalRow.id,
-                            PrincipalRow.kind == PrincipalKind.APPLICATION,
-                        )
+            accepts_assignment = await self._session.scalar(
+                select(
+                    and_(
+                        PrincipalRow.status == PrincipalStatus.ACTIVE,
+                        ProjectPrincipalQueries.membership(
+                            PrincipalRow.id, target.project_id, organization
+                        ),
                     )
                 )
+                .select_from(ApplicationAccountRow)
+                .join(
+                    PrincipalRow,
+                    and_(
+                        ApplicationAccountRow.principal_id == PrincipalRow.id,
+                        ApplicationAccountRow.organization_id == PrincipalRow.organization_id,
+                    ),
+                )
+                .where(
+                    ApplicationAccountRow.project_id == target.project_id.value,
+                    ApplicationAccountRow.organization_id == organization.value,
+                    ApplicationAccountRow.principal_id == target.application_principal_id.value,
+                    ApplicationAccountRow.principal_kind == PrincipalKind.APPLICATION,
+                    PrincipalRow.kind == PrincipalKind.APPLICATION,
+                )
             )
+            return accepts_assignment is not None, accepts_assignment is True
         else:
-            return True
-        return bool(
+            return True, True
+        group_exists = bool(
             await self._session.scalar(
                 select(
                     exists().where(
@@ -336,6 +350,7 @@ class PostgresStrandedAuthorityRepairFactsReader(StrandedAuthorityRepairFactsRea
                 )
             )
         )
+        return group_exists, group_exists
 
     async def _eligible_holder(
         self,

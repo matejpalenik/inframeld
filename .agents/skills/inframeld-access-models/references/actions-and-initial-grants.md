@@ -91,7 +91,7 @@ Applications may receive **can use** only for eligible actions. Humans may recei
 | `create-application-accounts` | Project | Human | Create an empty application account and its creator administration assignments. No key or inherited rights. |
 | `create-pipelines` | Project | Human | Create a Pipeline and its fixed creator assignments. |
 | `create-deployments` | Project | Human | Create a Deployment with a ready compatible initial version and fixed creator assignments. |
-| `manage-upload-defaults` | Project | Human | Change future upload audiences, managing every old/new group. |
+| `manage-upload-defaults` | Project | Human | [Inspect and change saved future-upload audiences](upload-default-contracts.md), managing every current/proposed group including retained groups. No delegation level or unrelated Project action is required. |
 | `delete-project` | Project | Human | Block and erase project-owned contents under the project-deletion contract. Does not grant reading. |
 | `inspect-budget` | Project | Human or application | Inspect permitted budget information. Accounting schemas belong to the model contract. |
 | `manage-budget` | Project | Human | Set, raise, lower or remove its limit through the guarded policy operation. |

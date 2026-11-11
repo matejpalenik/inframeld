@@ -20,8 +20,14 @@ from inframeld_backend.access.application.dtos.grant_recipient_candidate_dto imp
 from inframeld_backend.access.application.dtos.grant_recipients_page_facts_dto import (
     GrantRecipientsPageFactsDTO,
 )
+from inframeld_backend.access.application.dtos.human_credential_facts_dto import (
+    HumanCredentialFactsDTO,
+)
 from inframeld_backend.access.application.dtos.project_action_facts_dto import ProjectActionFactsDTO
 from inframeld_backend.access.application.dtos.project_grant_target_dto import ProjectGrantTargetDTO
+from inframeld_backend.access.application.errors.human_oauth_credential_rejected_error import (
+    HumanOAuthCredentialRejectedError,
+)
 from inframeld_backend.access.application.protocols.grant_recipients_facts_reader import (
     GrantRecipientsFactsReader,
 )
@@ -43,11 +49,15 @@ from inframeld_backend.access.domain.value_objects.access_group_relationships im
     AccessGroupRelationships,
 )
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
+from inframeld_backend.access.domain.value_objects.human_credential_version import (
+    HumanCredentialVersion,
+)
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
 from inframeld_backend.shared.application.errors.application_errors import (
     AccessDeniedError,
+    AuthenticationRequiredError,
     InvalidInputError,
     ResourceNotFoundError,
 )
@@ -91,7 +101,7 @@ FACTS = GrantRecipientsPageFactsDTO(
     actor=ProjectActionFactsDTO(
         principal=ACTOR,
         has_pending_recovery=False,
-        oauth_credential_facts=None,
+        oauth_credential_facts=HumanCredentialFactsDTO(True, HumanCredentialVersion(1)),
         project_status=ProjectStatus.ACTIVE,
         is_project_member=True,
         has_exact_action_grant=False,
@@ -268,3 +278,23 @@ async def test_authorized_empty_continuation_still_rechecks_current_management()
     )
     with pytest.raises(AccessDeniedError):
         await service.list_recipients(access=ACCESS, query=_query(cursor=cursor))
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("oauth", [False, True])
+async def test_browser_currentness_preserves_the_presented_credential_family(oauth: bool) -> None:
+    """Reject stale evidence before disclosing data, recovering originals or changing authority."""
+    evidence = (
+        MockAuthenticationEvidence.human_oauth() if oauth else MockAuthenticationEvidence.browser()
+    )
+    stale = HumanCredentialFactsDTO(True, HumanCredentialVersion(2))
+    expected = HumanOAuthCredentialRejectedError if oauth else AuthenticationRequiredError
+    reader = MockRecipientsFacts(
+        replace(FACTS, actor=replace(FACTS.actor, oauth_credential_facts=stale))
+    )
+    with pytest.raises(AuthenticationRequiredError) as caught:
+        await ProjectGrantRecipientsService(reader).list_recipients(
+            access=replace(ACCESS, authentication_evidence=evidence), query=_query()
+        )
+    assert type(caught.value) is expected
+    assert reader.calls == [((PrincipalKind.HUMAN, PrincipalKind.APPLICATION), None, 1)]

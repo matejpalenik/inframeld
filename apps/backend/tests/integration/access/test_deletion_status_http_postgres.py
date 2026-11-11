@@ -81,7 +81,9 @@ class MockDeletionCookieVerifier(BrowserSessionVerifier):
         self._identity = identity
 
     @override
-    async def verify(self, credential: BrowserSessionCredential) -> VerifiedHumanIdentityDTO | None:
+    async def verify(
+        self, credential: BrowserSessionCredential, *, timeout_seconds: float | None = None
+    ) -> VerifiedHumanIdentityDTO | None:
         if credential.value == "provider-unavailable":
             raise DependencyUnavailableError()
         return self._identity if credential.value == "retained-read-cookie" else None

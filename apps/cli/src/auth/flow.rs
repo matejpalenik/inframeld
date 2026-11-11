@@ -10,7 +10,7 @@ use openidconnect::{
 };
 use zeroize::Zeroizing;
 
-use serde::Serialize;
+use serde::{Serialize, ser::SerializeStruct as _};
 use tokio::time::Instant;
 use url::Url;
 use uuid::Uuid;
@@ -19,7 +19,9 @@ use crate::discovery::{DiscoveryOptions, discover};
 
 use super::{
     callback::{CallbackListener, CallbackResponse},
-    recipient_proof::{RecipientProof, RepairRequest},
+    recipient_proof::{
+        BootstrapProof, BootstrapReceipt, BootstrapRequest, RecipientProof, RepairRequest,
+    },
     transport::{AuthTransport, TransportError},
 };
 
@@ -33,6 +35,7 @@ pub struct HostContext {
     installation_id: Uuid,
     identity_id: Uuid,
     options: DiscoveryOptions,
+    proxy_destination: Option<String>,
 }
 
 /// Invalid trusted setup input never becomes provider or SDK configuration.
@@ -82,12 +85,19 @@ impl HostContext {
             }
             certificates.extend(bundle);
         }
+        // Keep only an already supported credential-free origin for later preview.
+        // Repair retains its existing transport policy even when no safe preview exists.
+        let proxy_destination = configuration.proxy.as_ref().and_then(|proxy| {
+            crate::targets::Transport::new(Vec::new(), Some(proxy.clone()))
+                .ok()
+                .and_then(|transport| transport.proxy)
+        });
         let proxy = configuration
             .proxy
             .map(reqwest::Proxy::all)
             .transpose()
             .map_err(|_| InvalidHostContext)?;
-        Ok(Self::new(
+        let mut context = Self::new(
             configuration.api,
             configuration.issuer,
             configuration.client_id,
@@ -97,7 +107,9 @@ impl HostContext {
                 certificate_authorities: certificates,
                 proxy,
             },
-        ))
+        );
+        context.proxy_destination = proxy_destination;
+        Ok(context)
     }
 
     /// Capture host facts without discovery, credential lookup or ambient configuration.
@@ -117,8 +129,38 @@ impl HostContext {
             installation_id,
             identity_id,
             options,
+            proxy_destination: None,
         }
     }
+
+    /// Expose only validated operator-provided public destinations, without network work.
+    pub(super) fn bootstrap_destinations(
+        &self,
+    ) -> Result<BootstrapDestinations, InvalidHostContext> {
+        crate::discovery::validate_saved_identity(&self.api, &self.issuer)
+            .map_err(|_| InvalidHostContext)?;
+        if self.options.proxy.is_some() && self.proxy_destination.is_none() {
+            return Err(InvalidHostContext);
+        }
+        Ok(BootstrapDestinations {
+            api: self.api.clone(),
+            issuer: self.issuer.clone(),
+            proxy: self.proxy_destination.clone(),
+            host_execution: "operator-controlled-unverified",
+            provider_endpoints: "unresolved-until-discovery",
+        })
+    }
+}
+
+/// Public endpoint facts are available only after the existing pure URL policy passes.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct BootstrapDestinations {
+    pub api: String,
+    pub issuer: String,
+    pub proxy: Option<String>,
+    pub host_execution: &'static str,
+    pub provider_endpoints: &'static str,
 }
 
 impl std::fmt::Debug for HostContext {
@@ -243,6 +285,105 @@ pub struct RepairOutcome {
     pub credential_observations: CredentialObservations,
 }
 
+/// Keep original claim certainty separate from current admission and cleanup.
+#[derive(Debug)]
+pub struct BootstrapOutcome {
+    /// Only an exact original host receipt establishes the claim result.
+    pub maintenance: HandoffOutcome<BootstrapReceipt>,
+    /// Optional current observation, made before revoking the fresh credential.
+    pub current_session: SessionObservation,
+    /// Cleanup never changes an original claim's certainty.
+    pub credential_cleanup: CleanupStatus,
+    /// Passive facts about this invocation's credentials.
+    pub credential_observations: CredentialObservations,
+}
+
+// Project only the closed bootstrap consumer code. The shared handoff and
+// repair encodings stay unchanged, and this code never establishes a receipt.
+impl Serialize for BootstrapOutcome {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let mut value = serializer.serialize_struct("BootstrapOutcome", 4)?;
+        value.serialize_field("maintenance", &self.maintenance)?;
+        value.serialize_field("currentSession", &self.current_session)?;
+        value.serialize_field("credentialCleanup", &self.credential_cleanup)?;
+        value.serialize_field("consumerErrorCode", &self.maintenance.backend_error)?;
+        value.end()
+    }
+}
+
+/// A current API read is independent of an original host operation's result.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(tag = "status", rename_all = "kebab-case")]
+pub enum SessionObservation {
+    /// The generated API observed a current admitted principal.
+    Admitted {
+        /// Current principal, not a substitute for an original receipt.
+        #[serde(rename = "principalId")]
+        principal_id: Uuid,
+    },
+    /// No current admitted principal was established.
+    Unavailable,
+    /// This invocation did not request a current-session observation.
+    NotRequested,
+}
+
+/// Acquire a transient same-person proof for one reviewed first-administrator claim.
+///
+/// # Errors
+/// Returns fixed stage and cleanup facts without protected provider text.
+pub async fn bootstrap(
+    host: &HostContext,
+    request: &[u8],
+    execution: &ExecutionSpec,
+    browser: &mut impl BrowserLauncher,
+    observe_session: bool,
+    cancellation: impl Future<Output = ()> + Send,
+) -> Result<BootstrapOutcome, RepairFailure> {
+    let deadline = Instant::now() + Duration::from_mins(10);
+    let request = host.bound_bootstrap_request(request)?;
+    let mut cancellation = std::pin::pin!(cancellation);
+    let VerifiedAuthorization {
+        transport,
+        oidc,
+        tokens,
+    } = acquire_proof(host, browser, deadline, cancellation.as_mut()).await?;
+    let proof = BootstrapProof {
+        access_token: Zeroizing::new(tokens.access_token().secret().clone()),
+        installation_id: host.installation_id,
+        identity_id: host.identity_id,
+    };
+    let maintenance = super::maintenance_handoff::handoff_bootstrap(
+        execution,
+        &request,
+        &proof,
+        deadline,
+        cancellation.as_mut(),
+    )
+    .await;
+    let current_session = if observe_session {
+        match within(
+            deadline,
+            cancellation.as_mut(),
+            transport.session_principal(tokens.access_token()),
+        )
+        .await
+        {
+            Ok(Ok(principal_id)) => SessionObservation::Admitted { principal_id },
+            _ => SessionObservation::Unavailable,
+        }
+    } else {
+        SessionObservation::NotRequested
+    };
+    let (credential_cleanup, credential_observations) =
+        revoke_new(&oidc, &transport, &tokens).await;
+    Ok(BootstrapOutcome {
+        maintenance,
+        current_session,
+        credential_cleanup,
+        credential_observations,
+    })
+}
+
 /// Fixed observations retain no protected provider response or token bytes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RevocationObservation {
@@ -315,6 +456,65 @@ pub async fn repair(
     let deadline = Instant::now() + Duration::from_mins(10);
     let request = host.bound_request(request)?;
     let mut cancellation = std::pin::pin!(cancellation);
+    let VerifiedAuthorization {
+        transport,
+        oidc,
+        tokens,
+    } = acquire_proof(host, browser, deadline, cancellation.as_mut()).await?;
+    let principal = match within(
+        deadline,
+        cancellation.as_mut(),
+        transport.session_principal(tokens.access_token()),
+    )
+    .await
+    {
+        Ok(Ok(principal)) => principal,
+        result => {
+            let kind = match result {
+                Err(kind) => kind,
+                _ => FailureKind::Session,
+            };
+            let (cleanup, _) = revoke_new(&oidc, &transport, &tokens).await;
+            return Err(failure(kind, cleanup));
+        }
+    };
+    let proof = RecipientProof {
+        access_token: Zeroizing::new(tokens.access_token().secret().clone()),
+        installation_id: host.installation_id,
+        identity_id: host.identity_id,
+        principal_id: principal,
+    };
+    let maintenance = super::maintenance_handoff::handoff(
+        execution,
+        &request,
+        &proof,
+        deadline,
+        cancellation.as_mut(),
+    )
+    .await;
+    let (credential_cleanup, credential_observations) =
+        revoke_new(&oidc, &transport, &tokens).await;
+    Ok(RepairOutcome {
+        maintenance,
+        credential_cleanup,
+        credential_observations,
+    })
+}
+
+/// Verified provider credentials remain local to this invocation until revocation.
+struct VerifiedAuthorization {
+    transport: AuthTransport,
+    oidc: AuthorizationClient,
+    tokens: CoreTokenResponse,
+}
+
+/// Share callback, PKCE and maintained token validation without sharing admission policy.
+async fn acquire_proof(
+    host: &HostContext,
+    browser: &mut impl BrowserLauncher,
+    deadline: Instant,
+    mut cancellation: Pin<&mut (impl Future<Output = ()> + Send)>,
+) -> Result<VerifiedAuthorization, RepairFailure> {
     let PendingAuthorization {
         transport,
         oidc,
@@ -373,43 +573,10 @@ pub async fn repair(
         let (cleanup, _) = revoke_new(&oidc, &transport, &tokens).await;
         return Err(failure(FailureKind::Identity, cleanup));
     }
-    let principal = match within(
-        deadline,
-        cancellation.as_mut(),
-        transport.session_principal(tokens.access_token()),
-    )
-    .await
-    {
-        Ok(Ok(principal)) => principal,
-        result => {
-            let kind = match result {
-                Err(kind) => kind,
-                _ => FailureKind::Session,
-            };
-            let (cleanup, _) = revoke_new(&oidc, &transport, &tokens).await;
-            return Err(failure(kind, cleanup));
-        }
-    };
-    let proof = RecipientProof {
-        access_token: Zeroizing::new(tokens.access_token().secret().clone()),
-        installation_id: host.installation_id,
-        identity_id: host.identity_id,
-        principal_id: principal,
-    };
-    let maintenance = super::maintenance_handoff::handoff(
-        execution,
-        &request,
-        &proof,
-        deadline,
-        cancellation.as_mut(),
-    )
-    .await;
-    let (credential_cleanup, credential_observations) =
-        revoke_new(&oidc, &transport, &tokens).await;
-    Ok(RepairOutcome {
-        maintenance,
-        credential_cleanup,
-        credential_observations,
+    Ok(VerifiedAuthorization {
+        transport,
+        oidc,
+        tokens,
     })
 }
 
@@ -509,13 +676,36 @@ async fn prepare_authorization(
 }
 
 impl HostContext {
+    /// Bind all operator-provided bootstrap values before any effect or explanation.
+    pub(crate) fn bound_bootstrap_request(
+        &self,
+        request: &[u8],
+    ) -> Result<BootstrapRequest, RepairFailure> {
+        let request = BootstrapRequest::parse(request)
+            .map_err(|_| failure(FailureKind::InvalidRequest, CleanupStatus::NotNeeded))?;
+        self.validate_binding(
+            request.expected_installation_id,
+            request.expected_identity_id,
+        )?;
+        Ok(request)
+    }
+
     /// Validate repair intent before discovery, browser or maintenance effects.
     fn bound_request(&self, request: &[u8]) -> Result<RepairRequest, RepairFailure> {
         let request = RepairRequest::parse(request)
             .map_err(|_| failure(FailureKind::InvalidRequest, CleanupStatus::NotNeeded))?;
-        if request.expected_installation_id != self.installation_id
-            || request.expected_identity_id != self.identity_id
-        {
+        self.validate_binding(
+            request.expected_installation_id,
+            request.expected_identity_id,
+        )?;
+        Ok(request)
+    }
+    fn validate_binding(
+        &self,
+        installation_id: Uuid,
+        identity_id: Uuid,
+    ) -> Result<(), RepairFailure> {
+        if installation_id != self.installation_id || identity_id != self.identity_id {
             return Err(failure(FailureKind::Binding, CleanupStatus::NotNeeded));
         }
         if self.client_id != "inframeld-cli" {
@@ -524,7 +714,7 @@ impl HostContext {
                 CleanupStatus::NotNeeded,
             ));
         }
-        Ok(request)
+        Ok(())
     }
     fn options_copy(&self) -> DiscoveryOptions {
         DiscoveryOptions {

@@ -22,11 +22,11 @@ from inframeld_backend.access.application.dtos.application_account_grant_target_
 from inframeld_backend.access.application.dtos.group_manager_repair_responsibility_dto import (
     GroupManagerRepairResponsibilityDTO,
 )
+from inframeld_backend.access.application.dtos.human_credential_facts_dto import (
+    HumanCredentialFactsDTO,
+)
 from inframeld_backend.access.application.dtos.human_oauth_credential_binding_dto import (
     HumanOAuthCredentialBindingDTO,
-)
-from inframeld_backend.access.application.dtos.human_oauth_credential_facts_dto import (
-    HumanOAuthCredentialFactsDTO,
 )
 from inframeld_backend.access.application.dtos.organization_grant_target_dto import (
     OrganizationGrantTargetDTO,
@@ -132,9 +132,10 @@ class MockRepairFacts(StrandedAuthorityRepairFactsReader):
             access_revision=0,
             is_project_member=True,
             has_pending_recovery=False,
-            oauth_credential_facts=HumanOAuthCredentialFactsDTO(True, HumanCredentialVersion(2)),
+            oauth_credential_facts=HumanCredentialFactsDTO(True, HumanCredentialVersion(2)),
             eligible_grantor_exists=False,
             target_exists=True,
+            target_accepts_assignment=True,
             observed_at=datetime(2030, 1, 1, tzinfo=UTC),
         )
         self.saved: StrandedAuthorityRepairReceiptDTO | None = None
@@ -244,7 +245,7 @@ async def test_provider_active_old_generation_proof_is_rejected_before_completed
     s.save_original()
     s.facts.facts = replace(
         s.facts.facts,
-        oauth_credential_facts=HumanOAuthCredentialFactsDTO(True, HumanCredentialVersion(3)),
+        oauth_credential_facts=HumanCredentialFactsDTO(True, HumanCredentialVersion(3)),
     )
     with pytest.raises(StrandedAuthorityMaintenanceError) as failure:
         await s.service.repair(access=ACCESS, command=COMMAND)
@@ -319,8 +320,9 @@ class BroaderFacts(StrandedAuthorityRepairFactsReader):
             0,
             not organization_only,
             False,
-            HumanOAuthCredentialFactsDTO(True, HumanCredentialVersion(2)),
+            HumanCredentialFactsDTO(True, HumanCredentialVersion(2)),
             False,
+            True,
             True,
             datetime(2030, 1, 1, tzinfo=UTC),
         )
@@ -431,7 +433,7 @@ async def test_broader_current_eligibility_and_scope_precede_original_recovery(l
     if loss == "credential":
         s.facts.facts = replace(
             s.facts.facts,
-            oauth_credential_facts=HumanOAuthCredentialFactsDTO(True, HumanCredentialVersion(3)),
+            oauth_credential_facts=HumanCredentialFactsDTO(True, HumanCredentialVersion(3)),
         )
     elif loss == "recovery":
         s.facts.facts = replace(s.facts.facts, has_pending_recovery=True)

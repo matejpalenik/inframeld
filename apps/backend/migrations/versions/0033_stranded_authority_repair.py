@@ -4,8 +4,8 @@ import sqlalchemy as sa
 from alembic import op
 from migrations.types import MigrationRevisionReference
 
-revision: str = "0030_stranded_authority_repair"
-down_revision: MigrationRevisionReference = "0029_application_key_revocation"
+revision: str = "0033_stranded_authority_repair"
+down_revision: MigrationRevisionReference = "0032_application_retirement"
 branch_labels: MigrationRevisionReference = None
 depends_on: MigrationRevisionReference = None
 

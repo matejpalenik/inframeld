@@ -12,14 +12,19 @@ from uuid import uuid4
 import pytest
 from sqlalchemy import delete, func, select, update
 from tests.support.access_scenarios import MockAccessScenarios
-from tests.support.authentication_evidence import MockAuthenticationEvidence
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
+from inframeld_backend.access.application.dtos.browser_session_authentication_dto import (
+    BrowserSessionAuthenticationDTO,
+)
 from inframeld_backend.access.application.dtos.human_oauth_credential_binding_dto import (
     HumanOAuthCredentialBindingDTO,
 )
 from inframeld_backend.access.application.dtos.operation_lookup_authorization_dto import (
     OperationLookupAuthorizationDTO,
+)
+from inframeld_backend.access.application.dtos.verified_human_identity_dto import (
+    VerifiedHumanIdentityDTO,
 )
 from inframeld_backend.access.application.enums.identity_recovery_event_kind import (
     IdentityRecoveryEventKind,
@@ -33,9 +38,7 @@ from inframeld_backend.access.application.services.operation_lookup_authorizatio
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.enums.principal_status import PrincipalStatus
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
-from inframeld_backend.access.domain.value_objects.human_credential_version import (
-    HumanCredentialVersion,
-)
+from inframeld_backend.access.domain.value_objects.identity_authority import IdentityAuthority
 from inframeld_backend.access.domain.value_objects.identity_subject import IdentitySubject
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
@@ -59,6 +62,9 @@ from inframeld_backend.access.infrastructure.rows.project_action_grant_row impor
     ProjectActionGrantRow,
 )
 from inframeld_backend.access.infrastructure.rows.project_membership_row import ProjectMembershipRow
+from inframeld_backend.access.infrastructure.writers.postgres_human_credential_state_initializer import (
+    PostgresHumanCredentialStateInitializer,
+)
 from inframeld_backend.shared.application.dtos.completed_synchronous_operation_dto import (
     CompletedSynchronousOperationDTO,
 )
@@ -95,9 +101,6 @@ from inframeld_backend.shared.application.value_objects.request_fingerprint impo
     RequestFingerprint,
 )
 from inframeld_backend.shared.domain.value_objects.installation_id import InstallationId
-from inframeld_backend.shared.infrastructure.readers.postgres_installation_identity_reader import (
-    PostgresInstallationIdentityReader,
-)
 from inframeld_backend.shared.infrastructure.readers.postgres_operation_lookup_reader import (
     PostgresOperationLookupReader,
 )
@@ -119,6 +122,9 @@ ACTION = ActionId("create-projects")
 async def organization_admitted(
     database: Database,
 ) -> tuple[AccessContextDTO, LookupOriginalOperationQuery, str, ProjectId]:
+    identity = VerifiedHumanIdentityDTO(
+        IdentityAuthority("kratos:test"), IdentitySubject(str(uuid4()))
+    )
     async with database.session() as session, session.begin():
         seed = await MockAccessScenarios.seed_project_authorization(
             session, is_project_member=False, has_action_grant=False
@@ -132,10 +138,24 @@ async def organization_admitted(
                 can_grant=False,
             )
         )
-    access = AccessContextDTO(seed.principal_id, MockAuthenticationEvidence.browser())
-    installed = await PostgresInstallationIdentityReader(database).read()
+        session.add(
+            HumanIdentityLinkRow(
+                authority=identity.authority.value,
+                subject=identity.subject.value,
+                organization_id=seed.organization_id.value,
+                principal_id=seed.principal_id.value,
+                principal_kind=PrincipalKind.HUMAN,
+            )
+        )
+
+    state = await PostgresHumanCredentialStateInitializer(database).initialize(identity)
+    assert state.version is not None
+    access = AccessContextDTO(
+        seed.principal_id,
+        BrowserSessionAuthenticationDTO(identity, state.installation_id, state.version),
+    )
     query = LookupOriginalOperationQuery(
-        installed,
+        state.installation_id,
         seed.organization_id,
         None,
         HttpMethod.POST,
@@ -295,17 +315,9 @@ async def test_another_organization_is_not_substituted(database: Database) -> No
 @pytest.mark.asyncio
 async def test_organization_recovery_block_is_current_authority(database: Database) -> None:
     access, query, _operation, _project = await organization_admitted(database)
-    identity = MockAuthenticationEvidence.browser().identity
+    assert isinstance(access.authentication_evidence, BrowserSessionAuthenticationDTO)
+    identity = access.authentication_evidence.identity
     async with database.session() as session, session.begin():
-        session.add(
-            HumanIdentityLinkRow(
-                authority=identity.authority.value,
-                subject=identity.subject.value,
-                organization_id=query.organization_id.value,
-                principal_id=access.actor_principal_id.value,
-                principal_kind=PrincipalKind.HUMAN,
-            )
-        )
         session.add(
             IdentityRecoveryAdmissionRow(
                 operation_id="new-recovery",
@@ -358,32 +370,30 @@ async def test_organization_lookup_uses_current_original_human_credential_bindin
     database: Database, credential: str
 ) -> None:
     access, query, operation, _project = await organization_admitted(database)
-    identity = MockAuthenticationEvidence.browser().identity
-    async with database.session() as session, session.begin():
-        session.add(
-            HumanIdentityLinkRow(
-                authority=identity.authority.value,
-                subject=identity.subject.value,
-                organization_id=query.organization_id.value,
-                principal_id=access.actor_principal_id.value,
-                principal_kind=PrincipalKind.HUMAN,
-            )
-        )
-        if credential != "missing_version":
-            session.add(
-                HumanCredentialVersionRow(
-                    installation_id=query.installation_id.value,
-                    authority=identity.authority.value,
-                    subject=identity.subject.value,
-                    version=2 if credential == "stale" else 1,
+    original = access.authentication_evidence
+    assert isinstance(original, BrowserSessionAuthenticationDTO)
+    identity = original.identity
+    if credential in ("missing_version", "stale"):
+        async with database.session() as session, session.begin():
+            if credential == "missing_version":
+                statement = delete(HumanCredentialVersionRow)
+            else:
+                statement = update(HumanCredentialVersionRow).values(
+                    version=original.version.value + 1
+                )
+            await session.execute(
+                statement.where(
+                    HumanCredentialVersionRow.installation_id == original.installation_id.value,
+                    HumanCredentialVersionRow.authority == identity.authority.value,
+                    HumanCredentialVersionRow.subject == identity.subject.value,
                 )
             )
     binding = HumanOAuthCredentialBindingDTO(
         replace(identity, subject=IdentitySubject("another-human"))
         if credential == "other_identity"
         else identity,
-        InstallationId(uuid4()) if credential == "other_installation" else query.installation_id,
-        HumanCredentialVersion(1),
+        InstallationId(uuid4()) if credential == "other_installation" else original.installation_id,
+        original.version,
     )
     access = replace(access, authentication_evidence=binding)
     if credential == "current":

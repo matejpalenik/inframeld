@@ -12,6 +12,11 @@ from tests.support.job_effect_recovery_handler import (
     MockEffectTransactions,
     original_effect,
 )
+from tests.unit.shared.application.services.test_project_deletion_job_authorization_service import (
+    BINDING,
+    FACTS,
+    MockFacts,
+)
 
 from inframeld_backend.access.application.dtos.admitted_work_authority_dto import (
     AdmittedWorkAuthorityDTO,
@@ -38,6 +43,9 @@ from inframeld_backend.shared.application.services.job_continuation_eligibility_
 )
 from inframeld_backend.shared.application.services.job_execution_service import JobExecutionService
 from inframeld_backend.shared.application.services.job_recovery_service import JobRecoveryService
+from inframeld_backend.shared.application.services.project_deletion_job_authorization_service import (
+    ProjectDeletionJobAuthorizationService,
+)
 from inframeld_backend.shared.application.value_objects.artifact_cleanup_obligation_id import (
     ArtifactCleanupObligationId,
 )
@@ -238,3 +246,46 @@ async def test_unavailable_or_cancelled_access_does_not_take_queue_ownership(
         await execution(store, product).claim_next()
     assert caught.value is failure
     assert store.events == ["begin", "peek", "product", "rollback"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("completed", [False, True])
+async def test_deletion_recovery_settles_only_local_child_without_parent_expiry_or_spin(
+    completed: bool,
+) -> None:
+
+    store = MockEffectStore(original_effect())
+    store.job = replace(
+        store.job,
+        binding=BINDING,
+        payload=FACTS.payload,
+        pending_effect=None,
+        lease_expires_at=store.job.observed_at - timedelta(seconds=1),
+    )
+    reader = MockFacts()
+    parent = replace(
+        FACTS,
+        job_id=store.job.job_id,
+        observed_at=store.job.observed_at,
+        shutdown_completed_at=FACTS.admitted_at + timedelta(seconds=5) if completed else None,
+        source_revision=2 if completed else 1,
+    )
+    reader.result = parent
+    assessment = JobContinuationEligibilityService(
+        store,
+        MockEffectProductAuthority(store.events),
+        MockEffectCleanupAuthority(store),
+        supported_payloads=(("project.application-shutdown", 1),),
+        project_deletion_job_authorizer=ProjectDeletionJobAuthorizationService(reader),
+    )
+    deadline = store.job.work_deadline
+    await JobRecoveryService(store, assessment).recover_in_transaction(store.job)
+    assert store.job.status is (JobStatus.SUCCEEDED if completed else JobStatus.QUEUED)
+    assert store.job.attempt == 1 and store.job.work_deadline == deadline
+    assert reader.result == parent and parent.physical_cleanup_completed_at is None
+    assert (
+        "product" not in store.events
+        and "cleanup" not in store.events
+        and "consume" not in store.events
+    )
+    assert store.events.count("retire") == 1
