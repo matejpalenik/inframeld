@@ -11,29 +11,34 @@ from uuid import UUID, uuid4
 import pytest
 from sqlalchemy import delete, func, select, update
 from tests.support.project_metadata_scenarios import (
-    metadata_repair_service,
     seed_metadata_repair_recipient,
+    stranded_repair_service,
 )
 
-from inframeld_backend.access.application.commands.repair_project_metadata_authority_command import (
-    RepairProjectMetadataAuthorityCommand,
+from inframeld_backend.access.application.commands.repair_stranded_authority_command import (
+    RepairStrandedAuthorityCommand,
 )
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
+from inframeld_backend.access.application.dtos.action_grantor_repair_responsibility_dto import (
+    ActionGrantorRepairResponsibilityDTO,
+)
 from inframeld_backend.access.application.dtos.human_oauth_credential_binding_dto import (
     HumanOAuthCredentialBindingDTO,
 )
+from inframeld_backend.access.application.dtos.project_grant_target_dto import ProjectGrantTargetDTO
 from inframeld_backend.access.application.dtos.verified_human_identity_dto import (
     VerifiedHumanIdentityDTO,
 )
-from inframeld_backend.access.application.enums.project_metadata_maintenance_error_code import (
-    ProjectMetadataMaintenanceErrorCode as Code,
+from inframeld_backend.access.application.enums.stranded_authority_maintenance_error_code import (
+    StrandedAuthorityMaintenanceErrorCode as Code,
 )
-from inframeld_backend.access.application.errors.project_metadata_maintenance_error import (
-    ProjectMetadataMaintenanceError,
+from inframeld_backend.access.application.errors.stranded_authority_maintenance_error import (
+    StrandedAuthorityMaintenanceError,
 )
 from inframeld_backend.access.application.value_objects.human_access_token_credential import (
     HumanAccessTokenCredential,
 )
+from inframeld_backend.access.domain.value_objects.action_id import ActionId
 from inframeld_backend.access.domain.value_objects.identity_authority import IdentityAuthority
 from inframeld_backend.access.domain.value_objects.identity_subject import IdentitySubject
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
@@ -51,6 +56,9 @@ from inframeld_backend.access.infrastructure.rows.project_metadata_repair_receip
     ProjectMetadataRepairReceiptRow,
 )
 from inframeld_backend.access.infrastructure.rows.project_row import ProjectRow
+from inframeld_backend.access.infrastructure.writers.postgres_stranded_authority_audit_writer import (
+    PostgresStrandedAuthorityAuditWriter,
+)
 from inframeld_backend.shared.application.value_objects.operation_id import OperationId
 from inframeld_backend.shared.infrastructure.resources.database import Database
 
@@ -64,11 +72,13 @@ def command(
     binding: HumanOAuthCredentialBindingDTO,
     project_id: ProjectId,
     operation: str = "operator-original",
-) -> RepairProjectMetadataAuthorityCommand:
-    return RepairProjectMetadataAuthorityCommand(
+) -> RepairStrandedAuthorityCommand:
+    return RepairStrandedAuthorityCommand(
         expected_installation_id=binding.installation_id,
         operation_id=OperationId(operation),
-        project_id=project_id,
+        responsibility=ActionGrantorRepairResponsibilityDTO(
+            ProjectGrantTargetDTO(project_id), ActionId("edit-project-metadata")
+        ),
         expected_access_revision=0,
         expected_identity_id=UUID(binding.identity.subject.value),
         operator_label="Host operator",
@@ -88,7 +98,7 @@ async def test_first_grant_receipt_and_operator_audit_commit_without_unrelated_a
     seed, binding = await seed_metadata_repair_recipient(database, identity())
     request = command(binding, seed.project_id)
     async with database.session() as session:
-        result = await metadata_repair_service(session).repair(
+        result = await stranded_repair_service(session).repair(
             access=AccessContextDTO(seed.principal_id, binding), command=request
         )
     assert result.access_revision == 1 and result.recipient_id == seed.principal_id
@@ -147,7 +157,7 @@ async def test_refreshed_proof_replays_original_receipt_after_grant_removal_with
     request = command(binding, seed.project_id)
     access = AccessContextDTO(seed.principal_id, binding)
     async with database.session() as session:
-        first = await metadata_repair_service(session).repair(access=access, command=request)
+        first = await stranded_repair_service(session).repair(access=access, command=request)
     async with database.session() as session, session.begin():
         await session.execute(
             delete(ProjectActionGrantRow).where(
@@ -160,7 +170,7 @@ async def test_refreshed_proof_replays_original_receipt_after_grant_removal_with
             .values(access_revision=ProjectRow.access_revision + 1)
         )
     async with database.session() as session:
-        replay = await metadata_repair_service(session).repair(
+        replay = await stranded_repair_service(session).repair(
             access=access,
             command=replace(
                 request, identity_proof=HumanAccessTokenCredential("replaced-transient-proof")
@@ -180,8 +190,8 @@ async def test_refreshed_proof_replays_original_receipt_after_grant_removal_with
             await session.scalar(select(func.count()).select_from(HostMaintenanceReceiptRow)) == 1
         )
     async with database.session() as session:
-        with pytest.raises(ProjectMetadataMaintenanceError) as failure:
-            await metadata_repair_service(session).repair(
+        with pytest.raises(StrandedAuthorityMaintenanceError) as failure:
+            await stranded_repair_service(session).repair(
                 access=access, command=replace(request, reason="Changed reviewed meaning")
             )
         assert failure.value.code is Code.KEY_REUSED
@@ -195,7 +205,7 @@ async def test_concurrent_repairs_assign_once_and_do_not_create_a_second_receipt
 
     async def repair(key: str):
         async with database.session() as session:
-            return await metadata_repair_service(session).repair(
+            return await stranded_repair_service(session).repair(
                 access=AccessContextDTO(seed.principal_id, binding),
                 command=command(binding, seed.project_id, key),
             )
@@ -203,7 +213,7 @@ async def test_concurrent_repairs_assign_once_and_do_not_create_a_second_receipt
     results = await asyncio.gather(repair("first"), repair("second"), return_exceptions=True)
     assert sum(not isinstance(result, BaseException) for result in results) == 1
     conflicts = [
-        result for result in results if isinstance(result, ProjectMetadataMaintenanceError)
+        result for result in results if isinstance(result, StrandedAuthorityMaintenanceError)
     ]
     assert len(conflicts) == 1 and conflicts[0].code in {Code.STALE_REVISION, Code.NOT_STRANDED}
     async with database.session() as session:
@@ -229,8 +239,8 @@ async def test_locally_stale_generation_is_rejected_before_new_or_replayed_autho
             .values(version=binding.version.value + 1)
         )
     async with database.session() as session:
-        with pytest.raises(ProjectMetadataMaintenanceError) as failure:
-            await metadata_repair_service(session).repair(
+        with pytest.raises(StrandedAuthorityMaintenanceError) as failure:
+            await stranded_repair_service(session).repair(
                 access=AccessContextDTO(seed.principal_id, binding),
                 command=command(binding, seed.project_id),
             )
@@ -263,7 +273,9 @@ async def test_audit_failure_rolls_back_repair_grant_revision_and_both_receipts(
     seed, binding = await seed_metadata_repair_recipient(database, identity())
     async with database.session() as session:
         with pytest.raises(RuntimeError, match="Audit storage failed"):
-            await metadata_repair_service(session, MockFailingAudit(session)).repair(
+            await stranded_repair_service(
+                session, PostgresStrandedAuthorityAuditWriter(session, MockFailingAudit(session))
+            ).repair(
                 access=AccessContextDTO(seed.principal_id, binding),
                 command=command(binding, seed.project_id),
             )
@@ -337,8 +349,8 @@ async def test_existing_grantor_or_unknown_identity_cannot_prove_exact_responsib
             )
         )
     async with database.session() as session:
-        with pytest.raises(ProjectMetadataMaintenanceError) as failure:
-            await metadata_repair_service(session).repair(
+        with pytest.raises(StrandedAuthorityMaintenanceError) as failure:
+            await stranded_repair_service(session).repair(
                 access=AccessContextDTO(seed.principal_id, binding),
                 command=command(binding, seed.project_id),
             )
@@ -367,7 +379,7 @@ async def test_recovery_reader_rejects_actual_repair_receipt_before_recovery_dec
     seed, binding = await seed_metadata_repair_recipient(database, identity())
     request = command(binding, seed.project_id)
     async with database.session() as session:
-        await metadata_repair_service(session).repair(
+        await stranded_repair_service(session).repair(
             access=AccessContextDTO(seed.principal_id, binding),
             command=request,
         )
@@ -396,18 +408,18 @@ async def test_repair_waits_for_identity_turn_then_rejects_newly_stale_generatio
 
     from typing import override
 
-    from inframeld_backend.access.application.dtos.project_metadata_repair_facts_dto import (
-        ProjectMetadataRepairFactsDTO,
+    from inframeld_backend.access.application.dtos.stranded_authority_repair_facts_dto import (
+        StrandedAuthorityRepairFactsDTO,
     )
-    from inframeld_backend.access.infrastructure.readers.postgres_project_metadata_repair_facts_reader import (
-        PostgresProjectMetadataRepairFactsReader,
+    from inframeld_backend.access.infrastructure.readers.postgres_stranded_authority_repair_facts_reader import (
+        PostgresStrandedAuthorityRepairFactsReader,
     )
 
-    class MockObservedFacts(PostgresProjectMetadataRepairFactsReader):
+    class MockObservedFacts(PostgresStrandedAuthorityRepairFactsReader):
         @override
         async def read(
-            self, *, access: AccessContextDTO, command: RepairProjectMetadataAuthorityCommand
-        ) -> ProjectMetadataRepairFactsDTO | None:
+            self, *, access: AccessContextDTO, command: RepairStrandedAuthorityCommand
+        ) -> StrandedAuthorityRepairFactsDTO | None:
             pid = await self._session.scalar(select(func.pg_backend_pid().cast(Integer)))
             assert pid is not None
             pid_ready.set_result(pid)
@@ -415,8 +427,8 @@ async def test_repair_waits_for_identity_turn_then_rejects_newly_stale_generatio
 
     async def repair() -> None:
         async with database.session() as session:
-            with pytest.raises(ProjectMetadataMaintenanceError) as failure:
-                await metadata_repair_service(session, facts=MockObservedFacts(session)).repair(
+            with pytest.raises(StrandedAuthorityMaintenanceError) as failure:
+                await stranded_repair_service(session, facts=MockObservedFacts(session)).repair(
                     access=AccessContextDTO(seed.principal_id, binding),
                     command=command(binding, seed.project_id),
                 )

@@ -1,7 +1,7 @@
 from enum import StrEnum
 
 
-class ProjectMetadataMaintenanceErrorCode(StrEnum):
+class StrandedAuthorityMaintenanceErrorCode(StrEnum):
     INVALID_INPUT = "invalid_input"
     INVALID_IDENTITY_PROOF = "invalid_identity_proof"
     IDENTITY_INELIGIBLE = "identity_ineligible"

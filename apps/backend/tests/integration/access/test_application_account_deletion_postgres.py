@@ -761,7 +761,7 @@ async def test_retirement_original_lifetime_follows_only_its_native_reservation(
     async with database.session() as session, session.begin():
         assert (
             await session.scalar(select(AlembicVersionRow.version_num))
-            == "0032_application_retirement"
+            == "0033_stranded_authority_repair"
         )
         assert (
             await session.get(ApplicationAccountDeletionResultRow, operation_id.value) is not None

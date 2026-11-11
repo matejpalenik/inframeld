@@ -20,6 +20,8 @@ The supported account-to-client and disposable-resource setup, engineering dry r
 
 You must be a currently eligible admitted human with use-and-grant authority for the exact action on the target. Project-scoped targets also require current membership and visibility in their owning Project. For the three document actions on an access group, current management of that same group is an alternative for ordinary grant reads, changes, recipient discovery and same-write replay. Managing another group or merely belonging to the group is insufficient.
 
+If no eligible human can administer the exact action, first consider recovery of the legitimate account. Otherwise, involve the installation's verified host operator and review [scoped operator repair](https://github.com/matejpalenik/inframeld/blob/main/.agents/skills/inframeld-access-models/references/host-maintenance.md#access-owned-authority-repair). It can establish only the reviewed use-and-grant assignment. For a group action, an eligible manager of that same group already provides an ordinary administration path, so the action is not stranded.
+
 Generic [original-operation metadata lookup](/guides/recover-original-request) has a different permission requirement. It always requires current exact use-and-grant authority for the original grant action and target, including group grant history. Group management alone cannot authorize that lookup.
 
 Cookie-authenticated writes retain the installation's trusted Origin requirement and `X-Inframeld-CSRF: 1`. Use one supported credential family per request and keep credentials out of saved examples and diagnostics.

@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Inframeld version 1 maintenance input, design contract",
-  "description": "Bootstrap and stranded-authority repair remain design-only at this recording checkpoint. ADR-0124 approves the exact Project edit-project-metadata repair subset for #120 delivery. Recovery-cleanup continuation is implemented. A schema-valid shape does not establish runtime support or host authority.",
-  "$comment": "Owner: .agents/skills/inframeld-access-models/references/host-maintenance.md. ADR-0085 resolves PD-ACCESS-03. Enforce the 64 KiB received-byte bound, strict JSON integer tokens, duplicate-key rejection, one JSON value and verified host/installation authority separately. Bootstrap/repair require current recipient proof and reviewed scope. Recovery continuation forbids that proof and reviewed-run inputs, deduplicates the operator request and checks current original recovery eligibility and active runs. Only resume-recovery-cleanup is implemented by apps/backend/src/inframeld_backend/access/cli/mappers/recovery_maintenance_mapper.py. Bootstrap/repair remain design-only. JSON Schema integer validation accepts 1.0. ADR-0124 selects only responsibility.kind action-grantor, target.kind project with its projectId, and literal actionId edit-project-metadata for the forthcoming #120 repair implementation. Other repair shapes remain future design, even when this schema accepts them. Preserve shared installation/operator operationId uniqueness and typed mode receipts. Proof verification, recipient eligibility, stranded/revision checks and atomic assignment/audit are application work, not schema validation.",
+  "description": "Version1 private maintenance supports first-administrator bootstrap, recovery-cleanup continuation and exact Access-owned stranded-authority repair. A schema-valid shape does not establish current recipient eligibility or host authority. Targets outside Access remain accepted design for their future owning integrations.",
+  "$comment": "Owner: .agents/skills/inframeld-access-models/references/host-maintenance.md. Preserve the64KiB received-byte bound, strict JSON integer tokens, duplicate-key rejection, one JSON value, verified host/installation authority and shared installation/operator operationId namespace. Bootstrap and repair require current recipient proof and reviewed scope. The installed private consumer supports group-manager and fixed action-grantor responsibilities on Organization, Project, access-group and application-account only. Other target kinds remain unsupported design. Recovery continuation forbids recipient proof and reviewed-run inputs. Proof verification, current recipient eligibility, stranded/revision checks, atomic assignment/audit and immutable original recovery are application work, not schema validation. JSON Schema integer validation alone accepts1.0, which the consumer rejects.",
   "$defs": {
     "target": {
       "oneOf": [
@@ -209,7 +209,7 @@
           "additionalProperties": false
         }
       ],
-      "$comment": "The broad variants preserve accepted future repair design. #120 runtime delivery is restricted to action-grantor on one exact Project for edit-project-metadata. Group-manager and other action/target combinations remain unsupported until separately delivered."
+      "$comment": "The installed private consumer supports exact group-manager responsibility and fixed Access action-grantor combinations. Other domain target variants remain future design and are rejected by this consumer."
     }
   },
   "oneOf": [
@@ -248,7 +248,7 @@
         "expectedAccessRevision": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 9223372036854775807
+          "maximum": 9007199254740991
         },
         "expectedIdentityId": {
           "type": "string",

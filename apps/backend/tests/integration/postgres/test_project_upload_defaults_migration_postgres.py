@@ -206,7 +206,7 @@ async def test_downgrade_refuses_retained_default_or_original(
     async with database.session() as session:
         assert (
             await session.scalar(select(AlembicVersionRow.version_num))
-            == "0032_application_retirement"
+            == "0033_stranded_authority_repair"
         )
         if retained == "live-default":
             assert (
@@ -237,6 +237,6 @@ async def test_empty_upgrade_downgrade_preserves_existing_groups(
         ) == set(original_ids)
         assert (
             await session.scalar(select(AlembicVersionRow.version_num))
-            == "0032_application_retirement"
+            == "0033_stranded_authority_repair"
         )
         assert list(await session.scalars(select(ProjectUploadDefaultGroupRow.group_id))) == []

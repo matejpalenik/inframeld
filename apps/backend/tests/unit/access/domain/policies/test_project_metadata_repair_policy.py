@@ -4,8 +4,8 @@ from inframeld_backend.access.domain.entities.principal import Principal
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.enums.principal_status import PrincipalStatus
 from inframeld_backend.access.domain.enums.project_status import ProjectStatus
-from inframeld_backend.access.domain.policies.project_metadata_repair_policy import (
-    ProjectMetadataRepairPolicy,
+from inframeld_backend.access.domain.policies.stranded_authority_repair_policy import (
+    StrandedAuthorityRepairPolicy,
 )
 from inframeld_backend.access.domain.policy_inputs.principal_access_policy_input import (
     PrincipalAccessPolicyInput,
@@ -25,21 +25,24 @@ def test_only_an_eligible_human_member_can_receive_a_definitely_stranded_respons
         has_pending_recovery=False,
         credential_is_current=True,
     )
-    assert ProjectMetadataRepairPolicy.may_assign(
+    assert StrandedAuthorityRepairPolicy.may_assign(
         recipient_access=eligible,
+        requires_project=True,
         is_project_member=True,
         project_status=ProjectStatus.ACTIVE,
         eligible_grantor_exists=False,
     )
     for grantor in (True, None):
-        assert not ProjectMetadataRepairPolicy.may_assign(
+        assert not StrandedAuthorityRepairPolicy.may_assign(
             recipient_access=eligible,
+            requires_project=True,
             is_project_member=True,
             project_status=ProjectStatus.ACTIVE,
             eligible_grantor_exists=grantor,
         )
-    assert not ProjectMetadataRepairPolicy.may_assign(
+    assert not StrandedAuthorityRepairPolicy.may_assign(
         recipient_access=eligible,
+        requires_project=True,
         is_project_member=False,
         project_status=ProjectStatus.ACTIVE,
         eligible_grantor_exists=False,

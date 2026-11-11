@@ -12,6 +12,9 @@ from tests.support.recovery_notifications import notification_service
 from inframeld_backend.access.application.commands.resume_identity_recovery_cleanup_command import (
     ResumeIdentityRecoveryCleanupCommand,
 )
+from inframeld_backend.access.application.dtos.action_grantor_repair_responsibility_dto import (
+    ActionGrantorRepairResponsibilityDTO,
+)
 from inframeld_backend.access.application.dtos.human_oauth_cleanup_outcome_dto import (
     HumanOAuthCleanupOutcomeDTO,
 )
@@ -21,6 +24,7 @@ from inframeld_backend.access.application.dtos.identity_recovery_event_dto impor
 from inframeld_backend.access.application.dtos.identity_recovery_settings_evidence_dto import (
     IdentityRecoverySettingsEvidenceDTO,
 )
+from inframeld_backend.access.application.dtos.project_grant_target_dto import ProjectGrantTargetDTO
 from inframeld_backend.access.application.dtos.verified_human_identity_dto import (
     VerifiedHumanIdentityDTO,
 )
@@ -53,6 +57,7 @@ from inframeld_backend.access.application.value_objects.identity_settings_flow_i
 from inframeld_backend.access.domain.enums.identity_recovery_cleanup_state import (
     IdentityRecoveryCleanupState as State,
 )
+from inframeld_backend.access.domain.value_objects.action_id import ActionId
 from inframeld_backend.access.domain.value_objects.identity_authority import IdentityAuthority
 from inframeld_backend.access.domain.value_objects.identity_recovery_flow_id import (
     IdentityRecoveryFlowId,
@@ -712,19 +717,19 @@ async def test_metadata_repair_cannot_reinterpret_real_completed_recovery_receip
     from uuid import UUID
 
     from tests.support.project_metadata_scenarios import (
-        metadata_repair_service,
         seed_metadata_repair_recipient,
+        stranded_repair_service,
     )
 
-    from inframeld_backend.access.application.commands.repair_project_metadata_authority_command import (
-        RepairProjectMetadataAuthorityCommand,
+    from inframeld_backend.access.application.commands.repair_stranded_authority_command import (
+        RepairStrandedAuthorityCommand,
     )
     from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
-    from inframeld_backend.access.application.enums.project_metadata_maintenance_error_code import (
-        ProjectMetadataMaintenanceErrorCode,
+    from inframeld_backend.access.application.enums.stranded_authority_maintenance_error_code import (
+        StrandedAuthorityMaintenanceErrorCode,
     )
-    from inframeld_backend.access.application.errors.project_metadata_maintenance_error import (
-        ProjectMetadataMaintenanceError,
+    from inframeld_backend.access.application.errors.stranded_authority_maintenance_error import (
+        StrandedAuthorityMaintenanceError,
     )
     from inframeld_backend.access.application.value_objects.human_access_token_credential import (
         HumanAccessTokenCredential,
@@ -752,10 +757,12 @@ async def test_metadata_repair_cannot_reinterpret_real_completed_recovery_receip
         IdentityAuthority("kratos:metadata-test"), IdentitySubject(str(uuid4()))
     )
     seed, binding = await seed_metadata_repair_recipient(database, identity)
-    repair = RepairProjectMetadataAuthorityCommand(
+    repair = RepairStrandedAuthorityCommand(
         binding.installation_id,
         recovery.operation_id,
-        seed.project_id,
+        ActionGrantorRepairResponsibilityDTO(
+            ProjectGrantTargetDTO(seed.project_id), ActionId("edit-project-metadata")
+        ),
         0,
         UUID(identity.subject.value),
         "Metadata operator",
@@ -763,12 +770,12 @@ async def test_metadata_repair_cannot_reinterpret_real_completed_recovery_receip
         HumanAccessTokenCredential("post-authentication-fixture-proof"),
     )
     async with database.session() as session:
-        with pytest.raises(ProjectMetadataMaintenanceError) as failure:
-            await metadata_repair_service(session).repair(
+        with pytest.raises(StrandedAuthorityMaintenanceError) as failure:
+            await stranded_repair_service(session).repair(
                 access=AccessContextDTO(seed.principal_id, binding),
                 command=repair,
             )
-        assert failure.value.code is ProjectMetadataMaintenanceErrorCode.KEY_REUSED
+        assert failure.value.code is StrandedAuthorityMaintenanceErrorCode.KEY_REUSED
     async with database.session() as session, session.begin():
         assert (
             await PostgresIdentityRecoveryCleanupResumeFactsReader(session).receipt(

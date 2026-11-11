@@ -1715,6 +1715,11 @@ assert request['authorizationUrl']=='https://identity.test/authorize?state=synth
             (true, "WRONG\n", true),
             (false, "READY1\n", true),
         ] {
+            let allowance = if close_ack {
+                Duration::from_secs(3)
+            } else {
+                Duration::from_millis(150)
+            };
             let (directory, mut execution) = fixture();
             let marker = directory.path().join("url-admitted");
             execution.args.push(marker.to_str().unwrap().into());
@@ -1747,7 +1752,7 @@ if sys.stdin.read():
             let error = browser
                 .open(
                     &navigation(),
-                    Instant::now() + Duration::from_millis(150),
+                    Instant::now() + allowance,
                     cancellation.as_mut(),
                 )
                 .await

@@ -70,7 +70,7 @@ async def test_empty_retirement_history_round_trips_without_changing_live_accoun
     async with database.session() as session:
         assert (
             await session.scalar(select(AlembicVersionRow.version_num))
-            == "0032_application_retirement"
+            == "0033_stranded_authority_repair"
         )
         account = await session.get(ApplicationAccountRow, metadata.application_principal_id.value)
         principal = await session.get(PrincipalRow, metadata.application_principal_id.value)

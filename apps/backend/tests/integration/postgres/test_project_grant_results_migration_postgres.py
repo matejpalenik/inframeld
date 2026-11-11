@@ -140,7 +140,7 @@ async def test_retained_original_receipt_refuses_downgrade_and_keeps_schema_and_
     async with database.session() as session:
         assert (
             await session.scalar(select(AlembicVersionRow.version_num))
-            == "0032_application_retirement"
+            == "0033_stranded_authority_repair"
         )
         row = await session.get(
             ProjectActionGrantOperationResultRow, original.operation.operation_id.value

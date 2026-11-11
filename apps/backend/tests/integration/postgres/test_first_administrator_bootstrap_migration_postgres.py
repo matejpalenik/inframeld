@@ -112,7 +112,7 @@ async def test_retained_claim_refuses_downgrade_without_losing_original_typed_re
     async with database.session() as session:
         assert (
             await session.scalar(select(AlembicVersionRow.version_num))
-            == "0032_application_retirement"
+            == "0033_stranded_authority_repair"
         )
         receipt = await session.get(
             FirstAdministratorBootstrapReceiptRow, original.installation_id.value

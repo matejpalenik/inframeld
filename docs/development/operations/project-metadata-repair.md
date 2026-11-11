@@ -39,9 +39,9 @@ The runtime accepts only this subset of host repair:
 | `identityProof` | Typed `hydra-access-token` proof, supplied transiently through protected stdin |
 | `responsibility` | `action-grantor`, target `project` with one `projectId`, and literal `edit-project-metadata` |
 
-Unknown fields, duplicate JSON keys, another JSON value, non-integer version/revision tokens and unsupported responsibilities fail validation. General bootstrap, group repair and other action grants are unavailable through this consumer. Keep proof out of arguments, environment variables, normal output, audit and replay records. This runbook supplies no token-bearing shell history or temporary-file recipe.
+Unknown fields, duplicate JSON keys, another JSON value, non-integer version/revision tokens and unsupported responsibilities fail validation. Bootstrap uses its separate mode. Group repair and other action grants are outside this metadata-only procedure and the current source-built proof helper. Keep proof out of arguments, environment variables, normal output, audit and replay records. This runbook supplies no token-bearing shell history or temporary-file recipe.
 
-The runtime-owned [mapper](../../../apps/backend/src/inframeld_backend/access/cli/mappers/project_metadata_maintenance_mapper.py) owns the exact request fields. A design schema cannot establish proof validity, current eligibility or stranded authority. Do not invoke the consumer using an invented acquisition flow.
+The runtime-owned [StrandedAuthorityMaintenanceMapper](../../../apps/backend/src/inframeld_backend/access/cli/mappers/stranded_authority_maintenance_mapper.py) owns the exact request fields for this metadata intent and the broader Access-owned repair variants. A design schema cannot establish proof validity, current eligibility or stranded authority. Do not invoke the consumer using an invented acquisition flow.
 
 ## Interpret the result and recover
 

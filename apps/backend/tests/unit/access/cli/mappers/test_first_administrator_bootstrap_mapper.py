@@ -6,8 +6,8 @@ import pytest
 from inframeld_backend.access.application.dtos.first_administrator_bootstrap_result_dto import (
     FirstAdministratorBootstrapResultDTO,
 )
-from inframeld_backend.access.cli.errors.project_metadata_maintenance_input_error import (
-    ProjectMetadataMaintenanceInputError,
+from inframeld_backend.access.cli.errors.stranded_authority_maintenance_input_error import (
+    StrandedAuthorityMaintenanceInputError,
 )
 from inframeld_backend.access.cli.mappers.first_administrator_bootstrap_mapper import (
     FirstAdministratorBootstrapMapper,
@@ -71,7 +71,7 @@ def test_reads_only_the_fixed_bootstrap_intent_and_keeps_proof_out_of_repr() -> 
 def test_rejects_changed_or_unbounded_bootstrap_meaning(field: str, value: object) -> None:
     values = request() | {field: value}
 
-    with pytest.raises(ProjectMetadataMaintenanceInputError) as error:
+    with pytest.raises(StrandedAuthorityMaintenanceInputError) as error:
         FirstAdministratorBootstrapMapper.read(json.dumps(values).encode())
 
     assert "private-proof" not in str(error.value)
@@ -79,7 +79,7 @@ def test_rejects_changed_or_unbounded_bootstrap_meaning(field: str, value: objec
 
 @pytest.mark.parametrize("field", ["responsibility", "organizationName", "principalId"])
 def test_cannot_choose_assignments_or_organization_through_extra_fields(field: str) -> None:
-    with pytest.raises(ProjectMetadataMaintenanceInputError):
+    with pytest.raises(StrandedAuthorityMaintenanceInputError):
         FirstAdministratorBootstrapMapper.read(
             json.dumps(request() | {field: "untrusted"}).encode()
         )
@@ -97,7 +97,7 @@ def test_cannot_choose_assignments_or_organization_through_extra_fields(field: s
     ids=["invalid-utf8", "duplicate-key", "second-value", "nonfinite", "oversized"],
 )
 def test_rejects_malformed_duplicate_or_oversized_input_without_echo(payload: bytes) -> None:
-    with pytest.raises(ProjectMetadataMaintenanceInputError):
+    with pytest.raises(StrandedAuthorityMaintenanceInputError):
         FirstAdministratorBootstrapMapper.read(payload)
 
 
