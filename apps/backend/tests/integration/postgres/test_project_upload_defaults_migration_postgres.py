@@ -204,10 +204,7 @@ async def test_downgrade_refuses_retained_default_or_original(
     with pytest.raises(RuntimeError, match="Retained.*upload"):
         command.downgrade(_config(temporary_postgres_settings), "0029_application_key_revocation")
     async with database.session() as session:
-        assert (
-            await session.scalar(select(AlembicVersionRow.version_num))
-            == "0033_stranded_authority_repair"
-        )
+        assert await session.scalar(select(AlembicVersionRow.version_num)) == "0034_human_lifecycle"
         if retained == "live-default":
             assert (
                 await session.get(
@@ -235,8 +232,5 @@ async def test_empty_upgrade_downgrade_preserves_existing_groups(
                 select(AccessGroupRow.id).where(AccessGroupRow.project_id == scope.project_id.value)
             )
         ) == set(original_ids)
-        assert (
-            await session.scalar(select(AlembicVersionRow.version_num))
-            == "0033_stranded_authority_repair"
-        )
+        assert await session.scalar(select(AlembicVersionRow.version_num)) == "0034_human_lifecycle"
         assert list(await session.scalars(select(ProjectUploadDefaultGroupRow.group_id))) == []

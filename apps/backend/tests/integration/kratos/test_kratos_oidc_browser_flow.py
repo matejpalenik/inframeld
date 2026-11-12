@@ -5,10 +5,14 @@ import os
 import httpx2
 import pytest
 from fastapi.testclient import TestClient
-from pydantic import HttpUrl
+from ory_kratos_client.api.identity_api import IdentityApi
+from ory_kratos_client.api_client import ApiClient
+from ory_kratos_client.configuration import Configuration
+from ory_kratos_client.models.session import Session
+from pydantic import HttpUrl, ValidationError
 from tests.support.access_scenarios import MockAccessScenarios
 from tests.support.authentication_evidence import MockAuthenticationEvidence
-from tests.support.integration_services import KRATOS_PUBLIC_URL, MOCK_OIDC_URL
+from tests.support.integration_services import KRATOS_ADMIN_URL, KRATOS_PUBLIC_URL, MOCK_OIDC_URL
 from tests.support.kratos_admin import get_identity
 from tests.support.kratos_browser import (
     BrowserFlow,
@@ -30,11 +34,20 @@ from inframeld_backend.access.application.dtos.verified_human_identity_dto impor
 from inframeld_backend.access.application.services.action_authorization_service import (
     ActionAuthorizationService,
 )
+from inframeld_backend.access.application.value_objects.browser_session_credential import (
+    BrowserSessionCredential,
+)
+from inframeld_backend.access.domain.enums.identity_recovery_cleanup_state import (
+    IdentityRecoveryCleanupState,
+)
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.value_objects.identity_authority import IdentityAuthority
 from inframeld_backend.access.domain.value_objects.identity_subject import IdentitySubject
 from inframeld_backend.access.infrastructure.readers.postgres_project_action_facts_reader import (
     PostgresProjectActionFactsReader,
+)
+from inframeld_backend.access.infrastructure.revokers.kratos_human_session_revoker import (
+    KratosHumanSessionRevoker,
 )
 from inframeld_backend.access.infrastructure.rows.human_identity_link_row import (
     HumanIdentityLinkRow,
@@ -57,6 +70,73 @@ pytestmark = pytest.mark.skipif(
     or os.getenv("INFRAMELD_RUN_KRATOS_INTEGRATION") != "1",
     reason="Requires PostgreSQL, Kratos, and the mock OIDC provider",
 )
+
+
+async def _active_kratos_session(
+    browser: httpx2.AsyncClient, credential: BrowserSessionCredential
+) -> Session:
+    response = await browser.get(
+        "/sessions/whoami",
+        headers={"Cookie": f"ory_kratos_session={credential.value}"},
+    )
+    assert response.status_code == 200
+    try:
+        session = Session.model_validate_json(response.content)
+    except ValidationError:
+        raise AssertionError("Kratos did not return a valid session.") from None
+    assert session.active is True
+    return session
+
+
+@pytest.mark.asyncio
+async def test_session_revoker_invalidates_only_the_target_identity_sessions() -> None:
+    """Observe provider revocation using the original cookies in three browser contexts."""
+    async with (
+        create_browser() as first_browser,
+        create_browser() as second_browser,
+        create_browser() as control_browser,
+    ):
+        target = await register_human(first_browser)
+        second_credential = await login_human(second_browser, target)
+        control = await register_human(control_browser)
+
+        first = await _active_kratos_session(first_browser, target.credential)
+        second = await _active_kratos_session(second_browser, second_credential)
+        unrelated = await _active_kratos_session(control_browser, control.credential)
+        assert first.identity is not None and second.identity is not None
+        assert unrelated.identity is not None
+        assert str(first.identity.id) == str(second.identity.id) == target.subject.value
+        assert str(unrelated.identity.id) == control.subject.value
+        assert first.identity.id != unrelated.identity.id
+        assert len({first.id, second.id, unrelated.id}) == 3
+
+        admin = ApiClient(Configuration(host=KRATOS_ADMIN_URL, retries=0, debug=False))
+        try:
+            outcome = await KratosHumanSessionRevoker(
+                IdentityApi(admin), AUTHORITY
+            ).revoke_sessions(
+                VerifiedHumanIdentityDTO(AUTHORITY, target.subject), timeout_seconds=3.0
+            )
+        finally:
+            admin.rest_client.pool_manager.clear()
+        assert outcome.state is IdentityRecoveryCleanupState.CONFIRMED
+        assert outcome.http_status == 204
+
+        # Resend the saved cookies so a browser dropping one cannot explain the 401s.
+        for browser, credential in (
+            (first_browser, target.credential),
+            (second_browser, second_credential),
+        ):
+            revoked = await browser.get(
+                "/sessions/whoami",
+                headers={"Cookie": f"ory_kratos_session={credential.value}"},
+            )
+            assert revoked.status_code == 401
+
+        current = await _active_kratos_session(control_browser, control.credential)
+        assert current.identity is not None
+        assert current.identity.id == unrelated.identity.id
+        assert current.id == unrelated.id
 
 
 async def _matching_email_challenge(

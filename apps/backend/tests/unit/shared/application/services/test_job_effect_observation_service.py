@@ -14,6 +14,15 @@ from tests.unit.shared.application.services.test_project_deletion_job_authorizat
     FACTS,
 )
 
+from inframeld_backend.access.application.dtos.verified_human_identity_dto import (
+    VerifiedHumanIdentityDTO,
+)
+from inframeld_backend.access.domain.value_objects.human_suspension_id import HumanSuspensionId
+from inframeld_backend.access.domain.value_objects.identity_authority import IdentityAuthority
+from inframeld_backend.access.domain.value_objects.identity_subject import IdentitySubject
+from inframeld_backend.shared.application.dtos.human_suspension_job_binding_dto import (
+    HumanSuspensionJobBindingDTO,
+)
 from inframeld_backend.shared.application.errors.application_errors import (
     ConflictError,
     DependencyUnavailableError,
@@ -23,6 +32,7 @@ from inframeld_backend.shared.application.services.job_effect_observation_servic
     JobEffectObservationService,
 )
 from inframeld_backend.shared.application.value_objects.artifact_attempt_id import ArtifactAttemptId
+from inframeld_backend.shared.application.value_objects.job_payload import JobPayload
 
 
 def service(store: MockEffectStore) -> tuple[JobEffectObservationService, MockEffectTransactions]:
@@ -111,13 +121,35 @@ async def test_registration_rechecks_original_target_without_inventing_sealed_co
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("action", ["register", "admit-delete", "record-abort"])
-async def test_project_deletion_never_acquires_artifact_dispatch_or_abort_proof(
-    action: str,
+@pytest.mark.parametrize("owner", ["project-deletion", "human-suspension"])
+async def test_nonartifact_cleanup_never_acquires_artifact_dispatch_or_abort_proof(
+    action: str, owner: str
 ) -> None:
-
     original = original_effect()
+    if owner == "project-deletion":
+        job_binding = BINDING
+        payload = FACTS.payload
+    else:
+        job_binding = HumanSuspensionJobBindingDTO(
+            obligation_id=HumanSuspensionId(uuid4()),
+            job_id=original.context.job_id,
+            operation_id=BINDING.operation_id,
+            request_id=BINDING.request_id,
+            installation_id=BINDING.installation_id,
+            organization_id=BINDING.organization_id,
+            principal_id=uuid4(),
+            initiator_principal_id=BINDING.initiator_principal_id,
+            identity=VerifiedHumanIdentityDTO(
+                IdentityAuthority("test"), IdentitySubject("subject")
+            ),
+            key=BINDING.key,
+            fingerprint=BINDING.fingerprint,
+            before_access_revision=BINDING.before_access_revision,
+            access_revision=BINDING.access_revision,
+        )
+        payload = JobPayload("human.suspension-cleanup", 1, job_binding.obligation_id.value.bytes)
     binding = replace(
-        original, context=replace(original.context, binding=BINDING, payload=FACTS.payload)
+        original, context=replace(original.context, binding=job_binding, payload=payload)
     )
     store = MockEffectStore(binding)
     # The artifact authorizer is initialized from its real artifact fixture.

@@ -1757,6 +1757,162 @@
         "title": "HumanOAuthScope",
         "type": "string"
       },
+      "HumanRestorationRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "expectedAccessRevision": {
+            "format": "int64",
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "title": "Expectedaccessrevision",
+            "type": "integer"
+          },
+          "securityReviewReference": {
+            "description": "Required safe single-line audit text, at most 128 Unicode characters.",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Securityreviewreference",
+            "type": "string"
+          }
+        },
+        "required": [
+          "expectedAccessRevision",
+          "securityReviewReference"
+        ],
+        "title": "HumanRestorationRequest",
+        "type": "object"
+      },
+      "HumanRestorationResponse": {
+        "additionalProperties": false,
+        "description": "Return the original safe receipt without inferring current account state.",
+        "properties": {
+          "accessRevision": {
+            "format": "int64",
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "title": "Accessrevision",
+            "type": "integer"
+          },
+          "idempotencyExpiresAt": {
+            "format": "date-time",
+            "title": "Idempotencyexpiresat",
+            "type": "string"
+          },
+          "operationId": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Operationid",
+            "type": "string"
+          },
+          "organizationId": {
+            "format": "uuid",
+            "title": "Organizationid",
+            "type": "string"
+          },
+          "principalId": {
+            "format": "uuid",
+            "title": "Principalid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "operationId",
+          "idempotencyExpiresAt",
+          "organizationId",
+          "principalId",
+          "accessRevision"
+        ],
+        "title": "HumanRestorationResponse",
+        "type": "object"
+      },
+      "HumanSuspensionRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "expectedAccessRevision": {
+            "format": "int64",
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "title": "Expectedaccessrevision",
+            "type": "integer"
+          },
+          "reason": {
+            "description": "Required safe single-line audit text, at most 512 Unicode characters.",
+            "maxLength": 512,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "expectedAccessRevision",
+          "reason"
+        ],
+        "title": "HumanSuspensionRequest",
+        "type": "object"
+      },
+      "HumanSuspensionResponse": {
+        "additionalProperties": false,
+        "description": "Return the original safe receipt without inferring current account state.",
+        "properties": {
+          "accessBlocked": {
+            "const": true,
+            "title": "Accessblocked",
+            "type": "boolean"
+          },
+          "accessRevision": {
+            "format": "int64",
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "title": "Accessrevision",
+            "type": "integer"
+          },
+          "cleanupOperationId": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Cleanupoperationid",
+            "type": "string"
+          },
+          "idempotencyExpiresAt": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idempotencyexpiresat"
+          },
+          "operationId": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Operationid",
+            "type": "string"
+          },
+          "organizationId": {
+            "format": "uuid",
+            "title": "Organizationid",
+            "type": "string"
+          },
+          "principalId": {
+            "format": "uuid",
+            "title": "Principalid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "operationId",
+          "idempotencyExpiresAt",
+          "organizationId",
+          "principalId",
+          "accessRevision",
+          "accessBlocked",
+          "cleanupOperationId"
+        ],
+        "title": "HumanSuspensionResponse",
+        "type": "object"
+      },
       "InProgressOperationLookupResponse": {
         "additionalProperties": false,
         "properties": {
@@ -6800,6 +6956,364 @@
           }
         ],
         "summary": "Admit",
+        "tags": [
+          "access"
+        ]
+      }
+    },
+    "/v1/organizations/{organization_id}/humans/{principal_id}/restore": {
+      "post": {
+        "operationId": "restoreHuman",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "organization_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Organization Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "principal_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Principal Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": ".*\\S.*",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HumanRestorationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HumanRestorationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Invalid authentication request",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Trusted Bearer challenge when applicable.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Unauthorized",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Trusted Bearer challenge when applicable.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Access denied"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Resource not found"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Operation conflicts with current state"
+          },
+          "413": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Content Too Large"
+          },
+          "415": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Unsupported Media Type"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Dependency unavailable"
+          }
+        },
+        "security": [
+          {
+            "KratosSession": []
+          },
+          {
+            "ProductBearer": []
+          }
+        ],
+        "summary": "Restore",
+        "tags": [
+          "access"
+        ]
+      }
+    },
+    "/v1/organizations/{organization_id}/humans/{principal_id}/suspend": {
+      "post": {
+        "operationId": "suspendHuman",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "organization_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Organization Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "principal_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Principal Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": ".*\\S.*",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HumanSuspensionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HumanSuspensionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Invalid authentication request",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Trusted Bearer challenge when applicable.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Unauthorized",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Trusted Bearer challenge when applicable.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Access denied"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Resource not found"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Operation conflicts with current state"
+          },
+          "413": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Content Too Large"
+          },
+          "415": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Unsupported Media Type"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Dependency unavailable"
+          }
+        },
+        "security": [
+          {
+            "KratosSession": []
+          },
+          {
+            "ProductBearer": []
+          }
+        ],
+        "summary": "Suspend",
         "tags": [
           "access"
         ]

@@ -22,6 +22,9 @@ from inframeld_backend.access.application.services.application_key_revocation_fi
 from inframeld_backend.access.application.services.human_admission_fingerprint_service import (
     HumanAdmissionFingerprintService,
 )
+from inframeld_backend.access.application.services.human_lifecycle_fingerprint_service import (
+    HumanLifecycleFingerprintService,
+)
 from inframeld_backend.access.application.services.invitation_fingerprint_service import (
     InvitationFingerprintService,
 )
@@ -87,6 +90,8 @@ from inframeld_backend.access.http.requests.application_key_revocation_request i
     ApplicationKeyRevocationRequest,
 )
 from inframeld_backend.access.http.requests.human_admission_request import HumanAdmissionRequest
+from inframeld_backend.access.http.requests.human_restoration_request import HumanRestorationRequest
+from inframeld_backend.access.http.requests.human_suspension_request import HumanSuspensionRequest
 from inframeld_backend.access.http.requests.invitation_activation_request import (
     InvitationActivationRequest,
 )
@@ -173,6 +178,12 @@ from inframeld_backend.access.http.responses.application_key_revocation_response
 from inframeld_backend.access.http.responses.current_application_session_response import (
     CurrentApplicationSessionResponse,
 )
+from inframeld_backend.access.http.responses.human_restoration_response import (
+    HumanRestorationResponse,
+)
+from inframeld_backend.access.http.responses.human_suspension_response import (
+    HumanSuspensionResponse,
+)
 from inframeld_backend.access.http.responses.invitation_activation_response import (
     InvitationActivationResponse,
 )
@@ -241,6 +252,9 @@ from inframeld_backend.access.http.routes.current_session_routes import create_s
 from inframeld_backend.access.http.routes.discovery_routes import create_discovery_router
 from inframeld_backend.access.http.routes.human_admission_routes import (
     create_human_admission_router,
+)
+from inframeld_backend.access.http.routes.human_lifecycle_routes import (
+    create_human_lifecycle_router,
 )
 from inframeld_backend.access.http.routes.human_oauth_consent_routes import (
     create_human_oauth_consent_router,
@@ -321,6 +335,10 @@ from inframeld_backend.bootstrap.application_settings import ApplicationSettings
 from inframeld_backend.bootstrap.deletion_status_composition import open_deletion_status_lookup
 from inframeld_backend.bootstrap.grant_recipients_composition import open_project_grant_recipients
 from inframeld_backend.bootstrap.human_admission_composition import open_human_admission
+from inframeld_backend.bootstrap.human_lifecycle_composition import (
+    open_human_restoration,
+    open_human_suspension,
+)
 from inframeld_backend.bootstrap.invitation_composition import (
     open_invitation_activation,
     open_invitation_administration,
@@ -419,12 +437,13 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
             request_fingerprints
         )
         admission_fingerprints = HumanAdmissionFingerprintService(request_fingerprints)
+        lifecycle_fingerprints = HumanLifecycleFingerprintService(request_fingerprints)
         membership_fingerprints = ProjectMembershipChangeFingerprintService(request_fingerprints)
         invitation_fingerprints = InvitationFingerprintService(request_fingerprints)
         admission_authority = (
             resolved_settings.kratos.authority if resolved_settings.kratos is not None else None
         )
-        admission_verifier = (
+        identity_verifier = (
             KratosHumanIdentityVerifier(
                 IdentityApi(access.kratos_admin_client), admission_authority
             )
@@ -491,6 +510,8 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
                 ApplicationKeyIssueRequest,
                 ApplicationKeyRevocationRequest,
                 HumanAdmissionRequest,
+                HumanSuspensionRequest,
+                HumanRestorationRequest,
                 ProjectCreationRequest,
                 ProjectMembershipRequest,
                 ProjectMetadataUpdateRequest,
@@ -525,6 +546,8 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
                 ApplicationKeyRevocationResponse,
                 ApplicationKeyFirstDeliveryResponse,
                 ApplicationKeyIssuanceReplayResponse,
+                HumanSuspensionResponse,
+                HumanRestorationResponse,
                 MyOrganizationAccessResponse,
                 MyProjectAccessResponse,
                 ProjectActionGrantResponse,
@@ -599,12 +622,21 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
                     open_human_admission,
                     database,
                     admission_fingerprints,
-                    admission_verifier,
+                    identity_verifier,
                     admission_authority,
                     min(
                         resolved_settings.human_authentication.provider_timeout_seconds,
                         resolved_settings.human_authentication.total_timeout_seconds,
                     ),
+                ),
+            )
+        )
+        application.include_router(
+            create_human_lifecycle_router(
+                product_access,
+                partial(open_human_suspension, database, lifecycle_fingerprints),
+                partial(
+                    open_human_restoration, database, lifecycle_fingerprints, identity_verifier
                 ),
             )
         )

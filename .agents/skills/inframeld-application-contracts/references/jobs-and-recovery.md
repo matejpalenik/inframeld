@@ -106,7 +106,7 @@ Some IDs are discovered later. A source-sync job can find a document, create its
 
 ### Workers own bounded execution
 
-The application worker and a [dedicated recovery worker](../../../../docs/adr/ADR-0087-isolate-recovery-cleanup-in-a-dedicated-worker.md) use PostgreSQL-backed durable mechanics. Recovery has one active attempt and no document-processing work. This separates execution capacity without adding a broker or generic priority scheduler. For each claim, a worker:
+The application worker and a [dedicated recovery worker](../../../../docs/adr/ADR-0087-isolate-recovery-cleanup-in-a-dedicated-worker.md) use PostgreSQL-backed durable mechanics. Recovery has one active attempt and no document-processing work. This separates execution capacity without adding a broker or generic priority scheduler. [ADR-0131](../../../../docs/adr/ADR-0131-bind-suspension-cleanup-to-the-original-obligation.md) places routine recovery and suspension cleanup in one shared live fenced local attempt on that recovery worker. [The Access workflow](../../inframeld-access-models/references/recovery-completion.md#suspension-cleanup) owns the alternating claim opportunity, installation turn and original limits. For each claim, a worker:
 
 1. **Claim one eligible job.** In a short transaction, lock the job and save the attempt, worker, expiry, and ownership token. Then finish the transaction.
 2. **Do the work.** Process files and call external services without keeping that SQL transaction open.
@@ -128,7 +128,7 @@ V1 needs no SQS, Kafka, Redis, dead-letter queue, or workflow engine. Webhooks a
 
 The application worker takes the oldest admitted eligible due job, with a stable job-ID tie-break. One active application attempt retains its slot until completion, failure, cancellation or its bounded deadline. Checkpoints preserve progress and observe cancellation/authority, without implying round-robin yielding. The dedicated recovery worker keeps ADR-0087's separate execution.
 
-Count queued and running work against finite configured capacity and reserve the final slot atomically with admission. Reject new business work before effects when capacity is unavailable. A new deletion requiring a cleanup job must admit that job atomically or fail before its business effects. Already accepted cleanup stays durable. Revocation, suspension and cancellation require no new ordinary queue slot. Product cleanup may wait behind a bounded product job, while access blocks remain effective.
+Count queued and running work against finite configured capacity and reserve the final slot atomically with admission. Reject new business work before effects when capacity is unavailable. A new deletion requiring a cleanup job must admit that job atomically or fail before its business effects. Already accepted cleanup stays durable. Revocation, suspension and cancellation require no new ordinary queue slot. The suspension child starts queued on its original obligation, outside ordinary admission, capacity, claims and pressure. The two recovery families may wait behind each other in their separate slot. Product cleanup may wait behind a bounded product job, while access blocks remain effective.
 
 Preserve order, budgets, ownership and known effects after restart. Observe queue depth, oldest eligible age, worker health and cleanup delay. [PD-CONTRACTS-05](decision-queue-saturation-and-cleanup.md#approved-resolution) owns the complete policy. Numerical capacities/deadlines and demonstrated operating guarantees remain with the operating-profile decision.
 

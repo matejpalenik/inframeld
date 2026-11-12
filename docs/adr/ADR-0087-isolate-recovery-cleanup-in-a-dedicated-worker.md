@@ -39,3 +39,5 @@ This refines the earlier single-worker convention. It adds no queue broker, gene
 ## Later resolution
 
 [ADR-0102](ADR-0102-use-bounded-fifo-with-separate-recovery-execution.md) records the developer-approved 2026-10-29 policy for the temporal or queue question left open here. The earlier component/recovery-isolation choice remains accepted.
+
+[ADR-0131](ADR-0131-bind-suspension-cleanup-to-the-original-obligation.md) partially supersedes the routine-only worker scope. The same recovery process owns routine recovery and original suspension cleanup with one shared live fenced local attempt. The application worker remains separate. Routine proof reconciliation and run budgets retain their original contract.

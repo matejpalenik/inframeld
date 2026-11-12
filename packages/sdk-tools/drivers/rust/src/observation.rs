@@ -25,6 +25,30 @@ macro_rules! problems {
     };
 }
 problems!(
+    SuspendHumanApiError,
+    SuspendHumanApiError::Status400,
+    SuspendHumanApiError::Status401,
+    SuspendHumanApiError::Status403,
+    SuspendHumanApiError::Status404,
+    SuspendHumanApiError::Status409,
+    SuspendHumanApiError::Status413,
+    SuspendHumanApiError::Status415,
+    SuspendHumanApiError::Status422,
+    SuspendHumanApiError::Status503
+);
+problems!(
+    RestoreHumanApiError,
+    RestoreHumanApiError::Status400,
+    RestoreHumanApiError::Status401,
+    RestoreHumanApiError::Status403,
+    RestoreHumanApiError::Status404,
+    RestoreHumanApiError::Status409,
+    RestoreHumanApiError::Status413,
+    RestoreHumanApiError::Status415,
+    RestoreHumanApiError::Status422,
+    RestoreHumanApiError::Status503
+);
+problems!(
     GetProjectUploadDefaultsApiError,
     GetProjectUploadDefaultsApiError::Status400,
     GetProjectUploadDefaultsApiError::Status401,

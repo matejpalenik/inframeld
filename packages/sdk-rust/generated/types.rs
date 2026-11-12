@@ -8358,6 +8358,65 @@ pub struct HumanOAuthConsentDecisionResponse {
     pub redirect_to: String,
 }
 #[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct HumanRestorationRequest {
+    ///Constraint: minimum=0, maximum=9007199254740991
+    #[serde(rename = "expectedAccessRevision")]
+    pub expected_access_revision: i64,
+    ///Required safe single-line audit text, at most 128 Unicode characters.
+    ///Constraint: minLength=1, maxLength=128
+    #[serde(rename = "securityReviewReference")]
+    pub security_review_reference: String,
+}
+///Return the original safe receipt without inferring current account state.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct HumanRestorationResponse {
+    ///Constraint: minimum=0, maximum=9007199254740991
+    #[serde(rename = "accessRevision")]
+    pub access_revision: i64,
+    #[serde(rename = "idempotencyExpiresAt")]
+    pub idempotency_expires_at: chrono::DateTime<chrono::Utc>,
+    ///Constraint: minLength=1, maxLength=128
+    #[serde(rename = "operationId")]
+    pub operation_id: String,
+    #[serde(rename = "organizationId")]
+    pub organization_id: uuid::Uuid,
+    #[serde(rename = "principalId")]
+    pub principal_id: uuid::Uuid,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct HumanSuspensionRequest {
+    ///Constraint: minimum=0, maximum=9007199254740991
+    #[serde(rename = "expectedAccessRevision")]
+    pub expected_access_revision: i64,
+    ///Required safe single-line audit text, at most 512 Unicode characters.
+    ///Constraint: minLength=1, maxLength=512
+    pub reason: String,
+}
+///Return the original safe receipt without inferring current account state.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct HumanSuspensionResponse {
+    #[serde(rename = "accessBlocked")]
+    pub access_blocked: BooleanConstant<true>,
+    ///Constraint: minimum=0, maximum=9007199254740991
+    #[serde(rename = "accessRevision")]
+    pub access_revision: i64,
+    ///Constraint: minLength=1, maxLength=128
+    #[serde(rename = "cleanupOperationId")]
+    pub cleanup_operation_id: String,
+    #[serde(
+        rename = "idempotencyExpiresAt",
+        deserialize_with = "presence_serde::required_nullable"
+    )]
+    pub idempotency_expires_at: Option<chrono::DateTime<chrono::Utc>>,
+    ///Constraint: minLength=1, maxLength=128
+    #[serde(rename = "operationId")]
+    pub operation_id: String,
+    #[serde(rename = "organizationId")]
+    pub organization_id: uuid::Uuid,
+    #[serde(rename = "principalId")]
+    pub principal_id: uuid::Uuid,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct InvitationActivationRequest {
     #[serde(rename = "invitationToken")]
     pub invitation_token: String,

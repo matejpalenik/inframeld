@@ -187,10 +187,7 @@ async def test_retained_broader_original_refuses_destructive_downgrade(
     with pytest.raises(RuntimeError, match="Retained stranded-authority repair originals"):
         command.downgrade(_config(temporary_postgres_settings), "0032_application_retirement")
     async with database.session() as session:
-        assert (
-            await session.scalar(select(AlembicVersionRow.version_num))
-            == "0033_stranded_authority_repair"
-        )
+        assert await session.scalar(select(AlembicVersionRow.version_num)) == "0034_human_lifecycle"
         row = await session.get(
             StrandedAuthorityRepairReceiptRow,
             (broader_original.installation_id.value, broader_original.operation_id.value),
@@ -251,5 +248,5 @@ async def test_empty_broader_history_round_trip_preserves_legacy_metadata_origin
             assert stored is not None and stored.request_fingerprint == fingerprint
             assert (
                 await session.scalar(select(AlembicVersionRow.version_num))
-                == "0033_stranded_authority_repair"
+                == "0034_human_lifecycle"
             )

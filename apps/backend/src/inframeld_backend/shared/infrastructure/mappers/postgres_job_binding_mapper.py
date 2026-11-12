@@ -12,6 +12,7 @@ from inframeld_backend.access.domain.value_objects.action_id import ActionId
 from inframeld_backend.access.domain.value_objects.human_credential_version import (
     HumanCredentialVersion,
 )
+from inframeld_backend.access.domain.value_objects.human_suspension_id import HumanSuspensionId
 from inframeld_backend.access.domain.value_objects.identity_authority import IdentityAuthority
 from inframeld_backend.access.domain.value_objects.identity_subject import IdentitySubject
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
@@ -23,6 +24,9 @@ from inframeld_backend.shared.application.dtos.artifact_cleanup_job_binding_dto 
 from inframeld_backend.shared.application.dtos.artifact_scope_dto import ArtifactScopeDTO
 from inframeld_backend.shared.application.dtos.business_operation_artifact_origin_dto import (
     BusinessOperationArtifactOriginDTO,
+)
+from inframeld_backend.shared.application.dtos.human_suspension_job_binding_dto import (
+    HumanSuspensionJobBindingDTO,
 )
 from inframeld_backend.shared.application.dtos.product_job_binding_dto import ProductJobBindingDTO
 from inframeld_backend.shared.application.dtos.project_deletion_job_binding_dto import (
@@ -38,6 +42,7 @@ from inframeld_backend.shared.application.value_objects.artifact_cleanup_obligat
     ArtifactCleanupObligationId,
 )
 from inframeld_backend.shared.application.value_objects.idempotency_key import IdempotencyKey
+from inframeld_backend.shared.application.value_objects.job_id import JobId
 from inframeld_backend.shared.application.value_objects.operation_id import OperationId
 from inframeld_backend.shared.application.value_objects.request_fingerprint import (
     RequestFingerprint,
@@ -48,6 +53,9 @@ from inframeld_backend.shared.infrastructure.rows.artifact_cleanup_obligation_ro
     ArtifactCleanupObligationRow,
 )
 from inframeld_backend.shared.infrastructure.rows.durable_job_row import DurableJobRow
+from inframeld_backend.shared.infrastructure.rows.human_suspension_obligation_row import (
+    HumanSuspensionObligationRow,
+)
 from inframeld_backend.shared.infrastructure.rows.project_deletion_obligation_row import (
     ProjectDeletionObligationRow,
 )
@@ -91,6 +99,8 @@ class PostgresJobBindingMapper:
         if (
             row.binding_kind != "product"
             or row.deletion_obligation_id is not None
+            or row.suspension_obligation_id is not None
+            or row.project_id is None
             or row.cleanup_obligation_id is not None
             or row.operation_id is None
             or row.principal_id is None
@@ -146,4 +156,24 @@ class PostgresJobBindingMapper:
             RequestFingerprint(row.request_fingerprint),
             row.before_access_revision,
             row.access_revision,
+        )
+
+    @staticmethod
+    def human_suspension(row: HumanSuspensionObligationRow) -> HumanSuspensionJobBindingDTO:
+        return HumanSuspensionJobBindingDTO(
+            obligation_id=HumanSuspensionId(row.id),
+            job_id=JobId(row.job_id),
+            operation_id=OperationId(row.operation_id),
+            request_id=RequestId(row.request_id),
+            installation_id=InstallationId(row.installation_id),
+            organization_id=row.organization_id,
+            principal_id=row.principal_id,
+            initiator_principal_id=row.initiator_principal_id,
+            identity=VerifiedHumanIdentityDTO(
+                IdentityAuthority(row.authority), IdentitySubject(row.subject)
+            ),
+            key=IdempotencyKey(row.request_key),
+            fingerprint=RequestFingerprint(row.request_fingerprint),
+            before_access_revision=row.before_access_revision,
+            access_revision=row.access_revision,
         )

@@ -219,10 +219,13 @@ services:
       INFRAMELD_DATABASE__MAX_OVERFLOW: "0"
       INFRAMELD_RECOVERY_CLEANUP__AUTHORITY: kratos:local
       INFRAMELD_RECOVERY_CLEANUP__HYDRA_ADMIN_URL: http://hydra:4445
+      INFRAMELD_RECOVERY_CLEANUP__KRATOS_ADMIN_URL: http://kratos:4434
     depends_on:
       postgres:
         condition: service_healthy
       hydra:
+        condition: service_started
+      kratos:
         condition: service_started
 
   application-worker:

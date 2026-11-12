@@ -30,7 +30,8 @@ class PostgresJobQueueStatusReader:
                         ),
                         clock,
                     ).where(
-                        DurableJobRow.status.in_((JobStatus.QUEUED.value, JobStatus.RUNNING.value))
+                        DurableJobRow.binding_kind != "human_suspension",
+                        DurableJobRow.status.in_((JobStatus.QUEUED.value, JobStatus.RUNNING.value)),
                     )
                 )
             )

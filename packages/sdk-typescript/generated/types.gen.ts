@@ -1134,6 +1134,102 @@ export type HumanOAuthConsentRequest = {
 export type HumanOAuthScope = 'openid' | 'offline_access' | 'inframeld:api';
 
 /**
+ * HumanRestorationRequest
+ */
+export type HumanRestorationRequest = {
+    /**
+     * Expectedaccessrevision
+     */
+    expectedAccessRevision: number;
+    /**
+     * Securityreviewreference
+     *
+     * Required safe single-line audit text, at most 128 Unicode characters.
+     */
+    securityReviewReference: string;
+};
+
+/**
+ * HumanRestorationResponse
+ *
+ * Return the original safe receipt without inferring current account state.
+ */
+export type HumanRestorationResponse = {
+    /**
+     * Accessrevision
+     */
+    accessRevision: number;
+    /**
+     * Idempotencyexpiresat
+     */
+    idempotencyExpiresAt: string;
+    /**
+     * Operationid
+     */
+    operationId: string;
+    /**
+     * Organizationid
+     */
+    organizationId: string;
+    /**
+     * Principalid
+     */
+    principalId: string;
+};
+
+/**
+ * HumanSuspensionRequest
+ */
+export type HumanSuspensionRequest = {
+    /**
+     * Expectedaccessrevision
+     */
+    expectedAccessRevision: number;
+    /**
+     * Reason
+     *
+     * Required safe single-line audit text, at most 512 Unicode characters.
+     */
+    reason: string;
+};
+
+/**
+ * HumanSuspensionResponse
+ *
+ * Return the original safe receipt without inferring current account state.
+ */
+export type HumanSuspensionResponse = {
+    /**
+     * Accessblocked
+     */
+    accessBlocked: true;
+    /**
+     * Accessrevision
+     */
+    accessRevision: number;
+    /**
+     * Cleanupoperationid
+     */
+    cleanupOperationId: string;
+    /**
+     * Idempotencyexpiresat
+     */
+    idempotencyExpiresAt: string | null;
+    /**
+     * Operationid
+     */
+    operationId: string;
+    /**
+     * Organizationid
+     */
+    organizationId: string;
+    /**
+     * Principalid
+     */
+    principalId: string;
+};
+
+/**
  * InProgressOperationLookupResponse
  */
 export type InProgressOperationLookupResponse = {
@@ -3913,6 +4009,150 @@ export type AdmitHumanResponses = {
 };
 
 export type AdmitHumanResponse = AdmitHumanResponses[keyof AdmitHumanResponses];
+
+export type RestoreHumanData = {
+    body: HumanRestorationRequest;
+    headers: {
+        /**
+         * Idempotency-Key
+         */
+        'Idempotency-Key': string;
+    };
+    path: {
+        /**
+         * Organization Id
+         */
+        organization_id: string;
+        /**
+         * Principal Id
+         */
+        principal_id: string;
+    };
+    query?: never;
+    url: '/v1/organizations/{organization_id}/humans/{principal_id}/restore';
+};
+
+export type RestoreHumanErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Operation conflicts with current state
+     */
+    409: ProblemDetails;
+    /**
+     * Content Too Large
+     */
+    413: ProblemDetails;
+    /**
+     * Unsupported Media Type
+     */
+    415: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type RestoreHumanError = RestoreHumanErrors[keyof RestoreHumanErrors];
+
+export type RestoreHumanResponses = {
+    /**
+     * Successful Response
+     */
+    200: HumanRestorationResponse;
+};
+
+export type RestoreHumanResponse = RestoreHumanResponses[keyof RestoreHumanResponses];
+
+export type SuspendHumanData = {
+    body: HumanSuspensionRequest;
+    headers: {
+        /**
+         * Idempotency-Key
+         */
+        'Idempotency-Key': string;
+    };
+    path: {
+        /**
+         * Organization Id
+         */
+        organization_id: string;
+        /**
+         * Principal Id
+         */
+        principal_id: string;
+    };
+    query?: never;
+    url: '/v1/organizations/{organization_id}/humans/{principal_id}/suspend';
+};
+
+export type SuspendHumanErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Operation conflicts with current state
+     */
+    409: ProblemDetails;
+    /**
+     * Content Too Large
+     */
+    413: ProblemDetails;
+    /**
+     * Unsupported Media Type
+     */
+    415: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type SuspendHumanError = SuspendHumanErrors[keyof SuspendHumanErrors];
+
+export type SuspendHumanResponses = {
+    /**
+     * Successful Response
+     */
+    202: HumanSuspensionResponse;
+};
+
+export type SuspendHumanResponse = SuspendHumanResponses[keyof SuspendHumanResponses];
 
 export type CreateProjectData = {
     body: ProjectCreationRequest;

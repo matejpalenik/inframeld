@@ -117,10 +117,7 @@ async def test_retained_parent_blocks_downgrade_without_erasing_default_history(
             configuration(temporary_postgres_settings), "0030_project_upload_defaults"
         )
     async with database.session() as session:
-        assert (
-            await session.scalar(select(AlembicVersionRow.version_num))
-            == "0033_stranded_authority_repair"
-        )
+        assert await session.scalar(select(AlembicVersionRow.version_num)) == "0034_human_lifecycle"
         assert (
             await session.get(ProjectDeletionObligationRow, accepted.obligation_id.value)
             is not None
@@ -152,10 +149,7 @@ async def test_empty_deletion_downgrade_preserves_actual0030_links_groups_and_hi
     command.downgrade(configuration(temporary_postgres_settings), "0030_project_upload_defaults")
     command.upgrade(configuration(temporary_postgres_settings), "head")
     async with database.session() as session:
-        assert (
-            await session.scalar(select(AlembicVersionRow.version_num))
-            == "0033_stranded_authority_repair"
-        )
+        assert await session.scalar(select(AlembicVersionRow.version_num)) == "0034_human_lifecycle"
         assert (
             tuple(await session.scalars(select(AccessGroupRow.id).order_by(AccessGroupRow.id)))
             == groups

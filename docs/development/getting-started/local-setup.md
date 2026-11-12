@@ -95,7 +95,7 @@ mise exec -- uv run --project apps/backend --locked --env-file apps/backend/.env
 
 This explicitly loads the ignored API environment file for database settings. Worker startup checks the schema and existing installation identity without migrating. Look for `application_worker_ready`, then use Ctrl-C to stop the foreground process when finished. The worker has no HTTP listener and does not require the API's fingerprint key or provider credentials.
 
-The production handler registry is currently empty, so startup does not enable document processing, builds or evaluations. [The operator guide](../operations/application-jobs.md) covers the opt-in `jobs` Compose service, effective settings, queue events and restart or shutdown uncertainty. There is no generic job submission or inspection interface.
+The production registry contains only the artifact cleanup and Project deletion handlers. [The operator guide](../operations/application-jobs.md) covers the opt-in `jobs` Compose service, effective settings, queue events and restart or shutdown uncertainty. There is no generic job submission or inspection interface.
 
 ---
 
@@ -446,9 +446,11 @@ The development `recovery-callbacks` service uses the backend image on private p
 
 Supply a dedicated 32 to 256 byte printable ASCII key through `INFRAMELD_RECOVERY_KEY_HOST_FILE`. The mounted regular file must be readable by the container's runtime UID 10001, with mode 0400 or 0600 as seen inside the container. Compose file-backed secrets do not reliably remap host ownership. Provision the correct runtime ownership rather than making the file group/world-readable. Do not reuse an API, database or fingerprint secret.
 
-After configuration, explicitly start it with `podman compose -f compose.dev.yaml --profile recovery up -d --no-deps recovery-callbacks recovery-worker` (use `docker compose` on Docker). This assumes the development database and Hydra already run and the application database has been migrated. There is no host-port publication. The process needs `INFRAMELD_DATABASE__*` and `INFRAMELD_RECOVERY__*`, without Hydra or fingerprint configuration.
+Run one recovery worker. When upgrading from a binary without the shared claim guard, stop the old worker and confirm it has exited before starting the replacement. Both cleanup families share one live local attempt. An earlier remote call can still finish after its lease expires. See [runtime and networking](../operations/runtime-and-networking.md#operate-the-runtime-and-its-network-boundaries).
 
-[The hook overlay example](../../../config/kratos/recovery-hooks.example.yaml) points directly to the private service. Render it into operator-owned protected Kratos configuration, replacing the placeholder with the same dedicated key and merging any existing provider overlay. Never commit that rendered file. Kratos must load both its normal configuration and this overlay. The three Jsonnet templates in `config/kratos/` emit identifiers only. The settings and password-saved templates intentionally repeat their source guards because Kratos forbids Jsonnet imports. Keep both files self-contained and validate both hooks after edits. Keep native hook activation explicit and start callbacks plus the recovery worker together. The worker uses the same backend image without a listener. It requires only database settings, `INFRAMELD_RECOVERY_CLEANUP__AUTHORITY` and the private `INFRAMELD_RECOVERY_CLEANUP__HYDRA_ADMIN_URL`. Its database pool defaults in Compose to two connections with no overflow. Neither process runs migrations. Exhausted or permanently rejected cleanup keeps access blocked. Use [protected host continuation](#resume-recovery-cleanup) after fixing the cause of an ended run.
+After configuration, explicitly start both processes with `podman compose -f compose.dev.yaml --profile recovery up -d --no-deps recovery-callbacks recovery-worker` (use `docker compose` on Docker). This assumes the development database, Kratos and Hydra already run and the application database has been migrated. There is no host-port publication. The process needs `INFRAMELD_DATABASE__*` and `INFRAMELD_RECOVERY__*`, without Hydra or fingerprint configuration.
+
+[The hook overlay example](../../../config/kratos/recovery-hooks.example.yaml) points directly to the private service. Render it into operator-owned protected Kratos configuration, replacing the placeholder with the same dedicated key and merging any existing provider overlay. Never commit that rendered file. Kratos must load both its normal configuration and this overlay. The three Jsonnet templates in `config/kratos/` emit identifiers only. The settings and password-saved templates intentionally repeat their source guards because Kratos forbids Jsonnet imports. Keep both files self-contained and validate both hooks after edits. Keep native hook activation explicit and start callbacks plus the recovery worker together. The worker uses the same backend image without a listener. Configure database settings, `INFRAMELD_RECOVERY_CLEANUP__AUTHORITY` and the private `INFRAMELD_RECOVERY_CLEANUP__HYDRA_ADMIN_URL`. The `INFRAMELD_RECOVERY_CLEANUP__KRATOS_ADMIN_URL` setting is optional for routine recovery alone and required to execute suspension cleanup. Development Compose supplies the worker's private `http://kratos:4434` endpoint. Keep both provider administration endpoints private. Its database pool defaults in Compose to two connections with no overflow. Neither process runs migrations. Exhausted or permanently rejected cleanup keeps access blocked. Use the protected host procedure for [routine recovery](#resume-recovery-cleanup) or the [original suspension](#inspect-or-continue-suspension-cleanup).
 
 For rotation, configure a current file plus optional retiring file and `INFRAMELD_RECOVERY__RETIRING_KEY_ACCEPT_UNTIL` with an explicit timezone. The instantiated file reader loads protected keys at process construction. Restart the callback process to load changed files. Update Kratos to send the current key, then remove the retiring configuration after overlap. No product cookie or bearer token substitutes for the hook key. See [the private contract](../../../.agents/skills/inframeld-access-models/references/private-recovery-handoff.md#recovery-wire).
 
@@ -481,6 +483,64 @@ Use `docker compose` on Docker. Do not add a root/privileged override or expose 
 Exit 0 returns the original accepted result: `cleanup-authorized` includes its run ID and UTC deadline, while `already-completed` and `cleanup-confirmed` create no provider run. Exit 2 means invalid input/configuration. Exit 1 means an operational failure or controlled rejection, with a safe code. `cleanup_run_active` means the existing budget still owns the work, including a live final attempt. A missing or interrupted stdout response is unknown. Send the **same exact request and request ID** to recover its original result. A new ID authorizes new work and is not a substitute for recovering a lost acknowledgment.
 
 One immutable receipt retains both replay meaning and operator audit history. The command preserves prior runs, consumed attempts and confirmed steps. It neither calls Hydra nor releases access. The existing recovery worker executes unfinished work and applies normal proof-backed completion. See [the complete maintenance contract](../../../.agents/skills/inframeld-access-models/references/host-maintenance.md#recovery-cleanup-continuation).
+
+<a id="inspect-or-continue-suspension-cleanup"></a>
+
+## Inspect or continue the original suspension cleanup
+
+A successful [suspension](../../../apps/docs/src/app/guides/admit-human/page.mdx#suspend-or-deliberately-restore-an-admitted-human) returns `202`, blocks product access and records the original cleanup obligation. Give the operator its `cleanupOperationId`. The receipt's separate `operationId` identifies the public request. Use the original cleanup ID for both maintenance intents.
+
+Use a verified operator host with container-exec authority for the exact installation. Obtain its expected UUID from the protected installation record. Apply [the current required database revision](../../../apps/backend/src/inframeld_backend/shared/infrastructure/migrations/migration_runner.py) deliberately before starting the backend and worker. [Migration `0034_human_lifecycle`](../../../apps/backend/migrations/versions/0034_human_lifecycle.py) introduces these records.
+
+The installed backend command reads one version 1 JSON object of at most 64 KiB through protected stdin. This mode uses the database and existing process settings. Put no provider endpoint, identity subject, product credential, password or token in the request. The recovery worker owns provider calls.
+
+Create `inspect.json` in an operator-only directory with file mode `0600`. Replace the example IDs with the verified installation UUID, an operator correlation ID and the saved cleanup ID.
+
+```json
+{
+  "schemaVersion": 1,
+  "mode": "human-suspension-cleanup",
+  "intent": "inspect",
+  "expectedInstallationId": "00000000-0000-4000-8000-000000000001",
+  "operationId": "incident-42-inspect",
+  "cleanupOperationId": "00000000-0000-4000-8000-000000000002"
+}
+```
+
+From the repository root, set `SUSPENSION_REQUEST_DIR` to that directory's absolute path. Use `docker compose` on Docker.
+
+```sh
+podman compose -f compose.dev.yaml exec -T backend inframeld-maintenance \
+  < "$SUSPENSION_REQUEST_DIR/inspect.json"
+```
+
+Inspection saves no operator receipt. Read `execution` and the three states under `steps`. While work is `queued` or `running`, inspect again for progress. A running step can report `uncertain` while its dispatch lacks a saved outcome. For example, `stopped` with `kratosSessions: confirmed`, `hydraCliGrants: uncertain` and `hydraRememberedLogins: pending` means the worker saved the first confirmation, stopped with the second outcome unknown and left the third pending. The account stays blocked. Exhausted work is available for inspection.
+
+For an eligible stopped original, resolve the cause before deciding whether to authorize continued work. If a step is uncertain, review the risk that the prior call may have taken effect. A continuation can authorize one repeat of that exact unresolved step. It keeps the original 24-hour queue deadline, the work deadline set on first claim and the maximum of three total attempts. Confirmed steps stay confirmed.
+
+Create a protected `continue.json` in the same directory. Use the same installation and cleanup IDs, a unique operator request ID, and your own attribution and reason. Save the exact file before sending it.
+
+```json
+{
+  "schemaVersion": 1,
+  "mode": "human-suspension-cleanup",
+  "intent": "continue",
+  "expectedInstallationId": "00000000-0000-4000-8000-000000000001",
+  "operationId": "incident-42-continue-01",
+  "cleanupOperationId": "00000000-0000-4000-8000-000000000002",
+  "operatorLabel": "Deployment operator",
+  "reason": "Reviewed the Hydra transport failure and approved the unresolved step"
+}
+```
+
+```sh
+podman compose -f compose.dev.yaml exec -T backend inframeld-maintenance \
+  < "$SUSPENSION_REQUEST_DIR/continue.json"
+```
+
+Exit `0` returns the original `requeued`, `already-scheduled` or `already-complete` outcome. Exit `2` indicates invalid input or settings. Exit `1` can report a controlled rejection, such as `suspension_cleanup_not_continuable`. If output is lost, explicitly repeat the command with the same unchanged `continue.json` to recover the original authorization. If the original did not commit, the same request can take effect only while its current checks still pass. Changed meaning under the same ID conflicts. Use a separate inspection to read current progress.
+
+Restoration is a separate authorized action after all three confirmations and a security review. See the [protected maintenance contract](../../../.agents/skills/inframeld-access-models/references/host-maintenance.md#suspension-cleanup-maintenance) for exact inputs, status and replay.
 
 ## Rust CLI development
 

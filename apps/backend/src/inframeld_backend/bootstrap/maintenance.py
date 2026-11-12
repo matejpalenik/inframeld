@@ -14,6 +14,9 @@ from structlog.contextvars import bound_contextvars
 from inframeld_backend.access.application.commands.bootstrap_first_administrator_command import (
     BootstrapFirstAdministratorCommand,
 )
+from inframeld_backend.access.application.commands.human_suspension_cleanup_maintenance_command import (
+    HumanSuspensionCleanupMaintenanceCommand,
+)
 from inframeld_backend.access.application.commands.repair_stranded_authority_command import (
     RepairStrandedAuthorityCommand,
 )
@@ -26,11 +29,17 @@ from inframeld_backend.access.application.enums.recovery_maintenance_error_code 
 from inframeld_backend.access.application.errors.first_administrator_bootstrap_error import (
     FirstAdministratorBootstrapError,
 )
+from inframeld_backend.access.application.errors.human_suspension_cleanup_maintenance_error import (
+    HumanSuspensionCleanupMaintenanceError,
+)
 from inframeld_backend.access.application.errors.recovery_maintenance_error import (
     RecoveryMaintenanceError,
 )
 from inframeld_backend.access.application.errors.stranded_authority_maintenance_error import (
     StrandedAuthorityMaintenanceError,
+)
+from inframeld_backend.access.application.services.human_suspension_cleanup_maintenance_service import (
+    HumanSuspensionCleanupMaintenanceService,
 )
 from inframeld_backend.access.application.services.identity_recovery_cleanup_resume_service import (
     IdentityRecoveryCleanupResumeService,
@@ -42,12 +51,18 @@ from inframeld_backend.access.cli.errors.stranded_authority_maintenance_input_er
     StrandedAuthorityMaintenanceInputError,
 )
 from inframeld_backend.access.cli.maintenance_cli import MaintenanceCli
+from inframeld_backend.access.cli.mappers.human_suspension_cleanup_maintenance_mapper import (
+    HumanSuspensionCleanupMaintenanceMapper,
+)
 from inframeld_backend.access.cli.recovery_maintenance_cli import RecoveryMaintenanceCli
 from inframeld_backend.access.infrastructure.readers.postgres_identity_recovery_cleanup_resume_facts_reader import (
     PostgresIdentityRecoveryCleanupResumeFactsReader,
 )
 from inframeld_backend.access.infrastructure.readers.postgres_identity_recovery_completion_facts_reader import (
     PostgresIdentityRecoveryCompletionFactsReader,
+)
+from inframeld_backend.access.infrastructure.repositories.postgres_human_suspension_cleanup_maintenance_repository import (
+    PostgresHumanSuspensionCleanupMaintenanceRepository,
 )
 from inframeld_backend.access.infrastructure.resources.sqlalchemy_recovery_transaction_manager import (
     SqlAlchemyRecoveryTransactionManager,
@@ -90,6 +105,7 @@ async def _execute(
         ResumeIdentityRecoveryCleanupCommand
         | RepairStrandedAuthorityCommand
         | BootstrapFirstAdministratorCommand
+        | HumanSuspensionCleanupMaintenanceCommand
     ),
     settings: MaintenanceApplicationSettings,
 ) -> dict[str, object]:
@@ -106,6 +122,14 @@ async def _execute(
     try:
         await database.startup()
         async with database.session() as session:
+            if isinstance(command, HumanSuspensionCleanupMaintenanceCommand):
+                maintenance = HumanSuspensionCleanupMaintenanceService(
+                    SqlAlchemyRecoveryTransactionManager(session),
+                    PostgresHumanSuspensionCleanupMaintenanceRepository(session),
+                )
+                return HumanSuspensionCleanupMaintenanceMapper.result(
+                    await maintenance.execute(command=command)
+                )
             service = IdentityRecoveryCleanupResumeService(
                 SqlAlchemyRecoveryTransactionManager(session),
                 PostgresIdentityRecoveryCleanupResumeFactsReader(session),
@@ -168,6 +192,7 @@ def main(arguments: Sequence[str] | None = None) -> int:
         RecoveryMaintenanceError,
         StrandedAuthorityMaintenanceError,
         FirstAdministratorBootstrapError,
+        HumanSuspensionCleanupMaintenanceError,
     ) as failure:
         code = failure.code.value
     except (

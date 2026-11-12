@@ -51,6 +51,7 @@ from inframeld_backend.access.application.commands.remove_project_action_grant_c
 from inframeld_backend.access.application.commands.remove_project_member_command import (
     RemoveProjectMemberCommand,
 )
+from inframeld_backend.access.application.commands.restore_human_command import RestoreHumanCommand
 from inframeld_backend.access.application.commands.set_access_group_action_grant_command import (
     SetAccessGroupActionGrantCommand,
 )
@@ -63,6 +64,7 @@ from inframeld_backend.access.application.commands.set_organization_action_grant
 from inframeld_backend.access.application.commands.set_project_action_grant_command import (
     SetProjectActionGrantCommand,
 )
+from inframeld_backend.access.application.commands.suspend_human_command import SuspendHumanCommand
 from inframeld_backend.access.application.commands.update_project_metadata_command import (
     UpdateProjectMetadataCommand,
 )
@@ -110,6 +112,12 @@ from inframeld_backend.access.application.dtos.human_oauth_consent_details_dto i
 )
 from inframeld_backend.access.application.dtos.human_oauth_credential_binding_dto import (
     HumanOAuthCredentialBindingDTO,
+)
+from inframeld_backend.access.application.dtos.human_restoration_result_dto import (
+    HumanRestorationResultDTO,
+)
+from inframeld_backend.access.application.dtos.human_suspension_result_dto import (
+    HumanSuspensionResultDTO,
 )
 from inframeld_backend.access.application.dtos.my_organization_access_dto import (
     MyOrganizationAccessDTO,
@@ -220,9 +228,11 @@ from inframeld_backend.access.application.protocols.human_admitter import HumanA
 from inframeld_backend.access.application.protocols.human_oauth_consent_handler import (
     HumanOAuthConsentHandler,
 )
+from inframeld_backend.access.application.protocols.human_restorer import HumanRestorer
 from inframeld_backend.access.application.protocols.human_session_authenticator import (
     HumanSessionAuthenticator,
 )
+from inframeld_backend.access.application.protocols.human_suspender import HumanSuspender
 from inframeld_backend.access.application.protocols.my_organization_access_reader import (
     MyOrganizationAccessReader,
 )
@@ -370,6 +380,9 @@ from inframeld_backend.access.http.routes.current_session_routes import create_s
 from inframeld_backend.access.http.routes.discovery_routes import create_discovery_router
 from inframeld_backend.access.http.routes.human_admission_routes import (
     create_human_admission_router,
+)
+from inframeld_backend.access.http.routes.human_lifecycle_routes import (
+    create_human_lifecycle_router,
 )
 from inframeld_backend.access.http.routes.human_oauth_consent_routes import (
     create_human_oauth_consent_router,
@@ -1189,6 +1202,91 @@ async def _open_human_admitter() -> AsyncGenerator[HumanAdmitter]:
     yield MockSDKHumanAdmitter()
 
 
+_LIFECYCLE_ORGANIZATION = OrganizationId(UUID("00000000-0000-4000-8000-000000000002"))
+_LIFECYCLE_TARGET = PrincipalId(UUID("00000000-0000-4000-8000-00000000000a"))
+_LIFECYCLE_INCOMPLETE_TARGET = PrincipalId(UUID("00000000-0000-4000-8000-00000000000b"))
+
+
+class MockSDKHumanLifecycle(HumanSuspender, HumanRestorer):
+    """Supply fixed original receipts and an incomplete-cleanup conflict for wire tests."""
+
+    @override
+    async def suspend(
+        self,
+        *,
+        access: AccessContextDTO,
+        command: SuspendHumanCommand,
+        context: IdempotencyContextDTO,
+        request_id: RequestId,
+    ) -> HumanSuspensionResultDTO:
+        if access.actor_principal_id != PRINCIPAL:
+            raise AccessDeniedError()
+        if (
+            command.organization_id != _LIFECYCLE_ORGANIZATION
+            or command.principal_id != _LIFECYCLE_TARGET
+        ):
+            raise ResourceNotFoundError()
+        if command.expected_access_revision != 7:
+            raise StaleRevisionError()
+        if context.key.value != "sdk-suspend-original":
+            raise ValueError("The SDK changed the suspension idempotency header.")
+
+        return HumanSuspensionResultDTO(
+            organization_id=command.organization_id,
+            principal_id=command.principal_id,
+            actor_principal_id=access.actor_principal_id,
+            access_revision=8,
+            cleanup_operation_id=OperationId("sdk-human-suspension-cleanup"),
+            operation=AcceptedAsyncOperationDTO(OperationId("sdk-human-suspension"), False, None),
+        )
+
+    @override
+    async def restore(
+        self,
+        *,
+        access: AccessContextDTO,
+        command: RestoreHumanCommand,
+        context: IdempotencyContextDTO,
+    ) -> HumanRestorationResultDTO:
+        if access.actor_principal_id != PRINCIPAL:
+            raise AccessDeniedError()
+        if command.organization_id != _LIFECYCLE_ORGANIZATION or command.principal_id not in (
+            _LIFECYCLE_TARGET,
+            _LIFECYCLE_INCOMPLETE_TARGET,
+        ):
+            raise ResourceNotFoundError()
+        if command.expected_access_revision != 7:
+            raise StaleRevisionError()
+        if command.principal_id == _LIFECYCLE_INCOMPLETE_TARGET:
+            raise ConflictError("The original suspension cleanup is incomplete.")
+        if context.key.value != "sdk-restore-original":
+            raise ValueError("The SDK changed the restoration idempotency header.")
+
+        return HumanRestorationResultDTO(
+            organization_id=command.organization_id,
+            principal_id=command.principal_id,
+            actor_principal_id=access.actor_principal_id,
+            access_revision=8,
+            credential_version=HumanCredentialVersion(2),
+            operation=CompletedSynchronousOperationDTO(
+                OperationId("sdk-human-restoration"),
+                False,
+                OperationReplayKind.SAFE_RESULT,
+                datetime(2030, 1, 1, tzinfo=UTC),
+            ),
+        )
+
+
+@asynccontextmanager
+async def _open_human_suspender() -> AsyncGenerator[HumanSuspender]:
+    yield MockSDKHumanLifecycle()
+
+
+@asynccontextmanager
+async def _open_human_restorer() -> AsyncGenerator[HumanRestorer]:
+    yield MockSDKHumanLifecycle()
+
+
 class MockSDKMembershipChanger(ProjectMembershipChanger):
     """Supply typed wire outcomes, without simulating SQL, handover or retained history."""
 
@@ -1999,6 +2097,9 @@ def create_sdk_conformance_app(browser_origin: str | None = None) -> FastAPI:
     )
     application.include_router(create_human_admission_router(authenticate, _open_human_admitter))
     application.include_router(
+        create_human_lifecycle_router(authenticate, _open_human_suspender, _open_human_restorer)
+    )
+    application.include_router(
         create_project_action_grant_change_router(authenticate, _open_grant_change)
     )
     application.include_router(
@@ -2139,6 +2240,16 @@ def create_sdk_conformance_app(browser_origin: str | None = None) -> FastAPI:
                 "headers": dict(request.headers),
                 "rawBodyBase64": base64.b64encode(await request.body()).decode(),
             }
+            path_parts = request.url.path.split("/")
+            if (
+                request.method == "POST"
+                and len(path_parts) == 7
+                and path_parts[:3] == ["", "v1", "organizations"]
+                and path_parts[4] == "humans"
+                and path_parts[6] in ("suspend", "restore")
+            ):
+                idempotency_keys: list[JsonValue] = [*request.headers.getlist("idempotency-key")]
+                observations[key]["idempotencyKeys"] = idempotency_keys
             if request.url.path == "/contract-fixture/upload":
                 # Cache the wire body for the downstream route's independent parser.
                 await request.body()

@@ -52,6 +52,7 @@ from inframeld_backend.shared.application.value_objects.request_fingerprint impo
 )
 from inframeld_backend.shared.application.value_objects.request_id import RequestId
 from inframeld_backend.shared.domain.value_objects.installation_id import InstallationId
+from inframeld_backend.shared.infrastructure.repositories.postgres_job_store import PostgresJobStore
 from inframeld_backend.shared.infrastructure.rows.application_job_queue_row import (
     ApplicationJobQueueRow,
 )
@@ -181,12 +182,7 @@ class PostgresProjectDeletionAdmissionWriter(ProjectDeletionAdmissionWriter):
             )
         ):
             raise ConflictError("Deletion admission has no matching original reservation.")
-        count = await self._session.scalar(
-            select(func.count())
-            .select_from(DurableJobRow)
-            .where(DurableJobRow.status.in_(("queued", "running")))
-        )
-        if count is None or count >= self._capacity:
+        if not await PostgresJobStore(self._session).has_fresh_capacity(capacity=self._capacity):
             raise JobQueueFullError("The ordinary job queue is full.")
         advanced = await self._session.scalar(
             update(ProjectRow)

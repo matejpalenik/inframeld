@@ -15,6 +15,8 @@ export const operations = [
   "getCurrentApplicationSession",
   "getMyOrganizationAccess",
   "admitHuman",
+  "suspendHuman",
+  "restoreHuman",
   "issueInvitation",
   "revokeInvitation",
   "previewInvitation",

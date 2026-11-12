@@ -15,11 +15,17 @@ from structlog.contextvars import bound_contextvars
 from inframeld_backend.access.application.commands.resume_identity_recovery_cleanup_command import (
     ResumeIdentityRecoveryCleanupCommand,
 )
+from inframeld_backend.access.application.dtos.human_suspension_cleanup_maintenance_result_dto import (
+    HumanSuspensionCleanupMaintenanceResultDTO,
+)
 from inframeld_backend.access.application.dtos.identity_recovery_cleanup_resume_result_dto import (
     IdentityRecoveryCleanupResumeResultDTO,
 )
 from inframeld_backend.access.application.enums.first_administrator_bootstrap_error_code import (
     FirstAdministratorBootstrapErrorCode,
+)
+from inframeld_backend.access.application.enums.human_suspension_cleanup_execution_state import (
+    HumanSuspensionCleanupExecutionState,
 )
 from inframeld_backend.access.application.enums.identity_recovery_cleanup_resume_outcome import (
     IdentityRecoveryCleanupResumeOutcome,
@@ -27,8 +33,14 @@ from inframeld_backend.access.application.enums.identity_recovery_cleanup_resume
 from inframeld_backend.access.application.errors.first_administrator_bootstrap_error import (
     FirstAdministratorBootstrapError,
 )
+from inframeld_backend.access.cli.mappers.human_suspension_cleanup_maintenance_mapper import (
+    HumanSuspensionCleanupMaintenanceMapper,
+)
 from inframeld_backend.access.cli.mappers.recovery_maintenance_mapper import (
     RecoveryMaintenanceMapper,
+)
+from inframeld_backend.access.domain.enums.identity_recovery_cleanup_state import (
+    IdentityRecoveryCleanupState,
 )
 from inframeld_backend.bootstrap import maintenance
 from inframeld_backend.bootstrap.maintenance_application_settings import (
@@ -205,6 +217,52 @@ def test_successful_command_emits_one_result(
     )
     assert maintenance.main(()) == 0
     assert json.loads(capsys.readouterr().out)["outcome"] == "already-completed"
+
+
+def test_suspension_inspection_stdout_has_only_fixed_safe_fields(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    request = {
+        "schemaVersion": 1,
+        "mode": "human-suspension-cleanup",
+        "intent": "inspect",
+        "expectedInstallationId": "1ff2c32e-2438-42fc-b2a8-60d4a59ad91a",
+        "operationId": "inspect-original",
+        "cleanupOperationId": "original",
+    }
+    payload = json.dumps(request).encode()
+    _stdin(monkeypatch, payload)
+    monkeypatch.setenv("INFRAMELD_DATABASE__NAME", "test")
+    monkeypatch.setenv("INFRAMELD_DATABASE__USER", "test")
+    monkeypatch.setenv("INFRAMELD_DATABASE__PASSWORD", "unused-test-only")
+    command = HumanSuspensionCleanupMaintenanceMapper.read(payload)
+    result = HumanSuspensionCleanupMaintenanceResultDTO(
+        command.operation_id,
+        command.expected_installation_id,
+        command.cleanup_operation_id,
+        HumanSuspensionCleanupExecutionState.STOPPED,
+        IdentityRecoveryCleanupState.CONFIRMED,
+        IdentityRecoveryCleanupState.UNCERTAIN,
+        IdentityRecoveryCleanupState.PENDING,
+    )
+    operation = AsyncMock(return_value=HumanSuspensionCleanupMaintenanceMapper.result(result))
+    monkeypatch.setattr(maintenance, "_execute", operation)
+    assert maintenance.main(()) == 0
+    assert json.loads(capsys.readouterr().out) == {
+        "schemaVersion": 1,
+        "mode": "human-suspension-cleanup",
+        "intent": "inspect",
+        "installationId": request["expectedInstallationId"],
+        "operationId": "inspect-original",
+        "cleanupOperationId": "original",
+        "execution": "stopped",
+        "steps": {
+            "kratosSessions": "confirmed",
+            "hydraCliGrants": "uncertain",
+            "hydraRememberedLogins": "pending",
+        },
+    }
+    operation.assert_awaited_once()
 
 
 @pytest.mark.parametrize("log_format", ["json", "console"])

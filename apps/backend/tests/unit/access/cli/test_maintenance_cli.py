@@ -10,6 +10,9 @@ import pytest
 from inframeld_backend.access.application.commands.bootstrap_first_administrator_command import (
     BootstrapFirstAdministratorCommand,
 )
+from inframeld_backend.access.application.commands.human_suspension_cleanup_maintenance_command import (
+    HumanSuspensionCleanupMaintenanceCommand,
+)
 from inframeld_backend.access.application.commands.repair_stranded_authority_command import (
     RepairStrandedAuthorityCommand,
 )
@@ -27,6 +30,9 @@ from inframeld_backend.access.application.dtos.stranded_authority_repair_result_
 from inframeld_backend.access.application.dtos.verified_human_identity_dto import (
     VerifiedHumanIdentityDTO,
 )
+from inframeld_backend.access.application.enums.human_suspension_cleanup_maintenance_intent import (
+    HumanSuspensionCleanupMaintenanceIntent,
+)
 from inframeld_backend.access.application.protocols.human_access_token_authenticator import (
     HumanAccessTokenAuthenticator,
 )
@@ -35,6 +41,9 @@ from inframeld_backend.access.application.protocols.stranded_authority_repairer 
 )
 from inframeld_backend.access.application.value_objects.human_access_token_credential import (
     HumanAccessTokenCredential,
+)
+from inframeld_backend.access.cli.errors.stranded_authority_maintenance_input_error import (
+    StrandedAuthorityMaintenanceInputError,
 )
 from inframeld_backend.access.cli.maintenance_cli import MaintenanceCli
 from inframeld_backend.access.cli.stranded_authority_maintenance_cli import (
@@ -149,6 +158,96 @@ def test_mode_dispatch_preserves_the_existing_recovery_command() -> None:
     }
     command = MaintenanceCli.read(io.BytesIO(json.dumps(request).encode()))
     assert command.operation_id.value == "host-original"
+
+
+@pytest.mark.parametrize(
+    ("intent", "attribution"),
+    [
+        (HumanSuspensionCleanupMaintenanceIntent.INSPECT, {}),
+        (
+            HumanSuspensionCleanupMaintenanceIntent.CONTINUE,
+            {"operatorLabel": "Operator", "reason": "Continue stopped original"},
+        ),
+    ],
+    ids=["inspect", "continue"],
+)
+def test_mode_dispatch_accepts_the_two_suspension_cleanup_intents(
+    intent: HumanSuspensionCleanupMaintenanceIntent, attribution: dict[str, str]
+) -> None:
+    request = {
+        "schemaVersion": 1,
+        "mode": "human-suspension-cleanup",
+        "intent": intent.value,
+        "expectedInstallationId": str(UUID(int=4)),
+        "operationId": "host-request",
+        "cleanupOperationId": "retained-original",
+        **attribution,
+    }
+
+    command = MaintenanceCli.read(io.BytesIO(json.dumps(request).encode()))
+
+    assert isinstance(command, HumanSuspensionCleanupMaintenanceCommand)
+    assert command.intent is intent
+    assert command.expected_installation_id == InstallationId(UUID(int=4))
+    assert command.operation_id == OperationId("host-request")
+    assert command.cleanup_operation_id == OperationId("retained-original")
+    assert command.operator_label == attribution.get("operatorLabel")
+    assert command.reason == attribution.get("reason")
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"schemaVersion": True},
+        {"schemaVersion": 1.0},
+        {"intent": "retry"},
+        {"operatorLabel": "Operator", "reason": "Inspect"},
+        {"intent": "continue", "operatorLabel": "Operator"},
+        {"intent": "continue", "reason": "Continue"},
+        {"intent": "continue", "operatorLabel": " ", "reason": "Continue"},
+        {"intent": "continue", "operatorLabel": "Operator", "reason": "r" * 513},
+        {"identityProof": {"kind": "unexpected"}},
+    ],
+)
+def test_suspension_cleanup_rejects_invalid_intent_or_fields(changes: dict[str, object]) -> None:
+    request: dict[str, object] = {
+        "schemaVersion": 1,
+        "mode": "human-suspension-cleanup",
+        "intent": "inspect",
+        "expectedInstallationId": str(UUID(int=4)),
+        "operationId": "host-request",
+        "cleanupOperationId": "retained-original",
+    }
+    request.update(changes)
+
+    with pytest.raises(StrandedAuthorityMaintenanceInputError) as error:
+        MaintenanceCli.read(io.BytesIO(json.dumps(request).encode()))
+
+    assert error.value.operation_id == OperationId("host-request")
+
+
+def test_suspension_cleanup_requires_one_bounded_json_value() -> None:
+    payload = json.dumps(
+        {
+            "schemaVersion": 1,
+            "mode": "human-suspension-cleanup",
+            "intent": "inspect",
+            "expectedInstallationId": str(UUID(int=4)),
+            "operationId": "host-request",
+            "cleanupOperationId": "retained-original",
+        }
+    ).encode()
+    bounded = payload.ljust(65_536, b" ")
+    assert isinstance(
+        MaintenanceCli.read(io.BytesIO(bounded)), HumanSuspensionCleanupMaintenanceCommand
+    )
+    for invalid in (
+        bounded + b" ",
+        payload + b" {}",
+        payload[:-1] + b', "intent": "inspect"}',
+    ):
+        with pytest.raises(StrandedAuthorityMaintenanceInputError):
+            MaintenanceCli.read(io.BytesIO(invalid))
 
 
 def test_mode_dispatch_accepts_the_fixed_first_administrator_claim() -> None:

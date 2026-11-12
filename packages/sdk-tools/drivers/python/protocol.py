@@ -16,6 +16,8 @@ class Operation(StrEnum):
     GET_CURRENT_APPLICATION_SESSION = "getCurrentApplicationSession"
     GET_MY_ORGANIZATION_ACCESS = "getMyOrganizationAccess"
     ADMIT_HUMAN = "admitHuman"
+    SUSPEND_HUMAN = "suspendHuman"
+    RESTORE_HUMAN = "restoreHuman"
     ISSUE_INVITATION = "issueInvitation"
     REVOKE_INVITATION = "revokeInvitation"
     PREVIEW_INVITATION = "previewInvitation"

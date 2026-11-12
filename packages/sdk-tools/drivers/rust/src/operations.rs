@@ -2,9 +2,9 @@ use crate::observation::{Problem, observed};
 use crate::protocol::{Call, Observation, WireValue, headers};
 use inframeld_sdk::client::*;
 use inframeld_sdk::types::{
-    ApplicationKeyIssueRequest, ApplicationKeyRevocationRequest, InvitationActivationRequest,
-    InvitationIssueRequest, InvitationPreviewRequest, InvitationRevocationRequest,
-    ProjectUploadDefaultRequest,
+    ApplicationKeyIssueRequest, ApplicationKeyRevocationRequest, HumanRestorationRequest,
+    HumanSuspensionRequest, InvitationActivationRequest, InvitationIssueRequest,
+    InvitationPreviewRequest, InvitationRevocationRequest, ProjectUploadDefaultRequest,
 };
 use inframeld_sdk_test_rust::client as fixture;
 use serde_json::Value;
@@ -16,6 +16,34 @@ pub async fn observe(
 ) -> Observation {
     let body = request.body.clone().unwrap_or(Value::Null);
     match request.operation.as_str() {
+        "suspendHuman" => observed!(
+            client
+                .suspend_human(
+                    request.path.as_ref().unwrap()["organization_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.path.as_ref().unwrap()["principal_id"]
+                        .as_str()
+                        .unwrap(),
+                    &request.headers["Idempotency-Key"],
+                    serde_json::from_value::<HumanSuspensionRequest>(body).unwrap()
+                )
+                .await
+        ),
+        "restoreHuman" => observed!(
+            client
+                .restore_human(
+                    request.path.as_ref().unwrap()["organization_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.path.as_ref().unwrap()["principal_id"]
+                        .as_str()
+                        .unwrap(),
+                    &request.headers["Idempotency-Key"],
+                    serde_json::from_value::<HumanRestorationRequest>(body).unwrap()
+                )
+                .await
+        ),
         "revokeApplicationKey" => observed!(
             client
                 .revoke_application_key(

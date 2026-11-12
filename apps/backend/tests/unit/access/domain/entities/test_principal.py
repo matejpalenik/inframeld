@@ -30,3 +30,41 @@ def test_principal_state_is_immutable() -> None:
     )
     with pytest.raises(FrozenInstanceError):
         principal.__setattr__("status", PrincipalStatus.SUSPENDED)
+
+
+@pytest.mark.parametrize(
+    "method,status,expected",
+    [
+        ("suspend", PrincipalStatus.ACTIVE, PrincipalStatus.SUSPENDED),
+        ("suspend", PrincipalStatus.SUSPENDED, PrincipalStatus.SUSPENDED),
+        ("restore", PrincipalStatus.SUSPENDED, PrincipalStatus.ACTIVE),
+        ("restore", PrincipalStatus.ACTIVE, PrincipalStatus.ACTIVE),
+    ],
+)
+def test_deliberate_human_transition_preserves_identity_and_the_original_snapshot(
+    method: str, status: PrincipalStatus, expected: PrincipalStatus
+) -> None:
+    principal = Principal(
+        PrincipalId(uuid4()), OrganizationId(uuid4()), PrincipalKind.HUMAN, status
+    )
+    changed = getattr(principal, method)()
+    assert changed.id == principal.id and changed.organization_id == principal.organization_id
+    assert changed.status is expected and principal.status is status
+
+
+@pytest.mark.parametrize("method", ["suspend", "restore"])
+@pytest.mark.parametrize(
+    "kind,status",
+    [
+        (PrincipalKind.HUMAN, PrincipalStatus.RETIRED),
+        (PrincipalKind.APPLICATION, PrincipalStatus.ACTIVE),
+    ],
+)
+def test_human_lifecycle_cannot_revive_retirement_or_act_on_applications(
+    method: str, kind: PrincipalKind, status: PrincipalStatus
+) -> None:
+    from inframeld_backend.shared.domain.errors.domain_errors import InvalidStateTransitionError
+
+    principal = Principal(PrincipalId(uuid4()), OrganizationId(uuid4()), kind, status)
+    with pytest.raises(InvalidStateTransitionError):
+        getattr(principal, method)()

@@ -36,6 +36,7 @@ async def recovery_worker_process(
             "INFRAMELD_DATABASE__MAX_OVERFLOW": "0",
             "INFRAMELD_RECOVERY_CLEANUP__AUTHORITY": EXECUTION_PUBLIC,
             "INFRAMELD_RECOVERY_CLEANUP__HYDRA_ADMIN_URL": admin_url,
+            "INFRAMELD_RECOVERY_CLEANUP__KRATOS_ADMIN_URL": "http://kratos-recovery-execution:4434",
             "INFRAMELD_LOG_FORMAT": "json",
         }
     )

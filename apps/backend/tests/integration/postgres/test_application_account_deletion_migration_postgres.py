@@ -68,10 +68,7 @@ async def test_empty_retirement_history_round_trips_without_changing_live_accoun
     command.downgrade(config, "0031_project_deletion")
     command.upgrade(config, "head")
     async with database.session() as session:
-        assert (
-            await session.scalar(select(AlembicVersionRow.version_num))
-            == "0033_stranded_authority_repair"
-        )
+        assert await session.scalar(select(AlembicVersionRow.version_num)) == "0034_human_lifecycle"
         account = await session.get(ApplicationAccountRow, metadata.application_principal_id.value)
         principal = await session.get(PrincipalRow, metadata.application_principal_id.value)
         key = await session.get(ApplicationKeyRow, metadata.key_id.value)

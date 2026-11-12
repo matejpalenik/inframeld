@@ -3,6 +3,9 @@ from typing import BinaryIO
 from inframeld_backend.access.application.commands.bootstrap_first_administrator_command import (
     BootstrapFirstAdministratorCommand,
 )
+from inframeld_backend.access.application.commands.human_suspension_cleanup_maintenance_command import (
+    HumanSuspensionCleanupMaintenanceCommand,
+)
 from inframeld_backend.access.application.commands.repair_stranded_authority_command import (
     RepairStrandedAuthorityCommand,
 )
@@ -14,6 +17,9 @@ from inframeld_backend.access.cli.errors.stranded_authority_maintenance_input_er
 )
 from inframeld_backend.access.cli.mappers.first_administrator_bootstrap_mapper import (
     FirstAdministratorBootstrapMapper,
+)
+from inframeld_backend.access.cli.mappers.human_suspension_cleanup_maintenance_mapper import (
+    HumanSuspensionCleanupMaintenanceMapper,
 )
 from inframeld_backend.access.cli.mappers.maintenance_input_mapper import MaintenanceInputMapper
 from inframeld_backend.access.cli.mappers.recovery_maintenance_mapper import (
@@ -32,6 +38,7 @@ class MaintenanceCli:
         ResumeIdentityRecoveryCleanupCommand
         | RepairStrandedAuthorityCommand
         | BootstrapFirstAdministratorCommand
+        | HumanSuspensionCleanupMaintenanceCommand
     ):
         operation_id = None
         try:
@@ -44,6 +51,8 @@ class MaintenanceCli:
                 return StrandedAuthorityMaintenanceMapper.read(payload)
             if values.get("mode") == "bootstrap-first-administrator":
                 return FirstAdministratorBootstrapMapper.read(payload)
+            if values.get("mode") == "human-suspension-cleanup":
+                return HumanSuspensionCleanupMaintenanceMapper.read(payload)
             raise ValueError("Unsupported maintenance mode.")
         except (ValueError, TypeError, UnicodeError, RecursionError):
             raise StrandedAuthorityMaintenanceInputError(operation_id) from None

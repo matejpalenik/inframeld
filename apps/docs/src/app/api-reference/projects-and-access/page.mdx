@@ -92,6 +92,18 @@ A fresh `201` returns `changed: true` and advances the Organization Access revis
 
 Exact business replay requires Alice's current authority and Bob's current admissibility. It returns the original status, result and `idempotencyExpiresAt`, without reinitializing credentials, restoring rights or repeating provisioning or audit. Generic original-request metadata lookup has its own disclosure contract. [Keep the original request after uncertainty](/guides/admit-human#keep-the-original-request-after-uncertainty) explains recovery and relevant failures.
 
+## Suspend and restore an admitted human
+
+<ApiOperation operationId="suspendHuman" />
+
+A currently eligible admitted human with exact Organization `suspend-users` use authority submits the target's local `principalId`, reviewed Organization Access revision, reason and original key. A `202` records the installation-wide local block and its durable original cleanup obligation. `cleanupOperationId` identifies that obligation for protected operator inspection. Provider cleanup can still be pending. An already-suspended target can return a fresh `202` for its existing obligation without advancing the revision.
+
+<ApiOperation operationId="restoreHuman" />
+
+A separate write requires current Organization `restore-users` use authority. The security-review reference records the decision to restore the same legitimate identity. Fresh restoration also checks the reviewed revision, the current linked identity, all three confirmations on the original suspension cleanup and independent recovery restrictions. A real transition to active advances the credential version once. The `200` receipt describes the original result. Removed memberships and grants stay removed.
+
+Both writes check current caller authority and scope before exact original replay. Restoration also verifies the stable linked identity on replay. A retained result preserves its original revision and expiry without repeating effects. Generic original-request lookup supplies only retained operation metadata under the exact Organization action. [Suspend or deliberately restore an admitted human](/guides/admit-human#suspend-or-deliberately-restore-an-admitted-human) explains the browser inputs, receipts and recovery.
+
 ## Create an additional Project
 
 <ApiOperation operationId="createProject" />

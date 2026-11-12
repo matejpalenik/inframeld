@@ -41,7 +41,7 @@ In the table below, **ingress** is the entry point for incoming traffic and **TL
 | **Full Studio (deferred)** | Not required in the v1 runtime or release chain. When delivered, use a production build and the same generated-client/identity contracts. The account UI above is required independently. |
 | **Python API** | Handles admission, authorization, queries, and release commands. Admission means durably accepting requested work. Database and vector services need no public ports. |
 | **Python application worker** | Runs the same application release/image as the API through a different command. Executes bounded durable application jobs from PostgreSQL. Support one application worker alongside the dedicated recovery worker. Vector mutation ownership follows [Preparing and searching reliable indexes](../../inframeld-indexing/references/profiles-and-preparation.md). |
-| **Recovery worker** | Uses the backend image with a separate command and no listener. Executes one recovery attempt at a time through PostgreSQL ownership and proof reconciliation. It needs database and private Hydra access, without artifact volumes, model credentials or the callback key. [ADR-0087](../../../../docs/adr/ADR-0087-isolate-recovery-cleanup-in-a-dedicated-worker.md) records the isolation boundary. |
+| **Recovery worker** | Uses the backend image with a separate command and no listener. [ADR-0087](../../../../docs/adr/ADR-0087-isolate-recovery-cleanup-in-a-dedicated-worker.md) isolates recovery from ordinary jobs. [ADR-0131](../../../../docs/adr/ADR-0131-bind-suspension-cleanup-to-the-original-obligation.md) places routine recovery and suspension cleanup in one shared live fenced local attempt. The existing process retains database and private Hydra access and needs private Kratos administration for suspension. Artifact volumes, model credentials and the callback key stay outside this process. The shared worker and private suspension cleanup are implemented and locally qualified. |
 | **Isolated parser service** | Converts untrusted documents using [Processing untrusted documents safely](../../inframeld-knowledge/references/uploads-and-source-sync.md)’s per-attempt sandbox. Has no network, credentials, general artifact volume, or Docker socket. Its only worker connection is a private IPC socket. IPC means interprocess communication. |
 | **Recovery callbacks** | A private backend process on port 8081, sharing the backend image and application database. It accepts authenticated native Kratos evidence only. Publish no host port or public route. It requires no Hydra client or fingerprint key. |
 | **PostgreSQL** | Holds authoritative application state, jobs, permissions, and operation records on durable storage. Accessible only privately. Kratos and Hydra each use their own database and database role, separate from application state, with separately controlled migrations. One PostgreSQL server can host all three. |
@@ -112,8 +112,8 @@ flowchart LR
     API --> AppDB[Private application PostgreSQL]
     Kratos -->|authenticated native hooks| Callbacks[Private recovery callbacks]
     Callbacks -->|short transactions| AppDB
-    RecoveryWorker[Dedicated recovery worker] -->|claims and proof checkpoints| AppDB
-    RecoveryWorker -->|Hydra cleanup| IdentityAdmin
+    RecoveryWorker[Dedicated recovery worker] -->|claims, proof and cleanup checkpoints| AppDB
+    RecoveryWorker -->|routine Hydra and suspension Kratos and Hydra cleanup| IdentityAdmin
     Worker[Application worker] --> Stores
     Worker --> AppDB
     Worker -->|private Unix socket| Parser[Offline parser]
@@ -121,7 +121,7 @@ flowchart LR
     Worker -->|via ModelGateway| Models
 ```
 
-The arrows show allowed request paths, not every internal dependency. Storage and identity administration stay private. The parser has no external network connection and communicates with the worker only through its local socket.
+The arrows show allowed request paths, not every internal dependency. Storage and identity administration stay private. The parser has no external network connection and communicates with the worker only through its local socket. The suspension edge shows the recovery worker's private Kratos administration path. Deploy one recovery worker and retire an older binary before starting the first guard-enabled replacement. Its guard bounds live fenced local claims. Earlier remote calls can finish after lease expiry.
 
 <a id="restrict-access-and-resources-for-the-whole-installation"></a>
 

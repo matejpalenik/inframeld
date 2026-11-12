@@ -463,6 +463,50 @@ export const zHumanOAuthConsentDetailsResponse = z.object({
 });
 
 /**
+ * HumanRestorationRequest
+ */
+export const zHumanRestorationRequest = z.object({
+    expectedAccessRevision: z.int().gte(0).lte(9007199254740991),
+    securityReviewReference: z.string().min(1).max(128)
+});
+
+/**
+ * HumanRestorationResponse
+ *
+ * Return the original safe receipt without inferring current account state.
+ */
+export const zHumanRestorationResponse = z.object({
+    accessRevision: z.int().gte(0).lte(9007199254740991),
+    idempotencyExpiresAt: z.iso.datetime(),
+    operationId: z.string().min(1).max(128),
+    organizationId: z.uuid(),
+    principalId: z.uuid()
+});
+
+/**
+ * HumanSuspensionRequest
+ */
+export const zHumanSuspensionRequest = z.object({
+    expectedAccessRevision: z.int().gte(0).lte(9007199254740991),
+    reason: z.string().min(1).max(512)
+});
+
+/**
+ * HumanSuspensionResponse
+ *
+ * Return the original safe receipt without inferring current account state.
+ */
+export const zHumanSuspensionResponse = z.object({
+    accessBlocked: z.literal(true),
+    accessRevision: z.int().gte(0).lte(9007199254740991),
+    cleanupOperationId: z.string().min(1).max(128),
+    idempotencyExpiresAt: z.iso.datetime().nullable(),
+    operationId: z.string().min(1).max(128),
+    organizationId: z.uuid(),
+    principalId: z.uuid()
+});
+
+/**
  * InProgressOperationLookupResponse
  */
 export const zInProgressOperationLookupResponse = z.object({
@@ -2360,6 +2404,138 @@ export const zAdmitHuman503Representation0Response = zProblemDetails;
  * Already admitted.
  */
 export const zAdmitHumanResponse = zHumanAdmissionResponse;
+
+export const zRestoreHumanBody = zHumanRestorationRequest;
+
+export const zRestoreHumanHeaders = z.object({
+    'Idempotency-Key': z.string().min(1).max(128).regex(/.*\S.*/)
+});
+
+export const zRestoreHumanPath = z.object({
+    organization_id: z.uuid(),
+    principal_id: z.uuid()
+});
+
+/**
+ * Successful Response
+ */
+export const zRestoreHuman200Representation0Response = zHumanRestorationResponse;
+
+/**
+ * Invalid authentication request
+ */
+export const zRestoreHuman400Representation0Response = zProblemDetails;
+
+/**
+ * Unauthorized
+ */
+export const zRestoreHuman401Representation0Response = zProblemDetails;
+
+/**
+ * Access denied
+ */
+export const zRestoreHuman403Representation0Response = zProblemDetails;
+
+/**
+ * Resource not found
+ */
+export const zRestoreHuman404Representation0Response = zProblemDetails;
+
+/**
+ * Operation conflicts with current state
+ */
+export const zRestoreHuman409Representation0Response = zProblemDetails;
+
+/**
+ * Content Too Large
+ */
+export const zRestoreHuman413Representation0Response = zProblemDetails;
+
+/**
+ * Unsupported Media Type
+ */
+export const zRestoreHuman415Representation0Response = zProblemDetails;
+
+/**
+ * Request validation failed
+ */
+export const zRestoreHuman422Representation0Response = zProblemDetails;
+
+/**
+ * Dependency unavailable
+ */
+export const zRestoreHuman503Representation0Response = zProblemDetails;
+
+/**
+ * Successful Response
+ */
+export const zRestoreHumanResponse = zHumanRestorationResponse;
+
+export const zSuspendHumanBody = zHumanSuspensionRequest;
+
+export const zSuspendHumanHeaders = z.object({
+    'Idempotency-Key': z.string().min(1).max(128).regex(/.*\S.*/)
+});
+
+export const zSuspendHumanPath = z.object({
+    organization_id: z.uuid(),
+    principal_id: z.uuid()
+});
+
+/**
+ * Successful Response
+ */
+export const zSuspendHuman202Representation0Response = zHumanSuspensionResponse;
+
+/**
+ * Invalid authentication request
+ */
+export const zSuspendHuman400Representation0Response = zProblemDetails;
+
+/**
+ * Unauthorized
+ */
+export const zSuspendHuman401Representation0Response = zProblemDetails;
+
+/**
+ * Access denied
+ */
+export const zSuspendHuman403Representation0Response = zProblemDetails;
+
+/**
+ * Resource not found
+ */
+export const zSuspendHuman404Representation0Response = zProblemDetails;
+
+/**
+ * Operation conflicts with current state
+ */
+export const zSuspendHuman409Representation0Response = zProblemDetails;
+
+/**
+ * Content Too Large
+ */
+export const zSuspendHuman413Representation0Response = zProblemDetails;
+
+/**
+ * Unsupported Media Type
+ */
+export const zSuspendHuman415Representation0Response = zProblemDetails;
+
+/**
+ * Request validation failed
+ */
+export const zSuspendHuman422Representation0Response = zProblemDetails;
+
+/**
+ * Dependency unavailable
+ */
+export const zSuspendHuman503Representation0Response = zProblemDetails;
+
+/**
+ * Successful Response
+ */
+export const zSuspendHumanResponse = zHumanSuspensionResponse;
 
 export const zCreateProjectBody = zProjectCreationRequest;
 
