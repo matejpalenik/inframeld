@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import Boolean, DateTime, Text, Uuid
+from sqlalchemy import Boolean, DateTime, Integer, Text, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
 
 from inframeld_backend.access.infrastructure.rows.access_persistence_base import (
@@ -27,3 +27,10 @@ class HostMaintenanceReceiptRow(AccessPersistenceBase):
     released: Mapped[bool | None] = mapped_column(Boolean)
     run_id: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True))
     deadline: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    suspension_obligation_id: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True), default=None)
+    suspension_repeat_step: Mapped[str | None] = mapped_column(Text, default=None)
+    suspension_repeat_attempt: Mapped[int | None] = mapped_column(Integer, default=None)
+    suspension_repeat_fence: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True), default=None)
+    suspension_repeat_consumed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None
+    )

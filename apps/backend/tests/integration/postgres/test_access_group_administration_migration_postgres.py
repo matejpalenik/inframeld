@@ -94,10 +94,7 @@ def test_legacy_group_label_survives_upgrade_downgrade_and_repeat_upgrade(
     with database_session(settings) as session:
         stored = session.get(AccessGroupRow, group)
         assert stored is not None and stored.resource_name is None and stored.name == label
-        assert (
-            session.scalar(select(AlembicVersionRow.version_num))
-            == "0033_stranded_authority_repair"
-        )
+        assert session.scalar(select(AlembicVersionRow.version_num)) == "0034_human_lifecycle"
     command.downgrade(config, "0024_application_accounts")
     with database_session(settings) as session:
         assert session.scalar(select(legacy.c.name).where(legacy.c.id == group)) == label
@@ -193,10 +190,7 @@ def test_named_group_requires_its_exact_scoped_binding_and_retirement_keeps_name
             )
         )
     with database_session(settings) as session:
-        assert (
-            session.scalar(select(AlembicVersionRow.version_num))
-            == "0033_stranded_authority_repair"
-        )
+        assert session.scalar(select(AlembicVersionRow.version_num)) == "0034_human_lifecycle"
 
 
 @pytest.mark.asyncio
@@ -264,9 +258,6 @@ async def test_retained_legacy_group_deletion_status_prevents_unsafe_downgrade(
     with pytest.raises(RuntimeError, match="Retained group"):
         command.downgrade(_config(temporary_postgres_settings), "0024_application_accounts")
     async with database.session() as session:
-        assert (
-            await session.scalar(select(AlembicVersionRow.version_num))
-            == "0033_stranded_authority_repair"
-        )
+        assert await session.scalar(select(AlembicVersionRow.version_num)) == "0034_human_lifecycle"
         assert await session.get(DeletionStatusBindingRow, operation_id) is not None
         assert await session.get(DeletionStatusObservationRow, operation_id) is not None

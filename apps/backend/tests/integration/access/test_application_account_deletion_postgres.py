@@ -759,10 +759,7 @@ async def test_retirement_original_lifetime_follows_only_its_native_reservation(
     with pytest.raises(RuntimeError, match="Retained application retirement originals"):
         alembic_command.downgrade(config, "0031_project_deletion")
     async with database.session() as session, session.begin():
-        assert (
-            await session.scalar(select(AlembicVersionRow.version_num))
-            == "0033_stranded_authority_repair"
-        )
+        assert await session.scalar(select(AlembicVersionRow.version_num)) == "0034_human_lifecycle"
         assert (
             await session.get(ApplicationAccountDeletionResultRow, operation_id.value) is not None
         )

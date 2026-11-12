@@ -1,6 +1,6 @@
 from typing import override
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from inframeld_backend.access.application.dtos.identity_recovery_cleanup_work_dto import (
@@ -22,6 +22,9 @@ from inframeld_backend.access.infrastructure.readers.identity_recovery_cleanup_w
 )
 from inframeld_backend.access.infrastructure.resources.postgres_identity_coordinator import (
     PostgresIdentityCoordinator,
+)
+from inframeld_backend.access.infrastructure.resources.postgres_recovery_worker_slot import (
+    PostgresRecoveryWorkerSlot,
 )
 from inframeld_backend.access.infrastructure.rows.identity_recovery_cleanup_job_row import (
     IdentityRecoveryCleanupJobRow,
@@ -67,7 +70,9 @@ class PostgresIdentityRecoveryCleanupFactsReader(IdentityRecoveryCleanupFactsRea
 
     @override
     async def next_candidate(self) -> OperationId | None:
-        await self._require_scope()
+        now = await PostgresRecoveryWorkerSlot(self._session).acquire_if_free(self._installation_id)
+        if now is None:
+            return None
         result = await self._session.scalar(
             select(IdentityRecoveryCleanupJobRow.operation_id)
             .join(
@@ -79,10 +84,10 @@ class PostgresIdentityRecoveryCleanupFactsReader(IdentityRecoveryCleanupFactsRea
                 IdentityRecoveryCleanupJobRow.installation_id == self._installation_id.value,
                 IdentityRecoveryCleanupJobRow.authority == self._authority.value,
                 IdentityRecoveryCleanupRunRow.ended_at.is_(None),
-                IdentityRecoveryCleanupRunRow.next_attempt_at <= func.now(),
+                IdentityRecoveryCleanupRunRow.next_attempt_at <= now,
                 or_(
                     IdentityRecoveryCleanupJobRow.lease_expires_at.is_(None),
-                    IdentityRecoveryCleanupJobRow.lease_expires_at <= func.now(),
+                    IdentityRecoveryCleanupJobRow.lease_expires_at <= now,
                 ),
             )
             .order_by(

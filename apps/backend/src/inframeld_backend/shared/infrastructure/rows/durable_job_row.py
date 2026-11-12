@@ -21,7 +21,7 @@ class DurableJobRow(SharedPersistenceBase):
     principal_id: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True), nullable=True)
     principal_kind: Mapped[str | None] = mapped_column(String(32), nullable=True)
     organization_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
-    project_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    project_id: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True), nullable=True)
     action_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
     payload_kind: Mapped[str] = mapped_column(String(100), nullable=False)
     payload_version: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -56,5 +56,8 @@ class DurableJobRow(SharedPersistenceBase):
     )
 
     deletion_obligation_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True), nullable=True, default=None
+    )
+    suspension_obligation_id: Mapped[UUID | None] = mapped_column(
         Uuid(as_uuid=True), nullable=True, default=None
     )

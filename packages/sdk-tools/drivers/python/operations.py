@@ -26,6 +26,8 @@ from inframeld_sdk.models.application_key_revocation_request import ApplicationK
 from inframeld_sdk.models.grant_target_kind import GrantTargetKind
 from inframeld_sdk.models.human_admission_request import HumanAdmissionRequest
 from inframeld_sdk.models.human_o_auth_consent_request import HumanOAuthConsentRequest
+from inframeld_sdk.models.human_restoration_request import HumanRestorationRequest
+from inframeld_sdk.models.human_suspension_request import HumanSuspensionRequest
 from inframeld_sdk.models.invitation_activation_request import InvitationActivationRequest
 from inframeld_sdk.models.invitation_issue_request import InvitationIssueRequest
 from inframeld_sdk.models.invitation_preview_request import InvitationPreviewRequest
@@ -1418,7 +1420,53 @@ async def set_project_upload_defaults_async(clients: Clients, call: Call) -> Nat
     )
 
 
+def suspend_human_sync(clients: Clients, call: Call) -> NativeResponse:
+    return AccessApi(clients.production).suspend_human_sync_with_http_info(
+        organization_id=UUID(call.path["organization_id"]),
+        principal_id=UUID(call.path["principal_id"]),
+        idempotency_key=call.headers["Idempotency-Key"],
+        human_suspension_request=HumanSuspensionRequest.model_validate(call.body),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def suspend_human_async(clients: Clients, call: Call) -> NativeResponse:
+    return await AccessApi(clients.production).suspend_human_with_http_info(
+        organization_id=UUID(call.path["organization_id"]),
+        principal_id=UUID(call.path["principal_id"]),
+        idempotency_key=call.headers["Idempotency-Key"],
+        human_suspension_request=HumanSuspensionRequest.model_validate(call.body),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+def restore_human_sync(clients: Clients, call: Call) -> NativeResponse:
+    return AccessApi(clients.production).restore_human_sync_with_http_info(
+        organization_id=UUID(call.path["organization_id"]),
+        principal_id=UUID(call.path["principal_id"]),
+        idempotency_key=call.headers["Idempotency-Key"],
+        human_restoration_request=HumanRestorationRequest.model_validate(call.body),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def restore_human_async(clients: Clients, call: Call) -> NativeResponse:
+    return await AccessApi(clients.production).restore_human_with_http_info(
+        organization_id=UUID(call.path["organization_id"]),
+        principal_id=UUID(call.path["principal_id"]),
+        idempotency_key=call.headers["Idempotency-Key"],
+        human_restoration_request=HumanRestorationRequest.model_validate(call.body),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
 BINDINGS: dict[Operation, Binding] = {
+    Operation.SUSPEND_HUMAN: Binding(suspend_human_sync, suspend_human_async),
+    Operation.RESTORE_HUMAN: Binding(restore_human_sync, restore_human_async),
     Operation.GET_PROJECT_UPLOAD_DEFAULTS: Binding(
         get_project_upload_defaults_sync, get_project_upload_defaults_async
     ),

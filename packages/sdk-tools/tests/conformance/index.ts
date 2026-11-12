@@ -17,6 +17,7 @@ import "./project-members.ts";
 import "./project-action-grants.ts";
 import "./project-membership.ts";
 import "./human-admission.ts";
+import "./human-lifecycle.ts";
 
 import "./application-accounts.ts";
 import "./application-key-issuance.ts";

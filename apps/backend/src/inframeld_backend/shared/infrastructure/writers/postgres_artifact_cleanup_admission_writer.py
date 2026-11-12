@@ -17,10 +17,10 @@ from inframeld_backend.shared.application.protocols.artifact_cleanup_admission_w
     ArtifactCleanupAdmissionWriter,
 )
 from inframeld_backend.shared.application.value_objects.job_id import JobId
-from inframeld_backend.shared.domain.enums.job_status import JobStatus
 from inframeld_backend.shared.infrastructure.mappers.postgres_job_binding_mapper import (
     PostgresJobBindingMapper,
 )
+from inframeld_backend.shared.infrastructure.repositories.postgres_job_store import PostgresJobStore
 from inframeld_backend.shared.infrastructure.rows.application_job_queue_row import (
     ApplicationJobQueueRow,
 )
@@ -76,12 +76,7 @@ class PostgresArtifactCleanupAdmissionWriter(ArtifactCleanupAdmissionWriter):
             ):
                 raise ArtifactReservationError("The original cleanup job binding is inconsistent.")
             return ArtifactCleanupAdmissionDTO(JobId(existing.id), binding.obligation_id, False)
-        count = await self._session.scalar(
-            select(func.count())
-            .select_from(DurableJobRow)
-            .where(DurableJobRow.status.in_((JobStatus.QUEUED.value, JobStatus.RUNNING.value)))
-        )
-        if count is None or count >= capacity:
+        if not await PostgresJobStore(self._session).has_fresh_capacity(capacity=capacity):
             raise JobQueueFullError()
         targets = await self._session.scalar(
             select(func.count())

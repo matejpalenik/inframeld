@@ -355,6 +355,38 @@ Records the original admission or no-change result, including the local `princip
 
 <ApiSchema name="HumanOAuthScope" />
 
+<a id="HumanRestorationRequest" />
+
+## HumanRestorationRequest
+
+Carries the reviewed Organization Access revision and a reference to the completed security review of the same linked identity.
+
+<ApiSchema name="HumanRestorationRequest" />
+
+<a id="HumanRestorationResponse" />
+
+## HumanRestorationResponse
+
+Records the original restoration result and retained-result expiry. Current access requires a separate read.
+
+<ApiSchema name="HumanRestorationResponse" />
+
+<a id="HumanSuspensionRequest" />
+
+## HumanSuspensionRequest
+
+Carries the reviewed Organization Access revision and the reason for blocking the specified human.
+
+<ApiSchema name="HumanSuspensionRequest" />
+
+<a id="HumanSuspensionResponse" />
+
+## HumanSuspensionResponse
+
+Records the original local block and the cleanup obligation accepted with it. `cleanupOperationId` identifies the exact obligation for protected inspection. The receipt can arrive before provider cleanup finishes.
+
+<ApiSchema name="HumanSuspensionResponse" />
+
 <a id="InProgressOperationLookupResponse" />
 
 ## InProgressOperationLookupResponse

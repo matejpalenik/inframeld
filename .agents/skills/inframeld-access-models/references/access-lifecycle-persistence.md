@@ -13,6 +13,16 @@ Alice wants to stop managing SupportKnowledge but keep reading its documents. De
 
 For appointment, ordinary membership and management must agree. A foreign key protects the relationship, while the application establishes permission and safe handover. See [Memberships and handover](memberships-groups-and-handover.md) for the full human workflow. The following sections specify the persistence effects rather than another authorization engine.
 
+<a id="suspension-and-restoration-lifecycle"></a>
+
+## Commit suspension before its provider cleanup
+
+**Implemented and locally qualified.** [Migration 0034](../../../../apps/backend/migrations/versions/0034_human_lifecycle.py) adds the suspension and restoration records. Save the immediate local block, Access revision increment, required audit, immutable original result, exact cleanup obligation and fixed typed queued child in one transaction. The `202` receipt follows commit. Suspension and its child use no ordinary queue capacity. They preserve the person's assignments and block their use.
+
+The [suspension cleanup workflow](recovery-completion.md#suspension-cleanup) uses the existing recovery worker and fences each provider step against the exact stored original. Preserve consumed attempts, original deadlines and independent confirmations across replacement. [The record contract](credential-and-recovery-records.md#suspension-cleanup-records) separates a protected continuation receipt from a provider checkpoint. Confirmation alone neither restores the principal nor clears an independent recovery block.
+
+[Deliberate restoration](recovery.md#deliberate-restoration-cutover) checks the same legitimate identity, security review, all three original confirmations and applicable current restrictions. Under [ADR-0127](../../../../docs/adr/ADR-0127-fence-human-authentication-evidence-at-restoration.md), a real transition saves the once-only credential version advance, state, revision, audit and original outcome together. A replay advances nothing and removed rights stay removed.
+
 <a id="group-manager-membership-constraint"></a>
 
 <a id="every-group-manager-requires-ordinary-membership"></a>

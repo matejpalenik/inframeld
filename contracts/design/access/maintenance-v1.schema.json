@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Inframeld version 1 maintenance input, design contract",
-  "description": "Version1 private maintenance supports first-administrator bootstrap, recovery-cleanup continuation and exact Access-owned stranded-authority repair. A schema-valid shape does not establish current recipient eligibility or host authority. Targets outside Access remain accepted design for their future owning integrations.",
-  "$comment": "Owner: .agents/skills/inframeld-access-models/references/host-maintenance.md. Preserve the64KiB received-byte bound, strict JSON integer tokens, duplicate-key rejection, one JSON value, verified host/installation authority and shared installation/operator operationId namespace. Bootstrap and repair require current recipient proof and reviewed scope. The installed private consumer supports group-manager and fixed action-grantor responsibilities on Organization, Project, access-group and application-account only. Other target kinds remain unsupported design. Recovery continuation forbids recipient proof and reviewed-run inputs. Proof verification, current recipient eligibility, stranded/revision checks, atomic assignment/audit and immutable original recovery are application work, not schema validation. JSON Schema integer validation alone accepts1.0, which the consumer rejects.",
+  "description": "Version1 private maintenance supports first-administrator bootstrap, recovery-cleanup continuation and exact Access-owned stranded-authority repair. A schema-valid shape does not establish current recipient eligibility or host authority. Targets outside Access remain accepted design for their future owning integrations. The installed consumer supports the closed human-suspension-cleanup inspect and continue inputs.",
+  "$comment": "Owner: .agents/skills/inframeld-access-models/references/host-maintenance.md. Preserve the64KiB received-byte bound, strict JSON integer tokens, duplicate-key rejection, one JSON value, verified host/installation authority and shared installation/operator operationId namespace. Bootstrap and repair require current recipient proof and reviewed scope. The installed private consumer supports group-manager and fixed action-grantor responsibilities on Organization, Project, access-group and application-account only. Other target kinds remain unsupported design. Recovery continuation forbids recipient proof and reviewed-run inputs. Suspension cleanup uses the exact original cleanup ID and expected installation. Inspection reserves no receipt. Continue alone requires operator attribution and reason and uses the shared namespace. Proof verification, current recipient eligibility, stranded/revision checks, atomic assignment/audit and immutable original recovery are application work, not schema validation. JSON Schema integer validation alone accepts1.0, which the consumer rejects.",
   "$defs": {
     "target": {
       "oneOf": [
@@ -352,6 +352,83 @@
         "recoveryOperationId"
       ],
       "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "const": 1,
+          "type": "integer"
+        },
+        "mode": {
+          "const": "human-suspension-cleanup"
+        },
+        "intent": {
+          "enum": ["inspect", "continue"]
+        },
+        "expectedInstallationId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "operationId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "\\S"
+        },
+        "cleanupOperationId": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "operatorLabel": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "\\S"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512,
+          "pattern": "\\S"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "mode",
+        "intent",
+        "expectedInstallationId",
+        "operationId",
+        "cleanupOperationId"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "intent": {
+                "const": "inspect"
+              }
+            }
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": ["operatorLabel"]
+                },
+                {
+                  "required": ["reason"]
+                }
+              ]
+            }
+          },
+          "else": {
+            "required": ["operatorLabel", "reason"]
+          }
+        }
+      ]
     }
   ]
 }

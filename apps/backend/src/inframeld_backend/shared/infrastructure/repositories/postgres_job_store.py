@@ -4,8 +4,9 @@ from datetime import UTC, datetime, timedelta
 from typing import override
 from uuid import UUID, uuid4
 
-from sqlalchemy import DateTime, case, func, or_, select, update
+from sqlalchemy import DateTime, String, case, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql.selectable import ScalarSelect
 
 from inframeld_backend.access.application.dtos.admitted_work_authority_dto import (
     AdmittedWorkAuthorityDTO,
@@ -18,6 +19,9 @@ from inframeld_backend.shared.application.dtos.artifact_cleanup_job_binding_dto 
 from inframeld_backend.shared.application.dtos.artifact_scope_dto import ArtifactScopeDTO
 from inframeld_backend.shared.application.dtos.business_operation_artifact_origin_dto import (
     BusinessOperationArtifactOriginDTO,
+)
+from inframeld_backend.shared.application.dtos.human_suspension_job_binding_dto import (
+    HumanSuspensionJobBindingDTO,
 )
 from inframeld_backend.shared.application.dtos.job_admission_dto import JobAdmissionDTO
 from inframeld_backend.shared.application.dtos.job_attempt_context_dto import JobAttemptContextDTO
@@ -255,6 +259,8 @@ class PostgresJobStore(JobStore):
         context = binding.context
         if isinstance(context.binding, ProjectDeletionJobBindingDTO):
             raise ConflictError("Project deletion does not authorize artifact effects.")
+        if isinstance(context.binding, HumanSuspensionJobBindingDTO):
+            raise ConflictError("Human suspension does not authorize artifact effects.")
         parts = [
             b"inframeld-job-effect-v1",
             binding.effect_id.value.bytes,
@@ -479,11 +485,12 @@ class PostgresJobStore(JobStore):
         query = (
             select(DurableJobRow)
             .where(
+                DurableJobRow.binding_kind != "human_suspension",
                 or_(
                     DurableJobRow.status == JobStatus.RUNNING.value,
                     (DurableJobRow.status == JobStatus.QUEUED.value)
                     & or_(DurableJobRow.due_at <= now, DurableJobRow.queued_deadline <= now),
-                )
+                ),
             )
             .order_by(
                 case((DurableJobRow.status == JobStatus.RUNNING.value, 0), else_=1),
@@ -510,6 +517,7 @@ class PostgresJobStore(JobStore):
         now = await self._now()
         if (
             row is None
+            or row.binding_kind == "human_suspension"
             or job.status is not JobStatus.RUNNING
             or job.fence is None
             or job.lease_expires_at is None
@@ -584,12 +592,7 @@ class PostgresJobStore(JobStore):
             or reservation.project_id != authority.project_id.value
         ):
             raise ConflictError("Job admission requires its original checked reservation.")
-        count = await self._session.scalar(
-            select(func.count())
-            .select_from(DurableJobRow)
-            .where(DurableJobRow.status.in_((JobStatus.QUEUED.value, JobStatus.RUNNING.value)))
-        )
-        if count is None or count >= capacity:
+        if not await self.has_fresh_capacity(capacity=capacity):
             raise JobQueueFullError("The ordinary job queue is full.")
         now = await self._session.scalar(select(func.clock_timestamp()))
         if now is None:
@@ -633,6 +636,32 @@ class PostgresJobStore(JobStore):
         )
         return None if row is None else await self._snapshot(row, await self._now())
 
+    async def has_fresh_capacity(self, *, capacity: int) -> bool:
+        """Check ordinary capacity under the caller's queue turn."""
+        await self._require_read_committed()
+        return await self._session.scalar(select(self._active_count(capacity) < capacity)) is True
+
+    @staticmethod
+    def _active_count(capacity: int) -> ScalarSelect[int]:
+        active = (
+            select(DurableJobRow.id)
+            .where(
+                DurableJobRow.binding_kind != "human_suspension",
+                DurableJobRow.status.in_((JobStatus.QUEUED.value, JobStatus.RUNNING.value)),
+            )
+            .limit(capacity)
+            .subquery()
+        )
+        return select(func.count()).select_from(active).scalar_subquery()
+
+    async def _require_read_committed(self) -> None:
+        self._require_transaction()
+        isolation = await self._session.scalar(
+            select(func.current_setting("transaction_isolation", type_=String()))
+        )
+        if isolation != "read committed":
+            raise RuntimeError("Ordinary queue capacity requires READ COMMITTED isolation.")
+
     @override
     async def next_candidate(self) -> JobSnapshotDTO | None:
         await self._queue_turn()
@@ -649,7 +678,10 @@ class PostgresJobStore(JobStore):
         active = await self._session.scalar(
             select(func.count())
             .select_from(DurableJobRow)
-            .where(DurableJobRow.status == JobStatus.RUNNING.value)
+            .where(
+                DurableJobRow.binding_kind != "human_suspension",
+                DurableJobRow.status == JobStatus.RUNNING.value,
+            )
         )
         row = await self._session.scalar(
             select(DurableJobRow)
@@ -660,6 +692,7 @@ class PostgresJobStore(JobStore):
         if (
             active
             or row is None
+            or row.binding_kind == "human_suspension"
             or row.status != JobStatus.QUEUED.value
             or row.cancel_requested
             or row.due_at > now
@@ -763,6 +796,7 @@ class PostgresJobStore(JobStore):
         )
         if (
             row is None
+            or row.binding_kind == "human_suspension"
             or job.status not in (JobStatus.QUEUED, JobStatus.RUNNING)
             or row.status != job.status.value
             or row.attempt_count != job.attempt
@@ -845,6 +879,7 @@ class PostgresJobStore(JobStore):
         now = await self._now()
         if (
             row is None
+            or row.binding_kind == "human_suspension"
             or row.lease_expires_at is None
             or row.lease_expires_at <= now
             or row.work_deadline is None
@@ -931,6 +966,7 @@ class PostgresJobStore(JobStore):
                 value is not None
                 for value in (
                     row.deletion_obligation_id,
+                    row.suspension_obligation_id,
                     row.operation_id,
                     row.principal_id,
                     row.principal_kind,

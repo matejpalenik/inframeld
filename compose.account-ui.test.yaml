@@ -311,9 +311,11 @@ services:
       INFRAMELD_DATABASE__MAX_OVERFLOW: "0"
       INFRAMELD_RECOVERY_CLEANUP__AUTHORITY: kratos:account-ui-test
       INFRAMELD_RECOVERY_CLEANUP__HYDRA_ADMIN_URL: http://hydra:4445
+      INFRAMELD_RECOVERY_CLEANUP__KRATOS_ADMIN_URL: http://kratos:4434
     depends_on:
       seed: { condition: service_completed_successfully }
       hydra: { condition: service_started }
+      kratos: { condition: service_started }
   web:
     <<: *web
     environment:

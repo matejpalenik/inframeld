@@ -202,7 +202,7 @@ async def test_empty_revocation_history_round_trips_without_changing_existing_is
             ) == before
             assert (
                 await session.scalar(select(AlembicVersionRow.version_num))
-                == "0033_stranded_authority_repair"
+                == "0034_human_lifecycle"
             )
 
 
@@ -214,10 +214,7 @@ async def test_retained_revocation_original_prevents_lossy_downgrade(
     with pytest.raises(RuntimeError, match="Retained application-key revocation originals"):
         command.downgrade(_config(temporary_postgres_settings), "0028_application_key_issuance")
     async with database.session() as session:
-        assert (
-            await session.scalar(select(AlembicVersionRow.version_num))
-            == "0033_stranded_authority_repair"
-        )
+        assert await session.scalar(select(AlembicVersionRow.version_num)) == "0034_human_lifecycle"
         original = await session.get(
             ApplicationKeyRevocationResultRow, revoked_original.operation.operation_id.value
         )

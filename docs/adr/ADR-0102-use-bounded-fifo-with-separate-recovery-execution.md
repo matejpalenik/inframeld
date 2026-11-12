@@ -29,3 +29,4 @@ Implementation, tests and production qualification remain separate delivery work
 
 - [Stable decision reference](../../.agents/skills/inframeld-application-contracts/references/decision-queue-saturation-and-cleanup.md)
 - [Decision finalization](../development/guides/architecture-decisions.md#just-in-time-architecture-decisions)
+- [ADR-0131](ADR-0131-bind-suspension-cleanup-to-the-original-obligation.md) assigns suspension cleanup to the existing recovery execution slot. Suspension and its cleanup child need no ordinary queue capacity. The ordinary FIFO and saturation rules remain in force.

@@ -4,7 +4,7 @@
 
 The supported design is a single-server Docker Compose installation. The current development Compose stack is smaller than the full target. Use executable configuration for actual ports and service pins. Do not infer production delivery from an architecture diagram.
 
-The opt-in `jobs` Compose profile runs the [ordinary application worker](application-jobs.md), with PostgreSQL-backed claims, checkpoints and bounded shutdown. Its production handler registry is currently empty. Identity-recovery cleanup retains its separate worker and `recovery` profile. These processes do not establish delivery of the full product workload.
+The opt-in `jobs` Compose profile runs the [ordinary application worker](application-jobs.md), with PostgreSQL-backed claims, checkpoints and bounded shutdown. Its production registry contains the artifact cleanup and Project deletion handlers. The `recovery` profile runs one separate recovery worker for routine identity recovery and suspension cleanup. Both families share one live local attempt, independent of ordinary job capacity. The worker has no listener and uses private Hydra administration plus private Kratos administration when suspension cleanup is enabled. Stop an older worker and confirm its exit before starting the first replacement with the shared claim guard. An earlier remote request can finish after its lease expires. [Local setup](../getting-started/local-setup.md#private-recovery-callbacks) owns the settings, and [protected maintenance](../getting-started/local-setup.md#inspect-or-continue-suspension-cleanup) owns the operator procedure. These processes do not establish delivery of the full product workload.
 
 <a id="operate-within-visible-limits"></a>
 

@@ -8,6 +8,9 @@ from inframeld_backend.shared.application.dtos.artifact_cleanup_job_binding_dto 
     ArtifactCleanupJobBindingDTO,
 )
 from inframeld_backend.shared.application.dtos.artifact_scope_dto import ArtifactScopeDTO
+from inframeld_backend.shared.application.dtos.human_suspension_job_binding_dto import (
+    HumanSuspensionJobBindingDTO,
+)
 from inframeld_backend.shared.application.dtos.job_effect_binding_dto import JobEffectBindingDTO
 from inframeld_backend.shared.application.dtos.job_effect_observation_dto import (
     JobEffectObservationDTO,
@@ -143,6 +146,8 @@ class JobEffectObservationService(JobEffectObservationRecorder):
         context = binding.context
         if isinstance(context.binding, ProjectDeletionJobBindingDTO):
             raise ConflictError("Project deletion does not authorize artifact effects.")
+        if isinstance(context.binding, HumanSuspensionJobBindingDTO):
+            raise ConflictError("Human suspension does not authorize artifact effects.")
         if isinstance(context.binding, ProductJobBindingDTO):
             authority = context.binding.authority
             if (authority.installation_id, authority.organization_id, authority.project_id) != (

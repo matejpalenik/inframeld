@@ -7,7 +7,7 @@ from uuid import uuid4
 import pytest
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import func, inspect, select
+from sqlalchemy import func, insert, inspect, select
 from sqlalchemy.exc import IntegrityError
 from tests.support.artifact_scenarios import (
     allocate_artifact,
@@ -259,8 +259,8 @@ async def test_artifact_upgrade_preserves_0014_metadata_deletion_status_product_
                 unfinished_source_revision=7,
             )
         )
-        session.add(
-            HostMaintenanceReceiptRow(
+        session.execute(
+            insert(HostMaintenanceReceiptRow).values(
                 installation_id=installation,
                 operator_request_id="original-repair",
                 authority="kratos:test",
@@ -322,7 +322,7 @@ async def test_artifact_upgrade_preserves_0014_metadata_deletion_status_product_
         async with database.session() as session:
             assert (
                 await session.scalar(select(AlembicVersionRow.version_num))
-                == "0033_stranded_authority_repair"
+                == "0034_human_lifecycle"
             )
             snapshot = await PostgresJobStore(session).find(OperationId("original-job"))
             assert snapshot is not None and snapshot.job_id.value == job_id
@@ -462,7 +462,7 @@ async def test_retained_artifact_ownership_refuses_downgrade_without_changing_st
         async with database.session() as session:
             assert (
                 await session.scalar(select(AlembicVersionRow.version_num))
-                == "0033_stranded_authority_repair"
+                == "0034_human_lifecycle"
             )
             attempt = await session.get(ArtifactAttemptRow, scenario.attempt_id.value)
             reservation = await session.get(

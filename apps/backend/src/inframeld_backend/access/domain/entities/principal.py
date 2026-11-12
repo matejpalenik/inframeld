@@ -1,10 +1,11 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import override
 
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.enums.principal_status import PrincipalStatus
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
+from inframeld_backend.shared.domain.errors.domain_errors import InvalidStateTransitionError
 
 
 @dataclass(frozen=True, slots=True, eq=False)
@@ -29,3 +30,23 @@ class Principal:
     @override
     def __hash__(self) -> int:
         return hash(self.id)
+
+    def suspend(self) -> "Principal":
+        """Block a human immediately without applying ordinary assignment handover."""
+        if self.kind is not PrincipalKind.HUMAN or self.status is PrincipalStatus.RETIRED:
+            raise InvalidStateTransitionError("Only a non-retired human can be suspended.")
+        return (
+            self
+            if self.status is PrincipalStatus.SUSPENDED
+            else replace(self, status=PrincipalStatus.SUSPENDED)
+        )
+
+    def restore(self) -> "Principal":
+        """Produce the checked human status transition without granting any rights."""
+        if self.kind is not PrincipalKind.HUMAN or self.status is PrincipalStatus.RETIRED:
+            raise InvalidStateTransitionError("Only a non-retired human can be restored.")
+        return (
+            self
+            if self.status is PrincipalStatus.ACTIVE
+            else replace(self, status=PrincipalStatus.ACTIVE)
+        )

@@ -192,13 +192,23 @@ The recovery admission writer advances the version once for each newly inserted 
 
 The narrow `HumanCredentialStateDTO`, `HumanCredentialStateQueries.for_identity()` and `PostgresHumanCredentialStateMapper.to_state()` retain their raw-four projection: installation UUID, nullable version, pending-recovery fact and retained-history fact. The separate [authentication-state record](../../../../apps/backend/src/inframeld_backend/access/application/dtos/human_authentication_state_dto.py) encloses that state, explicit linked/unlinked/incoherent classification and the observed linked Principal. [Its mapper](../../../../apps/backend/src/inframeld_backend/access/infrastructure/mappers/postgres_human_credential_state_mapper.py) does not invent missing versions or initialize history.
 
+<a id="suspension-cleanup-records"></a>
+
+### Accepted original suspension cleanup records
+
+[ADR-0131](../../../../docs/adr/ADR-0131-bind-suspension-cleanup-to-the-original-obligation.md) selects a separate suspension obligation and one fixed queued child. Bind both to the exact installation, Organization, suspended principal and stored provider identity from the original suspension. Save them with the immediate block, revision, audit and immutable suspension result. Retain the original queue deadline, first-claim work deadline and attempt exhaustion even if the child is later removed.
+
+The child uses the existing bounded attempt, checkpoint and live fence records. Keep each Kratos sessions, Hydra grants and Hydra remembered-login outcome independently. Bind the pre-I/O marker to the exact original job, step, attempt and fence. Preserve ambiguous dispatch history, including when a later repeat is confirmed. An expired local owner does not establish that its provider call ended.
+
+[Protected continuation](host-maintenance.md#suspension-cleanup-maintenance) stores an immutable typed receipt under the existing installation/operator request identity. It retains the exact original, intent, attribution, reason and authorization outcome, and binds any repeat to its exact unresolved step and prior attempt/fence. Consume that authorization with the next live dispatch marker. The receipt does not confirm provider work. Inspection reads the current original without reserving an operator receipt. [Migration 0034](../../../../apps/backend/migrations/versions/0034_human_lifecycle.py) persists the original, child binding and typed maintenance receipt.
+
 <a id="restoration-version-transition"></a>
 
 #### Accepted restoration version transition
 
 [ADR-0127](../../../../docs/adr/ADR-0127-fence-human-authentication-evidence-at-restoration.md) reuses the existing identity-scoped version. A newly authorized actual `SUSPENDED` to `ACTIVE` transition advances it exactly once in the same transaction as principal state, Access revision, required audit and immutable original outcome. Original-result replay and non-transitions never advance it again. Failure or cancellation cannot save only part of the transition. An uncertain commit is reconciled through the same original operation. Preserve version/history integrity without reset, downgrade or a second registry.
 
-The browser's accepted logical evidence contains verified provider identity and the installation/version binding captured before final same-cookie verification. It contains no cookie, mutable account status or permissions. Current authorization needs the exact actor/installation/identity match and current version before disclosure, replay or effects. The browser record carries that binding. The neutral current-facts projection supplies the facts needed to check it. Restoration persistence, suspension cleanup/jobs and their complete qualification remain unfinished.
+The browser's accepted logical evidence contains verified provider identity and the installation/version binding captured before final same-cookie verification. It contains no cookie, mutable account status or permissions. Current authorization needs the exact actor/installation/identity match and current version before disclosure, replay or effects. The browser record carries that binding. The neutral current-facts projection supplies the facts needed to check it. The registered lifecycle writes consume these facts. [Lifecycle persistence](access-lifecycle-persistence.md#suspension-and-restoration-lifecycle) owns the atomic transition and original receipts.
 
 Consent's accepted observations also distinguish a genuinely absent local link from a linked human's current suspension/retirement or incoherent required state. Initial blocking remains authoritative for that approval. See [consent](human-cli-consent.md#linked-human-restoration-checks). A fresh post-cutover request can still accept a late-created currently valid Kratos session under the [explicit limit](browser-sessions.md#restoration-evidence-cutover). No stored proof of that session's causal generation follows.
 

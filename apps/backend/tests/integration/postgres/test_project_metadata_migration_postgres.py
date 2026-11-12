@@ -6,6 +6,7 @@ from uuid import uuid4
 import pytest
 from alembic import command
 from alembic.config import Config
+from sqlalchemy import insert
 from tests.support.postgres import database_session
 from tests.support.project_metadata_legacy_rows import LegacyProjectRow
 
@@ -144,8 +145,8 @@ async def test_upgrade_preserves_original_completed_recovery_receipt_and_replay(
             )
         )
         session.flush()
-        session.add(
-            HostMaintenanceReceiptRow(
+        session.execute(
+            insert(HostMaintenanceReceiptRow).values(
                 installation_id=installed,
                 operator_request_id="legacy-operator-operation",
                 mode="resume-recovery-cleanup",

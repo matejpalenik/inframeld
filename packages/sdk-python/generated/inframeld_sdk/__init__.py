@@ -80,6 +80,10 @@ __all__ = [
     "HumanOAuthConsentDetailsResponse",
     "HumanOAuthConsentRequest",
     "HumanOAuthScope",
+    "HumanRestorationRequest",
+    "HumanRestorationResponse",
+    "HumanSuspensionRequest",
+    "HumanSuspensionResponse",
     "InProgressOperationLookupResponse",
     "InframeldDiscoveryResponse",
     "InitialApplicationAccountGrantResponse",
@@ -242,6 +246,10 @@ from inframeld_sdk.models.human_o_auth_consent_decision_response import HumanOAu
 from inframeld_sdk.models.human_o_auth_consent_details_response import HumanOAuthConsentDetailsResponse as HumanOAuthConsentDetailsResponse
 from inframeld_sdk.models.human_o_auth_consent_request import HumanOAuthConsentRequest as HumanOAuthConsentRequest
 from inframeld_sdk.models.human_o_auth_scope import HumanOAuthScope as HumanOAuthScope
+from inframeld_sdk.models.human_restoration_request import HumanRestorationRequest as HumanRestorationRequest
+from inframeld_sdk.models.human_restoration_response import HumanRestorationResponse as HumanRestorationResponse
+from inframeld_sdk.models.human_suspension_request import HumanSuspensionRequest as HumanSuspensionRequest
+from inframeld_sdk.models.human_suspension_response import HumanSuspensionResponse as HumanSuspensionResponse
 from inframeld_sdk.models.in_progress_operation_lookup_response import InProgressOperationLookupResponse as InProgressOperationLookupResponse
 from inframeld_sdk.models.inframeld_discovery_response import InframeldDiscoveryResponse as InframeldDiscoveryResponse
 from inframeld_sdk.models.initial_application_account_grant_response import InitialApplicationAccountGrantResponse as InitialApplicationAccountGrantResponse

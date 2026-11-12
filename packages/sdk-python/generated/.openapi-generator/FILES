@@ -58,6 +58,10 @@ inframeld_sdk/models/human_o_auth_consent_decision_response.py
 inframeld_sdk/models/human_o_auth_consent_details_response.py
 inframeld_sdk/models/human_o_auth_consent_request.py
 inframeld_sdk/models/human_o_auth_scope.py
+inframeld_sdk/models/human_restoration_request.py
+inframeld_sdk/models/human_restoration_response.py
+inframeld_sdk/models/human_suspension_request.py
+inframeld_sdk/models/human_suspension_response.py
 inframeld_sdk/models/in_progress_operation_lookup_response.py
 inframeld_sdk/models/inframeld_discovery_response.py
 inframeld_sdk/models/initial_application_account_grant_response.py

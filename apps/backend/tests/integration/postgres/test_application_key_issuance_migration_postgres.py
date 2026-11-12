@@ -267,10 +267,7 @@ async def test_unequal_dual_bindings_refuse_downgrade_before_any_data_loss(
     with pytest.raises(RuntimeError, match="Unequal application-key adapter bindings"):
         command.downgrade(_config(temporary_postgres_settings), "0027_invitations")
     async with database.session() as session:
-        assert (
-            await session.scalar(select(AlembicVersionRow.version_num))
-            == "0033_stranded_authority_repair"
-        )
+        assert await session.scalar(select(AlembicVersionRow.version_num)) == "0034_human_lifecycle"
         key = await session.get(ApplicationKeyRow, seed.credential.key_id.value)
         assert (
             key is not None

@@ -125,3 +125,104 @@ An explicit exact replay checks Alice's current authority and Bob's current prov
 | `503` or no usable response  | Retain the original request and resolve the unavailable dependency or uncertain outcome before another submission.                                                                                                                                                                                                                       |
 
 See [the native operation and models](/api-reference/projects-and-access#admit-an-existing-human) for the exact request, response and declared errors.
+
+## Suspend or deliberately restore an admitted human
+
+If Bob's account might be compromised, Alice can block his Inframeld access across the installation while the server clears affected credentials. Bob keeps his stored memberships and grants during suspension, but cannot use them. Alice can restore the same human later, after cleanup and a security review.
+
+### Review the person and your authority
+
+1. In Alice's browser profile, open `/v1/my-organization-access`. Use its `organizationId` and current `accessRevision`. Check for `suspend-users` before suspension or `restore-users` before restoration. Either `canGrant` value permits use. The server checks Alice's eligibility and exact permission again on each write.
+2. Identify Bob by the local `principalId` in his admission receipt or a previously verified `/v1/session` result from his profile. His Kratos `identity.id`, email and display name identify different things. Use the local UUID in the request path.
+3. Before sending, save the installation, acting principal, exact POST path, body and unique `Idempotency-Key` together. For suspension, supply a short single-line reason without secrets. For a later, deliberate restoration, review a new Organization revision and save a separate key and a short, non-secret reference to your completed security review.
+
+### Submit one reviewed action
+
+Use the same HTTPS browser origin and local SDK setup as for admission. Add this complete `human-lifecycle.ts` module to your existing browser application's client bundle. Call only the function for the action you reviewed. Pass the saved Organization UUID, Bob's local principal UUID, reviewed revision and key as `original`. The module sends a write only when you call a function.
+
+<CodeGroup>
+
+```typescript {{ title: "TypeScript (browser)" }}
+import { createClient, restoreHuman, suspendHuman } from "@inframeld/sdk"
+
+type ReviewedRequest = {
+  organizationId: string
+  principalId: string
+  expectedAccessRevision: number
+  idempotencyKey: string
+}
+
+const client = createClient({
+  baseUrl: window.location.origin,
+  credentials: "same-origin",
+  timeoutMs: 5000,
+  responseStyle: "fields",
+  throwOnError: false,
+})
+
+export function suspendReviewedHuman(
+  original: ReviewedRequest,
+  reason: string
+) {
+  return suspendHuman({
+    client,
+    path: {
+      organization_id: original.organizationId,
+      principal_id: original.principalId,
+    },
+    headers: {
+      "Idempotency-Key": original.idempotencyKey,
+      "X-Inframeld-CSRF": "1",
+    },
+    body: {
+      expectedAccessRevision: original.expectedAccessRevision,
+      reason,
+    },
+  })
+}
+
+export function restoreReviewedHuman(
+  original: ReviewedRequest,
+  securityReviewReference: string
+) {
+  return restoreHuman({
+    client,
+    path: {
+      organization_id: original.organizationId,
+      principal_id: original.principalId,
+    },
+    headers: {
+      "Idempotency-Key": original.idempotencyKey,
+      "X-Inframeld-CSRF": "1",
+    },
+    body: {
+      expectedAccessRevision: original.expectedAccessRevision,
+      securityReviewReference,
+    },
+  })
+}
+```
+
+</CodeGroup>
+
+Await the call and inspect `result.response?.status` and `result.data`. For a structured failure, use `result.error.kind` and, when the kind is `api`, the problem's `code` and `requestId`.
+
+### Read the suspension receipt and wait for cleanup
+
+A `202` with `accessBlocked: true` records the local block and accepts cleanup. Save both `operationId`, which identifies the suspension request's result, and `cleanupOperationId`, which identifies the original cleanup obligation. The `202` arrives before provider cleanup is necessarily complete.
+
+Give the original `cleanupOperationId` to your installation operator for protected inspection. Before considering restoration, confirm the original records all three steps as complete. The steps clear Bob's Kratos sessions, revoke consent grants for the official CLI and clear remembered OAuth sign-ins. A password reset, an accepted continuation or a report that work is running leaves this requirement in place.
+
+### Restore after the security review
+
+Verify that Bob is still the legitimate owner of the same linked identity. After confirming the original cleanup, review Alice's current `restore-users` permission and the Organization revision. Call `restoreReviewedHuman` with the separately saved request and its `securityReviewReference`. That reference records your completed review. The server verifies the same identity and checks current restrictions, including independent recovery blocks.
+
+A `200` returns the original restoration receipt. A new transition to active invalidates earlier Inframeld credential evidence and lets Bob use assignments that are still current. Any memberships or grants removed during suspension stay removed. Bob can check `/v1/session` from his own profile, then read his current access. A fresh request after restoration can still accept a valid session that Kratos created late for the same identity, so the receipt cannot confirm that every such session ended.
+
+### Recover an uncertain suspension or restoration
+
+A timeout, lost response, decoding failure or `503` can leave the outcome unknown. To recover the business receipt, deliberately submit the exact saved POST with its original key and body, including the reviewed revision. The server checks current acting authority and scope before returning a retained result. Restoration also verifies the linked identity with the provider. A retained replay returns the original result without repeating effects. If the first request never committed, the same request can take effect only when the fresh checks still pass.
+
+A denial during recovery leaves the earlier outcome unresolved. Keep the original key and body together, and check the saved `idempotencyExpiresAt` if you have a receipt. If suspension returns `null`, the receipt gives no fixed expiry. If the original result is no longer available, establish current state before deciding whether any new action is needed.
+
+For metadata-only inspection, use the original concrete POST route, key and Organization, with `projectId: null`, authority family `organization_action_use` and the exact action `suspend-users` or `restore-users`. This lookup cannot report provider cleanup. See [original-request lookup](/guides/recover-original-request) and the [suspension and restoration operations](/api-reference/projects-and-access#suspend-and-restore-an-admitted-human).

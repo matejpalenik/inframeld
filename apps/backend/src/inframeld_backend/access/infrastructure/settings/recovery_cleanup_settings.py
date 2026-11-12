@@ -16,6 +16,7 @@ class RecoveryCleanupSettings(BaseModel):
 
     authority: Annotated[IdentityAuthority, NoDecode]
     hydra_admin_url: HttpUrl
+    kratos_admin_url: HttpUrl | None = None
     poll_seconds: float = Field(default=1, gt=0, le=30)
     provider_timeout_seconds: float = Field(default=5, gt=0, le=30)
     database_timeout_seconds: float = Field(default=5, gt=0, le=30)
@@ -57,9 +58,11 @@ class RecoveryCleanupSettings(BaseModel):
             raise ValueError("Shutdown must allow the current call and checkpoint to finish.")
         return self
 
-    @field_validator("hydra_admin_url")
+    @field_validator("hydra_admin_url", "kratos_admin_url")
     @classmethod
-    def _require_private_endpoint_shape(cls, value: HttpUrl) -> HttpUrl:
+    def _require_private_endpoint_shape(cls, value: HttpUrl | None) -> HttpUrl | None:
+        if value is None:
+            return None
         parsed = urlsplit(str(value))
         if (
             parsed.username is not None

@@ -17,6 +17,22 @@ def test_recovery_defaults_need_no_browser_callback_or_fingerprint_configuration
         settings.lease_seconds,
         settings.shutdown_seconds,
     ) == (1, 5, 5, 60, 15)
+    assert settings.kratos_admin_url is None
+
+
+@pytest.mark.parametrize(
+    "endpoint",
+    ["http://private-user@kratos:4434", "http://kratos:4434?value=x", "http://kratos:4434#x"],
+)
+def test_worker_rejects_unsafe_kratos_admin_endpoint(endpoint: str) -> None:
+    with pytest.raises(ValidationError):
+        RecoveryCleanupSettings.model_validate(
+            {
+                "authority": "kratos:local",
+                "hydra_admin_url": "http://hydra:4445",
+                "kratos_admin_url": endpoint,
+            }
+        )
 
 
 @pytest.mark.parametrize(
