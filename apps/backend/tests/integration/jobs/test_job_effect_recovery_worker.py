@@ -2,11 +2,13 @@
 
 import asyncio
 import os
+import signal
 import threading
 from collections.abc import Callable, Iterator
-from contextlib import closing
+from contextlib import AsyncExitStack, closing
 from datetime import timedelta
 from io import BytesIO
+from pathlib import Path
 from typing import Unpack
 from uuid import uuid4
 
@@ -14,6 +16,7 @@ import pytest
 from botocore.exceptions import ClientError
 from mypy_boto3_s3.type_defs import DeleteObjectOutputTypeDef, DeleteObjectRequestTypeDef
 from sqlalchemy import func, literal, select, update
+from sqlalchemy.ext.asyncio import AsyncSession
 from tests.support.application_worker_process import application_worker_process
 from tests.support.artifact_scenarios import (
     allocate_artifact,
@@ -58,6 +61,7 @@ from inframeld_backend.shared.application.value_objects.artifact_content_digest 
 )
 from inframeld_backend.shared.application.value_objects.job_id import JobId
 from inframeld_backend.shared.domain.enums.job_status import JobStatus
+from inframeld_backend.shared.domain.value_objects.installation_id import InstallationId
 from inframeld_backend.shared.infrastructure.readers.postgres_artifact_cleanup_facts_reader import (
     PostgresArtifactCleanupFactsReader,
 )
@@ -73,6 +77,9 @@ from inframeld_backend.shared.infrastructure.rows.artifact_cleanup_obligation_ro
 )
 from inframeld_backend.shared.infrastructure.rows.artifact_staging_reservation_row import (
     ArtifactStagingReservationRow,
+)
+from inframeld_backend.shared.infrastructure.rows.artifact_storage_capacity_row import (
+    ArtifactStorageCapacityRow,
 )
 from inframeld_backend.shared.infrastructure.rows.durable_job_effect_row import DurableJobEffectRow
 from inframeld_backend.shared.infrastructure.rows.durable_job_row import DurableJobRow
@@ -130,8 +137,21 @@ async def _wait_status(database: Database, job_id: JobId, status: JobStatus) -> 
             await asyncio.sleep(0.02)
 
 
+async def _capacity_ledger(
+    session: AsyncSession, installation_id: InstallationId
+) -> tuple[int, int, int]:
+    capacity = await session.get(ArtifactStorageCapacityRow, installation_id.value)
+    assert capacity is not None
+    return capacity.spool_reserved_bytes, capacity.protected_reserved_bytes, capacity.occupied_bytes
+
+
 async def _retained(
-    database: Database, allocation: ArtifactAllocationDTO, *, attempts: int
+    database: Database,
+    allocation: ArtifactAllocationDTO,
+    *,
+    attempts: int,
+    reason: str = "physical_cleanup_pending",
+    pending_effect: str | None = None,
 ) -> bytes:
     async with database.session() as session:
         job = await session.get(DurableJobRow, allocation.cleanup_job_id.value)
@@ -148,13 +168,13 @@ async def _retained(
             and target is not None
             and reservation is not None
         )
-        assert (
-            job.status == JobStatus.RECOVERY_REQUIRED.value
-            and job.reason == "physical_cleanup_pending"
-        )
-        assert job.attempt_count == attempts and job.pending_effect is None
+        assert job.status == JobStatus.RECOVERY_REQUIRED.value and job.reason == reason
+        assert job.attempt_count == attempts and job.pending_effect == pending_effect
+        assert job.cleanup_obligation_id == obligation.id
         assert (
             obligation.execution_status == JobStatus.RECOVERY_REQUIRED.value
+            and obligation.execution_reason == reason
+            and obligation.origin_attempt_id == target.id
             and not obligation.physically_complete
         )
         assert not target.remote_removed and not target.published
@@ -240,6 +260,110 @@ async def test_registered_worker_acknowledges_exact_delete_without_releasing_phy
         finally:
             await store.delete(control.scope, control.attempt_id)
             await store.delete(original.scope, original.attempt_id)
+
+
+@pytest.mark.asyncio
+async def test_worker_loss_after_native_delete_preserves_unknown_effect_without_redispatch(
+    database: Database,
+    temporary_postgres_settings: DatabaseSettings,
+    seaweed: SeaweedFixture,
+    tmp_path: Path,
+) -> None:
+    async with seaweed.open_store() as store, AsyncExitStack() as cleanup:
+        allocation = await _allocated(database)
+        cleanup.push_async_callback(
+            store.delete, allocation.reservation.scope, allocation.reservation.attempt_id
+        )
+        original = await _upload(seaweed, allocation)
+        following = await _allocated(database)
+        cleanup.push_async_callback(
+            store.delete, following.reservation.scope, following.reservation.attempt_id
+        )
+        next_object = await _upload(seaweed, following)
+        journal = tmp_path / "delete-attempts"
+        journal.touch(mode=0o600, exist_ok=False)
+        effect_query = select(DurableJobEffectRow).where(
+            DurableJobEffectRow.job_id == allocation.cleanup_job_id.value
+        )
+        async with database.session() as session:
+            capacity_before = await _capacity_ledger(session, original.scope.installation_id)
+        async with application_worker_process(
+            temporary_postgres_settings,
+            allow_killed=True,
+            artifact_cleanup=True,
+            delete_journal=journal,
+            crash_after_delete=original.attempt_id,
+        ) as (worker, _):
+            assert await asyncio.wait_for(worker.wait(), 10) == -signal.SIGKILL
+
+        assert await store.head(original.scope, original.attempt_id) is None
+        assert await store.head(next_object.scope, next_object.attempt_id) is not None
+        assert journal.read_text(encoding="ascii").splitlines() == [original.attempt_id.value.hex]
+        async with database.session() as session:
+            before = await session.get(DurableJobRow, allocation.cleanup_job_id.value)
+            effect = (await session.scalars(effect_query)).one()
+            assert before is not None and before.status == JobStatus.RUNNING.value
+            assert before.fence == effect.fence and before.pending_effect == effect.unit
+            assert before.attempt_count == effect.attempt == 1
+            assert before.checkpoint == effect.checkpoint == b""
+            assert (
+                effect.artifact_id == original.artifact_id.value
+                and effect.artifact_attempt_id == original.attempt_id.value
+                and effect.admitted_at is not None
+                and effect.aborted_at is None
+                and effect.consumed_at is None
+            )
+
+        # Let the real lease expire while the replacement polls both jobs.
+        async with application_worker_process(
+            temporary_postgres_settings, artifact_cleanup=True, delete_journal=journal
+        ):
+            await _wait_status(database, allocation.cleanup_job_id, JobStatus.RECOVERY_REQUIRED)
+            await _wait_status(database, following.cleanup_job_id, JobStatus.RECOVERY_REQUIRED)
+
+        assert (
+            await _retained(
+                database,
+                allocation,
+                attempts=1,
+                reason="unknown_external_effect",
+                pending_effect=effect.unit,
+            )
+            == b""
+        )
+        async with database.session() as session:
+            after = await session.get(DurableJobRow, allocation.cleanup_job_id.value)
+            retained = (await session.scalars(effect_query)).one()
+            # A remote DELETE does not release storage. A future local removal proof may
+            # independently release its spool reservation.
+            assert (
+                await _capacity_ledger(session, original.scope.installation_id) == capacity_before
+            )
+            assert after is not None and after.fence is None
+            assert (after.payload, after.queued_deadline, after.work_deadline) == (
+                before.payload,
+                before.queued_deadline,
+                before.work_deadline,
+            )
+            assert (
+                retained.id == effect.id
+                and retained.binding_fingerprint == effect.binding_fingerprint
+                and retained.admitted_at == effect.admitted_at
+                and retained.aborted_at is None
+                and retained.consumed_at is None
+            )
+        assert (
+            await _retained(database, following, attempts=1)
+            == b"artifact.cleanup.delete-ack.v1\0"
+            + following.cleanup_binding.obligation_id.value.bytes
+            + next_object.artifact_id.value.bytes
+            + next_object.attempt_id.value.bytes
+        )
+        assert await store.head(next_object.scope, next_object.attempt_id) is None
+        assert journal.read_text(encoding="ascii").splitlines() == [
+            original.attempt_id.value.hex,
+            next_object.attempt_id.value.hex,
+        ]
 
 
 @pytest.mark.asyncio

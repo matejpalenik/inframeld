@@ -5,7 +5,9 @@ import os
 import sys
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
+from inframeld_backend.shared.application.value_objects.artifact_attempt_id import ArtifactAttemptId
 from inframeld_backend.shared.infrastructure.settings.database_settings import DatabaseSettings
 from tests.support.seaweedfs_fixture import storage_settings
 
@@ -49,15 +51,34 @@ def _environment(database: DatabaseSettings) -> dict[str, str]:
 
 @asynccontextmanager
 async def application_worker_process(
-    database: DatabaseSettings, *, allow_killed: bool = False, artifact_cleanup: bool = False
+    database: DatabaseSettings,
+    *,
+    allow_killed: bool = False,
+    artifact_cleanup: bool = False,
+    delete_journal: Path | None = None,
+    crash_after_delete: ArtifactAttemptId | None = None,
 ) -> AsyncGenerator[tuple[asyncio.subprocess.Process, list[int]]]:
     environment = _environment(database)
+    module = (
+        "inframeld_backend.application_worker"
+        if artifact_cleanup
+        else "tests.support.application_job_worker"
+    )
+    arguments: list[str] = []
+    if delete_journal is not None:
+        assert artifact_cleanup
+        module = "tests.support.observed_artifact_cleanup_worker"
+        arguments.append(str(delete_journal))
+        if crash_after_delete is not None:
+            assert allow_killed
+            arguments.append(crash_after_delete.value.hex)
+    else:
+        assert crash_after_delete is None
     process = await asyncio.create_subprocess_exec(
         sys.executable,
         "-m",
-        "inframeld_backend.application_worker"
-        if artifact_cleanup
-        else "tests.support.application_job_worker",
+        module,
+        *arguments,
         env=environment,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.STDOUT,
