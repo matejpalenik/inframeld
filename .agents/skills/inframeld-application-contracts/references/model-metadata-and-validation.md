@@ -56,3 +56,5 @@ Delete only a currently authorized same-Project live connection with no executab
 ## Choose a focused reading task
 
 - For optional probes and actual validation evidence, read [Model validation](model-validation.md).
+
+The [native contract examples](model-contract-examples.md) link the implemented application records to the connection and portability handoffs.
