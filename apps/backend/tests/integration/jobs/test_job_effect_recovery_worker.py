@@ -481,7 +481,11 @@ async def test_sql_pool_is_free_during_native_delete_and_committed_ack_prevents_
     )
     work: asyncio.Task[None] | None = None
     try:
-        context = await _context(owner, settings)
+        # Setup gets the normal database allowance. The in-flight pool check keeps its own bound.
+        claim_settings = settings.model_copy(
+            update={"jobs": settings.jobs.model_copy(update={"database_timeout_seconds": 5})}
+        )
+        context = await _context(owner, claim_settings)
         work = asyncio.create_task(
             ArtifactCleanupJobHandler(operations, store).run(context, operations)
         )

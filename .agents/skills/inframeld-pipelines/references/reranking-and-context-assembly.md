@@ -24,7 +24,7 @@ The supported choices are:
 | **Hosted connection** | Uses an explicitly selected supported reranking model through ModelGateway and embedded LiteLLM, with ordinary current connection, credential, egress and budget checks. |
 | **Explicit `none`** | Skips reranking as a deliberate pipeline configuration choice. It is not an error-recovery substitute for a missing model. |
 
-Use one pinned Ettin 32M bundle rather than download arbitrary models during requests. [ADR-0056](../../../../docs/adr/ADR-0056-support-explicit-local-hosted-or-disabled-reranking.md) records the accepted local/hosted/none choices. Exact checkpoint/tokenizer pins, packaging/license notices, supported language/input behavior and resource/quality measurements remain qualification work. Mode is explicit. Unsupported hosted reranking fails without fallback.
+Use the [pinned Ettin 32M assets](#package-the-pinned-ettin-assets) from the offline bundle. [ADR-0056](../../../../docs/adr/ADR-0056-support-explicit-local-hosted-or-disabled-reranking.md) records the accepted local, hosted and disabled choices. Mode is explicit. Unsupported hosted reranking fails without fallback.
 
 Validate the output structure, IDs, configured limits, and timeout. Scores must be finite, excluding infinity and “not a number.” Every returned result must still refer to the supplied evidence.
 
@@ -45,6 +45,23 @@ The **event loop** coordinates asynchronous requests. One long model calculation
 Prepare and check required assets before marking the reranker available. Do not download arbitrary models when requests arrive.
 
 **If the pipeline selects the cross-encoder and it is unavailable, fail visibly. Do not silently switch to `none`.** Otherwise the request would run a different configuration from the one the pipeline selected.
+
+### Package the pinned Ettin assets
+
+The [asset manifest](../../../../config/models/ettin-reranker-32m-v1.json) pins the publisher revision and lists every required file with its byte length and SHA-256. Download only its upstream members from that exact [publisher revision](https://huggingface.co/cross-encoder/ettin-reranker-32m-v1/tree/b33e5ceb5110773ea9cf5e00c9bedc83a8c2afdd). Keep the upstream model card and include the [Apache 2.0 license text](https://www.apache.org/licenses/LICENSE-2.0.txt) as `LICENSE-APACHE-2.0`. Write `MODEL-ATTRIBUTION.txt` with these exact UTF-8 lines and a final newline:
+
+```text
+Ettin Reranker 32M v1
+Publisher: Sentence Transformers cross-encoder
+Source: https://huggingface.co/cross-encoder/ettin-reranker-32m-v1/tree/b33e5ceb5110773ea9cf5e00c9bedc83a8c2afdd
+Base checkpoint: JHU CLSP Ettin Encoder 32M
+License: Apache-2.0, included as LICENSE-APACHE-2.0
+Model assets are unmodified. The upstream model card is included as README.md.
+```
+
+Compare each file with the repository manifest before packaging. To reproduce the qualification archive, copy the exact manifest bytes into the asset root as `bundle-manifest.json`. Write an uncompressed USTAR archive with Python’s standard `tarfile` module. Add the 18 regular files in lexicographic path order, with their exact byte lengths, mode 0644, zero UID/GID and timestamp, and empty owner and group names. Use `TarInfo` for each entry and omit directory entries. The archive SHA-256 is `ec96402b292ed7f19ba58eb842debf648944691d0d180a4ff2f17f2376a9c319`.
+
+Local asset qualification verified the upstream blob and LFS identities, all extracted file hashes and query/passage pair tokenization from the extracted tokenizer using Tokenizers 0.22.2. A changed or missing tokenizer failed verification. [Runtime packaging #95](https://github.com/matejpalenik/inframeld/issues/95) must verify the same assets and notices inside the immutable image. Verify installed files against the release’s trusted manifest before loading and fail visibly on missing or changed assets. [Reranker #56](https://github.com/matejpalenik/inframeld/issues/56) still owns the offline loader, supported input and language limits, candidate handling, and measured inference resource use and quality.
 
 <a id="authorize-before-sending-candidate-content"></a>
 
