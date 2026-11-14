@@ -1,4 +1,4 @@
-import { accountConfig } from "./config"
+import { accountConfig, isManagedLocalOrigin } from "./config"
 
 // Native login starts at the account host and redirects through the fixed issuer.
 export function accountContentSecurityPolicy(
@@ -9,6 +9,7 @@ export function accountContentSecurityPolicy(
   try {
     const { hydraOrigin, oidcFormActionOrigins } = accountConfig(env)
     if (
+      isManagedLocalOrigin(hydraOrigin) ||
       /^https:\/\/(?:[a-z0-9.-]+|\[[a-f0-9:]+\])(?::[0-9]+)?$/i.test(
         hydraOrigin
       )

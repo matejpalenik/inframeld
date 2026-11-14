@@ -43,6 +43,12 @@ The private HTTPS login profile builds the [standalone account image](Dockerfile
 
 Existing-human navigation startup and retries go through `scripts/test-account-ui.sh --login-only` from the repository root. The same wrapper has a closed `--recipient-proof` profile for the source-built shared Rust examples, with selected native-driver coverage recorded in the [verification report](../../docs/development/reports/recipient-proof-verification.md). The wrapper owns the explicit dependency order, runs fresh TLS initializers once, and requires TCP database readiness before migrations under one 180-second startup budget. Runtime web, identity and browser commands use installed Node/package entry points without invoking pnpm. After a failed run, complete cleanup and reconciliation before a fresh wrapper invocation. The [fixture instructions](tests/fixtures/README.md) describe those gates and recovery.
 
+## Managed-local account configuration
+
+The default server transport remains `https`. The managed runtime can set `INFRAMELD_ACCOUNT_TRANSPORT=managed-local` and supply its exact account and Hydra origins as `http://127.0.0.1` with two distinct explicit non-default ports. The UI checks provider forms and redirects against those origins. External OIDC form destinations still require HTTPS.
+
+The [managed runtime](../../.agents/skills/inframeld-application-contracts/references/cli-local-runtime.md) owns listener restrictions, request origin checks, and credential handling. This UI configuration is a prerequisite for the bundle. Managed ingress, native cookies and the complete browser and CLI journey still require qualification.
+
 ## Browser privacy
 
 Native session and CSRF cookies are necessary browser state. Login, consent and callback URLs necessarily contain flow IDs, challenges, state or authorization codes. Browsers may retain those URLs in history or session restoration. Do not copy them into logs, tickets, traces or screenshots.

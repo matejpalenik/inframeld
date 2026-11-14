@@ -880,6 +880,27 @@ class PostgresJobStore(JobStore, RestoredJobQuarantineRepository):
         return await self._snapshot(row, now)
 
     @override
+    async def require_issued_attempt(self, context: JobAttemptContextDTO) -> None:
+        self._require_transaction()
+        row = await self._session.scalar(
+            select(DurableJobRow)
+            .join(DurableJobAttemptRow, DurableJobAttemptRow.job_id == DurableJobRow.id)
+            .where(
+                DurableJobRow.id == context.job_id.value,
+                DurableJobRow.binding_kind == "product",
+                DurableJobAttemptRow.number == context.attempt,
+                DurableJobAttemptRow.fence == context.fence.value,
+            )
+            .execution_options(populate_existing=True)
+        )
+        if (
+            row is None
+            or PostgresJobBindingMapper.product(row) != context.binding
+            or JobPayload(row.payload_kind, row.payload_version, row.payload) != context.payload
+        ):
+            raise JobFenceLostError("The issued product attempt could not be confirmed.")
+
+    @override
     async def checkpoint(
         self, context: JobAttemptContextDTO, data: bytes, *, lease_seconds: float
     ) -> None:

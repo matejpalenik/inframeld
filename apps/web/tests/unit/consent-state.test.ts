@@ -1,6 +1,7 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 import { decideConsent, inspectConsent } from "../../lib/account/consent"
+import { accountConfig } from "../../lib/account/config"
 
 const baseUrl = "https://inframeld.account.test:8443"
 const hydra = "https://hydra.account.test:8443"
@@ -95,6 +96,33 @@ test("denial does not submit remembered approval", async () => {
     decision: "deny",
     remember: false,
   })
+})
+
+test("one local approval follows only the configured Hydra continuation", async () => {
+  const { hydraOrigin } = accountConfig({
+    INFRAMELD_ACCOUNT_TRANSPORT: "managed-local",
+    INFRAMELD_ACCOUNT_PUBLIC_ORIGIN: "http://127.0.0.1:8001",
+    INFRAMELD_ACCOUNT_HYDRA_ORIGIN: "http://127.0.0.1:14444",
+    INFRAMELD_ACCOUNT_API_INTERNAL_URL: "http://backend:8000",
+    INFRAMELD_ACCOUNT_KRATOS_INTERNAL_URL: "http://kratos:4433",
+  })
+  const redirectTo = `${hydraOrigin}/oauth2/auth?consent_verifier=private`
+  let calls = 0
+  const result = await decideConsent(
+    {
+      baseUrl,
+      challenge: "private",
+      fetch: async () => {
+        calls++
+        return response({ redirectTo })
+      },
+    },
+    "allow",
+    false,
+    hydraOrigin
+  )
+  assert.deepEqual(result, { kind: "continue", redirectTo })
+  assert.equal(calls, 1)
 })
 
 test("does not follow a forged or wrong-path continuation", async () => {

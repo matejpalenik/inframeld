@@ -5,6 +5,7 @@ import os
 from dataclasses import replace
 from decimal import Decimal
 from typing import override
+from uuid import uuid4
 
 import pytest
 from sqlalchemy import func, select, update
@@ -43,7 +44,10 @@ from inframeld_backend.shared.application.errors.application_errors import (
     ConflictError,
     StaleRevisionError,
 )
+from inframeld_backend.shared.application.errors.job_errors import JobFenceLostError
 from inframeld_backend.shared.application.errors.spending_errors import IncompleteSpendingFactsError
+from inframeld_backend.shared.application.value_objects.job_fence import JobFence
+from inframeld_backend.shared.application.value_objects.request_id import RequestId
 from inframeld_backend.shared.infrastructure.readers.postgres_spending_ledger_reader import (
     PostgresSpendingLedgerReader,
 )
@@ -98,6 +102,10 @@ async def test_stale_fence_commits_pending_evidence_without_changing_financial_f
         stored = await reader.observation(record=pending.record, evidence_id=evidence.evidence_id)
         assert stored == (evidence, None, True)
     async with open_spending_accounting(database) as service:
+        replay = await service.record_observation(
+            call=call, observation=evidence, expected_call_revision=0
+        )
+        assert replay.recovered and replay.pending and replay.record == pending.record
         corrected = await service.reconcile(
             access=scenario.access,
             project_id=scenario.project_id,
@@ -118,6 +126,54 @@ async def test_stale_fence_commits_pending_evidence_without_changing_financial_f
             row.resolved_by_evidence_id == evidence.evidence_id
             and row.resolution_revision == corrected.record.revision
         )
+
+
+@pytest.mark.parametrize("changed", ["attempt", "fence", "request", "payload"])
+async def test_unissued_or_changed_attempt_cannot_leave_a_pending_obligation(
+    database: Database, changed: str
+) -> None:
+    scenario = await seed_spending_scenario(database)
+    call = call_context(scenario)
+    original = await reserve(database, call, basis=price_basis())
+    await finish_fixture_job(database, scenario, pending_effect=f"call:{call.call_id.value}")
+    attempt = call.attempt
+    binding = attempt.binding
+    assert isinstance(binding, ProductJobBindingDTO)
+    if changed == "attempt":
+        attempt = replace(attempt, attempt=attempt.attempt + 1)
+    elif changed == "fence":
+        attempt = replace(attempt, fence=JobFence(uuid4()))
+    elif changed == "request":
+        attempt = replace(attempt, binding=replace(binding, request_id=RequestId(uuid4())))
+    elif changed == "payload":
+        attempt = replace(attempt, payload=replace(attempt.payload, data=b"different input"))
+    evidence = observation(call)
+
+    async with open_spending_accounting(database) as service:
+        with pytest.raises(JobFenceLostError):
+            await service.record_observation(
+                call=replace(call, attempt=attempt), observation=evidence, expected_call_revision=0
+            )
+
+    async with database.session() as session:
+        reader = PostgresSpendingLedgerReader(session)
+        stored = await reader.find_call(
+            organization_id=scenario.organization_id,
+            project_id=scenario.project_id,
+            call_id=call.call_id,
+        )
+        assert stored == original.record
+        assert (
+            await reader.observation(record=original.record, evidence_id=evidence.evidence_id)
+            is None
+        )
+        totals = await reader.project_totals(
+            organization_id=scenario.organization_id,
+            project_id=scenario.project_id,
+            period=original.record.period,
+        )
+        assert totals.held == original.record.hold_amount
+        assert totals.settled == money("0") and totals.unquantified_holds == 0
 
 
 async def test_current_authority_loss_rejects_pending_retention(database: Database) -> None:

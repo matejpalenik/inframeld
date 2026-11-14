@@ -73,7 +73,11 @@ jobs:
         run: |
           filters=(--filter inframeld)
           if [ "$BACKEND" = true ]; then filters+=(--filter @inframeld/backend); fi
-          if [ "$WEB" = true ] || [ "$WEB_FORMAT" = true ]; then filters+=(--filter @inframeld/web); fi
+          if [ "$WEB" = true ]; then
+            filters+=(--filter '@inframeld/web...')
+          elif [ "$WEB_FORMAT" = true ]; then
+            filters+=(--filter @inframeld/web)
+          fi
           if [ "$DOCS" = true ] || [ "$DOCS_FORMAT" = true ]; then filters+=(--filter @inframeld/docs); fi
           if [ "$CLI" = true ]; then filters+=(--filter @inframeld/cli); fi
           if [ "$SDK" = true ]; then filters+=(--filter '@inframeld/sdk-tools...'); fi
@@ -200,7 +204,7 @@ jobs:
     needs: [changes, quality]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-26.04
-    timeout-minutes: 60
+    timeout-minutes: 65
     env:
       CHANGES: ${{ needs.changes.result }}
       INTEGRATION: ${{ needs.changes.outputs.integration }}
@@ -267,7 +271,7 @@ jobs:
         env:
           INFRAMELD_CONTAINER_RUNTIME: docker
           INFRAMELD_INTEGRATION_IMAGE: localhost/inframeld-integration-tests:ci
-          INFRAMELD_TEST_NORMAL_WORK_SECONDS: "3300"
+          INFRAMELD_TEST_NORMAL_WORK_SECONDS: "3600"
         run: pnpm test:integration tests/integration --durations=20
 
       - name: Verify integration teardown
