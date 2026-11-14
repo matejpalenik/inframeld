@@ -111,6 +111,8 @@ Persist a typed repair payload alongside the common immutable receipt. Preserve 
 
 The existing [metadata-only proof example](../../../../docs/development/guides/recipient-proof.md) and [operator recipe](../../../../docs/development/operations/project-metadata-repair.md) retain this exact subset. Their qualification does not cover every broader repair variant. The design schema below remains subordinate to runtime parsing and cannot establish provider or operator qualification.
 
+The same protected `inframeld-maintenance` entry point accepts [ordinary job quarantine during restore](../../../../docs/development/operations/restore.md#quarantine-an-exact-restored-job). This job-owned operation uses the actual installation and one exact reviewed original job. It records operator attribution without a product principal or recipient proof. Its [owning job contract](../../inframeld-application-contracts/references/jobs-and-recovery.md#bind-one-original-storage-invocation) governs the one-way denial and retained original replay.
+
 <a id="recovery-cleanup-continuation"></a>
 
 ## Continue unfinished recovery cleanup
