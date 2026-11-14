@@ -14,3 +14,8 @@ class JobOwnership(Protocol):
 
     @abstractmethod
     async def require_current(self, context: JobAttemptContextDTO) -> JobSnapshotDTO: ...
+
+    @abstractmethod
+    async def require_issued_attempt(self, context: JobAttemptContextDTO) -> None:
+        """Match the retained product work and issued fence without granting ownership."""
+        ...
