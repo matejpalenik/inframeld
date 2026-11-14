@@ -88,6 +88,7 @@ async def test_safe_broader_repair_storage_is_available(database: Database) -> N
         "project_id",
         "access_group_id",
         "application_account_id",
+        "model_connection_id",
         "action_id",
     }
     # Historical target and recipient IDs cannot restrict normal resource/relationship deletion.

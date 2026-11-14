@@ -195,7 +195,10 @@ from inframeld_backend.shared.application.value_objects.request_fingerprint_key 
     RequestFingerprintKey,
 )
 from inframeld_backend.shared.domain.validation.revision_validation import RevisionValidation
-from inframeld_backend.shared.infrastructure.migrations.migration_runner import ALEMBIC_CONFIG_PATH
+from inframeld_backend.shared.infrastructure.migrations.migration_runner import (
+    ALEMBIC_CONFIG_PATH,
+    SUPPORTED_SCHEMA_REVISION,
+)
 from inframeld_backend.shared.infrastructure.resources.database import Database
 from inframeld_backend.shared.infrastructure.resources.sqlalchemy_transaction_manager import (
     SqlAlchemyTransactionManager,
@@ -759,7 +762,9 @@ async def test_retirement_original_lifetime_follows_only_its_native_reservation(
     with pytest.raises(RuntimeError, match="Retained application retirement originals"):
         alembic_command.downgrade(config, "0031_project_deletion")
     async with database.session() as session, session.begin():
-        assert await session.scalar(select(AlembicVersionRow.version_num)) == "0034_human_lifecycle"
+        assert (
+            await session.scalar(select(AlembicVersionRow.version_num)) == SUPPORTED_SCHEMA_REVISION
+        )
         assert (
             await session.get(ApplicationAccountDeletionResultRow, operation_id.value) is not None
         )
