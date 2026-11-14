@@ -106,3 +106,145 @@ for (const read of [
     },
   );
 }
+
+const credentialRoute = `${root}/${modelConnectionId}/credential`;
+const emptyCredential = {
+  projectId,
+  modelConnectionId,
+  credentialId: null,
+  revision: 0,
+  present: false,
+  changedAt: null,
+};
+const retainedCredential = {
+  ...emptyCredential,
+  credentialId: "00000000-0000-4000-8000-000000000031",
+  changedAt: "2030-01-01T00:00:00Z",
+};
+const credentialInput = {
+  expectedCredentialRevision: 0,
+  value: "synthetic-only-sdk-provider-fixture",
+};
+
+sdkTest(
+  {
+    id: "model-connection-credential-empty-metadata",
+    operation: "getModelConnectionCredential",
+    outcome: "success",
+  },
+  async ({ call }) => {
+    const { observation, witness } = await call({
+      operation: "getModelConnectionCredential",
+      path,
+      headers,
+      timeout: 2000,
+    });
+    assert.deepEqual(assertSuccess(observation, 200), emptyCredential);
+    assertDispatch(witness, "GET", credentialRoute);
+    assert.deepEqual(headerValues(observation, "cache-control"), ["no-store"]);
+  },
+);
+
+for (const replayed of [false, true]) {
+  sdkTest(
+    {
+      id: `model-connection-credential-put-${replayed ? "recovered" : "saved"}`,
+      operation: "putModelConnectionCredential",
+      outcome: "success",
+    },
+    async ({ call }) => {
+      const { observation, witness } = await call({
+        operation: "putModelConnectionCredential",
+        path,
+        headers: {
+          ...headers,
+          "Idempotency-Key": replayed
+            ? "sdk-credential-replay"
+            : "sdk-credential-original",
+        },
+        body: credentialInput,
+        timeout: 2000,
+      });
+      assert.deepEqual(assertSuccess(observation, 200), {
+        credential: { ...retainedCredential, revision: 1, present: true },
+        changed: true,
+        replayed,
+        operationId: "sdk-model-connection-credential-put",
+        idempotencyExpiresAt: "2030-01-01T00:00:00Z",
+      });
+      assertDispatch(witness, "PUT", credentialRoute);
+      const body = witness.jsonBody;
+      assert.ok(
+        body !== null &&
+          typeof body === "object" &&
+          !Array.isArray(body) &&
+          Object.keys(body).length === 2 &&
+          body.expectedCredentialRevision ===
+            credentialInput.expectedCredentialRevision &&
+          body.value === credentialInput.value,
+        "Backend received different credential request fields.",
+      );
+      assert.deepEqual(headerValues(observation, "cache-control"), [
+        "no-store",
+      ]);
+    },
+  );
+}
+
+sdkTest(
+  {
+    id: "model-connection-credential-remove-tombstone",
+    operation: "removeModelConnectionCredential",
+    outcome: "success",
+  },
+  async ({ call }) => {
+    const { observation, witness } = await call({
+      operation: "removeModelConnectionCredential",
+      path,
+      headers: { ...headers, "Idempotency-Key": "sdk-credential-remove" },
+      query: { expectedCredentialRevision: 1 },
+      timeout: 2000,
+    });
+    assert.deepEqual(assertSuccess(observation, 200), {
+      credential: { ...retainedCredential, revision: 2, present: false },
+      changed: true,
+      replayed: false,
+      operationId: "sdk-model-connection-credential-delete",
+      idempotencyExpiresAt: "2030-01-01T00:00:00Z",
+    });
+    assertDispatch(witness, "DELETE", credentialRoute);
+    assert.deepEqual(
+      [...new URLSearchParams(String(witness.query))],
+      [["expectedCredentialRevision", "1"]],
+    );
+    assert.deepEqual(headerValues(observation, "cache-control"), ["no-store"]);
+  },
+);
+
+sdkTest(
+  {
+    id: "model-connection-credential-stale-remove",
+    operation: "removeModelConnectionCredential",
+    outcome: "failure",
+  },
+  async ({ call }) => {
+    const { observation, witness } = await call({
+      operation: "removeModelConnectionCredential",
+      path,
+      headers: { ...headers, "Idempotency-Key": "sdk-credential-stale" },
+      query: { expectedCredentialRevision: 0 },
+      timeout: 2000,
+    });
+    assertDispatch(witness, "DELETE", credentialRoute);
+    assert.equal(observation.kind, "sdk-error");
+    assert.equal(observation.status, 409);
+    assert.notEqual(observation.validation, "none");
+    assert.ok(
+      observation.body &&
+        typeof observation.body === "object" &&
+        !Array.isArray(observation.body),
+    );
+    assert.equal(observation.body.code, "stale_revision");
+    assert.deepEqual(headerValues(observation, "cache-control"), ["no-store"]);
+  },
+);

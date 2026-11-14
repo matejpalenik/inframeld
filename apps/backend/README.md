@@ -25,6 +25,8 @@ Access recovery admission/completion and credential-state initialization share [
 
 [Contracts and data](../../docs/development/guides/contracts-and-data.md) routes to implemented types, generated HTTP schema and migrations. [The architecture introduction](../../docs/ARCHITECTURE.md) explains the accepted product. [AGENTS.md](../../AGENTS.md) distinguishes read-only guidance from requested implementation.
 
+Credential management for a Model Connection uses a distinct optional [provider credential key and trusted identity](../../docs/development/getting-started/local-setup.md#provider-credential-encryption-key). The dedicated API requires the current human Manage action. Saving or removing a key is conditional on its credential revision and produces a safe original receipt. Migration `0036_provider_credentials` preserves the slot and its latest revision after removal.
+
 ## Retained deletion-status reader
 
 `GET /v1/deletions/status?operationId=...` reads a content-free observation for the currently eligible original initiating human. Existing Kratos session and human OAuth authentication remain in force. Ordinary Project membership may have disappeared. Another eligible human receives the same unresolved result as missing history, while invalid credentials and current ineligibility remain authentication/authorization failures. [Read retained deletion status](../docs/src/app/guides/read-deletion-status/page.mdx) covers HTTP/generated-client examples and recovery.

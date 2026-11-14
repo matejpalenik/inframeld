@@ -391,6 +391,9 @@ from inframeld_backend.access.http.routes.human_oauth_consent_routes import (
     create_human_oauth_consent_router,
 )
 from inframeld_backend.access.http.routes.invitation_routes import create_invitation_router
+from inframeld_backend.access.http.routes.model_connection_credential_routes import (
+    create_model_connection_credential_router,
+)
 from inframeld_backend.access.http.routes.model_connection_grant_routes import (
     create_model_connection_grant_router,
 )
@@ -505,7 +508,11 @@ from tests.support.mock_sdk_application_key_issuer import MockSDKApplicationKeyI
 from tests.support.mock_sdk_application_key_revoker import MockSDKApplicationKeyRevoker
 from tests.support.mock_sdk_application_session_reader import MockSDKApplicationSessionReader
 from tests.support.mock_sdk_invitations import MockSDKInvitations
-from tests.support.mock_sdk_model_connections import SDK_MODEL_CONNECTION_ID, open_model_connections
+from tests.support.mock_sdk_model_connections import (
+    SDK_MODEL_CONNECTION_ID,
+    open_model_connection_credentials,
+    open_model_connections,
+)
 from tests.support.mock_sdk_project_upload_defaults import MockSDKProjectUploadDefaults
 from tests.support.openapi_schema_fixture import create_schema_fixture_app
 
@@ -2110,6 +2117,9 @@ def create_sdk_conformance_app(browser_origin: str | None = None) -> FastAPI:
         create_model_connection_grant_router(
             authenticate, open_model_connections, open_model_connections
         )
+    )
+    application.include_router(
+        create_model_connection_credential_router(authenticate, open_model_connection_credentials)
     )
     application.include_router(
         create_project_grant_recipients_router(authenticate, _open_grant_recipients)

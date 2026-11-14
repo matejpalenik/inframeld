@@ -1,7 +1,8 @@
 """Challenge the selected generated models, separately from HTTP scenarios."""
 
 import unittest
-from typing import assert_type
+from typing import assert_type, cast
+from uuid import UUID
 
 import httpx
 import inframeld_sdk
@@ -97,6 +98,45 @@ def _rejects_native_null() -> bool:
 
 
 class GeneratedModelTests(unittest.TestCase):
+    def test_password_requests_hide_diagnostics_and_keep_wire_values(self) -> None:
+        value = "synthetic-secret-marker-75"
+        for model, public_field, wire_field, body in (
+            (
+                inframeld_sdk.ModelConnectionCredentialRequest,
+                "value",
+                "value",
+                {"expectedCredentialRevision": 0},
+            ),
+            (
+                inframeld_sdk.HumanOAuthConsentRequest,
+                "consent_challenge",
+                "consentChallenge",
+                {"decision": "allow"},
+            ),
+        ):
+            with self.subTest(model=model.__name__):
+                request = model.model_validate({**body, wire_field: value})
+                self.assertTrue(
+                    getattr(request, public_field) == value,
+                    "The public request field changed.",
+                )
+                self.assertTrue(
+                    _JSON_OBJECT.validate_json(request.to_json()).get(wire_field) == value,
+                    "Explicit wire serialization changed the password field.",
+                )
+                with self.subTest(surface="model_formatting"):
+                    for description in (repr(request), str(request), request.to_str()):
+                        self.assertTrue(
+                            value not in description, "Model diagnostics exposed a password field."
+                        )
+                with self.subTest(surface="validation"):
+                    with self.assertRaises(ValidationError) as failure:
+                        model.model_validate({**body, wire_field: value.encode()})
+                    for description in (str(failure.exception), repr(failure.exception)):
+                        self.assertFalse(
+                            value in description, "Validation diagnostics exposed raw input."
+                        )
+
     def test_application_key_issue_preserves_order_omission_and_exact_integers(self) -> None:
         source: dict[str, JsonValue] = {
             "allowedAdapters": ["mcp", "http"],
@@ -488,6 +528,48 @@ class GeneratedModelTests(unittest.TestCase):
 
 
 class ResponseIntegrityTests(unittest.IsolatedAsyncioTestCase):
+    async def test_credential_call_rejects_raw_input_without_exposing_it(self) -> None:
+        from inframeld_sdk.api.access_api import AccessApi
+
+        secret = "synthetic-provider-marker-32"
+        client = inframeld_sdk.ApiClient(inframeld_sdk.Configuration(host="http://sdk.test"))
+
+        def reject_request(request: httpx.Request) -> httpx.Response:
+            self.fail("Invalid credential input reached HTTP dispatch.")
+
+        client.rest_client.pool_manager = httpx.AsyncClient(
+            transport=httpx.MockTransport(reject_request)
+        )
+        api = AccessApi(client)
+        project = UUID("00000000-0000-4000-0000-000000000003")
+        connection = UUID("00000000-0000-4000-0000-000000000004")
+        try:
+            for body, classification in (
+                ({"expectedCredentialRevision": 0, "value": secret.encode()}, "string_type"),
+                ({"value": secret}, "missing"),
+            ):
+                with self.subTest(classification=classification):
+                    # Exercise a malformed raw mapping explicitly across the typed boundary.
+                    request = cast(inframeld_sdk.ModelConnectionCredentialRequest, body)
+                    with self.assertRaises(ValidationError) as async_failure:
+                        await api.put_model_connection_credential(
+                            project, connection, "synthetic", request
+                        )
+                    with self.assertRaises(ValidationError) as sync_failure:
+                        api.put_model_connection_credential_sync(
+                            project, connection, "synthetic", request
+                        )
+                    for failure in (async_failure.exception, sync_failure.exception):
+                        self.assertEqual(
+                            failure.errors(include_input=False)[0]["type"], classification
+                        )
+                        self.assertFalse(
+                            secret in str(failure) or secret in repr(failure),
+                            "Credential call diagnostics exposed raw input.",
+                        )
+        finally:
+            await client.close()
+
     async def test_required_response_cannot_be_null_or_an_undeclared_success(self) -> None:
         from inframeld_sdk.api.access_api import AccessApi
         from inframeld_sdk.exceptions import ApiException

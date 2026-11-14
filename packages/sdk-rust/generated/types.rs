@@ -2275,6 +2275,38 @@ impl AsRef<str> for ModelConnectionUsageResponseConsumerKind {
         self.as_str()
     }
 }
+///Original safe receipt and whether this response recovered a completed request.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ModelConnectionCredentialResultResponse {
+    pub changed: bool,
+    pub credential: ModelConnectionCredentialDetailsResponse,
+    #[serde(rename = "idempotencyExpiresAt")]
+    pub idempotency_expires_at: chrono::DateTime<chrono::Utc>,
+    #[serde(rename = "operationId")]
+    pub operation_id: String,
+    pub replayed: bool,
+}
+///Safe details of the exact credential slot at the observed revision.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ModelConnectionCredentialDetailsResponse {
+    #[serde(
+        rename = "changedAt",
+        deserialize_with = "presence_serde::required_nullable"
+    )]
+    pub changed_at: Option<chrono::DateTime<chrono::Utc>>,
+    #[serde(
+        rename = "credentialId",
+        deserialize_with = "presence_serde::required_nullable"
+    )]
+    pub credential_id: Option<uuid::Uuid>,
+    #[serde(rename = "modelConnectionId")]
+    pub model_connection_id: uuid::Uuid,
+    pub present: bool,
+    #[serde(rename = "projectId")]
+    pub project_id: uuid::Uuid,
+    ///Constraint: minimum=0, maximum=9007199254740991
+    pub revision: i64,
+}
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ModelConnectionCreationResponse {
     pub connection: ModelConnectionResponse,
@@ -7188,7 +7220,7 @@ impl AsRef<str> for InProgressOperationLookupResponseOutcome {
     }
 }
 ///Choose a consent decision - account, access and lifetime come from the server.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 pub struct HumanOAuthConsentRequest {
     ///Constraint: minLength=1
     #[serde(rename = "consentChallenge")]
@@ -7200,6 +7232,13 @@ pub struct HumanOAuthConsentRequest {
         deserialize_with = "presence_serde::optional_nonnull"
     )]
     pub remember: Option<bool>,
+}
+impl std::fmt::Debug for HumanOAuthConsentRequest {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct(stringify!(HumanOAuthConsentRequest))
+            .finish_non_exhaustive()
+    }
 }
 impl HumanOAuthConsentRequest {
     /// Construct this request with every required wire field.
@@ -8951,6 +8990,22 @@ pub struct ModelConnectionActionGrantRequest {
     ///Constraint: minimum=0, maximum=9007199254740991
     #[serde(rename = "expectedAccessRevision")]
     pub expected_access_revision: i64,
+}
+///Submit one provider key over the protected credential-management route.
+#[derive(Clone, Deserialize, Serialize)]
+pub struct ModelConnectionCredentialRequest {
+    ///Constraint: minimum=0, maximum=9007199254740991
+    #[serde(rename = "expectedCredentialRevision")]
+    pub expected_credential_revision: i64,
+    ///Constraint: minLength=1, maxLength=16384
+    pub value: String,
+}
+impl std::fmt::Debug for ModelConnectionCredentialRequest {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct(stringify!(ModelConnectionCredentialRequest))
+            .finish_non_exhaustive()
+    }
 }
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct OrganizationActionGrantRemovalResponse {

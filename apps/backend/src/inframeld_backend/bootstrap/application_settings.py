@@ -25,6 +25,9 @@ from inframeld_backend.access.infrastructure.settings.kratos_settings import Kra
 from inframeld_backend.access.infrastructure.settings.model_connection_destination_settings import (
     ModelConnectionDestinationSettings,
 )
+from inframeld_backend.access.infrastructure.settings.provider_credential_settings import (
+    ProviderCredentialSettings,
+)
 from inframeld_backend.access.infrastructure.verifiers.pydantic_discovery_url_verifier import (
     PydanticDiscoveryURLVerifier,
 )
@@ -74,6 +77,9 @@ class ApplicationSettings(BaseSettings):
     invitation: InvitationSettings = Field(default_factory=InvitationSettings)
     model_connection_destinations: ModelConnectionDestinationSettings = Field(
         default_factory=ModelConnectionDestinationSettings
+    )
+    provider_credential: ProviderCredentialSettings = Field(
+        default_factory=ProviderCredentialSettings
     )
     discovery: DiscoverySettings | None = None
     csrf: CSRFSettings = Field(default_factory=CSRFSettings)

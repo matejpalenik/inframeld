@@ -753,6 +753,22 @@ Original safe creation receipt and four original assignments.
 
 <ApiSchema name="ModelConnectionCreationResponse" />
 
+<a id="ModelConnectionCredentialDetailsResponse" />
+
+## ModelConnectionCredentialDetailsResponse
+
+Project and connection IDs with safe credential metadata. The credential ID and change time are `null` before the first save.
+
+<ApiSchema name="ModelConnectionCredentialDetailsResponse" />
+
+<a id="ModelConnectionCredentialRequest" />
+
+## ModelConnectionCredentialRequest
+
+The reviewed credential revision and one write-only provider token. Supply the raw ASCII token value through protected input.
+
+<ApiSchema name="ModelConnectionCredentialRequest" />
+
 <a id="ModelConnectionCredentialResponse" />
 
 ## ModelConnectionCredentialResponse
@@ -760,6 +776,14 @@ Original safe creation receipt and four original assignments.
 Credential presence and revision.
 
 <ApiSchema name="ModelConnectionCredentialResponse" />
+
+<a id="ModelConnectionCredentialResultResponse" />
+
+## ModelConnectionCredentialResultResponse
+
+The original safe credential outcome, operation ID and expiry. `changed` describes the original effect. `replayed` indicates that this response recovered the original result.
+
+<ApiSchema name="ModelConnectionCredentialResultResponse" />
 
 <a id="ModelConnectionGrantTargetResponse" />
 

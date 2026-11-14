@@ -7,6 +7,9 @@ from datetime import UTC, datetime
 from typing import override
 from uuid import UUID
 
+from inframeld_backend.access.application.commands.change_model_connection_credential_command import (
+    ChangeModelConnectionCredentialCommand,
+)
 from inframeld_backend.access.application.commands.change_model_connection_grant_command import (
     ChangeModelConnectionGrantCommand,
 )
@@ -19,6 +22,12 @@ from inframeld_backend.access.application.dtos.model_connection_access_dto impor
 )
 from inframeld_backend.access.application.dtos.model_connection_creation_dto import (
     ModelConnectionCreationDTO,
+)
+from inframeld_backend.access.application.dtos.model_connection_credential_dto import (
+    ModelConnectionCredentialDTO,
+)
+from inframeld_backend.access.application.dtos.model_connection_credential_result_dto import (
+    ModelConnectionCredentialResultDTO,
 )
 from inframeld_backend.access.application.dtos.model_connection_dto import ModelConnectionDTO
 from inframeld_backend.access.application.dtos.model_connection_grant_item_dto import (
@@ -38,6 +47,9 @@ from inframeld_backend.access.application.dtos.model_connections_page_dto import
 )
 from inframeld_backend.access.application.protocols.model_connection_creator import (
     ModelConnectionCreator,
+)
+from inframeld_backend.access.application.protocols.model_connection_credential_manager import (
+    ModelConnectionCredentialManager,
 )
 from inframeld_backend.access.application.protocols.model_connection_grant_changer import (
     ModelConnectionGrantChanger,
@@ -63,6 +75,7 @@ from inframeld_backend.shared.application.enums.operation_replay_kind import Ope
 from inframeld_backend.shared.application.errors.application_errors import (
     AccessDeniedError,
     ResourceNotFoundError,
+    StaleRevisionError,
 )
 from inframeld_backend.shared.application.value_objects.model_connection_id import ModelConnectionId
 from inframeld_backend.shared.application.value_objects.operation_id import OperationId
@@ -207,3 +220,55 @@ class MockSDKModelConnections(
 @asynccontextmanager
 async def open_model_connections() -> AsyncGenerator[MockSDKModelConnections]:
     yield MockSDKModelConnections()
+
+
+class MockSDKModelConnectionCredentialManager(ModelConnectionCredentialManager):
+    @override
+    async def get(
+        self, access: AccessContextDTO, project_id: ProjectId, connection_id: ModelConnectionId
+    ) -> ModelConnectionCredentialDTO:
+        self._require_target(access, project_id, connection_id)
+        return ModelConnectionCredentialDTO(project_id, connection_id, None, 0, False, None)
+
+    @override
+    async def change(
+        self,
+        access: AccessContextDTO,
+        command: ChangeModelConnectionCredentialCommand,
+        context: IdempotencyContextDTO,
+    ) -> ModelConnectionCredentialResultDTO:
+        self._require_target(access, command.project_id, command.connection_id)
+        present = command.value is not None
+        if command.expected_revision != (0 if present else 1):
+            raise StaleRevisionError()
+        return ModelConnectionCredentialResultDTO(
+            ModelConnectionCredentialDTO(
+                command.project_id,
+                command.connection_id,
+                UUID("00000000-0000-4000-8000-000000000031"),
+                command.expected_revision + 1,
+                present,
+                _NOW,
+            ),
+            True,
+            CompletedSynchronousOperationDTO(
+                OperationId(f"sdk-model-connection-credential-{context.method.value.lower()}"),
+                context.key.value != "sdk-credential-replay",
+                OperationReplayKind.SAFE_RESULT,
+                _NOW,
+            ),
+        )
+
+    @staticmethod
+    def _require_target(
+        access: AccessContextDTO, project_id: ProjectId, connection_id: ModelConnectionId
+    ) -> None:
+        if access.actor_principal_id != _ACTOR:
+            raise AccessDeniedError()
+        if project_id != _PROJECT or connection_id != SDK_MODEL_CONNECTION_ID:
+            raise ResourceNotFoundError()
+
+
+@asynccontextmanager
+async def open_model_connection_credentials() -> AsyncGenerator[ModelConnectionCredentialManager]:
+    yield MockSDKModelConnectionCredentialManager()

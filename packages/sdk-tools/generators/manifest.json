@@ -96,13 +96,17 @@
       {
         "file": "py-openapi-generator-patched/0008-named-auth-metadata.patch",
         "sha256": "553568af66ec8c12a36045ec17d057fde7fea15fb8c81bac87afa425111b15ea"
+      },
+      {
+        "file": "py-openapi-generator-patched/0009-protect-password-diagnostics.patch",
+        "sha256": "5ae41960232dae0a768e7ae3789358720a7bd75a2b2229325f7aed3f97cedd9c"
       }
     ],
-    "revision": "inframeld.3"
+    "revision": "inframeld.4"
   },
   "rust": {
     "upstreamVersion": "0.23.0",
-    "revision": "inframeld.6",
+    "revision": "inframeld.7",
     "archiveUrl": "https://static.crates.io/crates/openapi-to-rust/openapi-to-rust-0.23.0.crate",
     "archiveSha256": "3bd6e71bfeb9c084586ad4daa7373a662be1f779432f263fa291460a98803d7d",
     "patches": [
@@ -141,6 +145,10 @@
       {
         "file": "0009-encoded-relative-paths.patch",
         "sha256": "80416aa8d00c1106e4b5244fcfa9e9fa8e1e6bed9745c00f94c4a14040cc5a8f"
+      },
+      {
+        "file": "0010-protect-password-debug.patch",
+        "sha256": "40b9a4e64779e59724585111268ff27a7821d075efa26db4ba19b559eb280fec"
       }
     ],
     "archiveRoot": "openapi-to-rust-0.23.0"

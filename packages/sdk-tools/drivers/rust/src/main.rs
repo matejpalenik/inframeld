@@ -56,6 +56,9 @@ const BINDINGS: &[&str] = &[
     "createModelConnection",
     "listModelConnections",
     "getModelConnection",
+    "getModelConnectionCredential",
+    "putModelConnectionCredential",
+    "removeModelConnectionCredential",
     "listModelConnectionUsage",
     "listModelConnectionActionGrants",
     "setModelConnectionActionGrant",
@@ -166,6 +169,9 @@ async fn main() {
                 | "createModelConnection"
                 | "listModelConnections"
                 | "getModelConnection"
+                | "getModelConnectionCredential"
+                | "putModelConnectionCredential"
+                | "removeModelConnectionCredential"
                 | "listModelConnectionUsage"
                 | "listModelConnectionActionGrants"
                 | "setModelConnectionActionGrant"
@@ -208,6 +214,8 @@ async fn main() {
                 | "deleteProject"
                 | "createApplicationAccount"
                 | "createModelConnection"
+                | "putModelConnectionCredential"
+                | "removeModelConnectionCredential"
                 | "setModelConnectionActionGrant"
                 | "removeModelConnectionActionGrant"
                 | "deleteApplicationAccount"

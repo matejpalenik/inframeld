@@ -372,6 +372,24 @@ List current connections in one Project that the eligible member can inspect und
 
 Read the exact connection in its owning Project under current `view-model-connection-configuration` authority. A visible result includes saved access settings, their revision and credential presence/revision. It carries no credential material or provider health result. Missing, inaccessible and mismatched targets retain the safe resource boundary.
 
+## Read model connection credential metadata
+
+<ApiOperation operationId="getModelConnectionCredential" />
+
+A currently eligible human needs `manage-model-connection` on the exact connection in the specified Project. HTTP `200` returns the Project and connection IDs, credential ID, revision, presence and time of the latest change. Before the first save, the credential ID and change time are `null`. The read leaves the credential encrypted. [Check your saved credential](/guides/models-and-processing#save-a-provider-credential).
+
+## Save a model connection credential
+
+<ApiOperation operationId="putModelConnectionCredential" />
+
+Use the same exact management authority, an `Idempotency-Key` and the reviewed `expectedCredentialRevision` as a JSON integer. Submit the raw ASCII Bearer token in `value`. The token allows 1 to 16,384 bytes after JSON decoding. The entire JSON request body allows up to 100 KiB. The server saves the encrypted credential and safe original receipt together. HTTP `200` returns the original outcome and expiry. A stale revision or reuse of the same key with a changed request conflicts. [Credential receipt schema](/api-reference/models#ModelConnectionCredentialResultResponse).
+
+## Remove a model connection credential
+
+<ApiOperation operationId="removeModelConnectionCredential" />
+
+Use the same exact management authority and an `Idempotency-Key`. Send a bodyless DELETE with one decimal `expectedCredentialRevision` query value. HTTP `200` shares the PUT receipt shape. For both writes, authorized equivalent replay recovers the original outcome and expiry with `replayed: true`. Use GET to inspect current state. These credential operations use no-store responses. [Review and remove a saved key](/guides/models-and-processing#remove-the-saved-provider-credential).
+
 ## List model connection usage
 
 <ApiOperation operationId="listModelConnectionUsage" />

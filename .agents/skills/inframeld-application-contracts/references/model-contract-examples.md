@@ -2,7 +2,7 @@
 
 Alice creates `company-gateway`, then reviews settings for its private alias `private/Chat-A`. Saving the connection creates a stable Project resource. Saving model settings configures a consumer. Only an accepted call can establish applicable validation evidence.
 
-The backend [model records](../../../../apps/backend/src/inframeld_backend/shared/application/dtos/model_metadata_dto.py) define typed metadata and effective settings. [#246](https://github.com/matejpalenik/inframeld/issues/246) implements connection creation, inspection and exact grants in native HTTP and the generated clients. [#247](https://github.com/matejpalenik/inframeld/issues/247) and [#248](https://github.com/matejpalenik/inframeld/issues/248) own the remaining connection lifecycle and credential routes described below.
+The backend [model records](../../../../apps/backend/src/inframeld_backend/shared/application/dtos/model_metadata_dto.py) define typed metadata and effective settings. [#246](https://github.com/matejpalenik/inframeld/issues/246) implements connection creation, inspection and exact grants in native HTTP and the generated clients. [#32](https://github.com/matejpalenik/inframeld/issues/32) owns credential management. [#247](https://github.com/matejpalenik/inframeld/issues/247) and [#248](https://github.com/matejpalenik/inframeld/issues/248) own the remaining connection access and retirement workflows.
 
 ## Create and inspect a connection
 
@@ -93,6 +93,20 @@ The [exact #246 grant routes](https://github.com/matejpalenik/inframeld/issues/2
 | `PUT /v1/model-connections/{model_connection_id}/grants/{recipient_principal_id}/{action_id}` | `setModelConnectionActionGrant` |
 | `DELETE /v1/model-connections/{model_connection_id}/grants/{recipient_principal_id}/{action_id}` | `removeModelConnectionActionGrant` |
 | `GET /v1/projects/{project_id}/grant-recipients?targetKind=model-connection&targetId=...&actionId=...` | `listProjectGrantRecipients` |
+
+## Manage a provider credential
+
+The `/credential` suffix extends `/v1/projects/{project_id}/model-connections/{model_connection_id}`. All three operations require current human Manage on that exact connection. Each successful response is private metadata with `Cache-Control: no-store`.
+
+| Method | Operation ID | Input |
+| --- | --- | --- |
+| `GET` | `getModelConnectionCredential` | Project and connection path IDs |
+| `PUT` | `putModelConnectionCredential` | `Idempotency-Key` and a JSON body with `expectedCredentialRevision` and write-only `value` |
+| `DELETE` | `removeModelConnectionCredential` | `Idempotency-Key` and the `expectedCredentialRevision` query parameter |
+
+The metadata contains `projectId`, `modelConnectionId`, `credentialId`, `revision`, `present`, and `changedAt`. A never-written slot has revision 0, `present: false`, and null identity and timestamp. An authorized removal retains the slot identity and advances its revision while clearing the encrypted value.
+
+Mutations return `credential` metadata with `changed`, `replayed`, `operationId`, and `idempotencyExpiresAt`. Repeat the original protected request after a lost acknowledgment. The retained result describes the original revision and presence, with `replayed: true`. Saving and removal make no provider call. The [credential storage reference](../../inframeld-access-models/references/provider-credential-storage.md) owns input bounds and root-key setup.
 
 ## Review current access and retire safely
 
