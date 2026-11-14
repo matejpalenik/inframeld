@@ -32,6 +32,8 @@ The [observation service](../../../../apps/backend/src/inframeld_backend/shared/
 
 For an expired attempt, mandatory [recovery](../../../../apps/backend/src/inframeld_backend/shared/application/services/job_recovery_service.py) checks current continuation eligibility and any original pending effect. It consumes matching unused no-dispatch proof and retires the attempt atomically. Only eligible safe work is requeued, preserving original identity, checkpoints, deadlines and attempt budgets. An unconfirmed pending effect remains `recovery_required`. [Targeted PostgreSQL and registered-worker checks](../../../../apps/backend/tests/integration/jobs/test_job_effect_recovery_worker.py) exercise original-invocation recovery, atomic proof consumption and retirement, and safe requeue. The [artifact workflow](artifact-storage.md#internal-s3-adapter-and-verification) retains the separate publication and physical-retirement requirements.
 
+The [protected restore command](../../../../docs/development/operations/restore.md#quarantine-an-exact-restored-job) classifies an exact restored ordinary product job when newer external history may be missing, even if the backup has no pending effect. It requires the matching installation, job, original operation, reviewed queued or expired running state and intact asynchronous reservation. The queue turn and exact job lock protect the reread and atomic `recovery_required` transition. The operator audit records the reviewed original status and attempt. Exact replay requires the retained audit and quarantine together. The command preserves existing pending work and cannot authorize provider calls or reopening.
+
 <a id="implemented-artifact-cleanup-binding"></a>
 
 ### Implemented artifact cleanup binding
