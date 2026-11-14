@@ -6,12 +6,16 @@ RUN apt-get update \
     && npm install --global pnpm@12.4.0
 WORKDIR /workspace
 COPY . .
+ARG ACCOUNT_FIXTURE_BUILD_WEB=1
 RUN pnpm install --frozen-lockfile \
-    && pnpm --filter @inframeld/sdk --fail-if-no-match build \
-    && pnpm --filter @inframeld/web --fail-if-no-match build \
+    && if [ "$ACCOUNT_FIXTURE_BUILD_WEB" = 1 ]; then \
+        pnpm --filter @inframeld/web --fail-if-no-match build \
+        && test -s /workspace/apps/web/.next/BUILD_ID; \
+    else \
+        pnpm --filter @inframeld/sdk --fail-if-no-match build; \
+    fi \
     && pnpm --filter @inframeld/web --fail-if-no-match exec playwright install --with-deps chromium
-RUN test -s /workspace/apps/web/.next/BUILD_ID \
-    && chmod 755 /workspace \
+RUN chmod 755 /workspace \
     && groupadd --gid 10001 fixture \
     && useradd --uid 10001 --gid fixture --create-home fixture \
     && mkdir -p /workspace/apps/web/.next \
@@ -22,3 +26,4 @@ RUN mv /root/.cache/ms-playwright /opt/account-browsers \
     && chmod -R a+rX /opt/account-browsers
 USER fixture:fixture
 WORKDIR /workspace/apps/web
+CMD ["node", "node_modules/next/dist/bin/next", "start", "--hostname", "0.0.0.0"]

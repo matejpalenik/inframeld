@@ -43,6 +43,10 @@ startup_stack() {
 
 cleanup_stack() {
     local result=0 remaining label kind image
+    local images=("${INFRAMELD_ACCOUNT_PROOF_IMAGE}" "${INFRAMELD_ACCOUNT_WEB_IMAGE}" "${INFRAMELD_ACCOUNT_BACKEND_IMAGE}")
+    if [[ "${INFRAMELD_ACCOUNT_WEB_FIXTURE_IMAGE}" != "${INFRAMELD_ACCOUNT_WEB_IMAGE}" ]]; then
+        images+=("${INFRAMELD_ACCOUNT_WEB_FIXTURE_IMAGE}")
+    fi
     if ! "${account_compose[@]}" --profile qualification down --volumes --remove-orphans; then result=1; fi
     for label in com.docker.compose.project io.podman.compose.project; do
         for kind in container network volume; do
@@ -58,7 +62,7 @@ cleanup_stack() {
             fi
         done
     done
-    for image in "${INFRAMELD_ACCOUNT_PROOF_IMAGE}" "${INFRAMELD_ACCOUNT_WEB_IMAGE}" "${INFRAMELD_ACCOUNT_BACKEND_IMAGE}"; do
+    for image in "${images[@]}"; do
         remaining=""
         if ! remaining="$("${account_runtime}" image ls -q --filter "reference=${image}")"; then
             result=1
@@ -96,14 +100,76 @@ prepare_contexts() {
 }
 
 account_browser_stack() {
+    local web_id
+    web_id="$(account_service_container_id web)" || return "$?"
+    "${account_runtime}" container inspect --format '{{json .}}' "${web_id}" |
+        account_web_image_state "${web_id}" || return "$?"
     "${account_compose[@]}" --profile qualification run --rm --no-deps -T browser-tests || return "$?"
     "${account_compose[@]}" exec -T backend python /fixture/backend.py verify-account-result
 }
 
 build_stack() {
-    # Both source builds share the original 600-second phase, including Cargo.
-    "${account_compose[@]}" build backend web || return "$?"
-    "${account_compose[@]}" --profile qualification build proof-driver
+    # All source builds share the original 600-second phase.
+    if [[ "${INFRAMELD_ACCOUNT_PROOF_MODE}" == 0 ]]; then
+        "${account_compose[@]}" build backend web identity-setup || return "$?"
+        "${account_runtime}" image inspect --format '{{.ID}}' "${INFRAMELD_ACCOUNT_WEB_IMAGE}" \
+            >"${account_directory}/web-image-id"
+    else
+        "${account_compose[@]}" build backend web || return "$?"
+        "${account_compose[@]}" --profile qualification build proof-driver
+    fi
+}
+
+account_web_image_state() {
+    # Verify the selected running container against the ID recorded at build time.
+    "${account_python}" -c '
+import json
+import re
+import sys
+
+def image_id(value):
+    if not isinstance(value, str) or re.fullmatch(r"(?:sha256:)?[0-9a-f]{64}", value) is None:
+        raise ValueError("Invalid image ID")
+    return value.removeprefix("sha256:")
+
+project, container, image_file = sys.argv[1:]
+try:
+    with open(image_file, encoding="ascii") as source:
+        expected = image_id(source.read(73).removesuffix("\n"))
+    payload = sys.stdin.buffer.read(65537)
+    if len(payload) > 65536:
+        raise ValueError("Inspection exceeded its bound")
+    data = json.loads(payload)
+    config, host, state = data["Config"], data["HostConfig"], data["State"]
+    for suffix, expected_label in (("project", project), ("service", "web")):
+        labels = [
+            config["Labels"][prefix + suffix]
+            for prefix in ("com.docker.compose.", "io.podman.compose.")
+            if prefix + suffix in config["Labels"]
+        ]
+        if not labels or any(value != expected_label for value in labels):
+            raise ValueError("Container scope changed")
+    ports = data["NetworkSettings"]["Ports"]
+    if (
+        data["Id"] != container
+        or image_id(data["Image"]) != expected
+        or state["Status"] != "running"
+        or state["Running"] is not True
+        or config["User"] != "10001:10001"
+        or host["Privileged"] is not False
+        or host["NetworkMode"] == "host"
+        or data["Mounts"] not in ([], None)
+        or host["PublishAllPorts"] is not False
+        or host["PortBindings"] not in ({}, None)
+        or (ports is not None and (
+            not isinstance(ports, dict) or any(binding is not None for binding in ports.values())
+        ))
+    ):
+        raise ValueError("Unexpected account web container state")
+except (KeyError, OSError, TypeError, ValueError):
+    raise SystemExit("Account web image or isolation could not be confirmed.") from None
+print(f"Exact private account web image sha256:{expected} and isolation confirmed.")
+' "${account_project}" "$1" "${account_directory}/web-image-id"
 }
 
 account_container_state() {
