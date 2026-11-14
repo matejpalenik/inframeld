@@ -38,10 +38,12 @@ x-backend: &backend
   entrypoint: [python, /fixture/backend.py]
 
 x-web: &web
-  image: ${INFRAMELD_ACCOUNT_WEB_IMAGE:?Use scripts/test-account-ui.sh}
+  image: ${INFRAMELD_ACCOUNT_WEB_FIXTURE_IMAGE:?Use scripts/test-account-ui.sh}
   build:
     context: ${INFRAMELD_ACCOUNT_WEB_CONTEXT:?Use scripts/test-account-ui.sh}
     dockerfile: apps/web/tests/fixtures/Dockerfile
+    args:
+      ACCOUNT_FIXTURE_BUILD_WEB: ${INFRAMELD_ACCOUNT_FIXTURE_BUILD_WEB:?Use scripts/test-account-ui.sh}
   user: "10001:10001"
 
 services:
@@ -318,13 +320,17 @@ services:
       kratos: { condition: service_started }
   web:
     <<: *web
+    image: ${INFRAMELD_ACCOUNT_WEB_IMAGE:?Use scripts/test-account-ui.sh}
+    pull_policy: never
+    build:
+      context: ${INFRAMELD_ACCOUNT_WEB_CONTEXT:?Use scripts/test-account-ui.sh}
+      dockerfile: ${INFRAMELD_ACCOUNT_WEB_DOCKERFILE:?Use scripts/test-account-ui.sh}
     environment:
       INFRAMELD_ACCOUNT_PUBLIC_ORIGIN: https://inframeld.account.test:8443
       INFRAMELD_ACCOUNT_HYDRA_ORIGIN: https://hydra.account.test:8443
       INFRAMELD_ACCOUNT_API_INTERNAL_URL: http://backend:8000
       INFRAMELD_ACCOUNT_KRATOS_INTERNAL_URL: http://kratos:4433
       INFRAMELD_ACCOUNT_OIDC_FORM_ACTION_ORIGINS: '["https://login.identity.test:8443"]'
-    command: [node, node_modules/next/dist/bin/next, start, --hostname, 0.0.0.0]
   gateway:
     image: docker.io/library/caddy:2.11.7-alpine@sha256:e70b164da81ef698b3ad19af799ea6086ce6d9e48ed4079eb9fe26f6fbf14ee5
     user: "10001:10001"
