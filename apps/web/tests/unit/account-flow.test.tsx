@@ -81,6 +81,84 @@ test("does not turn missing configuration or public HTTP into a login target", (
   }
 })
 
+test("the managed-local profile uses distinct canonical loopback origins", () => {
+  const local = {
+    ...env,
+    INFRAMELD_ACCOUNT_TRANSPORT: "managed-local",
+    INFRAMELD_ACCOUNT_PUBLIC_ORIGIN: "http://127.0.0.1:8001",
+    INFRAMELD_ACCOUNT_HYDRA_ORIGIN: "http://127.0.0.1:14444/",
+  }
+  assert.equal(accountConfig(local).publicOrigin, "http://127.0.0.1:8001")
+  assert.equal(accountConfig(local).hydraOrigin, "http://127.0.0.1:14444")
+  for (const value of [
+    "http://localhost:8001",
+    "http://127.1:8001",
+    "http://127.0.0.2:8001",
+    "http://[::1]:8001",
+    "http://192.168.1.2:8001",
+    "http://127.0.0.1",
+    "http://127.0.0.1:80",
+    "http://127.0.0.1:08001",
+    "http://127.0.0.1:8001/path",
+    "http://user@127.0.0.1:8001",
+    env.INFRAMELD_ACCOUNT_PUBLIC_ORIGIN,
+  ]) {
+    assert.throws(() =>
+      accountConfig({ ...local, INFRAMELD_ACCOUNT_PUBLIC_ORIGIN: value })
+    )
+    assert.throws(() =>
+      accountConfig({ ...local, INFRAMELD_ACCOUNT_HYDRA_ORIGIN: value })
+    )
+  }
+  assert.throws(() =>
+    accountConfig({
+      ...local,
+      INFRAMELD_ACCOUNT_HYDRA_ORIGIN: local.INFRAMELD_ACCOUNT_PUBLIC_ORIGIN,
+    })
+  )
+  assert.throws(() =>
+    accountConfig({ ...env, INFRAMELD_ACCOUNT_TRANSPORT: "unknown" })
+  )
+})
+
+test("renders a native local form only for the configured canonical action", () => {
+  const local = "http://127.0.0.1:8001"
+  const path = "/self-service/login"
+  const action = `${local}${path}?flow=${flowId}`
+  const ui = form([
+    input("csrf_token", "hidden", "native-token"),
+    input("identifier", "text", "alice@example.test", "password"),
+    input("password", "password", undefined, "password"),
+    input("method", "submit", "password", "password"),
+  ])
+  const markup = renderToStaticMarkup(
+    <KratosFlowForm
+      ui={{ ...ui, action }}
+      publicOrigin={local}
+      flowId={flowId}
+    />
+  )
+  assert.ok(markup.includes(`action="${action}"`))
+  assert.match(markup, /name="csrf_token"[^>]*value="native-token"/)
+  for (const value of [
+    "http://localhost:8001",
+    "http://127.1:8001",
+    "http://127.0.0.1:08001",
+    "http://127.0.0.1:8002",
+    "https://127.0.0.1:8001",
+    "http://user@127.0.0.1:8001",
+  ]) {
+    assert.throws(() => checkedProviderUrl(`${value}${path}`, local, path))
+  }
+  assert.throws(() =>
+    checkedProviderUrl(
+      "http://example.test/self-service/login",
+      "http://example.test",
+      path
+    )
+  )
+})
+
 test("rejects duplicate and malformed flow inputs instead of choosing one", () => {
   assert.equal(singleParameter(flowId, "flow"), flowId)
   assert.equal(singleParameter(undefined, "flow"), undefined)

@@ -6,15 +6,25 @@ export type AccountConfig = {
   oidcFormActionOrigins: readonly string[]
 }
 
-function endpoint(value: string | undefined, publicEndpoint: boolean): string {
+export function isManagedLocalOrigin(origin: string): boolean {
+  return /^http:\/\/127\.0\.0\.1:[1-9][0-9]{0,4}$/.test(origin)
+}
+
+function endpoint(
+  value: string | undefined,
+  kind: "https" | "managed-local" | "internal"
+): string {
   if (!value || value !== value.trim() || /[\x00-\x20\x7f]/.test(value)) {
-    throw new Error("Account HTTPS configuration is unavailable.")
+    throw new Error("Account origin configuration is unavailable.")
   }
   const url = new URL(value)
+  const supported = {
+    https: url.protocol === "https:",
+    "managed-local": isManagedLocalOrigin(url.origin),
+    internal: url.protocol === "http:" || url.protocol === "https:",
+  }
   if (
-    (publicEndpoint
-      ? url.protocol !== "https:"
-      : !["http:", "https:"].includes(url.protocol)) ||
+    !supported[kind] ||
     url.username ||
     url.password ||
     url.pathname !== "/" ||
@@ -22,7 +32,7 @@ function endpoint(value: string | undefined, publicEndpoint: boolean): string {
     url.hash ||
     (value !== url.origin && value !== `${url.origin}/`)
   ) {
-    throw new Error("Account HTTPS configuration is unavailable.")
+    throw new Error("Account origin configuration is unavailable.")
   }
   return url.origin
 }
@@ -37,7 +47,7 @@ function oidcFormActionOrigins(value: string | undefined): string[] {
     const result: string[] = []
     for (const entry of entries) {
       if (typeof entry !== "string") throw new Error()
-      const origin = endpoint(entry, true)
+      const origin = endpoint(entry, "https")
       if (
         !/^https:\/\/(?:[a-z0-9.-]+|\[[a-f0-9:]+\])(?::[0-9]+)?$/i.test(
           origin
@@ -56,13 +66,20 @@ function oidcFormActionOrigins(value: string | undefined): string[] {
 export function accountConfig(
   env: Readonly<Record<string, string | undefined>>
 ): AccountConfig {
+  const transport = env.INFRAMELD_ACCOUNT_TRANSPORT ?? "https"
+  if (transport !== "https" && transport !== "managed-local") {
+    throw new Error("Account transport configuration is unavailable.")
+  }
   const config = {
-    publicOrigin: endpoint(env.INFRAMELD_ACCOUNT_PUBLIC_ORIGIN, true),
-    hydraOrigin: endpoint(env.INFRAMELD_ACCOUNT_HYDRA_ORIGIN, true),
-    apiInternalUrl: endpoint(env.INFRAMELD_ACCOUNT_API_INTERNAL_URL, false),
+    publicOrigin: endpoint(env.INFRAMELD_ACCOUNT_PUBLIC_ORIGIN, transport),
+    hydraOrigin: endpoint(env.INFRAMELD_ACCOUNT_HYDRA_ORIGIN, transport),
+    apiInternalUrl: endpoint(
+      env.INFRAMELD_ACCOUNT_API_INTERNAL_URL,
+      "internal"
+    ),
     kratosInternalUrl: endpoint(
       env.INFRAMELD_ACCOUNT_KRATOS_INTERNAL_URL,
-      false
+      "internal"
     ),
     oidcFormActionOrigins: oidcFormActionOrigins(
       env.INFRAMELD_ACCOUNT_OIDC_FORM_ACTION_ORIGINS
@@ -99,11 +116,16 @@ export function checkedProviderUrl(
   path: string
 ): string {
   const url = new URL(value)
+  // Local callers supply an origin validated by the server's managed profile.
+  // Compare the original destination too, since URL parsing normalizes IPv4 aliases.
+  const exactLocalDestination =
+    isManagedLocalOrigin(origin) &&
+    (value === `${origin}${path}` || value.startsWith(`${origin}${path}?`))
   if (
     value !== value.trim() ||
     /[\x00-\x20\x7f]/.test(value) ||
     url.origin !== origin ||
-    url.protocol !== "https:" ||
+    (url.protocol !== "https:" && !exactLocalDestination) ||
     url.username ||
     url.password ||
     url.hash ||
