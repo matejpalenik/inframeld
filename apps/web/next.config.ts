@@ -1,7 +1,12 @@
+import { fileURLToPath } from "node:url"
 import type { NextConfig } from "next"
 
 const nextConfig: NextConfig = {
   logging: false,
+  ...(process.env.INFRAMELD_ACCOUNT_STANDALONE_BUILD === "1" && {
+    output: "standalone",
+    outputFileTracingRoot: fileURLToPath(new URL("../..", import.meta.url)),
+  }),
   async headers() {
     return [
       {
