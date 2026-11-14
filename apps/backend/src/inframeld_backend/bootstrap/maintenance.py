@@ -79,15 +79,24 @@ from inframeld_backend.bootstrap.first_administrator_bootstrap_settings import (
 from inframeld_backend.bootstrap.maintenance_application_settings import (
     MaintenanceApplicationSettings,
 )
+from inframeld_backend.bootstrap.restored_job_quarantine_composition import (
+    execute_restored_job_quarantine,
+)
 from inframeld_backend.bootstrap.stranded_authority_maintenance_settings import (
     StrandedAuthorityMaintenanceSettings,
 )
 from inframeld_backend.bootstrap.stranded_authority_repair_composition import (
     execute_stranded_authority_repair,
 )
+from inframeld_backend.shared.application.commands.restored_job_quarantine_command import (
+    RestoredJobQuarantineCommand,
+)
 from inframeld_backend.shared.application.errors.application_errors import (
     ConflictError,
     DependencyUnavailableError,
+)
+from inframeld_backend.shared.application.errors.restored_job_quarantine_error import (
+    RestoredJobQuarantineError,
 )
 from inframeld_backend.shared.infrastructure.diagnostics.error_reporting import (
     report_unexpected_error,
@@ -106,6 +115,7 @@ async def _execute(
         | RepairStrandedAuthorityCommand
         | BootstrapFirstAdministratorCommand
         | HumanSuspensionCleanupMaintenanceCommand
+        | RestoredJobQuarantineCommand
     ),
     settings: MaintenanceApplicationSettings,
 ) -> dict[str, object]:
@@ -121,6 +131,8 @@ async def _execute(
     database = Database(settings.database)
     try:
         await database.startup()
+        if isinstance(command, RestoredJobQuarantineCommand):
+            return await execute_restored_job_quarantine(command, database)
         async with database.session() as session:
             if isinstance(command, HumanSuspensionCleanupMaintenanceCommand):
                 maintenance = HumanSuspensionCleanupMaintenanceService(
@@ -171,7 +183,8 @@ def main(arguments: Sequence[str] | None = None) -> int:
         if arguments:
             raise ValueError("Unsupported arguments.")
         command = MaintenanceCli.read(sys.stdin.buffer)
-        error["operationId"] = command.operation_id.value
+        operation_id = command.operation_id.value
+        error["operationId"] = operation_id
         if isinstance(command, BootstrapFirstAdministratorCommand):
             settings = FirstAdministratorBootstrapSettings.model_validate({})
         elif isinstance(command, RepairStrandedAuthorityCommand):
@@ -207,11 +220,13 @@ def main(arguments: Sequence[str] | None = None) -> int:
         asyncio.CancelledError,
     ):
         code = RecoveryMaintenanceErrorCode.DEPENDENCY_UNAVAILABLE.value
+    except RestoredJobQuarantineError:
+        code = "restore_quarantine_conflict"
     except ConflictError:
         code = RecoveryMaintenanceErrorCode.DEPENDENCY_UNAVAILABLE.value
     except Exception as failure:
         code = RecoveryMaintenanceErrorCode.UNEXPECTED_ERROR.value
-        with bound_contextvars(operation_id=command.operation_id.value):
+        with bound_contextvars(operation_id=operation_id):
             report_unexpected_error(failure, event="maintenance_failed", error_code=code)
     else:
         return _emit(response, 0)
