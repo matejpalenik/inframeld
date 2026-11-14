@@ -5,10 +5,10 @@ import os
 from dataclasses import replace
 from datetime import timedelta
 from typing import override
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import DateTime, delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from tests.support.access_scenarios import MockAccessScenarios
 from tests.support.application_job_handler import BoundedJobHandler
@@ -18,6 +18,7 @@ from tests.support.application_worker_process import (
     application_worker_process,
 )
 from tests.support.authentication_evidence import MockAuthenticationEvidence
+from tests.support.maintenance_command import run_maintenance
 from tests.support.seaweedfs_fixture import storage_settings
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
@@ -82,23 +83,39 @@ from inframeld_backend.access.infrastructure.verifiers.postgres_application_key_
 from inframeld_backend.access.infrastructure.writers.postgres_job_admission_audit_writer import (
     PostgresJobAdmissionAuditWriter,
 )
+from inframeld_backend.access.infrastructure.writers.postgres_restored_job_quarantine_audit_writer import (
+    PostgresRestoredJobQuarantineAuditWriter,
+)
 from inframeld_backend.bootstrap import application_worker
 from inframeld_backend.bootstrap.application_worker_application_settings import (
     ApplicationWorkerApplicationSettings,
 )
 from inframeld_backend.bootstrap.application_worker_operations import ApplicationWorkerOperations
+from inframeld_backend.bootstrap.restored_job_quarantine_composition import (
+    execute_restored_job_quarantine,
+)
+from inframeld_backend.shared.application.commands.restored_job_quarantine_command import (
+    RestoredJobQuarantineCommand,
+)
 from inframeld_backend.shared.application.dtos.idempotency_context_dto import (
     IdempotencyContextDTO,
 )
 from inframeld_backend.shared.application.dtos.job_admission_dto import JobAdmissionDTO
 from inframeld_backend.shared.application.dtos.job_attempt_context_dto import JobAttemptContextDTO
 from inframeld_backend.shared.application.dtos.job_queue_status_dto import JobQueueStatusDTO
+from inframeld_backend.shared.application.dtos.job_snapshot_dto import JobSnapshotDTO
 from inframeld_backend.shared.application.dtos.operation_reservation_request_dto import (
     OperationReservationRequestDTO,
 )
 from inframeld_backend.shared.application.dtos.product_job_binding_dto import ProductJobBindingDTO
 from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.enums.operation_replay_kind import OperationReplayKind
+from inframeld_backend.shared.application.enums.operation_reservation_state import (
+    OperationReservationState,
+)
+from inframeld_backend.shared.application.enums.restored_job_quarantine_intent import (
+    RestoredJobQuarantineIntent,
+)
 from inframeld_backend.shared.application.errors.application_errors import (
     AccessDeniedError,
     DependencyUnavailableError,
@@ -109,6 +126,9 @@ from inframeld_backend.shared.application.errors.job_errors import (
     JobQueueFullError,
     JobStoppedError,
     UnsupportedJobPayloadError,
+)
+from inframeld_backend.shared.application.errors.restored_job_quarantine_error import (
+    RestoredJobQuarantineError,
 )
 from inframeld_backend.shared.application.services.artifact_cleanup_authorization_service import (
     ArtifactCleanupAuthorizationService,
@@ -125,6 +145,7 @@ from inframeld_backend.shared.application.services.job_execution_service import 
 from inframeld_backend.shared.application.services.job_recovery_service import JobRecoveryService
 from inframeld_backend.shared.application.value_objects.idempotency_key import IdempotencyKey
 from inframeld_backend.shared.application.value_objects.job_payload import JobPayload
+from inframeld_backend.shared.application.value_objects.operation_id import OperationId
 from inframeld_backend.shared.application.value_objects.request_fingerprint import (
     RequestFingerprint,
 )
@@ -143,6 +164,9 @@ from inframeld_backend.shared.infrastructure.resources.sqlalchemy_transaction_ma
     SqlAlchemyTransactionManager,
 )
 from inframeld_backend.shared.infrastructure.rows.alembic_version_row import AlembicVersionRow
+from inframeld_backend.shared.infrastructure.rows.durable_job_attempt_row import (
+    DurableJobAttemptRow,
+)
 from inframeld_backend.shared.infrastructure.rows.durable_job_row import DurableJobRow
 from inframeld_backend.shared.infrastructure.rows.idempotency_reservation_row import (
     IdempotencyReservationRow,
@@ -1298,3 +1322,226 @@ async def test_stop_during_queue_report_leaves_admitted_job_unclaimed(
         and saved.lease_expires_at is None
         and saved.work_deadline is None
     )
+
+
+def _restore_request(
+    installation: InstallationId, job: JobAdmissionDTO, *, operation: UUID
+) -> dict[str, object]:
+    return {
+        "schemaVersion": 1,
+        "mode": "quarantine-restored-job",
+        "intent": "quarantine",
+        "operationId": str(operation),
+        "expectedInstallationId": str(installation.value),
+        "jobId": str(job.job_id.value),
+        "jobOperationId": job.operation_id.value,
+        "expectedStatus": "queued",
+        "expectedAttempt": 0,
+        "operatorLabel": "Restore operator",
+        "reason": "Earlier external work is uncertain",
+    }
+
+
+@pytest.mark.asyncio
+async def test_host_command_quarantines_original_pre_intent_job_and_replays_only_its_receipt(
+    database: Database, temporary_postgres_settings: DatabaseSettings
+) -> None:
+    request, authority, access = await _human_request(database)
+    original = await _human_admit(database, request, authority, access)
+    unrelated = await _admit(database)
+    operation = uuid4()
+    quarantine = _restore_request(authority.installation_id, original, operation=operation)
+    inspect = {
+        name: value
+        for name, value in quarantine.items()
+        if name not in ("expectedStatus", "expectedAttempt", "operatorLabel", "reason")
+    } | {"intent": "inspect"}
+
+    async with database.session() as session:
+        before = await PostgresJobStore(session).find(original.operation_id)
+        candidate = await PostgresJobStore(session).peek_candidate()
+        assert before is not None and candidate is not None and candidate.job_id == original.job_id
+        assert before.attempt == 0 and before.pending_effect is None and before.checkpoint == b""
+    expected = {
+        "schemaVersion": 1,
+        "mode": "quarantine-restored-job",
+        "intent": "inspect",
+        "operationId": str(operation),
+        "installationId": str(authority.installation_id.value),
+        "jobId": str(original.job_id.value),
+        "jobOperationId": original.operation_id.value,
+        "status": "queued",
+        "attempt": 0,
+        "eligible": True,
+    }
+    assert await run_maintenance(inspect, temporary_postgres_settings) == (0, expected)
+    conflict = (
+        1,
+        {"schemaVersion": 1, "operationId": str(operation), "code": "restore_quarantine_conflict"},
+    )
+    for change in (
+        {"expectedInstallationId": str(uuid4())},
+        {"jobId": str(unrelated.job_id.value)},
+        {"expectedAttempt": 1},
+    ):
+        assert await run_maintenance(quarantine | change, temporary_postgres_settings) == conflict
+    async with database.session() as session, session.begin():
+        assert await session.get(AccessAuditEventRow, operation) is None
+        reservation = await session.get(IdempotencyReservationRow, original.operation_id.value)
+        assert reservation is not None and reservation.lookup_action_id == authority.action_id.value
+        reservation.lookup_action_id = "inspect-feedback"
+    assert await run_maintenance(quarantine, temporary_postgres_settings) == conflict
+    async with database.session() as session, session.begin():
+        untouched = await PostgresJobStore(session).find(original.operation_id)
+        assert untouched is not None and untouched.status is JobStatus.QUEUED
+        assert await session.get(AccessAuditEventRow, operation) is None
+        reservation = await session.get(IdempotencyReservationRow, original.operation_id.value)
+        assert reservation is not None
+        reservation.lookup_action_id = authority.action_id.value
+
+    # Discard the first result, then recover the exact committed outcome.
+    await run_maintenance(quarantine, temporary_postgres_settings)
+    async with database.session() as session:
+        committed_job = await session.get(DurableJobRow, original.job_id.value)
+        committed_audit = await session.get(AccessAuditEventRow, operation)
+        assert committed_job is not None and committed_job.status == "recovery_required"
+        assert committed_job.terminal_at is not None and committed_audit is not None
+        committed_terminal_at = committed_job.terminal_at
+        committed_audit_at = committed_audit.occurred_at
+    saved_result = expected | {
+        "intent": "quarantine",
+        "status": "recovery_required",
+        "eligible": False,
+    }
+    assert await run_maintenance(quarantine, temporary_postgres_settings) == (0, saved_result)
+    assert (
+        await run_maintenance(
+            quarantine | {"reason": "Different review"}, temporary_postgres_settings
+        )
+        == conflict
+    )
+    async with database.session() as session:
+        after = await PostgresJobStore(session).find(original.operation_id)
+        row = await session.get(DurableJobRow, original.job_id.value)
+        event = await session.get(AccessAuditEventRow, operation)
+        reservation = await session.get(IdempotencyReservationRow, original.operation_id.value)
+        assert (
+            after is not None and row is not None and event is not None and reservation is not None
+        )
+        assert row.terminal_at == committed_terminal_at
+        assert (event.id, event.occurred_at) == (operation, committed_audit_at)
+        assert (
+            after.status is JobStatus.RECOVERY_REQUIRED
+            and after.reason == "restore_history_incomplete"
+        )
+        assert (after.binding, after.payload, after.checkpoint, after.pending_effect) == (
+            before.binding,
+            before.payload,
+            before.checkpoint,
+            before.pending_effect,
+        )
+        assert (after.attempt, after.queued_deadline, after.work_deadline, after.due_at) == (
+            before.attempt,
+            before.queued_deadline,
+            before.work_deadline,
+            before.due_at,
+        )
+        assert await session.get(DurableJobAttemptRow, (original.job_id.value, 1)) is None
+        assert event.actor_kind == "operator" and event.actor_principal_id is None
+        assert event.target_id == original.job_id.value
+        assert event.before_values is not None and event.before_values["status"] == "queued"
+        assert reservation.state is OperationReservationState.REPLAYABLE
+        assert (
+            reservation.replay_kind is OperationReplayKind.ASYNC_JOB
+            and reservation.expires_at is None
+        )
+    replay = await _human_admit(database, request, authority, access)
+    assert replay.job_id == original.job_id and not replay.created
+    next_attempt = await _claim(database)
+    assert next_attempt is not None and next_attempt.job_id == unrelated.job_id
+
+    async with database.session() as session, session.begin():
+        await session.execute(
+            delete(AccessAuditEventRow).where(AccessAuditEventRow.id == operation)
+        )
+    assert await run_maintenance(quarantine, temporary_postgres_settings) == conflict
+
+
+@pytest.mark.asyncio
+async def test_active_attempt_is_refused_then_expired_attempt_keeps_its_unknown_effect(
+    database: Database, temporary_postgres_settings: DatabaseSettings
+) -> None:
+    request, authority, access = await _human_request(database)
+    original = await _human_admit(database, request, authority, access)
+    context = await _claim(database)
+    assert context is not None and context.job_id == original.job_id
+    operation = uuid4()
+    quarantine = _restore_request(authority.installation_id, original, operation=operation) | {
+        "expectedStatus": "running",
+        "expectedAttempt": 1,
+    }
+    async with database.session() as session, session.begin():
+        jobs = PostgresJobStore(session)
+        await jobs.checkpoint(context, b"verified", lease_seconds=30)
+        await jobs.begin_effect(context, "unconfirmed-unit")
+    status, response = await run_maintenance(quarantine, temporary_postgres_settings)
+    assert status == 1 and response["code"] == "restore_quarantine_conflict"
+
+    async with database.session() as session, session.begin():
+        assert await session.get(AccessAuditEventRow, operation) is None
+        job = await session.get(DurableJobRow, original.job_id.value)
+        assert job is not None and job.fence == context.fence.value and job.status == "running"
+        await session.execute(
+            update(DurableJobRow)
+            .where(DurableJobRow.id == original.job_id.value)
+            .values(
+                lease_expires_at=func.clock_timestamp(type_=DateTime(timezone=True))
+                - timedelta(seconds=1)
+            )
+        )
+    status, response = await run_maintenance(quarantine, temporary_postgres_settings)
+    assert status == 0 and response["status"] == "recovery_required" and response["attempt"] == 1
+    async with database.session() as session:
+        job = await session.get(DurableJobRow, original.job_id.value)
+        attempt = await session.get(DurableJobAttemptRow, (original.job_id.value, 1))
+        assert job is not None and attempt is not None
+        assert job.pending_effect == "unconfirmed-unit" and job.checkpoint == b"verified"
+        assert job.work_deadline == context.work_deadline and job.fence is None
+        assert attempt.fence == context.fence.value and attempt.ended_at is not None
+
+
+@pytest.mark.asyncio
+async def test_failed_audit_rolls_back_quarantine(
+    database: Database, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    request, authority, access = await _human_request(database)
+    original = await _human_admit(database, request, authority, access)
+    operation = uuid4()
+    command = RestoredJobQuarantineCommand(
+        OperationId(str(operation)),
+        authority.installation_id,
+        original.job_id,
+        original.operation_id,
+        RestoredJobQuarantineIntent.QUARANTINE,
+        JobStatus.QUEUED,
+        0,
+        "Restore operator",
+        "Earlier external work is uncertain",
+    )
+    append = PostgresRestoredJobQuarantineAuditWriter.append
+
+    async def fail_after_append(
+        writer: PostgresRestoredJobQuarantineAuditWriter,
+        command: RestoredJobQuarantineCommand,
+        job: JobSnapshotDTO,
+    ) -> None:
+        await append(writer, command, job)
+        raise RestoredJobQuarantineError("Controlled failure after audit flush.")
+
+    monkeypatch.setattr(PostgresRestoredJobQuarantineAuditWriter, "append", fail_after_append)
+    with pytest.raises(RestoredJobQuarantineError, match="Controlled failure"):
+        await execute_restored_job_quarantine(command, database)
+    async with database.session() as session:
+        job = await PostgresJobStore(session).find(original.operation_id)
+        assert job is not None and job.status is JobStatus.QUEUED and job.attempt == 0
+        assert await session.get(AccessAuditEventRow, operation) is None

@@ -92,7 +92,7 @@ The four-hour recovery target is conditional on this reconciliation. It may be m
 2. **Restore the matching set.** Verify the encrypted backup and manifest, recover the required keys, and restore every component to its recorded path with correct ownership. Use matching supported images and schema versions. Do not combine recovery with an untested upgrade or create new SeaweedFS volume IDs over restored data.
 3. **Check stores privately.** Verify the application, Kratos and Hydra databases with their matching configuration/key material. Preserve issuer/client and Kratos-to-principal identity mappings. Verify SeaweedFS namespace-to-volume references/checksums and Chroma dependencies. In limited-size batches, check artifact references and current, candidate, and previous Deployment pointers. Keep missing dependencies unavailable. Do not silently replace lost vectors with a new embedding call or missing identity state with a new installation.
 4. **Reapply current restrictions.** Follow the [security review](#restrictions), then test both allowed and denied human/integration access. Anonymous object access and internal administrative endpoints must remain inaccessible. Test local login and any configured OIDC login using current settings.
-5. **Review unfinished work.** Preserve original statuses as evidence. Identify safe resumptions and place uncertain work that can call a provider into `recovery_required`. A restored `queued` flag is not permission to execute it. The next section explains why.
+5. **Review unfinished work.** Preserve original statuses as evidence. Identify safe resumptions and [quarantine uncertain ordinary product jobs](#quarantine-an-exact-restored-job) in `recovery_required`. A restored `queued` flag supplies no proof of safe replay.
 6. **Check the application before reopening.** Query a known retained release and inspect its authorized evidence. During isolated rehearsal, try a safe release transition and rollback. Verify gateway routing, current document permissions, deleted-content exclusion, and idempotency. Record backup age, data loss, phase timings, checks, and exceptions. Reopen only validated scopes, then resume normal backups.
 
 A stored object without a published application reference is still an orphan, not an admitted document. An interrupted candidate is still unfinished. Before using any published record, establish that its required data exists.
@@ -116,6 +116,40 @@ After host loss:   restore shows J as queued again
 Repeating a saved vector insertion can be safe because its exact numbers are already captured. Follow the [Indexing retry checks](../../../.agents/skills/inframeld-indexing/references/profiles-and-preparation.md). A new model call to recover a lost answer does not have that same guarantee.
 
 Resume only work whose inputs, current permissions, and required retry payloads remain intact under the normal protocol.
+
+<a id="quarantine-an-exact-restored-job"></a>
+
+### Quarantine an exact restored job
+
+Keep the old installation excluded and the restored installation's workers, public ingress and provider calls disabled. Use protected host execution in the verified backend with the restored database configured. Take the expected installation UUID from your trusted installation record. Identify the job and original operation from the retained restore inventory.
+
+Pass one private JSON object to the installed `inframeld-maintenance` command over stdin. For example, save the following as `inspect-restored-job.json` in a private directory and substitute the three installation/job identifiers and a new UUID for the inspection request.
+
+```json
+{
+  "schemaVersion": 1,
+  "mode": "quarantine-restored-job",
+  "intent": "inspect",
+  "operationId": "6814ee59-5257-4746-8757-a4cc6246c6c4",
+  "expectedInstallationId": "a1f5a2bc-9e1b-4441-b91c-3e5f0bcfd0e8",
+  "jobId": "97d211ad-9d73-49cf-8832-88f9cf08c9f1",
+  "jobOperationId": "5e39c624-9b88-424f-8efa-dcefd0768fac"
+}
+```
+
+```sh
+inframeld-maintenance < inspect-restored-job.json
+```
+
+Review `status`, `attempt` and `eligible`. Eligibility covers local job state only. For an eligible queued or expired running job whose post-cut effects remain uncertain, save the exact request in a second private file. Keep the installation, job and original operation unchanged. Set `intent` to `quarantine`, choose a new maintenance `operationId` UUID, and add `expectedStatus` and `expectedAttempt` from inspection. Include a nonblank `operatorLabel` up to 128 characters and a nonblank `reason` up to 512 characters. Keep sensitive material out of both fields. Submit the reviewed file:
+
+```sh
+inframeld-maintenance < quarantine-restored-job.json
+```
+
+A successful action returns `status: recovery_required`. It keeps the original operation, inputs, checkpoint and attempt budget. The operator audit preserves the reviewed original status and attempt. An active lease, changed review, wrong installation or missing original reservation returns `restore_quarantine_conflict`. If output is lost, submit the same reviewed request with the same maintenance UUID. A missing or inconsistent original audit keeps the action unconfirmed and prevents a second write.
+
+This command classifies one job. Keep workers stopped until the full restore review accounts for every unfinished job and confirms which work can safely resume. Quarantine neither establishes what the provider did nor releases retained effects, costs or cleanup obligations.
 
 <a id="lost-idempotency-history-limits-duplicate-detection"></a>
 
