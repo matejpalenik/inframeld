@@ -69,7 +69,6 @@ class ArtifactAllocationService:
             raise ArtifactReservationError(
                 "Unadmitted source staging reserves its exact full allowance."
             )
-        capacity = await self._artifact_capacity_reader.read()
         binding = ArtifactCleanupJobBindingDTO(
             obligation_id, scope, ArtifactCleanupKind.ABANDONED_STAGING, origin
         )
@@ -81,7 +80,7 @@ class ArtifactAllocationService:
                 reservation_id=reservation_id,
                 limit_bytes=limit_bytes,
                 transfer_seconds=transfer_seconds,
-                capacity=capacity,
+                capacity_reader=self._artifact_capacity_reader,
             )
             await self._artifact_cleanup_obligation_repository.create_staging(
                 binding, targets=(attempt_id,), transfer_deadline=reservation.expires_at
