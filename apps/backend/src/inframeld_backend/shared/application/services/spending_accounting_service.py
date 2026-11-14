@@ -184,8 +184,8 @@ class SpendingAccountingService(SpendingAccountant):
             try:
                 await self._job_ownership.require_current(call.attempt)
             except JobFenceLostError:
-                # Normal return preserves this evidence in the owning transaction.
-                # The accounting record and its hold remain untouched.
+                await self._job_ownership.require_issued_attempt(call.attempt)
+                # Commit recognized late evidence without changing the hold.
                 await self._lock_account(call)
                 record = await self._require_call(call)
                 return await self._retain_pending(record, observation, expected_call_revision)
