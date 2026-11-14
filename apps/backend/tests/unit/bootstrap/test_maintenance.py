@@ -49,6 +49,9 @@ from inframeld_backend.bootstrap.maintenance_application_settings import (
 from inframeld_backend.shared.application.errors.application_errors import (
     DependencyUnavailableError,
 )
+from inframeld_backend.shared.application.errors.restored_job_quarantine_error import (
+    RestoredJobQuarantineError,
+)
 from inframeld_backend.shared.infrastructure.diagnostics.error_reporting import (
     report_unexpected_error,
 )
@@ -87,6 +90,59 @@ def _bootstrap_payload() -> bytes:
 
 def _stdin(monkeypatch: pytest.MonkeyPatch, payload: bytes) -> None:
     monkeypatch.setattr("sys.stdin", io.TextIOWrapper(io.BytesIO(payload), encoding="utf-8"))
+
+
+def test_invalid_restored_job_request_does_not_echo_unverified_operation_id(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _stdin(
+        monkeypatch,
+        b'{"schemaVersion":1,"mode":"quarantine-restored-job","operationId":"private-text"}',
+    )
+    execute = AsyncMock()
+    monkeypatch.setattr(maintenance, "_execute", execute)
+
+    assert maintenance.main(()) == 2
+    captured = capsys.readouterr()
+    assert json.loads(captured.out) == {"schemaVersion": 1, "code": "invalid_input"}
+    assert "private-text" not in captured.err
+    execute.assert_not_awaited()
+
+
+def test_restored_job_quarantine_conflict_has_fixed_safe_output(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    operation_id = "1ff2c32e-2438-42fc-b2a8-60d4a59ad91a"
+    _stdin(
+        monkeypatch,
+        json.dumps(
+            {
+                "schemaVersion": 1,
+                "mode": "quarantine-restored-job",
+                "intent": "inspect",
+                "operationId": operation_id,
+                "expectedInstallationId": "3ff2c32e-2438-42fc-b2a8-60d4a59ad91a",
+                "jobId": "4ff2c32e-2438-42fc-b2a8-60d4a59ad91a",
+                "jobOperationId": "original",
+            }
+        ).encode(),
+    )
+    monkeypatch.setenv("INFRAMELD_DATABASE__NAME", "test")
+    monkeypatch.setenv("INFRAMELD_DATABASE__USER", "test")
+    monkeypatch.setenv("INFRAMELD_DATABASE__PASSWORD", "unused-test-only")
+    monkeypatch.setattr(
+        maintenance,
+        "_execute",
+        AsyncMock(side_effect=RestoredJobQuarantineError("private internal cause")),
+    )
+    assert maintenance.main(()) == 1
+    captured = capsys.readouterr()
+    assert json.loads(captured.out) == {
+        "schemaVersion": 1,
+        "operationId": operation_id,
+        "code": "restore_quarantine_conflict",
+    }
+    assert "private internal cause" not in captured.out + captured.err
 
 
 def test_invalid_input_stops_before_configuration_or_database(

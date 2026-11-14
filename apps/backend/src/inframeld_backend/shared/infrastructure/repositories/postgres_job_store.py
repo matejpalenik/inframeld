@@ -13,6 +13,12 @@ from inframeld_backend.access.application.dtos.admitted_work_authority_dto impor
 )
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
+from inframeld_backend.access.infrastructure.writers.postgres_restored_job_quarantine_audit_writer import (
+    PostgresRestoredJobQuarantineAuditWriter,
+)
+from inframeld_backend.shared.application.commands.restored_job_quarantine_command import (
+    RestoredJobQuarantineCommand,
+)
 from inframeld_backend.shared.application.dtos.artifact_cleanup_job_binding_dto import (
     ArtifactCleanupJobBindingDTO,
 )
@@ -34,9 +40,15 @@ from inframeld_backend.shared.application.dtos.product_job_binding_dto import Pr
 from inframeld_backend.shared.application.dtos.project_deletion_job_binding_dto import (
     ProjectDeletionJobBindingDTO,
 )
+from inframeld_backend.shared.application.dtos.restored_job_quarantine_result_dto import (
+    RestoredJobQuarantineResultDTO,
+)
 from inframeld_backend.shared.application.enums.job_effect_action import JobEffectAction
 from inframeld_backend.shared.application.enums.job_effect_observation_kind import (
     JobEffectObservationKind,
+)
+from inframeld_backend.shared.application.enums.operation_lookup_authority_family import (
+    OperationLookupAuthorityFamily,
 )
 from inframeld_backend.shared.application.enums.operation_replay_kind import OperationReplayKind
 from inframeld_backend.shared.application.enums.operation_reservation_state import (
@@ -47,7 +59,13 @@ from inframeld_backend.shared.application.errors.job_errors import (
     JobFenceLostError,
     JobQueueFullError,
 )
+from inframeld_backend.shared.application.errors.restored_job_quarantine_error import (
+    RestoredJobQuarantineError,
+)
 from inframeld_backend.shared.application.protocols.job_store import JobStore
+from inframeld_backend.shared.application.protocols.restored_job_quarantine_repository import (
+    RestoredJobQuarantineRepository,
+)
 from inframeld_backend.shared.application.services.project_deletion_job_authorization_service import (
     ProjectDeletionJobAuthorizationService,
 )
@@ -88,12 +106,17 @@ from inframeld_backend.shared.infrastructure.rows.durable_job_row import Durable
 from inframeld_backend.shared.infrastructure.rows.idempotency_reservation_row import (
     IdempotencyReservationRow,
 )
+from inframeld_backend.shared.infrastructure.rows.installation_identity_row import (
+    InstallationIdentityRow,
+)
 from inframeld_backend.shared.infrastructure.rows.project_deletion_obligation_row import (
     ProjectDeletionObligationRow,
 )
 
+_RESTORE_QUARANTINE_REASON = "restore_history_incomplete"
 
-class PostgresJobStore(JobStore):
+
+class PostgresJobStore(JobStore, RestoredJobQuarantineRepository):
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
@@ -635,6 +658,126 @@ class PostgresJobStore(JobStore):
             .execution_options(populate_existing=True)
         )
         return None if row is None else await self._snapshot(row, await self._now())
+
+    @override
+    async def observe_restored_job(self, command: RestoredJobQuarantineCommand) -> JobSnapshotDTO:
+        self._require_transaction()
+        row = await self._restored_product_row(command, lock=False)
+        snapshot = await self._snapshot(row, await self._now())
+        await self._require_original_restored_reservation(snapshot, lock=False)
+        return snapshot
+
+    @override
+    async def quarantine_restored_job(
+        self, command: RestoredJobQuarantineCommand, observed: JobSnapshotDTO
+    ) -> JobSnapshotDTO:
+        await self._require_read_committed()
+        await self._queue_turn()
+        row = await self._restored_product_row(command, lock=True)
+        now = await self._now()
+        current = await self._snapshot(row, now)
+        if current != replace(observed, observed_at=now):
+            raise RestoredJobQuarantineError("The restored job changed during review.")
+        # Ordinary admission replays this nonexpiring reservation without a queue turn.
+        await self._require_original_restored_reservation(current, lock=True)
+
+        audit = PostgresRestoredJobQuarantineAuditWriter(self._session)
+        if await audit.matches_original(command, current):
+            if (
+                current.status is not JobStatus.RECOVERY_REQUIRED
+                or current.reason != _RESTORE_QUARANTINE_REASON
+                or current.attempt != command.expected_attempt
+                or row.fence is not None
+                or row.worker_id is not None
+                or row.lease_expires_at is not None
+                or row.terminal_at is None
+            ):
+                raise RestoredJobQuarantineError("The retained quarantine cannot be confirmed.")
+            return current
+
+        if (
+            current.status is not command.expected_status
+            or current.attempt != command.expected_attempt
+            or not RestoredJobQuarantineResultDTO.from_snapshot(current).eligible
+            or row.terminal_at is not None
+        ):
+            raise RestoredJobQuarantineError("The reviewed job cannot be quarantined.")
+        await self._require_restored_attempt_owner(row)
+        await self._complete(row, now, JobStatus.RECOVERY_REQUIRED, _RESTORE_QUARANTINE_REASON)
+        await audit.append(command, current)
+        return await self._snapshot(row, now)
+
+    async def _restored_product_row(
+        self, command: RestoredJobQuarantineCommand, *, lock: bool
+    ) -> DurableJobRow:
+        installed = await self._session.scalar(
+            select(InstallationIdentityRow.installation_id).where(
+                InstallationIdentityRow.singleton_key == 1
+            )
+        )
+        if installed != command.expected_installation_id.value:
+            raise RestoredJobQuarantineError("The expected installation could not be confirmed.")
+
+        statement = (
+            select(DurableJobRow)
+            .where(
+                DurableJobRow.id == command.job_id.value,
+                DurableJobRow.operation_id == command.job_operation_id.value,
+                DurableJobRow.installation_id == installed,
+                DurableJobRow.binding_kind == "product",
+            )
+            .execution_options(populate_existing=True)
+        )
+        if lock:
+            statement = statement.with_for_update()
+        row = await self._session.scalar(statement)
+        if row is None:
+            raise RestoredJobQuarantineError("The original restored job could not be confirmed.")
+        return row
+
+    async def _require_original_restored_reservation(
+        self, job: JobSnapshotDTO, *, lock: bool
+    ) -> None:
+        binding = job.binding
+        if not isinstance(binding, ProductJobBindingDTO):
+            raise RestoredJobQuarantineError("The restored job has no product binding.")
+        authority = binding.authority
+        statement = select(IdempotencyReservationRow.operation_id).where(
+            IdempotencyReservationRow.operation_id == binding.operation_id.value,
+            IdempotencyReservationRow.principal_id == authority.principal_id.value,
+            IdempotencyReservationRow.organization_id == authority.organization_id.value,
+            IdempotencyReservationRow.project_id == authority.project_id.value,
+            IdempotencyReservationRow.state == OperationReservationState.REPLAYABLE,
+            IdempotencyReservationRow.replay_kind == OperationReplayKind.ASYNC_JOB,
+            IdempotencyReservationRow.lookup_authority_family
+            == OperationLookupAuthorityFamily.PROJECT_ACTION_USE,
+            IdempotencyReservationRow.lookup_action_id == authority.action_id.value,
+            IdempotencyReservationRow.expires_at.is_(None),
+        )
+        if lock:
+            statement = statement.with_for_update()
+        if await self._session.scalar(statement) is None:
+            raise RestoredJobQuarantineError(
+                "The original asynchronous reservation is unavailable."
+            )
+
+    async def _require_restored_attempt_owner(self, row: DurableJobRow) -> None:
+        if row.status == JobStatus.QUEUED:
+            if row.worker_id is not None or row.pending_effect is not None:
+                raise RestoredJobQuarantineError("The queued job has inconsistent attempt state.")
+            return
+
+        attempt = await self._session.get(DurableJobAttemptRow, (row.id, row.attempt_count))
+        if (
+            attempt is None
+            or attempt.ended_at is not None
+            or row.fence is None
+            or row.worker_id is None
+            or attempt.fence != row.fence
+            or attempt.worker_id != row.worker_id
+            or row.work_deadline is None
+        ):
+            raise RestoredJobQuarantineError("The original expired attempt is unavailable.")
 
     async def has_fresh_capacity(self, *, capacity: int) -> bool:
         """Check ordinary capacity under the caller's queue turn."""
