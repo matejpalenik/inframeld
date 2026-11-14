@@ -20,7 +20,7 @@ A local change saves its domain effects, revision, audit and original outcome to
 
 ## Concrete contracts and future-resource drafts
 
-**Status:** Organization, Project, access-group and application-account exact grant GET/PUT/DELETE, both own-access reads and Project-scoped eligible-recipient discovery are implemented. The retired use-only POST is absent from native OpenAPI and generated clients. Native OpenAPI remains authoritative for implemented symbols. Other resource-target routes in this reference remain accepted design contracts for their real owners. Automated platform qualification and deferred human acceptance are separate evidence, not consequences of this status paragraph. Human routes use cookie or Hydra bearer authentication, without adding application-key authentication.
+**Status:** Organization, Project, access-group, application-account and Model Connection exact grant GET/PUT/DELETE, both own-access reads and Project-scoped eligible-recipient discovery are implemented. The retired use-only POST is absent from native OpenAPI and generated clients. Native OpenAPI remains authoritative for implemented symbols. Other resource-target routes in this reference remain accepted design for their real owners. Human routes use cookie or Hydra bearer authentication.
 
 For example, Alice sets SupportBot's `query` assignment on Support's Pipeline with `canGrant: false` and the reviewed access revision. If the response is lost, her same idempotency key recovers that original assignment result under current authority. Removing that assignment returns a removal result, not `canGrant: false`: the latter still permits use. If SupportBot is subsequently given another grant, replay of Alice's old removal cannot remove it again.
 
@@ -75,6 +75,8 @@ The [assignment guide](../../../../apps/docs/src/app/guides/assign-project-grant
 The implemented Project mutation interface is `PUT /v1/projects/{project_id}/grants/{recipient_principal_id}/{action_id}` and DELETE at the same path. The live POST route now returns 405. `assignProjectUseOnlyGrant` and its creation-only request/response exports are removed from native OpenAPI and all three generated clients. Actual callers and fixtures use explicit exact PUT intent. GET and the existing PUT/DELETE operation IDs and meanings remain unchanged.
 
 The historical POST rejected an existing assignment. PUT can change it, including downgrading use-and-grant to use-only. Never redirect or automatically convert an original POST retry into PUT. Preserve retained original operation identity, method, canonical route, fingerprint, expiry and outcome without extending retention. Original-operation lookup remains read-only and checks current authority for the original exact Project/action. Route removal cannot convert an uncertain or expired original result into proof of failure or permission to dispatch a new write.
+
+Model Connection grant routes use `/v1/model-connections/{model_connection_id}/grants` and resolve the actual owning Project from the connection. Current eligible-human membership and exact use-and-grant authority protect each grant operation and original lookup. The separate Project recipient route binds its Project ID to the same owner. Mutations take the reviewed Project Access revision and return the retained original result on exact authorized replay. Use lookup family `model_connection_grant_read` with the canonical grant mutation route and its actual Project ID.
 
 <a id="credential-and-response-profiles"></a>
 

@@ -19,6 +19,9 @@ from inframeld_backend.access.application.dtos.grant_recipient_candidate_dto imp
 from inframeld_backend.access.application.dtos.grant_recipients_page_facts_dto import (
     GrantRecipientsPageFactsDTO,
 )
+from inframeld_backend.access.application.dtos.model_connection_grant_target_dto import (
+    ModelConnectionGrantTargetDTO,
+)
 from inframeld_backend.access.application.dtos.project_grant_target_dto import ProjectGrantTargetDTO
 from inframeld_backend.access.application.protocols.grant_recipients_facts_reader import (
     GrantRecipientsFactsReader,
@@ -52,6 +55,10 @@ from inframeld_backend.access.infrastructure.rows.application_action_grant_row i
 from inframeld_backend.access.infrastructure.rows.group_action_grant_row import GroupActionGrantRow
 from inframeld_backend.access.infrastructure.rows.group_manager_row import GroupManagerRow
 from inframeld_backend.access.infrastructure.rows.group_membership_row import GroupMembershipRow
+from inframeld_backend.access.infrastructure.rows.model_connection_action_grant_row import (
+    ModelConnectionActionGrantRow,
+)
+from inframeld_backend.access.infrastructure.rows.model_connection_row import ModelConnectionRow
 from inframeld_backend.access.infrastructure.rows.principal_row import PrincipalRow
 from inframeld_backend.access.infrastructure.rows.project_action_grant_row import (
     ProjectActionGrantRow,
@@ -86,7 +93,8 @@ class PostgresGrantRecipientsFactsReader(GrantRecipientsFactsReader):
         project_id: ProjectId,
         target: ProjectGrantTargetDTO
         | AccessGroupGrantTargetDTO
-        | ApplicationAccountGrantTargetDTO,
+        | ApplicationAccountGrantTargetDTO
+        | ModelConnectionGrantTargetDTO,
         action_id: ActionId,
         eligible_kinds: tuple[PrincipalKind, ...],
         after: PrincipalId | None,
@@ -144,6 +152,30 @@ class PostgresGrantRecipientsFactsReader(GrantRecipientsFactsReader):
                 )
                 .correlate(PrincipalRow, ProjectRow, AccessGroupRow)
             )
+        elif isinstance(target, ModelConnectionGrantTargetDTO):
+            header = header.join(
+                ModelConnectionRow,
+                and_(
+                    ModelConnectionRow.project_id == ProjectRow.id,
+                    ModelConnectionRow.organization_id == ProjectRow.organization_id,
+                ),
+            ).where(
+                ModelConnectionRow.id == target.model_connection_id.value,
+                ModelConnectionRow.retired_at.is_(None),
+            )
+            model_grants = ModelConnectionActionGrantRow
+            granted = (
+                exists()
+                .where(
+                    model_grants.project_id == ProjectRow.id,
+                    model_grants.model_connection_id == ModelConnectionRow.id,
+                    model_grants.recipient_principal_id == PrincipalRow.id,
+                    model_grants.recipient_kind == PrincipalRow.kind,
+                    model_grants.action == action_id.value,
+                )
+                .correlate(PrincipalRow, ProjectRow, ModelConnectionRow)
+            )
+            delegated = granted.where(model_grants.can_grant.is_(True))
         else:
             application = aliased(PrincipalRow, name="application_principal")
             bound_membership = (

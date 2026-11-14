@@ -31,6 +31,9 @@ from inframeld_backend.access.application.dtos.invitation_group_manager_intent_d
 from inframeld_backend.access.application.dtos.invitation_group_membership_intent_dto import (
     InvitationGroupMembershipIntentDTO,
 )
+from inframeld_backend.access.application.dtos.invitation_model_connection_target_dto import (
+    InvitationModelConnectionTargetDTO,
+)
 from inframeld_backend.access.application.dtos.invitation_project_access_revision_dto import (
     InvitationProjectAccessRevisionDTO,
 )
@@ -65,6 +68,9 @@ from inframeld_backend.access.domain.value_objects.principal_id import Principal
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
 from inframeld_backend.access.infrastructure.mappers.postgres_invitation_mapper import (
     PostgresInvitationMapper,
+)
+from inframeld_backend.access.infrastructure.readers.model_connection_grant_queries import (
+    ModelConnectionGrantQueries,
 )
 from inframeld_backend.access.infrastructure.readers.postgres_invitation_binding_reader import (
     PostgresInvitationBindingReader,
@@ -647,6 +653,16 @@ class PostgresInvitationWriter(InvitationWriter, InvitationActivationOperationSt
                 raise ValueError("The completed Organization revision is invalid.")
             payload = PostgresInvitationMapper.to_project_revisions(project_access_revisions)
             expected_projects: set[ProjectId] = set()
+            model_projects = await ModelConnectionGrantQueries.invitation_projects(
+                self._session,
+                binding.organization_id,
+                tuple(
+                    intent.target
+                    for intent in record.assignments
+                    if isinstance(intent, InvitationActionGrantIntentDTO)
+                    and isinstance(intent.target, InvitationModelConnectionTargetDTO)
+                ),
+            )
             for intent in record.assignments:
                 if isinstance(
                     intent,
@@ -667,6 +683,11 @@ class PostgresInvitationWriter(InvitationWriter, InvitationActivationOperationSt
                         ),
                     ):
                         expected_projects.add(intent.target.project_id)
+                    elif isinstance(intent.target, InvitationModelConnectionTargetDTO):
+                        project = model_projects.get(intent.target.model_connection_id)
+                        if project is None:
+                            raise ConflictError("The invitation target owner is not available.")
+                        expected_projects.add(project)
                     elif (
                         not isinstance(intent.target, OrganizationGrantTargetDTO)
                         or intent.target.organization_id != binding.organization_id

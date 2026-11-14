@@ -1,4 +1,5 @@
 from inframeld_backend.access.domain.enums.access_group_action import AccessGroupAction
+from inframeld_backend.access.domain.enums.model_connection_action import ModelConnectionAction
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.enums.project_departure_target_kind import (
     ProjectDepartureTargetKind,
@@ -32,6 +33,8 @@ class ProjectDeparturePolicy:
             )
         if target_kind == ProjectDepartureTargetKind.ACCESS_GROUP:
             return action_id.value in _GROUP_DOCUMENT_ACTIONS
+        if target_kind == ProjectDepartureTargetKind.MODEL_CONNECTION:
+            return action_id.value in ModelConnectionAction
         if target_kind == ProjectDepartureTargetKind.APPLICATION_ACCOUNT:
             return action_id.value in {
                 "issue-application-keys",

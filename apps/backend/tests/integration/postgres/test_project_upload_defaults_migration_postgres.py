@@ -29,7 +29,10 @@ from inframeld_backend.shared.application.enums.operation_replay_kind import Ope
 from inframeld_backend.shared.application.enums.operation_reservation_state import (
     OperationReservationState,
 )
-from inframeld_backend.shared.infrastructure.migrations.migration_runner import ALEMBIC_CONFIG_PATH
+from inframeld_backend.shared.infrastructure.migrations.migration_runner import (
+    ALEMBIC_CONFIG_PATH,
+    SUPPORTED_SCHEMA_REVISION,
+)
 from inframeld_backend.shared.infrastructure.resources.database import Database
 from inframeld_backend.shared.infrastructure.rows.alembic_version_row import AlembicVersionRow
 from inframeld_backend.shared.infrastructure.rows.idempotency_reservation_row import (
@@ -204,7 +207,9 @@ async def test_downgrade_refuses_retained_default_or_original(
     with pytest.raises(RuntimeError, match="Retained.*upload"):
         command.downgrade(_config(temporary_postgres_settings), "0029_application_key_revocation")
     async with database.session() as session:
-        assert await session.scalar(select(AlembicVersionRow.version_num)) == "0034_human_lifecycle"
+        assert (
+            await session.scalar(select(AlembicVersionRow.version_num)) == SUPPORTED_SCHEMA_REVISION
+        )
         if retained == "live-default":
             assert (
                 await session.get(
@@ -232,5 +237,7 @@ async def test_empty_upgrade_downgrade_preserves_existing_groups(
                 select(AccessGroupRow.id).where(AccessGroupRow.project_id == scope.project_id.value)
             )
         ) == set(original_ids)
-        assert await session.scalar(select(AlembicVersionRow.version_num)) == "0034_human_lifecycle"
+        assert (
+            await session.scalar(select(AlembicVersionRow.version_num)) == SUPPORTED_SCHEMA_REVISION
+        )
         assert list(await session.scalars(select(ProjectUploadDefaultGroupRow.group_id))) == []

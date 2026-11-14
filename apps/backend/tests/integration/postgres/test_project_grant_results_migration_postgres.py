@@ -18,7 +18,10 @@ from inframeld_backend.access.infrastructure.rows.project_action_grant_operation
     ProjectActionGrantOperationResultRow,
 )
 from inframeld_backend.access.infrastructure.rows.project_row import ProjectRow
-from inframeld_backend.shared.infrastructure.migrations.migration_runner import ALEMBIC_CONFIG_PATH
+from inframeld_backend.shared.infrastructure.migrations.migration_runner import (
+    ALEMBIC_CONFIG_PATH,
+    SUPPORTED_SCHEMA_REVISION,
+)
 from inframeld_backend.shared.infrastructure.resources.database import Database
 from inframeld_backend.shared.infrastructure.rows.alembic_version_row import AlembicVersionRow
 from inframeld_backend.shared.infrastructure.settings.database_settings import DatabaseSettings
@@ -138,7 +141,9 @@ async def test_retained_original_receipt_refuses_downgrade_and_keeps_schema_and_
     with database_connection(temporary_postgres_settings) as connection:
         assert inspect(connection).has_table("project_action_grant_operation_results")
     async with database.session() as session:
-        assert await session.scalar(select(AlembicVersionRow.version_num)) == "0034_human_lifecycle"
+        assert (
+            await session.scalar(select(AlembicVersionRow.version_num)) == SUPPORTED_SCHEMA_REVISION
+        )
         row = await session.get(
             ProjectActionGrantOperationResultRow, original.operation.operation_id.value
         )

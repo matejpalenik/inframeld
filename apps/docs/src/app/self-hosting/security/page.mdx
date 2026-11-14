@@ -19,6 +19,27 @@ Use HTTPS for remote installations and the account site. Preserve certificate an
 
 Keep secrets out of source control, URLs, command arguments, shared screenshots and logs. Use the installation's supported protected credential channels. Public CA bundles contain certificates, not private keys.
 
+## Approve model destinations
+
+The operator decides which exact model base URLs Projects can save. Set the backend deployment environment before starting or recreating the API process. Each setting accepts a JSON array of base URLs and defaults to an empty list.
+
+<CodeGroup>
+
+```dotenv
+INFRAMELD_MODEL_CONNECTION_DESTINATIONS__HTTPS_BASE_URLS=["https://api.openai.com/v1","https://models.example.test/v1"]
+INFRAMELD_MODEL_CONNECTION_DESTINATIONS__LOCAL_OLLAMA_BASE_URLS=["http://127.0.0.1:11434"]
+```
+
+</CodeGroup>
+
+Use the exact HTTPS base URL, including the path and trailing slash if present. The official `openai` profile requires `https://api.openai.com/v1`. An `openai-compatible` profile uses one approved HTTPS URL. Both select `api-key` authentication. Keep credentials in their protected channel and out of the base URL. Omit a row you do not intend to approve.
+
+An `ollama` profile selects `none` and can save an explicitly approved HTTP loopback IP URL. Its address belongs to the backend's runtime network namespace. Inside a container, `127.0.0.1` means that container's loopback. Approving a URL controls saving. Saving performs no DNS or provider request and does not verify reachability.
+
+## Recover a stranded model grant
+
+If an exact model action has no eligible human grantor, contact the host operator. [Private authority repair](https://github.com/matejpalenik/inframeld/blob/main/.agents/skills/inframeld-access-models/references/host-maintenance.md#access-owned-authority-repair) requires an independently confirmed installation and fresh proof for the intended existing human Project member. The reviewed target is one `model-connection` with its `projectId`, `modelConnectionId` and exact `actionId` under `action-grantor`. The operator rechecks that the responsibility is still stranded and the Project Access revision still matches. For lost output, keep the same operation and reviewed meaning and use fresh same-person proof. A completed replay cannot restore a later-removed assignment.
+
 ## Review user access
 
 Apply current membership and action permissions. Administrators have no general document-reading bypass. [Projects and permissions](/product/projects-and-permissions) explains the user model and [authentication](/api-reference#authentication) distinguishes browser and bearer requests.

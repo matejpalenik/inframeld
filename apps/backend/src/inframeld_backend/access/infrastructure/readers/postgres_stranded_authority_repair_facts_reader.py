@@ -26,6 +26,9 @@ from inframeld_backend.access.application.dtos.human_credential_facts_dto import
 from inframeld_backend.access.application.dtos.human_oauth_credential_binding_dto import (
     HumanOAuthCredentialBindingDTO,
 )
+from inframeld_backend.access.application.dtos.model_connection_grant_target_dto import (
+    ModelConnectionGrantTargetDTO,
+)
 from inframeld_backend.access.application.dtos.organization_grant_target_dto import (
     OrganizationGrantTargetDTO,
 )
@@ -96,6 +99,10 @@ from inframeld_backend.access.infrastructure.rows.group_membership_row import Gr
 from inframeld_backend.access.infrastructure.rows.host_maintenance_receipt_row import (
     HostMaintenanceReceiptRow,
 )
+from inframeld_backend.access.infrastructure.rows.model_connection_action_grant_row import (
+    ModelConnectionActionGrantRow,
+)
+from inframeld_backend.access.infrastructure.rows.model_connection_row import ModelConnectionRow
 from inframeld_backend.access.infrastructure.rows.organization_action_grant_row import (
     OrganizationActionGrantRow,
 )
@@ -111,6 +118,7 @@ from inframeld_backend.access.infrastructure.rows.project_row import ProjectRow
 from inframeld_backend.access.infrastructure.rows.stranded_authority_repair_receipt_row import (
     StrandedAuthorityRepairReceiptRow,
 )
+from inframeld_backend.shared.application.value_objects.model_connection_id import ModelConnectionId
 from inframeld_backend.shared.application.value_objects.operation_id import OperationId
 from inframeld_backend.shared.application.value_objects.request_fingerprint import (
     RequestFingerprint,
@@ -339,6 +347,16 @@ class PostgresStrandedAuthorityRepairFactsReader(StrandedAuthorityRepairFactsRea
                 )
             )
             return accepts_assignment is not None, accepts_assignment is True
+        elif isinstance(responsibility.target, ModelConnectionGrantTargetDTO):
+            target = responsibility.target
+            active = await self._session.scalar(
+                select(ModelConnectionRow.retired_at.is_(None)).where(
+                    ModelConnectionRow.id == target.model_connection_id.value,
+                    ModelConnectionRow.project_id == target.project_id.value,
+                    ModelConnectionRow.organization_id == organization.value,
+                )
+            )
+            return active is not None, active is True
         else:
             return True, True
         group_exists = bool(
@@ -437,6 +455,20 @@ class PostgresStrandedAuthorityRepairFactsReader(StrandedAuthorityRepairFactsRea
                         GroupMembershipRow.project_id == target.project_id.value,
                         GroupMembershipRow.group_id == target.access_group_id.value,
                         GroupMembershipRow.principal_id == PrincipalRow.id,
+                    )
+                    .correlate(PrincipalRow)
+                )
+            elif isinstance(target, ModelConnectionGrantTargetDTO):
+                grant = ModelConnectionActionGrantRow
+                delegated = (
+                    exists()
+                    .where(
+                        grant.project_id == target.project_id.value,
+                        grant.model_connection_id == target.model_connection_id.value,
+                        grant.recipient_principal_id == PrincipalRow.id,
+                        grant.recipient_kind == PrincipalKind.HUMAN,
+                        grant.action == action,
+                        grant.can_grant.is_(True),
                     )
                     .correlate(PrincipalRow)
                 )
@@ -594,6 +626,7 @@ class PostgresStrandedAuthorityRepairFactsReader(StrandedAuthorityRepairFactsRea
             and row.target_kind == "access-group"
             and row.project_id is not None
             and row.access_group_id is not None
+            and row.model_connection_id is None
             and row.application_account_id is None
             and row.action_id is None
         ):
@@ -610,6 +643,7 @@ class PostgresStrandedAuthorityRepairFactsReader(StrandedAuthorityRepairFactsRea
             row.target_kind == "organization"
             and row.project_id is None
             and row.access_group_id is None
+            and row.model_connection_id is None
             and row.application_account_id is None
         ):
             target = OrganizationGrantTargetDTO(OrganizationId(row.organization_id))
@@ -617,6 +651,7 @@ class PostgresStrandedAuthorityRepairFactsReader(StrandedAuthorityRepairFactsRea
             row.target_kind == "project"
             and row.project_id is not None
             and row.access_group_id is None
+            and row.model_connection_id is None
             and row.application_account_id is None
             and action.value != ProjectAction.EDIT_PROJECT_METADATA.value
         ):
@@ -625,6 +660,7 @@ class PostgresStrandedAuthorityRepairFactsReader(StrandedAuthorityRepairFactsRea
             row.target_kind == "access-group"
             and row.project_id is not None
             and row.access_group_id is not None
+            and row.model_connection_id is None
             and row.application_account_id is None
         ):
             target = AccessGroupGrantTargetDTO(
@@ -634,10 +670,21 @@ class PostgresStrandedAuthorityRepairFactsReader(StrandedAuthorityRepairFactsRea
             row.target_kind == "application-account"
             and row.project_id is not None
             and row.access_group_id is None
+            and row.model_connection_id is None
             and row.application_account_id is not None
         ):
             target = ApplicationAccountGrantTargetDTO(
                 ProjectId(row.project_id), PrincipalId(row.application_account_id)
+            )
+        elif (
+            row.target_kind == "model-connection"
+            and row.project_id is not None
+            and row.access_group_id is None
+            and row.application_account_id is None
+            and row.model_connection_id is not None
+        ):
+            target = ModelConnectionGrantTargetDTO(
+                ProjectId(row.project_id), ModelConnectionId(row.model_connection_id)
             )
         else:
             raise ValueError("Incoherent retained target scope.")

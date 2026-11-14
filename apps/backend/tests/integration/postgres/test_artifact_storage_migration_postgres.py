@@ -50,6 +50,7 @@ from inframeld_backend.shared.application.enums.operation_reservation_state impo
 from inframeld_backend.shared.application.value_objects.operation_id import OperationId
 from inframeld_backend.shared.infrastructure.migrations.migration_runner import (
     BACKEND_ROOT,
+    SUPPORTED_SCHEMA_REVISION,
     run_migrations,
 )
 from inframeld_backend.shared.infrastructure.repositories.postgres_job_store import PostgresJobStore
@@ -322,7 +323,7 @@ async def test_artifact_upgrade_preserves_0014_metadata_deletion_status_product_
         async with database.session() as session:
             assert (
                 await session.scalar(select(AlembicVersionRow.version_num))
-                == "0034_human_lifecycle"
+                == SUPPORTED_SCHEMA_REVISION
             )
             snapshot = await PostgresJobStore(session).find(OperationId("original-job"))
             assert snapshot is not None and snapshot.job_id.value == job_id
@@ -462,7 +463,7 @@ async def test_retained_artifact_ownership_refuses_downgrade_without_changing_st
         async with database.session() as session:
             assert (
                 await session.scalar(select(AlembicVersionRow.version_num))
-                == "0034_human_lifecycle"
+                == SUPPORTED_SCHEMA_REVISION
             )
             attempt = await session.get(ArtifactAttemptRow, scenario.attempt_id.value)
             reservation = await session.get(

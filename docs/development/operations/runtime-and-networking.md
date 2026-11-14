@@ -6,6 +6,21 @@ The supported design is a single-server Docker Compose installation. The current
 
 The opt-in `jobs` Compose profile runs the [ordinary application worker](application-jobs.md), with PostgreSQL-backed claims, checkpoints and bounded shutdown. Its production registry contains the artifact cleanup and Project deletion handlers. The `recovery` profile runs one separate recovery worker for routine identity recovery and suspension cleanup. Both families share one live local attempt, independent of ordinary job capacity. The worker has no listener and uses private Hydra administration plus private Kratos administration when suspension cleanup is enabled. Stop an older worker and confirm its exit before starting the first replacement with the shared claim guard. An earlier remote request can finish after its lease expires. [Local setup](../getting-started/local-setup.md#private-recovery-callbacks) owns the settings, and [protected maintenance](../getting-started/local-setup.md#inspect-or-continue-suspension-cleanup) owns the operator procedure. These processes do not establish delivery of the full product workload.
 
+<a id="model-destination-allowlists"></a>
+
+## Approve saved model destinations
+
+The API process reads the deployment's exact model-destination lists through the backend settings. Both lists default to empty. Set their values as JSON arrays in the environment passed to the API, then start or recreate that process with the new configuration.
+
+```dotenv
+INFRAMELD_MODEL_CONNECTION_DESTINATIONS__HTTPS_BASE_URLS=["https://api.openai.com/v1","https://models.example.test/v1"]
+INFRAMELD_MODEL_CONNECTION_DESTINATIONS__LOCAL_OLLAMA_BASE_URLS=["http://127.0.0.1:11434"]
+```
+
+The local Ollama exception applies to an explicitly approved, credential-free HTTP loopback IP URL in the backend's network namespace. A host service on 127.0.0.1 is not reached through a container's 127.0.0.1. Never expose provider administration or broaden networking to satisfy a save check.
+
+The save-time policy checks the exact approved base URL, provider and authentication method without resolving or contacting the provider. Later calls need the separate [actual outbound destination enforcement](../../../.agents/skills/inframeld-application-contracts/references/model-dispatch-and-destinations.md#destinations). Save approval establishes no network reachability, credential or model-validation result.
+
 <a id="operate-within-visible-limits"></a>
 
 <a id="operations"></a>

@@ -24,6 +24,7 @@ def test_registered_exact_grant_contracts_keep_flat_receipts_and_safe_numeric_bo
             "/v1/projects/{project_id}/application-accounts/{application_principal_id}",
             {"projectId", "applicationPrincipalId"},
         ),
+        ("ModelConnection", "/v1/model-connections/{model_connection_id}", {"modelConnectionId"}),
     ):
         request = models[stem + "ActionGrantRequest"]
         assert set(request["required"]) == {"canGrant", "expectedAccessRevision"}
@@ -70,7 +71,12 @@ def test_registered_exact_grant_contracts_keep_flat_receipts_and_safe_numeric_bo
         scalar[name]["in"] == "query"
         for name in ("targetKind", "targetId", "actionId", "limit", "cursor")
     )
-    assert models["GrantTargetKind"]["enum"] == ["project", "access-group", "application-account"]
+    assert models["GrantTargetKind"]["enum"] == [
+        "project",
+        "access-group",
+        "application-account",
+        "model-connection",
+    ]
     assert set(models["GrantRecipientResponse"]["properties"]) == {
         "principalId",
         "displayName",

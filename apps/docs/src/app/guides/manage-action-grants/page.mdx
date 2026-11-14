@@ -1,14 +1,14 @@
 export const pageMetadata = {
-  title: "Manage Organization, group and application grants",
+  title: "Manage exact action grants",
   description:
     "Find an eligible recipient, inspect exact action assignments and deliberately set or remove a grant.",
 }
 
-# Manage Organization, group and application grants
+# Manage exact action grants
 
 Alice shares responsibility for Support with Bob. She can give him one installation permission, permission to add documents through SupportKnowledge, or permission to administer SupportBot. Each assignment identifies one recipient, one action and one exact target. Changing it leaves the recipient's other assignments alone.
 
-Use this guide for Organization, access-group and application-account grants. [Manage Project action grants](/guides/assign-project-grant) covers the existing Project operations and all eighteen Project actions. Other resource features supply their own grant integration when their resources are available.
+Use this guide for Organization, access-group, application-account and model-connection grants. [Manage Project action grants](/guides/assign-project-grant) covers the existing Project operations and all eighteen Project actions. Other resource features supply their own grant integration when their resources are available.
 
 ## Prepare the target and current authority
 
@@ -30,15 +30,16 @@ Cookie-authenticated writes retain the installation's trusted Origin requirement
 
 The target determines the action and eligible recipient:
 
-| Target              | Meaning                                                                             | Recipient                                                      |
-| ------------------- | ----------------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| Organization        | `admit-users`, `suspend-users`, `restore-users` or `create-projects`                | An eligible admitted human in that Organization                |
-| Access group        | `add-documents`, `update-documents` or `delete-documents`                           | An eligible human or application account in the owning Project |
-| Application account | `issue-application-keys`, `revoke-application-keys` or `delete-application-account` | An eligible human member of the owning Project                 |
+| Target              | Meaning                                                                                              | Recipient                                                                                                             |
+| ------------------- | ---------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Organization        | `admit-users`, `suspend-users`, `restore-users` or `create-projects`                                 | An eligible admitted human in that Organization                                                                       |
+| Access group        | `add-documents`, `update-documents` or `delete-documents`                                            | An eligible human or application account in the owning Project                                                        |
+| Application account | `issue-application-keys`, `revoke-application-keys` or `delete-application-account`                  | An eligible human member of the owning Project                                                                        |
+| Model connection    | [One exact configuration-view, use, management or deletion action](#grant-use-of-a-model-connection) | An eligible human in the owning Project. An eligible application can receive only use-only configuration-view or use. |
 
 An Organization grant uses the Organization's current Access revision. [Read your own Organization access](/guides/create-project#read-your-organization-access) to obtain the Organization ID, current revision and your stored Organization grants. The read requires current admitted-human eligibility and reveals only your own access.
 
-A group or application-account grant uses the owning Project's current Access revision. [Read your own Project access](/guides/assign-project-grant#read-your-project-access-and-current-revision) before a fresh change. Its typed grant targets distinguish Project, group and application-account assignments. Follow a non-null cursor to review the remaining stored entries. Neither an own-access page nor an old receipt authorizes a later change.
+A group, application-account or model-connection grant uses the owning Project's current Access revision. [Read your own Project access](/guides/assign-project-grant#read-your-project-access-and-current-revision) before a fresh change. Its typed grant targets distinguish Project, group and application-account assignments. Follow a non-null cursor to review the remaining stored entries. Neither an own-access page nor an old receipt authorizes a later change.
 
 `canGrant: false` gives use-only permission. `true` permits use and administration of that same action on that exact target. A human group recipient may receive either level. An application recipient can receive only an eligible use-only assignment. To take permission away, remove the assignment rather than setting `canGrant` to `false`.
 
@@ -66,7 +67,7 @@ export DISCOVERY_ACTION_ID="$GROUP_ACTION_ID"
 
 ## Find an eligible Project recipient
 
-Use recipient discovery when choosing a recipient for a Project, group or application-account grant. Supply the exact target kind, target ID and action within its owning Project. The supported kinds are `project`, `access-group` and `application-account`. For a Project target, its ID must equal the Project in the request path.
+Use recipient discovery when choosing a recipient for a Project, group, application-account or model-connection grant. Supply the exact target kind, target ID and action within its owning Project. The supported kinds are `project`, `access-group`, `application-account` and `model-connection`. For a model connection, use its permanent connection ID as `targetId` and its owning Project in the path. For a Project target, its ID must equal the Project in the request path.
 
 For example, list eligible recipients of `add-documents` on SupportKnowledge with the prepared group and Project IDs:
 
@@ -307,6 +308,39 @@ Do not refresh an uncertain request's revision, change its level or choose a new
 | `503` or a lost response | Keep the original context and reconcile uncertainty before another change.                                                                                  |
 
 Own-access reads, grant pages, recipient pages and grant receipts are no-store. [The API reference](/api-reference/projects-and-access) provides the native operation and model views.
+
+## Grant use of a model connection
+
+Alice wants Bob to use `company-gateway`. She can grant Use and keep configuration access separate. Choose the exact action:
+
+| Action                                | What the assignment enables                                     |
+| ------------------------------------- | --------------------------------------------------------------- |
+| `view-model-connection-configuration` | Inspect the allowed saved configuration and usage observations. |
+| `use-model-connection`                | Authorize this connection for a supported consumer.             |
+| `manage-model-connection`             | Hold the human-only authority for connection management.        |
+| `delete-model-connection`             | Hold the human-only authority for connection deletion.          |
+
+The management and deletion actions can already be assigned. Their corresponding connection operations are separate features. Use `canGrant: false` for Bob's use-only assignment. Alice needs current use-and-grant authority for `use-model-connection` on the exact connection. Bob must be an eligible member of its Project. An eligible application in the owning Project may receive use-only configuration-view or use.
+
+[Find an eligible Project recipient](#find-an-eligible-project-recipient) with `targetKind=model-connection`, the returned connection ID as `targetId` and `actionId=use-model-connection`. Read the owning [Project Access revision](/guides/assign-project-grant#read-your-project-access-and-current-revision). Supply the same connection ID as `MODEL_CONNECTION_ID`, Bob's ID as `RECIPIENT_ID`, the reviewed revision as `EXPECTED_ACCESS_REVISION` and one retained key as `MODEL_GRANT_KEY`.
+
+<CodeGroup>
+
+```shell {{ title: "cURL" }}
+curl --fail-with-body --silent --show-error --max-time 5 \
+  --request PUT \
+  --url "$INFRAMELD_URL/v1/model-connections/$MODEL_CONNECTION_ID/grants/$RECIPIENT_ID/use-model-connection" \
+  --header @- \
+  --header "Idempotency-Key: $MODEL_GRANT_KEY" \
+  --header 'Content-Type: application/json' \
+  --data "{\"canGrant\":false,\"expectedAccessRevision\":$EXPECTED_ACCESS_REVISION}" <<EOF_HEADERS
+Authorization: Bearer $INFRAMELD_TOKEN
+EOF_HEADERS
+```
+
+</CodeGroup>
+
+A new assignment returns `201`. An existing assignment returns `200`. Inspect current grants with exact `actionId=use-model-connection`. To remove the assignment, review the current Project Access revision and use the bodyless DELETE with its own key. Both operations and SDK shapes are in the [API reference](/api-reference/projects-and-access#read-model-connection-action-grants). To recover an uncertain result, keep the original method, path, reviewed revision, key and meaning. [Recover an uncertain result](#recover-an-uncertain-result) explains current authority and replay.
 
 ## Use a generated client
 

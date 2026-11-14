@@ -14,6 +14,9 @@ from inframeld_backend.access.application.dtos.action_grantor_repair_responsibil
 from inframeld_backend.access.application.dtos.group_manager_repair_responsibility_dto import (
     GroupManagerRepairResponsibilityDTO,
 )
+from inframeld_backend.access.application.dtos.model_connection_grant_target_dto import (
+    ModelConnectionGrantTargetDTO,
+)
 from inframeld_backend.access.application.dtos.organization_grant_target_dto import (
     OrganizationGrantTargetDTO,
 )
@@ -51,6 +54,9 @@ from inframeld_backend.access.infrastructure.rows.group_manager_row import Group
 from inframeld_backend.access.infrastructure.rows.group_membership_row import GroupMembershipRow
 from inframeld_backend.access.infrastructure.rows.host_maintenance_receipt_row import (
     HostMaintenanceReceiptRow,
+)
+from inframeld_backend.access.infrastructure.rows.model_connection_action_grant_row import (
+    ModelConnectionActionGrantRow,
 )
 from inframeld_backend.access.infrastructure.rows.organization_action_grant_row import (
     OrganizationActionGrantRow,
@@ -166,6 +172,7 @@ class PostgresStrandedAuthorityRepairWriter(StrandedAuthorityRepairWriter):
         project: UUID | None = None
         group: UUID | None = None
         application: UUID | None = None
+        model_connection: UUID | None = None
         action: str | None = None
         if isinstance(responsibility, GroupManagerRepairResponsibilityDTO):
             target_kind = "access-group"
@@ -182,6 +189,12 @@ class PostgresStrandedAuthorityRepairWriter(StrandedAuthorityRepairWriter):
                     "access-group",
                     target.project_id.value,
                     target.access_group_id.value,
+                )
+            elif isinstance(target, ModelConnectionGrantTargetDTO):
+                target_kind, project, model_connection = (
+                    "model-connection",
+                    target.project_id.value,
+                    target.model_connection_id.value,
                 )
             else:
                 target_kind, project, application = (
@@ -203,6 +216,7 @@ class PostgresStrandedAuthorityRepairWriter(StrandedAuthorityRepairWriter):
             project_id=project,
             access_group_id=group,
             application_account_id=application,
+            model_connection_id=model_connection,
             action_id=action,
         )
 
@@ -380,6 +394,29 @@ class PostgresStrandedAuthorityRepairWriter(StrandedAuthorityRepairWriter):
                             GroupActionGrantRow.group_id,
                             GroupActionGrantRow.recipient_principal_id,
                             GroupActionGrantRow.action,
+                        ],
+                        set_=replacement,
+                    )
+                )
+            elif isinstance(target, ModelConnectionGrantTargetDTO):
+                grant = ModelConnectionActionGrantRow
+                statement = (
+                    insert(grant)
+                    .values(
+                        project_id=target.project_id.value,
+                        model_connection_id=target.model_connection_id.value,
+                        recipient_principal_id=recipient,
+                        recipient_kind=PrincipalKind.HUMAN,
+                        action=action,
+                        can_grant=True,
+                        assigned_by_principal_id=None,
+                    )
+                    .on_conflict_do_update(
+                        index_elements=[
+                            grant.project_id,
+                            grant.model_connection_id,
+                            grant.recipient_principal_id,
+                            grant.action,
                         ],
                         set_=replacement,
                     )

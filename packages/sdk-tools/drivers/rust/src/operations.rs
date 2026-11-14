@@ -299,6 +299,125 @@ pub async fn observe(
                 )
                 .await
         ),
+        "createModelConnection" => observed!(
+            client
+                .create_model_connection(
+                    request.path.as_ref().unwrap()["project_id"]
+                        .as_str()
+                        .unwrap(),
+                    &request.headers["Idempotency-Key"],
+                    serde_json::from_value(body).unwrap(),
+                )
+                .await
+        ),
+        "getModelConnection" => observed!(
+            client
+                .get_model_connection(
+                    request.path.as_ref().unwrap()["project_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.path.as_ref().unwrap()["model_connection_id"]
+                        .as_str()
+                        .unwrap(),
+                )
+                .await
+        ),
+        "listModelConnections" => observed!(
+            client
+                .list_model_connections(
+                    request.path.as_ref().unwrap()["project_id"]
+                        .as_str()
+                        .unwrap(),
+                    request
+                        .query
+                        .as_ref()
+                        .and_then(|query| query.get("limit"))
+                        .and_then(Value::as_i64),
+                    request
+                        .query
+                        .as_ref()
+                        .and_then(|query| query.get("cursor"))
+                        .and_then(Value::as_str),
+                )
+                .await
+        ),
+        "listModelConnectionUsage" => observed!(
+            client
+                .list_model_connection_usage(
+                    request.path.as_ref().unwrap()["project_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.path.as_ref().unwrap()["model_connection_id"]
+                        .as_str()
+                        .unwrap(),
+                    request
+                        .query
+                        .as_ref()
+                        .and_then(|query| query.get("limit"))
+                        .and_then(Value::as_i64),
+                    request
+                        .query
+                        .as_ref()
+                        .and_then(|query| query.get("cursor"))
+                        .and_then(Value::as_str),
+                )
+                .await
+        ),
+        "listModelConnectionActionGrants" => observed!(
+            client
+                .list_model_connection_action_grants(
+                    request.path.as_ref().unwrap()["model_connection_id"]
+                        .as_str()
+                        .unwrap(),
+                    serde_json::from_value(request.query.as_ref().unwrap()["actionId"].clone())
+                        .unwrap(),
+                    request
+                        .query
+                        .as_ref()
+                        .and_then(|query| query.get("limit"))
+                        .and_then(Value::as_i64),
+                    request
+                        .query
+                        .as_ref()
+                        .and_then(|query| query.get("cursor"))
+                        .and_then(Value::as_str),
+                )
+                .await
+        ),
+        "setModelConnectionActionGrant" => observed!(
+            client
+                .set_model_connection_action_grant(
+                    request.path.as_ref().unwrap()["model_connection_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.path.as_ref().unwrap()["recipient_principal_id"]
+                        .as_str()
+                        .unwrap(),
+                    serde_json::from_value(request.path.as_ref().unwrap()["action_id"].clone())
+                        .unwrap(),
+                    &request.headers["Idempotency-Key"],
+                    serde_json::from_value(body).unwrap(),
+                )
+                .await
+        ),
+        "removeModelConnectionActionGrant" => observed!(
+            client
+                .remove_model_connection_action_grant(
+                    request.path.as_ref().unwrap()["model_connection_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.path.as_ref().unwrap()["recipient_principal_id"]
+                        .as_str()
+                        .unwrap(),
+                    serde_json::from_value(request.path.as_ref().unwrap()["action_id"].clone())
+                        .unwrap(),
+                    request.query.as_ref().unwrap()["expectedAccessRevision"]
+                        .as_i64()
+                        .unwrap(),
+                    &request.headers["Idempotency-Key"],
+                )
+                .await
+        ),
         "listProjectGrantRecipients" => observed!(
             client
                 .list_project_grant_recipients(

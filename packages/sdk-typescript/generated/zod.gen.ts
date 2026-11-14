@@ -394,7 +394,8 @@ export const zCurrentSessionResponse = z.object({
 export const zGrantTargetKind = z.enum([
     'project',
     'access-group',
-    'application-account'
+    'application-account',
+    'model-connection'
 ]);
 
 /**
@@ -862,6 +863,170 @@ export const zKnownJobReferenceResponse = z.object({
 });
 
 /**
+ * ModelConnectionAction
+ */
+export const zModelConnectionAction = z.enum([
+    'view-model-connection-configuration',
+    'use-model-connection',
+    'manage-model-connection',
+    'delete-model-connection'
+]);
+
+/**
+ * ModelConnectionActionGrantItemResponse
+ */
+export const zModelConnectionActionGrantItemResponse = z.object({
+    actionId: zModelConnectionAction,
+    canGrant: z.boolean(),
+    modelConnectionId: z.uuid(),
+    recipientPrincipalId: z.uuid()
+});
+
+/**
+ * ModelConnectionActionGrantRemovalResponse
+ */
+export const zModelConnectionActionGrantRemovalResponse = z.object({
+    accessRevision: z.int().gte(0).lte(9007199254740991),
+    actionId: zModelConnectionAction,
+    changed: z.boolean(),
+    idempotencyExpiresAt: z.iso.datetime(),
+    modelConnectionId: z.uuid(),
+    operationId: z.string().min(1).max(128),
+    recipientPrincipalId: z.uuid(),
+    removed: z.literal(true)
+});
+
+/**
+ * ModelConnectionActionGrantRequest
+ */
+export const zModelConnectionActionGrantRequest = z.object({
+    canGrant: z.boolean(),
+    expectedAccessRevision: z.int().gte(0).lte(9007199254740991)
+});
+
+/**
+ * ModelConnectionActionGrantResponse
+ */
+export const zModelConnectionActionGrantResponse = z.object({
+    accessRevision: z.int().gte(0).lte(9007199254740991),
+    actionId: zModelConnectionAction,
+    canGrant: z.boolean(),
+    changed: z.boolean(),
+    idempotencyExpiresAt: z.iso.datetime(),
+    modelConnectionId: z.uuid(),
+    operationId: z.string().min(1).max(128),
+    recipientPrincipalId: z.uuid()
+});
+
+/**
+ * ModelConnectionAuthentication
+ */
+export const zModelConnectionAuthentication = z.enum(['api-key', 'none']);
+
+/**
+ * ModelConnectionCredentialResponse
+ */
+export const zModelConnectionCredentialResponse = z.object({
+    present: z.boolean(),
+    revision: z.int().gte(0).lte(9007199254740991)
+});
+
+/**
+ * ModelConnectionGrantTargetResponse
+ */
+export const zModelConnectionGrantTargetResponse = z.object({
+    kind: z.literal('model-connection'),
+    modelConnectionId: z.uuid()
+});
+
+/**
+ * InitialModelConnectionGrantResponse
+ */
+export const zInitialModelConnectionGrantResponse = z.object({
+    actionId: zModelConnectionAction,
+    canGrant: z.literal(true),
+    target: zModelConnectionGrantTargetResponse
+});
+
+/**
+ * ModelConnectionProvider
+ */
+export const zModelConnectionProvider = z.enum([
+    'openai',
+    'openai-compatible',
+    'ollama'
+]);
+
+/**
+ * ModelConnectionAccessRequest
+ */
+export const zModelConnectionAccessRequest = z.object({
+    apiVersion: z.string().max(128).nullable(),
+    authentication: zModelConnectionAuthentication,
+    baseUrl: z.string().min(1).max(2048),
+    provider: zModelConnectionProvider
+});
+
+/**
+ * ModelConnectionAccessResponse
+ */
+export const zModelConnectionAccessResponse = z.object({
+    apiVersion: z.string().nullable(),
+    authentication: zModelConnectionAuthentication,
+    baseUrl: z.string(),
+    provider: zModelConnectionProvider
+});
+
+/**
+ * ModelConnectionCreationRequest
+ */
+export const zModelConnectionCreationRequest = z.object({
+    access: zModelConnectionAccessRequest,
+    displayName: z.string().min(1).max(128),
+    name: z.string().min(1).max(63).regex(/^[a-z](?:[a-z0-9-]*[a-z0-9])?$/)
+});
+
+/**
+ * ModelConnectionResponse
+ *
+ * Return only current configuration and public credential presence metadata.
+ */
+export const zModelConnectionResponse = z.object({
+    access: zModelConnectionAccessResponse,
+    connectionAccessRevision: z.int().gte(0).lte(9007199254740991),
+    credential: zModelConnectionCredentialResponse,
+    displayName: z.string(),
+    modelConnectionId: z.uuid(),
+    name: z.string(),
+    projectId: z.uuid()
+});
+
+/**
+ * ModelConnectionCreationResponse
+ */
+export const zModelConnectionCreationResponse = z.object({
+    connection: zModelConnectionResponse,
+    idempotencyExpiresAt: z.iso.datetime(),
+    initialGrants: z.tuple([
+        zInitialModelConnectionGrantResponse,
+        zInitialModelConnectionGrantResponse,
+        zInitialModelConnectionGrantResponse,
+        zInitialModelConnectionGrantResponse
+    ]),
+    operationId: z.string(),
+    projectAccessRevision: z.int().gte(1).lte(9007199254740991)
+});
+
+/**
+ * ModelRole
+ */
+export const zModelRole = z.enum([
+    'generation',
+    'embedding',
+    'reranking'
+]);
+
+/**
  * MyProjectAccessGroupResponse
  */
 export const zMyProjectAccessGroupResponse = z.object({
@@ -895,6 +1060,7 @@ export const zOperationLookupAuthorityFamily = z.enum([
     'organization_grant_read',
     'access_group_grant_read',
     'application_account_grant_read',
+    'model_connection_grant_read',
     'access_group_deletion',
     'project_deletion'
 ]);
@@ -1017,6 +1183,22 @@ export const zPageResponseApplicationAccountActionGrantItemResponse = z.object({
  */
 export const zPageResponseApplicationKeyMetadataResponse = z.object({
     items: z.array(zApplicationKeyMetadataResponse),
+    nextCursor: z.string().nullable()
+});
+
+/**
+ * PageResponse[ModelConnectionActionGrantItemResponse]
+ */
+export const zPageResponseModelConnectionActionGrantItemResponse = z.object({
+    items: z.array(zModelConnectionActionGrantItemResponse),
+    nextCursor: z.string().nullable()
+});
+
+/**
+ * PageResponse[ModelConnectionResponse]
+ */
+export const zPageResponseModelConnectionResponse = z.object({
+    items: z.array(zModelConnectionResponse),
     nextCursor: z.string().nullable()
 });
 
@@ -1575,6 +1757,59 @@ export const zProblemDetails = z.object({
 });
 
 /**
+ * _UsageAttemptResponse
+ */
+export const zUsageAttemptResponse = z.object({
+    connectionAccessRevision: z.int().gte(0).lte(9007199254740991),
+    credentialRevision: z.int().gte(0).lte(9007199254740991),
+    observedAt: z.iso.datetime(),
+    outcome: z.enum([
+        'accepted',
+        'failed',
+        'uncertain'
+    ]),
+    source: z.enum(['preflight', 'real-use'])
+});
+
+/**
+ * _UsageValidationResponse
+ */
+export const zUsageValidationResponse = z.object({
+    connectionAccessRevision: z.int().gte(0).lte(9007199254740991),
+    credentialRevision: z.int().gte(0).lte(9007199254740991),
+    observedAt: z.iso.datetime(),
+    source: z.enum(['preflight', 'real-use']),
+    status: z.enum(['validated', 'stale'])
+});
+
+/**
+ * ModelConnectionUsageResponse
+ *
+ * Describe a visible consumer's actual attempt and independently available validation.
+ */
+export const zModelConnectionUsageResponse = z.object({
+    consumerId: z.uuid(),
+    consumerKind: z.enum([
+        'pipeline-version',
+        'embedding-profile',
+        'processing-profile',
+        'evaluation-suite'
+    ]),
+    lastValidation: zUsageValidationResponse.nullable(),
+    latestAttempt: zUsageAttemptResponse.nullable(),
+    model: z.string(),
+    role: zModelRole
+});
+
+/**
+ * PageResponse[ModelConnectionUsageResponse]
+ */
+export const zPageResponseModelConnectionUsageResponse = z.object({
+    items: z.array(zModelConnectionUsageResponse),
+    nextCursor: z.string().nullable()
+});
+
+/**
  * HumanOAuthConsentRequest
  *
  * Choose a consent decision - account, access and lifetime come from the server.
@@ -1975,6 +2210,192 @@ export const zRevokeInvitation503Representation0Response = zProblemDetails;
  * Successful Response
  */
 export const zRevokeInvitationResponse = zInvitationRevocationResponse;
+
+export const zListModelConnectionActionGrantsPath = z.object({
+    model_connection_id: z.uuid()
+});
+
+export const zListModelConnectionActionGrantsQuery = z.object({
+    actionId: zModelConnectionAction,
+    limit: z.int().gte(1).lte(100).optional().default(25),
+    cursor: z.string().min(1).max(1024).regex(/^[A-Za-z0-9_-]+$/).nullish()
+});
+
+/**
+ * Successful Response
+ */
+export const zListModelConnectionActionGrants200Representation0Response = zPageResponseModelConnectionActionGrantItemResponse;
+
+/**
+ * Invalid authentication request
+ */
+export const zListModelConnectionActionGrants400Representation0Response = zProblemDetails;
+
+/**
+ * Unauthorized
+ */
+export const zListModelConnectionActionGrants401Representation0Response = zProblemDetails;
+
+/**
+ * Access denied
+ */
+export const zListModelConnectionActionGrants403Representation0Response = zProblemDetails;
+
+/**
+ * Resource not found
+ */
+export const zListModelConnectionActionGrants404Representation0Response = zProblemDetails;
+
+/**
+ * Revision is no longer current
+ */
+export const zListModelConnectionActionGrants409Representation0Response = zProblemDetails;
+
+/**
+ * Request validation failed
+ */
+export const zListModelConnectionActionGrants422Representation0Response = zProblemDetails;
+
+/**
+ * Dependency unavailable
+ */
+export const zListModelConnectionActionGrants503Representation0Response = zProblemDetails;
+
+/**
+ * Successful Response
+ */
+export const zListModelConnectionActionGrantsResponse = zPageResponseModelConnectionActionGrantItemResponse;
+
+export const zRemoveModelConnectionActionGrantHeaders = z.object({
+    'Idempotency-Key': z.string().min(1).max(128).regex(/.*\S.*/)
+});
+
+export const zRemoveModelConnectionActionGrantPath = z.object({
+    model_connection_id: z.uuid(),
+    recipient_principal_id: z.uuid(),
+    action_id: zModelConnectionAction
+});
+
+export const zRemoveModelConnectionActionGrantQuery = z.object({
+    expectedAccessRevision: z.int().gte(0).lte(9007199254740991)
+});
+
+/**
+ * Successful Response
+ */
+export const zRemoveModelConnectionActionGrant200Representation0Response = zModelConnectionActionGrantRemovalResponse;
+
+/**
+ * Invalid authentication request
+ */
+export const zRemoveModelConnectionActionGrant400Representation0Response = zProblemDetails;
+
+/**
+ * Unauthorized
+ */
+export const zRemoveModelConnectionActionGrant401Representation0Response = zProblemDetails;
+
+/**
+ * Access denied
+ */
+export const zRemoveModelConnectionActionGrant403Representation0Response = zProblemDetails;
+
+/**
+ * Resource not found
+ */
+export const zRemoveModelConnectionActionGrant404Representation0Response = zProblemDetails;
+
+/**
+ * Revision is no longer current
+ */
+export const zRemoveModelConnectionActionGrant409Representation0Response = zProblemDetails;
+
+/**
+ * Request validation failed
+ */
+export const zRemoveModelConnectionActionGrant422Representation0Response = zProblemDetails;
+
+/**
+ * Dependency unavailable
+ */
+export const zRemoveModelConnectionActionGrant503Representation0Response = zProblemDetails;
+
+/**
+ * Successful Response
+ */
+export const zRemoveModelConnectionActionGrantResponse = zModelConnectionActionGrantRemovalResponse;
+
+export const zSetModelConnectionActionGrantBody = zModelConnectionActionGrantRequest;
+
+export const zSetModelConnectionActionGrantHeaders = z.object({
+    'Idempotency-Key': z.string().min(1).max(128).regex(/.*\S.*/)
+});
+
+export const zSetModelConnectionActionGrantPath = z.object({
+    model_connection_id: z.uuid(),
+    recipient_principal_id: z.uuid(),
+    action_id: zModelConnectionAction
+});
+
+/**
+ * Changed or unchanged assignment.
+ */
+export const zSetModelConnectionActionGrant200Representation0Response = zModelConnectionActionGrantResponse;
+
+/**
+ * Successful Response
+ */
+export const zSetModelConnectionActionGrant201Representation0Response = zModelConnectionActionGrantResponse;
+
+/**
+ * Invalid authentication request
+ */
+export const zSetModelConnectionActionGrant400Representation0Response = zProblemDetails;
+
+/**
+ * Unauthorized
+ */
+export const zSetModelConnectionActionGrant401Representation0Response = zProblemDetails;
+
+/**
+ * Access denied
+ */
+export const zSetModelConnectionActionGrant403Representation0Response = zProblemDetails;
+
+/**
+ * Resource not found
+ */
+export const zSetModelConnectionActionGrant404Representation0Response = zProblemDetails;
+
+/**
+ * Revision is no longer current
+ */
+export const zSetModelConnectionActionGrant409Representation0Response = zProblemDetails;
+
+/**
+ * Content Too Large
+ */
+export const zSetModelConnectionActionGrant413Representation0Response = zProblemDetails;
+
+/**
+ * Unsupported Media Type
+ */
+export const zSetModelConnectionActionGrant415Representation0Response = zProblemDetails;
+
+/**
+ * Request validation failed
+ */
+export const zSetModelConnectionActionGrant422Representation0Response = zProblemDetails;
+
+/**
+ * Dependency unavailable
+ */
+export const zSetModelConnectionActionGrant503Representation0Response = zProblemDetails;
+
+/**
+ * Changed or unchanged assignment.
+ */
+export const zSetModelConnectionActionGrantResponse = zModelConnectionActionGrantResponse;
 
 /**
  * Successful Response
@@ -4669,6 +5090,215 @@ export const zUpdateProjectMetadata503Representation0Response = zProblemDetails;
  * Successful Response
  */
 export const zUpdateProjectMetadataResponse = zProjectMetadataChangeResponse;
+
+export const zListModelConnectionsPath = z.object({
+    project_id: z.uuid()
+});
+
+export const zListModelConnectionsQuery = z.object({
+    limit: z.int().gte(1).lte(100).optional().default(25),
+    cursor: z.string().min(1).max(1024).regex(/^[A-Za-z0-9_-]+$/).nullish()
+});
+
+/**
+ * Successful Response
+ */
+export const zListModelConnections200Representation0Response = zPageResponseModelConnectionResponse;
+
+/**
+ * Invalid authentication request
+ */
+export const zListModelConnections400Representation0Response = zProblemDetails;
+
+/**
+ * Unauthorized
+ */
+export const zListModelConnections401Representation0Response = zProblemDetails;
+
+/**
+ * Access denied
+ */
+export const zListModelConnections403Representation0Response = zProblemDetails;
+
+/**
+ * Resource not found
+ */
+export const zListModelConnections404Representation0Response = zProblemDetails;
+
+/**
+ * Request validation failed
+ */
+export const zListModelConnections422Representation0Response = zProblemDetails;
+
+/**
+ * Dependency unavailable
+ */
+export const zListModelConnections503Representation0Response = zProblemDetails;
+
+/**
+ * Successful Response
+ */
+export const zListModelConnectionsResponse = zPageResponseModelConnectionResponse;
+
+export const zCreateModelConnectionBody = zModelConnectionCreationRequest;
+
+export const zCreateModelConnectionHeaders = z.object({
+    'Idempotency-Key': z.string().min(1).max(128).regex(/.*\S.*/)
+});
+
+export const zCreateModelConnectionPath = z.object({
+    project_id: z.uuid()
+});
+
+/**
+ * Successful Response
+ */
+export const zCreateModelConnection201Representation0Response = zModelConnectionCreationResponse;
+
+/**
+ * Invalid authentication request
+ */
+export const zCreateModelConnection400Representation0Response = zProblemDetails;
+
+/**
+ * Unauthorized
+ */
+export const zCreateModelConnection401Representation0Response = zProblemDetails;
+
+/**
+ * Access denied
+ */
+export const zCreateModelConnection403Representation0Response = zProblemDetails;
+
+/**
+ * Resource not found
+ */
+export const zCreateModelConnection404Representation0Response = zProblemDetails;
+
+/**
+ * Operation conflicts with current state
+ */
+export const zCreateModelConnection409Representation0Response = zProblemDetails;
+
+/**
+ * Content Too Large
+ */
+export const zCreateModelConnection413Representation0Response = zProblemDetails;
+
+/**
+ * Unsupported Media Type
+ */
+export const zCreateModelConnection415Representation0Response = zProblemDetails;
+
+/**
+ * Request validation failed
+ */
+export const zCreateModelConnection422Representation0Response = zProblemDetails;
+
+/**
+ * Dependency unavailable
+ */
+export const zCreateModelConnection503Representation0Response = zProblemDetails;
+
+/**
+ * Successful Response
+ */
+export const zCreateModelConnectionResponse = zModelConnectionCreationResponse;
+
+export const zGetModelConnectionPath = z.object({
+    project_id: z.uuid(),
+    model_connection_id: z.uuid()
+});
+
+/**
+ * Successful Response
+ */
+export const zGetModelConnection200Representation0Response = zModelConnectionResponse;
+
+/**
+ * Invalid authentication request
+ */
+export const zGetModelConnection400Representation0Response = zProblemDetails;
+
+/**
+ * Unauthorized
+ */
+export const zGetModelConnection401Representation0Response = zProblemDetails;
+
+/**
+ * Access denied
+ */
+export const zGetModelConnection403Representation0Response = zProblemDetails;
+
+/**
+ * Resource not found
+ */
+export const zGetModelConnection404Representation0Response = zProblemDetails;
+
+/**
+ * Request validation failed
+ */
+export const zGetModelConnection422Representation0Response = zProblemDetails;
+
+/**
+ * Dependency unavailable
+ */
+export const zGetModelConnection503Representation0Response = zProblemDetails;
+
+/**
+ * Successful Response
+ */
+export const zGetModelConnectionResponse = zModelConnectionResponse;
+
+export const zListModelConnectionUsagePath = z.object({
+    project_id: z.uuid(),
+    model_connection_id: z.uuid()
+});
+
+export const zListModelConnectionUsageQuery = z.object({
+    limit: z.int().gte(1).lte(100).optional().default(25),
+    cursor: z.string().min(1).max(1024).regex(/^[A-Za-z0-9_-]+$/).nullish()
+});
+
+/**
+ * Successful Response
+ */
+export const zListModelConnectionUsage200Representation0Response = zPageResponseModelConnectionUsageResponse;
+
+/**
+ * Invalid authentication request
+ */
+export const zListModelConnectionUsage400Representation0Response = zProblemDetails;
+
+/**
+ * Unauthorized
+ */
+export const zListModelConnectionUsage401Representation0Response = zProblemDetails;
+
+/**
+ * Access denied
+ */
+export const zListModelConnectionUsage403Representation0Response = zProblemDetails;
+
+/**
+ * Resource not found
+ */
+export const zListModelConnectionUsage404Representation0Response = zProblemDetails;
+
+/**
+ * Request validation failed
+ */
+export const zListModelConnectionUsage422Representation0Response = zProblemDetails;
+
+/**
+ * Dependency unavailable
+ */
+export const zListModelConnectionUsage503Representation0Response = zProblemDetails;
+
+/**
+ * Successful Response
+ */
+export const zListModelConnectionUsageResponse = zPageResponseModelConnectionUsageResponse;
 
 export const zGetMyProjectAccessPath = z.object({
     project_id: z.uuid()

@@ -330,7 +330,7 @@ A fresh `201` creates bare membership and advances the Project Access revision o
 
 Require the same current human Project authority and a retained idempotency key. DELETE accepts one `expectedAccessRevision` query value and no body. The exact human recipient may be inactive. Departure preserves the required eligible human grantors and group managers or conflicts atomically.
 
-A fresh `200` reports `removed: true` and whether membership changed. Actual removal clears only that recipient's membership and received Project/group/application-account action grants and group relationships within the Project, advancing its Access revision once. It preserves Project-owned resources, other Projects and grants issued to other people. Rejoin restores only membership.
+A fresh `200` reports `removed: true` and whether membership changed. Actual removal clears only that recipient's membership and received Project, group, application-account and model-connection action grants and group relationships within the Project, advancing its Access revision once. It preserves Project-owned resources, other Projects and grants issued to other people. Rejoin restores only membership.
 
 Exact replay requires the actor's current authority and returns the original status, receipt and expiry without repeating removal or restoring access. [Departure checks and recovery](/guides/manage-project-members#check-responsibility-before-departure) explain the guards, self-departure and uncertain outcomes.
 
@@ -352,6 +352,52 @@ Resolution uses an exact selector in the current installation and Organization. 
 
 Require current human `edit-project-metadata` authority, the reviewed metadata revision and the original idempotency key. Omitted fields preserve values. Explicit null does not clear either field. Renaming preserves the permanent ID. [The guide](/guides/name-and-rename-project) shows preparation, the typed write and uncertain-result recovery.
 
+## Create a model connection
+
+<ApiOperation operationId="createModelConnection" />
+
+A currently eligible human Project member needs permission to use `create-model-connections` and one retained `Idempotency-Key`. Supply the exact Name, display name and supported access settings. Fresh creation checks the deployment-approved base URL and saves the connection and its four exact use-and-grant creator assignments together. The creation receipt includes the resulting Project Access revision. [Save your first connection](/guides/models-and-processing#create-the-connection) shows the request and safe replay.
+
+A current eligible replay returns the original `201` receipt and original expiry. It applies no further assignments and makes no provider request. No credential, model selection or preflight belongs in this POST.
+
+## List model connections
+
+<ApiOperation operationId="listModelConnections" />
+
+List current connections in one Project that the eligible member can inspect under `view-model-connection-configuration`. The page contains `items` and nullable `nextCursor`. Continue with the same Project and the unchanged cursor. There is no installation-wide list or count of hidden connections.
+
+## Read a model connection
+
+<ApiOperation operationId="getModelConnection" />
+
+Read the exact connection in its owning Project under current `view-model-connection-configuration` authority. A visible result includes saved access settings, their revision and credential presence/revision. It carries no credential material or provider health result. Missing, inaccessible and mismatched targets retain the safe resource boundary.
+
+## List model connection usage
+
+<ApiOperation operationId="listModelConnectionUsage" />
+
+Use the same exact target and current configuration-view permission. Usage observations belong to a specific consumer, role, model and observed access/credential revisions. Latest attempt and last validation are separate observations. In this version the endpoint returns an empty page after authorizing the read. It makes no provider request and supplies no information about hidden consumers.
+
+## Read model connection action grants
+
+<ApiOperation operationId="listModelConnectionActionGrants" />
+
+List stored assignments for the required `actionId` on the exact connection. The server resolves the authoritative Project. A currently eligible human member needs use-and-grant authority for that same action. Use optional `limit` and `cursor` to continue in the same scope. For eligible recipients, use [Project recipient discovery](#find-eligible-project-grant-recipients).
+
+## Set a model connection action grant
+
+<ApiOperation operationId="setModelConnectionActionGrant" />
+
+Supply the exact connection, recipient and action, one retained idempotency key, and strict `canGrant` and `expectedAccessRevision` for the owning Project. A human can receive either level when eligible. An eligible application in the same Project can receive a use-only grant for `view-model-connection-configuration` or `use-model-connection`. Creating a new assignment returns `201`. Changing or keeping an existing one returns `200`. Only a real change advances the revision and records a change audit.
+
+## Remove a model connection action grant
+
+<ApiOperation operationId="removeModelConnectionActionGrant" />
+
+Use the same exact target and actor authority, one idempotency key and one `expectedAccessRevision` query parameter. DELETE has no body. `200` gives the original removal result. Removing or downgrading an eligible grantor must preserve another eligible human grantor for that exact action. A fresh no-op preserves the Access revision.
+
+Current authority precedes original PUT or DELETE replay. The receipt preserves the original status, effect, revision and expiry. Replay cannot restore a later-removed grant or delete a later assignment. [Grant use of a model connection](/guides/manage-action-grants#grant-use-of-a-model-connection) explains exact assignment and recovery. These operations use no-store responses.
+
 ## Read Project action grants
 
 <ApiOperation operationId="listProjectActionGrants" />
@@ -364,11 +410,11 @@ The page contains only `items` and nullable `nextCursor`. Each stored assignment
 
 <ApiOperation operationId="listProjectGrantRecipients" />
 
-`GET /v1/projects/{project_id}/grant-recipients` requires scalar `targetKind`, `targetId` and `actionId`, plus optional `limit` and `cursor`. The supported kind literals are `project`, `access-group` and `application-account`. Project `targetId` must equal the path Project. Group and account targets must have that same authoritative parent Project. There is no body, Organization target, JSON/deep-object target or global directory.
+`GET /v1/projects/{project_id}/grant-recipients` requires scalar `targetKind`, `targetId` and `actionId`, plus optional `limit` and `cursor`. The supported kind literals are `project`, `access-group`, `application-account` and `model-connection`. Project `targetId` must equal the path Project. Group, account and connection targets must have that same authoritative parent Project. There is no body, Organization target, JSON/deep-object target or global directory.
 
 Every page requires current eligible-human Project membership/visibility and exact target/action use-and-grant authority. Current management of the same group is an alternative for its three document actions. The response filters eligibility before filling the page and returns only safe `principalId`, `displayName` and `kind` values, ordered by principal ID. It defaults to 25 items, accepts at most 100 and has nullable `nextCursor` bound to the exact scope, target and action.
 
-A candidate's appearance grants no permission and cannot guarantee eligibility at a later write. The page has no Access revision, totals, received-grant inventory or credential data. Project target mismatch is invalid input; a foreign or hidden group/account retains the safe resource boundary. The response is no-store. [Find an eligible recipient](/guides/manage-action-grants#find-an-eligible-project-recipient) explains selection and continuation.
+A candidate's appearance grants no permission and cannot guarantee eligibility at a later write. The page has no Access revision, totals, received-grant inventory or credential data. Project target mismatch is invalid input; a foreign or hidden group, account or connection retains the safe resource boundary. The response is no-store. [Find an eligible recipient](/guides/manage-action-grants#find-an-eligible-project-recipient) explains selection and continuation.
 
 ## Read your own Project access
 

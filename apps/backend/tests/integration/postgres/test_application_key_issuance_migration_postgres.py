@@ -38,7 +38,10 @@ from inframeld_backend.access.infrastructure.rows.organization_row import Organi
 from inframeld_backend.access.infrastructure.rows.principal_row import PrincipalRow
 from inframeld_backend.access.infrastructure.rows.project_membership_row import ProjectMembershipRow
 from inframeld_backend.access.infrastructure.rows.project_row import ProjectRow
-from inframeld_backend.shared.infrastructure.migrations.migration_runner import ALEMBIC_CONFIG_PATH
+from inframeld_backend.shared.infrastructure.migrations.migration_runner import (
+    ALEMBIC_CONFIG_PATH,
+    SUPPORTED_SCHEMA_REVISION,
+)
 from inframeld_backend.shared.infrastructure.resources.database import Database
 from inframeld_backend.shared.infrastructure.rows.alembic_version_row import AlembicVersionRow
 from inframeld_backend.shared.infrastructure.rows.installation_identity_row import (
@@ -267,7 +270,9 @@ async def test_unequal_dual_bindings_refuse_downgrade_before_any_data_loss(
     with pytest.raises(RuntimeError, match="Unequal application-key adapter bindings"):
         command.downgrade(_config(temporary_postgres_settings), "0027_invitations")
     async with database.session() as session:
-        assert await session.scalar(select(AlembicVersionRow.version_num)) == "0034_human_lifecycle"
+        assert (
+            await session.scalar(select(AlembicVersionRow.version_num)) == SUPPORTED_SCHEMA_REVISION
+        )
         key = await session.get(ApplicationKeyRow, seed.credential.key_id.value)
         assert (
             key is not None

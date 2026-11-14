@@ -143,7 +143,7 @@ After a timeout, cancellation, lost response or decoding failure, preserve the o
 | `400`, `413` or `415`         | Correct malformed authentication, an oversized body or the PUT content type. Keep credentials out of diagnostics.                                                                                                   |
 | `503` or an unusable response | Preserve the original context and reconcile uncertainty before more work.                                                                                                                                           |
 
-The own-access GET and Project PUT/DELETE responses are no-store. [Manage the other Access-owned targets](/guides/manage-action-grants) for Organization, access-group and application-account grants and eligible-recipient discovery. Other resource grant integrations arrive with their respective features. The [Project API reference](/api-reference/projects-and-access) explains the supported operation shapes.
+The own-access GET and Project PUT/DELETE responses are no-store. [Manage exact action grants](/guides/manage-action-grants) for Organization, access-group, application-account and model-connection grants and eligible-recipient discovery. Other resource grant integrations arrive with their respective features. The [Project API reference](/api-reference/projects-and-access) explains the supported operation shapes.
 
 ## Use a generated client
 

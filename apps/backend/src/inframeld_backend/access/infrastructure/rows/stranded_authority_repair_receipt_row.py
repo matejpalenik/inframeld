@@ -26,3 +26,4 @@ class StrandedAuthorityRepairReceiptRow(AccessPersistenceBase):
     access_group_id: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True))
     application_account_id: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True))
     action_id: Mapped[str | None] = mapped_column(String(100))
+    model_connection_id: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True), default=None)

@@ -89,7 +89,7 @@ A grant lookup requires the exact grant-read family above. A weaker action-use g
 
 ## Inspect another exact grant operation
 
-For an Organization, group or application-account grant, retain the original concrete route containing the actual scope, target and recipient UUIDs and action. Use the original `PUT` or `DELETE` method. DELETE's revision query remains part of the original business request but is excluded from its lookup route. Organization grants require explicit `projectId: null`.
+For an Organization, group, application-account or model-connection grant, retain the original concrete route containing the actual scope, target and recipient UUIDs and action. Use the original `PUT` or `DELETE` method. DELETE's revision query remains part of the original business request but is excluded from its lookup route. Organization grants require explicit `projectId: null`.
 
 Choose the matching complete lookup input below and save it as `original-request.json` in its own example directory. Replace the illustrative IDs and key with the original values. The common cURL and three generated programs below use the same lookup operation for each input, without resending a grant change:
 
@@ -142,7 +142,7 @@ Choose the matching complete lookup input below and save it as `original-request
 
 </CodeGroup>
 
-The same current exact use-and-grant requirement applies to all three. A saved key, original creator receipt or current group-management relationship grants no generic-history disclosure. [Manage exact action grants](/guides/manage-action-grants#recover-an-uncertain-result) explains the ordinary business-replay alternative and current-authority checks.
+For a model-connection grant, use the original concrete `/v1/model-connections/{model_connection_id}/grants/{recipient_principal_id}/{action_id}` route and `model_connection_grant_read` with that exact action. Include the connection's authoritative `projectId` in the lookup body even though the grant route has no Project segment. The same current exact use-and-grant requirement applies to each target. A saved key, original creator receipt or current group-management relationship grants no generic-history disclosure. [Manage exact action grants](/guides/manage-action-grants#recover-an-uncertain-result) explains the ordinary business-replay alternative and current-authority checks.
 
 ## Inspect historical use-only POST metadata
 

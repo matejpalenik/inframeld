@@ -7,6 +7,9 @@ from inframeld_backend.access.application.dtos.access_group_grant_target_dto imp
 from inframeld_backend.access.application.dtos.application_account_grant_target_dto import (
     ApplicationAccountGrantTargetDTO,
 )
+from inframeld_backend.access.application.dtos.model_connection_grant_target_dto import (
+    ModelConnectionGrantTargetDTO,
+)
 from inframeld_backend.access.application.dtos.organization_grant_target_dto import (
     OrganizationGrantTargetDTO,
 )
@@ -18,6 +21,7 @@ from inframeld_backend.access.domain.enums.access_group_action import AccessGrou
 from inframeld_backend.access.domain.enums.application_account_action import (
     ApplicationAccountAction,
 )
+from inframeld_backend.access.domain.enums.model_connection_action import ModelConnectionAction
 from inframeld_backend.access.domain.enums.organization_action import OrganizationAction
 from inframeld_backend.access.domain.enums.project_action import ProjectAction
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
@@ -30,6 +34,7 @@ class ActionGrantorRepairResponsibilityDTO:
         | ProjectGrantTargetDTO
         | AccessGroupGrantTargetDTO
         | ApplicationAccountGrantTargetDTO
+        | ModelConnectionGrantTargetDTO
     )
     action_id: ActionId
     kind: Literal[RepairResponsibilityKind.ACTION_GRANTOR] = field(
@@ -43,6 +48,8 @@ class ActionGrantorRepairResponsibilityDTO:
             supported = self.action_id.value in frozenset(ProjectAction)
         elif isinstance(self.target, AccessGroupGrantTargetDTO):
             supported = self.action_id.value in frozenset(AccessGroupAction)
+        elif isinstance(self.target, ModelConnectionGrantTargetDTO):
+            supported = self.action_id.value in ModelConnectionAction
         else:
             supported = self.action_id.value in frozenset(ApplicationAccountAction)
         if not supported:

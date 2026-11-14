@@ -19,6 +19,10 @@ from tests.support.project_metadata_scenarios import (
     seed_stranded_repair_target,
 )
 
+from inframeld_backend.access.application.commands.create_model_connection_command import (
+    CreateModelConnectionCommand,
+)
+from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
 from inframeld_backend.access.application.dtos.access_group_grant_target_dto import (
     AccessGroupGrantTargetDTO,
 )
@@ -31,6 +35,9 @@ from inframeld_backend.access.application.dtos.group_manager_repair_responsibili
 from inframeld_backend.access.application.dtos.human_oauth_credential_binding_dto import (
     HumanOAuthCredentialBindingDTO,
 )
+from inframeld_backend.access.application.dtos.model_connection_access_dto import (
+    ModelConnectionAccessDTO,
+)
 from inframeld_backend.access.application.dtos.organization_grant_target_dto import (
     OrganizationGrantTargetDTO,
 )
@@ -41,7 +48,13 @@ from inframeld_backend.access.application.dtos.verified_human_identity_dto impor
 from inframeld_backend.access.application.enums.stranded_authority_maintenance_error_code import (
     StrandedAuthorityMaintenanceErrorCode,
 )
+from inframeld_backend.access.domain.enums.model_connection_action import ModelConnectionAction
+from inframeld_backend.access.domain.enums.model_connection_authentication import (
+    ModelConnectionAuthentication,
+)
+from inframeld_backend.access.domain.enums.model_connection_provider import ModelConnectionProvider
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
+from inframeld_backend.access.domain.enums.project_action import ProjectAction
 from inframeld_backend.access.domain.value_objects.human_credential_version import (
     HumanCredentialVersion,
 )
@@ -63,6 +76,9 @@ from inframeld_backend.access.infrastructure.rows.host_maintenance_receipt_row i
 from inframeld_backend.access.infrastructure.rows.human_credential_version_row import (
     HumanCredentialVersionRow,
 )
+from inframeld_backend.access.infrastructure.rows.model_connection_action_grant_row import (
+    ModelConnectionActionGrantRow,
+)
 from inframeld_backend.access.infrastructure.rows.organization_action_grant_row import (
     OrganizationActionGrantRow,
 )
@@ -83,7 +99,24 @@ from inframeld_backend.access.infrastructure.settings.human_authentication_setti
 )
 from inframeld_backend.access.infrastructure.settings.hydra_settings import HydraSettings
 from inframeld_backend.access.infrastructure.settings.kratos_settings import KratosSettings
+from inframeld_backend.access.infrastructure.settings.model_connection_destination_settings import (
+    ModelConnectionDestinationSettings,
+)
 from inframeld_backend.bootstrap.access_composition import create_access_components
+from inframeld_backend.bootstrap.model_connection_composition import open_model_connection_creation
+from inframeld_backend.shared.application.dtos.idempotency_context_dto import IdempotencyContextDTO
+from inframeld_backend.shared.application.enums.http_method import HttpMethod
+from inframeld_backend.shared.application.services.request_fingerprint_service import (
+    RequestFingerprintService,
+)
+from inframeld_backend.shared.application.value_objects.idempotency_key import IdempotencyKey
+from inframeld_backend.shared.application.value_objects.request_fingerprint_key import (
+    RequestFingerprintKey,
+)
+from inframeld_backend.shared.domain.value_objects.resource_name import ResourceName
+from inframeld_backend.shared.domain.value_objects.submitted_display_name import (
+    SubmittedDisplayName,
+)
 from inframeld_backend.shared.infrastructure.resources.database import Database
 from inframeld_backend.shared.infrastructure.settings.database_settings import DatabaseSettings
 
@@ -96,7 +129,15 @@ pytestmark = pytest.mark.skipif(
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "target_kind",
-    ["metadata", "organization", "project", "group-manager", "group-action", "application-account"],
+    [
+        "metadata",
+        "organization",
+        "project",
+        "group-manager",
+        "group-action",
+        "application-account",
+        "model-connection",
+    ],
 )
 async def test_real_recipient_proof_current_generation_and_proof_independent_receipt_replay(
     database: Database, temporary_postgres_settings: DatabaseSettings, target_kind: str
@@ -104,7 +145,8 @@ async def test_real_recipient_proof_current_generation_and_proof_independent_rec
     async with hydra_test_provider() as provider, create_browser() as browser:
         human = await register_human(browser)
         identity = VerifiedHumanIdentityDTO(IdentityAuthority("kratos:test"), human.subject)
-        if target_kind == "metadata":
+        model_id = None
+        if target_kind in {"metadata", "model-connection"}:
             seed, binding = await seed_metadata_repair_recipient(database, identity)
             recipient_id = seed.principal_id
             project_id = seed.project_id
@@ -118,6 +160,55 @@ async def test_real_recipient_proof_current_generation_and_proof_independent_rec
             group_id = None
             application_id = None
             action = "edit-project-metadata"
+            if target_kind == "model-connection":
+                async with database.session() as session, session.begin():
+                    session.add(
+                        ProjectActionGrantRow(
+                            project_id=project_id.value,
+                            recipient_principal_id=recipient_id.value,
+                            recipient_kind=PrincipalKind.HUMAN,
+                            action=ProjectAction.CREATE_MODEL_CONNECTIONS.value,
+                            can_grant=True,
+                            assigned_by_principal_id=recipient_id.value,
+                        )
+                    )
+                endpoint = "https://models.example.test/v1"
+                async with open_model_connection_creation(
+                    database,
+                    RequestFingerprintService(RequestFingerprintKey(b"M" * 32)),
+                    ModelConnectionDestinationSettings(https_base_urls=frozenset({endpoint})),
+                ) as creator:
+                    created = await creator.create(
+                        access=AccessContextDTO(recipient_id, binding),
+                        command=CreateModelConnectionCommand(
+                            project_id,
+                            ResourceName("native-repair"),
+                            SubmittedDisplayName("Native repair"),
+                            ModelConnectionAccessDTO(
+                                ModelConnectionProvider.OPENAI_COMPATIBLE,
+                                endpoint,
+                                None,
+                                ModelConnectionAuthentication.API_KEY,
+                            ),
+                        ),
+                        context=IdempotencyContextDTO(
+                            HttpMethod.POST,
+                            f"/v1/projects/{project_id.value}/model-connections",
+                            IdempotencyKey("native-model"),
+                        ),
+                    )
+                model_id = created.connection.connection_id
+                action = ModelConnectionAction.USE.value
+                responsibility = {
+                    "kind": "action-grantor",
+                    "target": {
+                        "kind": "model-connection",
+                        "projectId": str(project_id.value),
+                        "modelConnectionId": str(model_id.value),
+                    },
+                    "actionId": action,
+                }
+                revision = created.project_access_revision
         else:
             access, native_command, _ = await seed_stranded_repair_target(
                 database, target_kind, identity=identity
@@ -260,6 +351,46 @@ async def test_real_recipient_proof_current_generation_and_proof_independent_rec
                 await session.scalar(select(func.count()).select_from(HostMaintenanceReceiptRow))
                 == 0
             )
+        if target_kind == "model-connection":
+            assert model_id is not None and project_id is not None and action is not None
+            status, denied, _ = await run_project_metadata_maintenance(
+                request | {"expectedInstallationId": str(UUID(int=1))},
+                temporary_postgres_settings,
+            )
+            assert status == 1 and denied["code"] == "installation_mismatch"
+            wrong_target = {
+                "kind": "model-connection",
+                "projectId": str(UUID(int=1)),
+                "modelConnectionId": str(model_id.value),
+            }
+            status, denied, _ = await run_project_metadata_maintenance(
+                request | {"responsibility": responsibility | {"target": wrong_target}},
+                temporary_postgres_settings,
+            )
+            assert status == 1 and denied["code"] == "identity_ineligible"
+            status, denied, _ = await run_project_metadata_maintenance(
+                request, temporary_postgres_settings
+            )
+            assert status == 1 and denied["code"] == "responsibility_not_stranded"
+            async with database.session() as session, session.begin():
+                await session.execute(
+                    delete(ModelConnectionActionGrantRow).where(
+                        ModelConnectionActionGrantRow.project_id == project_id.value,
+                        ModelConnectionActionGrantRow.model_connection_id == model_id.value,
+                        ModelConnectionActionGrantRow.action == action,
+                    )
+                )
+                await session.execute(
+                    update(ProjectRow)
+                    .where(ProjectRow.id == project_id.value)
+                    .values(access_revision=ProjectRow.access_revision + 1)
+                )
+            status, denied, _ = await run_project_metadata_maintenance(
+                request, temporary_postgres_settings
+            )
+            assert status == 1 and denied["code"] == "stale_revision"
+            revision += 1
+            request["expectedAccessRevision"] = revision
         status, first, diagnostics = await run_project_metadata_maintenance(
             request, temporary_postgres_settings
         )
@@ -382,6 +513,16 @@ async def test_real_recipient_proof_current_generation_and_proof_independent_rec
                         True,
                     )
                     audit_kind, audit_target = "application_account", application_id.value
+                elif target_kind == "model-connection":
+                    assert model_id is not None and action is not None
+                    model_grant = await session.get(
+                        ModelConnectionActionGrantRow,
+                        (project_id.value, model_id.value, recipient_id.value, action),
+                    )
+                    assert model_grant is not None and model_grant.can_grant
+                    assert model_grant.recipient_kind is PrincipalKind.HUMAN
+                    assert model_grant.assigned_by_principal_id is None
+                    audit_kind, audit_target = "model_connection", model_id.value
                 else:
                     assert action is not None
                     project_grant = await session.get(
@@ -458,6 +599,7 @@ async def test_real_recipient_proof_current_generation_and_proof_independent_rec
                     broader_original.project_id,
                     broader_original.access_group_id,
                     broader_original.application_account_id,
+                    broader_original.model_connection_id,
                     broader_original.action_id,
                 ) == (
                     responsibility["kind"],
@@ -465,6 +607,7 @@ async def test_real_recipient_proof_current_generation_and_proof_independent_rec
                     None if project_id is None else project_id.value,
                     None if group_id is None else group_id.value,
                     None if application_id is None else application_id.value,
+                    None if model_id is None else model_id.value,
                     action,
                 )
             audits = (
@@ -554,6 +697,15 @@ async def test_real_recipient_proof_current_generation_and_proof_independent_rec
                             ApplicationActionGrantRow.application_principal_id
                             == application_id.value,
                             ApplicationActionGrantRow.action == action,
+                        )
+                    )
+                elif target_kind == "model-connection":
+                    assert model_id is not None
+                    await session.execute(
+                        delete(ModelConnectionActionGrantRow).where(
+                            ModelConnectionActionGrantRow.project_id == project_id.value,
+                            ModelConnectionActionGrantRow.model_connection_id == model_id.value,
+                            ModelConnectionActionGrantRow.action == action,
                         )
                     )
                 else:
@@ -649,6 +801,15 @@ async def test_real_recipient_proof_current_generation_and_proof_independent_rec
                         )
                     )
                     == 0
+                )
+            elif target_kind == "model-connection":
+                assert model_id is not None and project_id is not None and action is not None
+                assert (
+                    await session.get(
+                        ModelConnectionActionGrantRow,
+                        (project_id.value, model_id.value, recipient_id.value, action),
+                    )
+                    is None
                 )
             elif target_kind == "organization":
                 assert (

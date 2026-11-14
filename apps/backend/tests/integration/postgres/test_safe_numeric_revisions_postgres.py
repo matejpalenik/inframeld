@@ -22,7 +22,10 @@ from inframeld_backend.access.infrastructure.rows.project_action_grant_row impor
 )
 from inframeld_backend.access.infrastructure.rows.project_row import ProjectRow
 from inframeld_backend.shared.application.errors.application_errors import ConflictError
-from inframeld_backend.shared.infrastructure.migrations.migration_runner import ALEMBIC_CONFIG_PATH
+from inframeld_backend.shared.infrastructure.migrations.migration_runner import (
+    ALEMBIC_CONFIG_PATH,
+    SUPPORTED_SCHEMA_REVISION,
+)
 from inframeld_backend.shared.infrastructure.resources.database import Database
 from inframeld_backend.shared.infrastructure.rows.alembic_version_row import AlembicVersionRow
 from inframeld_backend.shared.infrastructure.settings.database_settings import DatabaseSettings
@@ -97,7 +100,9 @@ async def test_unsafe_downgrade_preserves_current_schema_and_exact_revision(
     with pytest.raises(RuntimeError, match="previous integer"):
         command.downgrade(_config(temporary_postgres_settings), "0022_project_grant_results")
     async with database.session() as session:
-        assert await session.scalar(select(AlembicVersionRow.version_num)) == "0034_human_lifecycle"
+        assert (
+            await session.scalar(select(AlembicVersionRow.version_num)) == SUPPORTED_SCHEMA_REVISION
+        )
         assert await session.scalar(select(ProjectRow.access_revision)) == 2**31
 
 

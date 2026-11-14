@@ -56,6 +56,7 @@ from inframeld_backend.shared.application.value_objects.request_fingerprint_key 
 )
 from inframeld_backend.shared.infrastructure.migrations.migration_runner import (
     BACKEND_ROOT,
+    SUPPORTED_SCHEMA_REVISION,
     run_migrations,
 )
 from inframeld_backend.shared.infrastructure.resources.database import Database
@@ -84,7 +85,7 @@ async def _require_schema(database: Database) -> None:
     """Fail intentionally on the missing requirement before querying any new table."""
     async with database.session() as session:
         current = await session.scalar(select(AlembicVersionRow.version_num))
-    assert current == "0034_human_lifecycle", "Required current schema is not installed."
+    assert current == SUPPORTED_SCHEMA_REVISION, "Required current schema is not installed."
 
 
 async def _admitted(database: Database) -> HumanAdmissionResultDTO:

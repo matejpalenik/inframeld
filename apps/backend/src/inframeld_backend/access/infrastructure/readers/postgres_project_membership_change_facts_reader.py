@@ -65,6 +65,10 @@ from inframeld_backend.access.infrastructure.rows.application_action_grant_row i
 from inframeld_backend.access.infrastructure.rows.group_action_grant_row import GroupActionGrantRow
 from inframeld_backend.access.infrastructure.rows.group_manager_row import GroupManagerRow
 from inframeld_backend.access.infrastructure.rows.group_membership_row import GroupMembershipRow
+from inframeld_backend.access.infrastructure.rows.model_connection_action_grant_row import (
+    ModelConnectionActionGrantRow,
+)
+from inframeld_backend.access.infrastructure.rows.model_connection_row import ModelConnectionRow
 from inframeld_backend.access.infrastructure.rows.organization_row import OrganizationRow
 from inframeld_backend.access.infrastructure.rows.principal_row import PrincipalRow
 from inframeld_backend.access.infrastructure.rows.project_action_grant_row import (
@@ -385,6 +389,55 @@ class PostgresProjectMembershipChangeFactsReader(ProjectMembershipChangeFactsRea
                 ProjectDepartureResponsibilityDTO(
                     ProjectDepartureTargetKind.APPLICATION_ACCOUNT,
                     application,
+                    ActionId(action),
+                    await self._candidates(facts, departing, grant),
+                )
+            )
+
+        connections = (
+            (
+                await self._session.execute(
+                    select(
+                        ModelConnectionActionGrantRow.model_connection_id,
+                        ModelConnectionActionGrantRow.action,
+                    )
+                    .join(
+                        ModelConnectionRow,
+                        and_(
+                            ModelConnectionRow.project_id
+                            == ModelConnectionActionGrantRow.project_id,
+                            ModelConnectionRow.id
+                            == ModelConnectionActionGrantRow.model_connection_id,
+                        ),
+                    )
+                    .where(
+                        ModelConnectionActionGrantRow.project_id == project,
+                        ModelConnectionActionGrantRow.recipient_principal_id == departing.value,
+                        ModelConnectionActionGrantRow.can_grant.is_(True),
+                        ModelConnectionRow.retired_at.is_(None),
+                    )
+                )
+            )
+            .tuples()
+            .all()
+        )
+        for connection, action in connections:
+            grant = (
+                exists()
+                .where(
+                    ModelConnectionActionGrantRow.project_id == project,
+                    ModelConnectionActionGrantRow.model_connection_id == connection,
+                    ModelConnectionActionGrantRow.recipient_principal_id == PrincipalRow.id,
+                    ModelConnectionActionGrantRow.recipient_kind == PrincipalRow.kind,
+                    ModelConnectionActionGrantRow.action == action,
+                    ModelConnectionActionGrantRow.can_grant.is_(True),
+                )
+                .correlate(PrincipalRow)
+            )
+            result.append(
+                ProjectDepartureResponsibilityDTO(
+                    ProjectDepartureTargetKind.MODEL_CONNECTION,
+                    connection,
                     ActionId(action),
                     await self._candidates(facts, departing, grant),
                 )

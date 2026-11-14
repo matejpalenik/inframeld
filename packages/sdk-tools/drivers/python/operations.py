@@ -32,6 +32,11 @@ from inframeld_sdk.models.invitation_activation_request import InvitationActivat
 from inframeld_sdk.models.invitation_issue_request import InvitationIssueRequest
 from inframeld_sdk.models.invitation_preview_request import InvitationPreviewRequest
 from inframeld_sdk.models.invitation_revocation_request import InvitationRevocationRequest
+from inframeld_sdk.models.model_connection_action import ModelConnectionAction
+from inframeld_sdk.models.model_connection_action_grant_request import (
+    ModelConnectionActionGrantRequest,
+)
+from inframeld_sdk.models.model_connection_creation_request import ModelConnectionCreationRequest
 from inframeld_sdk.models.organization_action_grant_request import OrganizationActionGrantRequest
 from inframeld_sdk.models.original_operation_lookup_request import OriginalOperationLookupRequest
 from inframeld_sdk.models.project_action_grant_request import ProjectActionGrantRequest
@@ -290,6 +295,162 @@ async def remove_application_account_action_grant_async(
         action_id=call.path["action_id"],
         idempotency_key=call.headers["Idempotency-Key"],
         expected_access_revision=integer(call.query["expectedAccessRevision"]),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+def create_model_connection_sync(clients: Clients, call: Call) -> NativeResponse:
+    return AccessApi(clients.production).create_model_connection_sync_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        idempotency_key=call.headers["Idempotency-Key"],
+        model_connection_creation_request=ModelConnectionCreationRequest.model_validate(call.body),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def create_model_connection_async(clients: Clients, call: Call) -> NativeResponse:
+    return await AccessApi(clients.production).create_model_connection_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        idempotency_key=call.headers["Idempotency-Key"],
+        model_connection_creation_request=ModelConnectionCreationRequest.model_validate(call.body),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+def list_model_connections_sync(clients: Clients, call: Call) -> NativeResponse:
+    return AccessApi(clients.production).list_model_connections_sync_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        limit=integer(call.query["limit"]) if "limit" in call.query else None,
+        cursor=string(call.query["cursor"]) if "cursor" in call.query else None,
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def list_model_connections_async(clients: Clients, call: Call) -> NativeResponse:
+    return await AccessApi(clients.production).list_model_connections_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        limit=integer(call.query["limit"]) if "limit" in call.query else None,
+        cursor=string(call.query["cursor"]) if "cursor" in call.query else None,
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+def get_model_connection_sync(clients: Clients, call: Call) -> NativeResponse:
+    return AccessApi(clients.production).get_model_connection_sync_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        model_connection_id=UUID(call.path["model_connection_id"]),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def get_model_connection_async(clients: Clients, call: Call) -> NativeResponse:
+    return await AccessApi(clients.production).get_model_connection_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        model_connection_id=UUID(call.path["model_connection_id"]),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+def list_model_connection_usage_sync(clients: Clients, call: Call) -> NativeResponse:
+    return AccessApi(clients.production).list_model_connection_usage_sync_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        model_connection_id=UUID(call.path["model_connection_id"]),
+        limit=integer(call.query["limit"]) if "limit" in call.query else None,
+        cursor=string(call.query["cursor"]) if "cursor" in call.query else None,
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def list_model_connection_usage_async(clients: Clients, call: Call) -> NativeResponse:
+    return await AccessApi(clients.production).list_model_connection_usage_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        model_connection_id=UUID(call.path["model_connection_id"]),
+        limit=integer(call.query["limit"]) if "limit" in call.query else None,
+        cursor=string(call.query["cursor"]) if "cursor" in call.query else None,
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+def list_model_connection_action_grants_sync(clients: Clients, call: Call) -> NativeResponse:
+    return AccessApi(clients.production).list_model_connection_action_grants_sync_with_http_info(
+        model_connection_id=UUID(call.path["model_connection_id"]),
+        action_id=ModelConnectionAction(string(call.query["actionId"])),
+        limit=integer(call.query["limit"]) if "limit" in call.query else None,
+        cursor=string(call.query["cursor"]) if "cursor" in call.query else None,
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def list_model_connection_action_grants_async(clients: Clients, call: Call) -> NativeResponse:
+    return await AccessApi(clients.production).list_model_connection_action_grants_with_http_info(
+        model_connection_id=UUID(call.path["model_connection_id"]),
+        action_id=ModelConnectionAction(string(call.query["actionId"])),
+        limit=integer(call.query["limit"]) if "limit" in call.query else None,
+        cursor=string(call.query["cursor"]) if "cursor" in call.query else None,
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+def set_model_connection_action_grant_sync(clients: Clients, call: Call) -> NativeResponse:
+    return AccessApi(clients.production).set_model_connection_action_grant_sync_with_http_info(
+        model_connection_id=UUID(call.path["model_connection_id"]),
+        recipient_principal_id=UUID(call.path["recipient_principal_id"]),
+        action_id=ModelConnectionAction(call.path["action_id"]),
+        idempotency_key=call.headers["Idempotency-Key"],
+        model_connection_action_grant_request=ModelConnectionActionGrantRequest.model_validate(
+            call.body
+        ),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def set_model_connection_action_grant_async(clients: Clients, call: Call) -> NativeResponse:
+    return await AccessApi(clients.production).set_model_connection_action_grant_with_http_info(
+        model_connection_id=UUID(call.path["model_connection_id"]),
+        recipient_principal_id=UUID(call.path["recipient_principal_id"]),
+        action_id=ModelConnectionAction(call.path["action_id"]),
+        idempotency_key=call.headers["Idempotency-Key"],
+        model_connection_action_grant_request=ModelConnectionActionGrantRequest.model_validate(
+            call.body
+        ),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+def remove_model_connection_action_grant_sync(clients: Clients, call: Call) -> NativeResponse:
+    return AccessApi(clients.production).remove_model_connection_action_grant_sync_with_http_info(
+        model_connection_id=UUID(call.path["model_connection_id"]),
+        recipient_principal_id=UUID(call.path["recipient_principal_id"]),
+        action_id=ModelConnectionAction(call.path["action_id"]),
+        expected_access_revision=integer(call.query["expectedAccessRevision"]),
+        idempotency_key=call.headers["Idempotency-Key"],
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def remove_model_connection_action_grant_async(
+    clients: Clients, call: Call
+) -> NativeResponse:
+    return await AccessApi(clients.production).remove_model_connection_action_grant_with_http_info(
+        model_connection_id=UUID(call.path["model_connection_id"]),
+        recipient_principal_id=UUID(call.path["recipient_principal_id"]),
+        action_id=ModelConnectionAction(call.path["action_id"]),
+        expected_access_revision=integer(call.query["expectedAccessRevision"]),
+        idempotency_key=call.headers["Idempotency-Key"],
         _headers=call.headers,
         _request_timeout=call.timeout / 1000,
     )
@@ -1509,6 +1670,25 @@ BINDINGS: dict[Operation, Binding] = {
     ),
     Operation.REMOVE_APPLICATION_ACCOUNT_ACTION_GRANT: Binding(
         remove_application_account_action_grant_sync, remove_application_account_action_grant_async
+    ),
+    Operation.CREATE_MODEL_CONNECTION: Binding(
+        create_model_connection_sync, create_model_connection_async
+    ),
+    Operation.LIST_MODEL_CONNECTIONS: Binding(
+        list_model_connections_sync, list_model_connections_async
+    ),
+    Operation.GET_MODEL_CONNECTION: Binding(get_model_connection_sync, get_model_connection_async),
+    Operation.LIST_MODEL_CONNECTION_USAGE: Binding(
+        list_model_connection_usage_sync, list_model_connection_usage_async
+    ),
+    Operation.LIST_MODEL_CONNECTION_ACTION_GRANTS: Binding(
+        list_model_connection_action_grants_sync, list_model_connection_action_grants_async
+    ),
+    Operation.SET_MODEL_CONNECTION_ACTION_GRANT: Binding(
+        set_model_connection_action_grant_sync, set_model_connection_action_grant_async
+    ),
+    Operation.REMOVE_MODEL_CONNECTION_ACTION_GRANT: Binding(
+        remove_model_connection_action_grant_sync, remove_model_connection_action_grant_async
     ),
     Operation.LIST_PROJECT_GRANT_RECIPIENTS: Binding(
         project_grant_recipients_sync, project_grant_recipients_async

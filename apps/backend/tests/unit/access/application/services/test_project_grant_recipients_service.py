@@ -23,6 +23,9 @@ from inframeld_backend.access.application.dtos.grant_recipients_page_facts_dto i
 from inframeld_backend.access.application.dtos.human_credential_facts_dto import (
     HumanCredentialFactsDTO,
 )
+from inframeld_backend.access.application.dtos.model_connection_grant_target_dto import (
+    ModelConnectionGrantTargetDTO,
+)
 from inframeld_backend.access.application.dtos.project_action_facts_dto import ProjectActionFactsDTO
 from inframeld_backend.access.application.dtos.project_grant_target_dto import ProjectGrantTargetDTO
 from inframeld_backend.access.application.errors.human_oauth_credential_rejected_error import (
@@ -125,7 +128,8 @@ class MockRecipientsFacts(GrantRecipientsFactsReader):
         project_id: ProjectId,
         target: ProjectGrantTargetDTO
         | AccessGroupGrantTargetDTO
-        | ApplicationAccountGrantTargetDTO,
+        | ApplicationAccountGrantTargetDTO
+        | ModelConnectionGrantTargetDTO,
         action_id: ActionId,
         eligible_kinds: tuple[PrincipalKind, ...],
         after: PrincipalId | None,
@@ -178,7 +182,10 @@ async def test_same_group_manager_reads_only_safe_bounded_eligible_choices() -> 
     ],
 )
 async def test_existing_catalogue_supplies_eligible_kinds_before_the_reader_limit(
-    target: ProjectGrantTargetDTO | AccessGroupGrantTargetDTO | ApplicationAccountGrantTargetDTO,
+    target: ProjectGrantTargetDTO
+    | AccessGroupGrantTargetDTO
+    | ApplicationAccountGrantTargetDTO
+    | ModelConnectionGrantTargetDTO,
     action: str,
     kinds: tuple[PrincipalKind, ...],
 ) -> None:

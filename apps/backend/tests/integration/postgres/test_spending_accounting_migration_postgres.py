@@ -23,6 +23,7 @@ from inframeld_backend.access.infrastructure.rows.project_row import ProjectRow
 from inframeld_backend.bootstrap.spending_accounting_composition import open_spending_accounting
 from inframeld_backend.shared.infrastructure.migrations.migration_runner import (
     BACKEND_ROOT,
+    SUPPORTED_SCHEMA_REVISION,
     run_migrations,
 )
 from inframeld_backend.shared.infrastructure.readers.postgres_spending_ledger_reader import (
@@ -67,7 +68,7 @@ async def test_empty_spending_roundtrip_preserves_delivered_project_and_original
         async with database.session() as session:
             assert (
                 await session.scalar(select(AlembicVersionRow.version_num))
-                == "0034_human_lifecycle"
+                == SUPPORTED_SCHEMA_REVISION
             )
             assert await session.get(ProjectRow, scenario.project_id.value) is not None
             job = await session.get(DurableJobRow, scenario.attempt.job_id.value)
@@ -180,6 +181,8 @@ async def test_retained_financial_obligations_refuse_downgrade(
     with pytest.raises(RuntimeError, match="Retained spending"):
         command.downgrade(configuration(temporary_postgres_settings), "0017_project_creation")
     async with database.session() as session:
-        assert await session.scalar(select(AlembicVersionRow.version_num)) == "0034_human_lifecycle"
+        assert (
+            await session.scalar(select(AlembicVersionRow.version_num)) == SUPPORTED_SCHEMA_REVISION
+        )
         row = await session.get(ModelCallAccountingRow, call.call_id.value)
         assert row is not None and row.hold_amount == Decimal("0.1")

@@ -9,6 +9,9 @@ from inframeld_backend.access.application.dtos.application_account_grant_target_
 from inframeld_backend.access.application.dtos.grant_recipients_page_dto import (
     GrantRecipientsPageDTO,
 )
+from inframeld_backend.access.application.dtos.model_connection_grant_target_dto import (
+    ModelConnectionGrantTargetDTO,
+)
 from inframeld_backend.access.application.dtos.project_grant_target_dto import ProjectGrantTargetDTO
 from inframeld_backend.access.application.queries.list_project_grant_recipients_query import (
     ListProjectGrantRecipientsQuery,
@@ -20,6 +23,7 @@ from inframeld_backend.access.domain.value_objects.project_id import ProjectId
 from inframeld_backend.access.http.enums.grant_target_kind import GrantTargetKind
 from inframeld_backend.access.http.responses.grant_recipient_response import GrantRecipientResponse
 from inframeld_backend.shared.application.errors.application_errors import InvalidInputError
+from inframeld_backend.shared.application.value_objects.model_connection_id import ModelConnectionId
 from inframeld_backend.shared.http.requests.pagination_query import PaginationQuery
 from inframeld_backend.shared.http.responses.page_response import PageResponse
 
@@ -37,13 +41,20 @@ class ProjectGrantRecipientsMapper:
         pagination: PaginationQuery,
     ) -> ListProjectGrantRecipientsQuery:
         project = ProjectId(project_id)
-        target: ProjectGrantTargetDTO | AccessGroupGrantTargetDTO | ApplicationAccountGrantTargetDTO
+        target: (
+            ProjectGrantTargetDTO
+            | AccessGroupGrantTargetDTO
+            | ApplicationAccountGrantTargetDTO
+            | ModelConnectionGrantTargetDTO
+        )
         if target_kind is GrantTargetKind.PROJECT:
             target = ProjectGrantTargetDTO(project_id=ProjectId(target_id))
         elif target_kind is GrantTargetKind.ACCESS_GROUP:
             target = AccessGroupGrantTargetDTO(
                 project_id=project, access_group_id=AccessGroupId(target_id)
             )
+        elif target_kind is GrantTargetKind.MODEL_CONNECTION:
+            target = ModelConnectionGrantTargetDTO(project, ModelConnectionId(target_id))
         else:
             target = ApplicationAccountGrantTargetDTO(
                 project_id=project, application_principal_id=PrincipalId(target_id)

@@ -33,6 +33,7 @@ from inframeld_backend.access.infrastructure.rows.project_creation_operation_res
 from inframeld_backend.access.infrastructure.rows.project_row import ProjectRow
 from inframeld_backend.shared.infrastructure.migrations.migration_runner import (
     BACKEND_ROOT,
+    SUPPORTED_SCHEMA_REVISION,
     run_migrations,
 )
 from inframeld_backend.shared.infrastructure.resources.database import Database
@@ -75,7 +76,7 @@ async def test_0016_upgrade_and_empty_outcome_roundtrip_preserve_admission_and_l
         async with database.session() as session:
             assert (
                 await session.scalar(select(AlembicVersionRow.version_num))
-                == "0034_human_lifecycle"
+                == SUPPORTED_SCHEMA_REVISION
             )
             receipt = await session.get(
                 FirstAdministratorBootstrapReceiptRow, seed.binding.installation_id.value
@@ -125,7 +126,9 @@ async def test_retained_creation_outcome_refuses_downgrade_without_losing_replay
     with pytest.raises(RuntimeError, match="Retained Project creation outcomes"):
         command.downgrade(_configuration(temporary_postgres_settings), "0016_first_administrator")
     async with database.session() as session:
-        assert await session.scalar(select(AlembicVersionRow.version_num)) == "0034_human_lifecycle"
+        assert (
+            await session.scalar(select(AlembicVersionRow.version_num)) == SUPPORTED_SCHEMA_REVISION
+        )
         receipt = await session.get(
             ProjectCreationOperationResultRow, first.operation.operation_id.value
         )

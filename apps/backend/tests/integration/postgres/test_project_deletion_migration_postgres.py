@@ -20,7 +20,10 @@ from inframeld_backend.access.infrastructure.rows.project_upload_default_group_r
 from inframeld_backend.access.infrastructure.rows.project_upload_default_result_row import (
     ProjectUploadDefaultResultRow,
 )
-from inframeld_backend.shared.infrastructure.migrations.migration_runner import ALEMBIC_CONFIG_PATH
+from inframeld_backend.shared.infrastructure.migrations.migration_runner import (
+    ALEMBIC_CONFIG_PATH,
+    SUPPORTED_SCHEMA_REVISION,
+)
 from inframeld_backend.shared.infrastructure.resources.database import Database
 from inframeld_backend.shared.infrastructure.rows.alembic_version_row import AlembicVersionRow
 from inframeld_backend.shared.infrastructure.rows.durable_job_row import DurableJobRow
@@ -117,7 +120,9 @@ async def test_retained_parent_blocks_downgrade_without_erasing_default_history(
             configuration(temporary_postgres_settings), "0030_project_upload_defaults"
         )
     async with database.session() as session:
-        assert await session.scalar(select(AlembicVersionRow.version_num)) == "0034_human_lifecycle"
+        assert (
+            await session.scalar(select(AlembicVersionRow.version_num)) == SUPPORTED_SCHEMA_REVISION
+        )
         assert (
             await session.get(ProjectDeletionObligationRow, accepted.obligation_id.value)
             is not None
@@ -149,7 +154,9 @@ async def test_empty_deletion_downgrade_preserves_actual0030_links_groups_and_hi
     command.downgrade(configuration(temporary_postgres_settings), "0030_project_upload_defaults")
     command.upgrade(configuration(temporary_postgres_settings), "head")
     async with database.session() as session:
-        assert await session.scalar(select(AlembicVersionRow.version_num)) == "0034_human_lifecycle"
+        assert (
+            await session.scalar(select(AlembicVersionRow.version_num)) == SUPPORTED_SCHEMA_REVISION
+        )
         assert (
             tuple(await session.scalars(select(AccessGroupRow.id).order_by(AccessGroupRow.id)))
             == groups

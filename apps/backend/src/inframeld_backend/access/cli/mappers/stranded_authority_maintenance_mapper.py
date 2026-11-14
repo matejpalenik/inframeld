@@ -17,6 +17,9 @@ from inframeld_backend.access.application.dtos.application_account_grant_target_
 from inframeld_backend.access.application.dtos.group_manager_repair_responsibility_dto import (
     GroupManagerRepairResponsibilityDTO,
 )
+from inframeld_backend.access.application.dtos.model_connection_grant_target_dto import (
+    ModelConnectionGrantTargetDTO,
+)
 from inframeld_backend.access.application.dtos.organization_grant_target_dto import (
     OrganizationGrantTargetDTO,
 )
@@ -36,6 +39,7 @@ from inframeld_backend.access.domain.value_objects.action_id import ActionId
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
+from inframeld_backend.shared.application.value_objects.model_connection_id import ModelConnectionId
 from inframeld_backend.shared.application.value_objects.operation_id import OperationId
 from inframeld_backend.shared.domain.value_objects.installation_id import InstallationId
 
@@ -133,6 +137,15 @@ class StrandedAuthorityMaintenanceMapper:
                 ProjectId(UUID(_text(target["projectId"]))),
                 PrincipalId(UUID(_text(target["applicationPrincipalId"]))),
             )
+        elif kind == "model-connection" and set(target) == {
+            "kind",
+            "projectId",
+            "modelConnectionId",
+        }:
+            exact = ModelConnectionGrantTargetDTO(
+                ProjectId(UUID(_text(target["projectId"]))),
+                ModelConnectionId(UUID(_text(target["modelConnectionId"]))),
+            )
         else:
             raise ValueError("Unsupported exact repair target.")
         return ActionGrantorRepairResponsibilityDTO(exact, ActionId(_text(values["actionId"])))
@@ -161,6 +174,12 @@ class StrandedAuthorityMaintenanceMapper:
                     "kind": "access-group",
                     "projectId": str(target.project_id.value),
                     "accessGroupId": str(target.access_group_id.value),
+                }
+            elif isinstance(target, ModelConnectionGrantTargetDTO):
+                scope = {
+                    "kind": "model-connection",
+                    "projectId": str(target.project_id.value),
+                    "modelConnectionId": str(target.model_connection_id.value),
                 }
             else:
                 scope = {

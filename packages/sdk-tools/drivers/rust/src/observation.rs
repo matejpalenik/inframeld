@@ -698,6 +698,84 @@ problems!(
 );
 
 problems!(
+    CreateModelConnectionApiError,
+    CreateModelConnectionApiError::Status400,
+    CreateModelConnectionApiError::Status401,
+    CreateModelConnectionApiError::Status403,
+    CreateModelConnectionApiError::Status404,
+    CreateModelConnectionApiError::Status409,
+    CreateModelConnectionApiError::Status413,
+    CreateModelConnectionApiError::Status415,
+    CreateModelConnectionApiError::Status422,
+    CreateModelConnectionApiError::Status503
+);
+
+problems!(
+    GetModelConnectionApiError,
+    GetModelConnectionApiError::Status400,
+    GetModelConnectionApiError::Status401,
+    GetModelConnectionApiError::Status403,
+    GetModelConnectionApiError::Status404,
+    GetModelConnectionApiError::Status422,
+    GetModelConnectionApiError::Status503
+);
+
+problems!(
+    ListModelConnectionsApiError,
+    ListModelConnectionsApiError::Status400,
+    ListModelConnectionsApiError::Status401,
+    ListModelConnectionsApiError::Status403,
+    ListModelConnectionsApiError::Status404,
+    ListModelConnectionsApiError::Status422,
+    ListModelConnectionsApiError::Status503
+);
+
+problems!(
+    ListModelConnectionUsageApiError,
+    ListModelConnectionUsageApiError::Status400,
+    ListModelConnectionUsageApiError::Status401,
+    ListModelConnectionUsageApiError::Status403,
+    ListModelConnectionUsageApiError::Status404,
+    ListModelConnectionUsageApiError::Status422,
+    ListModelConnectionUsageApiError::Status503
+);
+
+problems!(
+    ListModelConnectionActionGrantsApiError,
+    ListModelConnectionActionGrantsApiError::Status400,
+    ListModelConnectionActionGrantsApiError::Status401,
+    ListModelConnectionActionGrantsApiError::Status403,
+    ListModelConnectionActionGrantsApiError::Status404,
+    ListModelConnectionActionGrantsApiError::Status409,
+    ListModelConnectionActionGrantsApiError::Status422,
+    ListModelConnectionActionGrantsApiError::Status503
+);
+
+problems!(
+    SetModelConnectionActionGrantApiError,
+    SetModelConnectionActionGrantApiError::Status400,
+    SetModelConnectionActionGrantApiError::Status401,
+    SetModelConnectionActionGrantApiError::Status403,
+    SetModelConnectionActionGrantApiError::Status404,
+    SetModelConnectionActionGrantApiError::Status409,
+    SetModelConnectionActionGrantApiError::Status413,
+    SetModelConnectionActionGrantApiError::Status415,
+    SetModelConnectionActionGrantApiError::Status422,
+    SetModelConnectionActionGrantApiError::Status503
+);
+
+problems!(
+    RemoveModelConnectionActionGrantApiError,
+    RemoveModelConnectionActionGrantApiError::Status400,
+    RemoveModelConnectionActionGrantApiError::Status401,
+    RemoveModelConnectionActionGrantApiError::Status403,
+    RemoveModelConnectionActionGrantApiError::Status404,
+    RemoveModelConnectionActionGrantApiError::Status409,
+    RemoveModelConnectionActionGrantApiError::Status422,
+    RemoveModelConnectionActionGrantApiError::Status503
+);
+
+problems!(
     ListProjectGrantRecipientsApiError,
     ListProjectGrantRecipientsApiError::Status400,
     ListProjectGrantRecipientsApiError::Status401,

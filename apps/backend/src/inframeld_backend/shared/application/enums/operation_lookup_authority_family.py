@@ -10,5 +10,6 @@ class OperationLookupAuthorityFamily(StrEnum):
     ORGANIZATION_GRANT_READ = "organization_grant_read"
     ACCESS_GROUP_GRANT_READ = "access_group_grant_read"
     APPLICATION_ACCOUNT_GRANT_READ = "application_account_grant_read"
+    MODEL_CONNECTION_GRANT_READ = "model_connection_grant_read"
     ACCESS_GROUP_DELETION = "access_group_deletion"
     PROJECT_DELETION = "project_deletion"

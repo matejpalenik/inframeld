@@ -9,6 +9,9 @@ from inframeld_backend.access.application.dtos.application_account_grant_target_
 from inframeld_backend.access.application.dtos.grant_recipient_candidate_dto import (
     GrantRecipientCandidateDTO,
 )
+from inframeld_backend.access.application.dtos.model_connection_grant_target_dto import (
+    ModelConnectionGrantTargetDTO,
+)
 from inframeld_backend.access.application.dtos.project_action_facts_dto import ProjectActionFactsDTO
 from inframeld_backend.access.application.dtos.project_grant_target_dto import ProjectGrantTargetDTO
 from inframeld_backend.access.domain.value_objects.access_group_relationships import (
@@ -27,7 +30,12 @@ class GrantRecipientsPageFactsDTO:
     installation_id: InstallationId
     organization_id: OrganizationId
     project_id: ProjectId
-    target: ProjectGrantTargetDTO | AccessGroupGrantTargetDTO | ApplicationAccountGrantTargetDTO
+    target: (
+        ProjectGrantTargetDTO
+        | AccessGroupGrantTargetDTO
+        | ApplicationAccountGrantTargetDTO
+        | ModelConnectionGrantTargetDTO
+    )
     action_id: ActionId
     actor: ProjectActionFactsDTO
     actor_can_grant: bool

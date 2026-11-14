@@ -42,7 +42,10 @@ from inframeld_backend.access.infrastructure.rows.stranded_authority_repair_rece
     StrandedAuthorityRepairReceiptRow,
 )
 from inframeld_backend.shared.application.value_objects.operation_id import OperationId
-from inframeld_backend.shared.infrastructure.migrations.migration_runner import ALEMBIC_CONFIG_PATH
+from inframeld_backend.shared.infrastructure.migrations.migration_runner import (
+    ALEMBIC_CONFIG_PATH,
+    SUPPORTED_SCHEMA_REVISION,
+)
 from inframeld_backend.shared.infrastructure.resources.database import Database
 from inframeld_backend.shared.infrastructure.rows.alembic_version_row import AlembicVersionRow
 from inframeld_backend.shared.infrastructure.settings.database_settings import DatabaseSettings
@@ -85,6 +88,7 @@ async def test_safe_broader_repair_storage_is_available(database: Database) -> N
         "project_id",
         "access_group_id",
         "application_account_id",
+        "model_connection_id",
         "action_id",
     }
     # Historical target and recipient IDs cannot restrict normal resource/relationship deletion.
@@ -187,7 +191,9 @@ async def test_retained_broader_original_refuses_destructive_downgrade(
     with pytest.raises(RuntimeError, match="Retained stranded-authority repair originals"):
         command.downgrade(_config(temporary_postgres_settings), "0032_application_retirement")
     async with database.session() as session:
-        assert await session.scalar(select(AlembicVersionRow.version_num)) == "0034_human_lifecycle"
+        assert (
+            await session.scalar(select(AlembicVersionRow.version_num)) == SUPPORTED_SCHEMA_REVISION
+        )
         row = await session.get(
             StrandedAuthorityRepairReceiptRow,
             (broader_original.installation_id.value, broader_original.operation_id.value),
@@ -248,5 +254,5 @@ async def test_empty_broader_history_round_trip_preserves_legacy_metadata_origin
             assert stored is not None and stored.request_fingerprint == fingerprint
             assert (
                 await session.scalar(select(AlembicVersionRow.version_num))
-                == "0034_human_lifecycle"
+                == SUPPORTED_SCHEMA_REVISION
             )

@@ -5,6 +5,7 @@ from inframeld_backend.access.domain.enums.access_group_action import AccessGrou
 from inframeld_backend.access.domain.enums.application_account_action import (
     ApplicationAccountAction,
 )
+from inframeld_backend.access.domain.enums.model_connection_action import ModelConnectionAction
 from inframeld_backend.access.domain.enums.organization_action import OrganizationAction
 from inframeld_backend.access.domain.enums.project_action import ProjectAction
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
@@ -88,6 +89,30 @@ class OperationLookupAuthority:
             ):
                 try:
                     valid = str(UUID(parts[5])) == parts[5]
+                except ValueError:
+                    valid = False
+            if not valid:
+                raise InvalidInputError()
+            return
+
+        model_grant_path = (
+            len(parts) >= 5
+            and parts[:3] == ["", "v1", "model-connections"]
+            and parts[4] == "grants"
+        )
+        if model_grant_path or self.family is family.MODEL_CONNECTION_GRANT_READ:
+            valid = False
+            if (
+                model_grant_path
+                and len(parts) == 7
+                and project_id is not None
+                and self.family is family.MODEL_CONNECTION_GRANT_READ
+                and method in {"PUT", "DELETE"}
+                and self.action_id.value in ModelConnectionAction
+                and parts[6] == self.action_id.value
+            ):
+                try:
+                    valid = str(UUID(parts[3])) == parts[3] and str(UUID(parts[5])) == parts[5]
                 except ValueError:
                     valid = False
             if not valid:

@@ -1014,7 +1014,7 @@ export type GrantRecipientResponse = {
  *
  * Discriminate published grant targets without changing their wire tags.
  */
-export type GrantTargetKind = 'project' | 'access-group' | 'application-account';
+export type GrantTargetKind = 'project' | 'access-group' | 'application-account' | 'model-connection';
 
 /**
  * HttpMethod
@@ -1273,6 +1273,18 @@ export type InitialApplicationAccountGrantResponse = {
      */
     canGrant: true;
     target: ApplicationAccountGrantTargetResponse;
+};
+
+/**
+ * InitialModelConnectionGrantResponse
+ */
+export type InitialModelConnectionGrantResponse = {
+    actionId: ModelConnectionAction;
+    /**
+     * Cangrant
+     */
+    canGrant: true;
+    target: ModelConnectionGrantTargetResponse;
 };
 
 /**
@@ -1858,6 +1870,285 @@ export type KnownJobReferenceResponse = {
 };
 
 /**
+ * ModelConnectionAccessRequest
+ */
+export type ModelConnectionAccessRequest = {
+    /**
+     * Apiversion
+     */
+    apiVersion: string | null;
+    authentication: ModelConnectionAuthentication;
+    /**
+     * Baseurl
+     */
+    baseUrl: string;
+    provider: ModelConnectionProvider;
+};
+
+/**
+ * ModelConnectionAccessResponse
+ */
+export type ModelConnectionAccessResponse = {
+    /**
+     * Apiversion
+     */
+    apiVersion: string | null;
+    authentication: ModelConnectionAuthentication;
+    /**
+     * Baseurl
+     */
+    baseUrl: string;
+    provider: ModelConnectionProvider;
+};
+
+/**
+ * ModelConnectionAction
+ */
+export type ModelConnectionAction = 'view-model-connection-configuration' | 'use-model-connection' | 'manage-model-connection' | 'delete-model-connection';
+
+/**
+ * ModelConnectionActionGrantItemResponse
+ */
+export type ModelConnectionActionGrantItemResponse = {
+    actionId: ModelConnectionAction;
+    /**
+     * Cangrant
+     */
+    canGrant: boolean;
+    /**
+     * Modelconnectionid
+     */
+    modelConnectionId: string;
+    /**
+     * Recipientprincipalid
+     */
+    recipientPrincipalId: string;
+};
+
+/**
+ * ModelConnectionActionGrantRemovalResponse
+ */
+export type ModelConnectionActionGrantRemovalResponse = {
+    /**
+     * Accessrevision
+     */
+    accessRevision: number;
+    actionId: ModelConnectionAction;
+    /**
+     * Changed
+     */
+    changed: boolean;
+    /**
+     * Idempotencyexpiresat
+     */
+    idempotencyExpiresAt: string;
+    /**
+     * Modelconnectionid
+     */
+    modelConnectionId: string;
+    /**
+     * Operationid
+     */
+    operationId: string;
+    /**
+     * Recipientprincipalid
+     */
+    recipientPrincipalId: string;
+    /**
+     * Removed
+     */
+    removed: true;
+};
+
+/**
+ * ModelConnectionActionGrantRequest
+ */
+export type ModelConnectionActionGrantRequest = {
+    /**
+     * Cangrant
+     */
+    canGrant: boolean;
+    /**
+     * Expectedaccessrevision
+     */
+    expectedAccessRevision: number;
+};
+
+/**
+ * ModelConnectionActionGrantResponse
+ */
+export type ModelConnectionActionGrantResponse = {
+    /**
+     * Accessrevision
+     */
+    accessRevision: number;
+    actionId: ModelConnectionAction;
+    /**
+     * Cangrant
+     */
+    canGrant: boolean;
+    /**
+     * Changed
+     */
+    changed: boolean;
+    /**
+     * Idempotencyexpiresat
+     */
+    idempotencyExpiresAt: string;
+    /**
+     * Modelconnectionid
+     */
+    modelConnectionId: string;
+    /**
+     * Operationid
+     */
+    operationId: string;
+    /**
+     * Recipientprincipalid
+     */
+    recipientPrincipalId: string;
+};
+
+/**
+ * ModelConnectionAuthentication
+ */
+export type ModelConnectionAuthentication = 'api-key' | 'none';
+
+/**
+ * ModelConnectionCreationRequest
+ */
+export type ModelConnectionCreationRequest = {
+    access: ModelConnectionAccessRequest;
+    /**
+     * Displayname
+     */
+    displayName: string;
+    /**
+     * Name
+     */
+    name: string;
+};
+
+/**
+ * ModelConnectionCreationResponse
+ */
+export type ModelConnectionCreationResponse = {
+    connection: ModelConnectionResponse;
+    /**
+     * Idempotencyexpiresat
+     */
+    idempotencyExpiresAt: string;
+    /**
+     * Initialgrants
+     */
+    initialGrants: [
+        InitialModelConnectionGrantResponse,
+        InitialModelConnectionGrantResponse,
+        InitialModelConnectionGrantResponse,
+        InitialModelConnectionGrantResponse
+    ];
+    /**
+     * Operationid
+     */
+    operationId: string;
+    /**
+     * Projectaccessrevision
+     */
+    projectAccessRevision: number;
+};
+
+/**
+ * ModelConnectionCredentialResponse
+ */
+export type ModelConnectionCredentialResponse = {
+    /**
+     * Present
+     */
+    present: boolean;
+    /**
+     * Revision
+     */
+    revision: number;
+};
+
+/**
+ * ModelConnectionGrantTargetResponse
+ */
+export type ModelConnectionGrantTargetResponse = {
+    /**
+     * Kind
+     */
+    kind: 'model-connection';
+    /**
+     * Modelconnectionid
+     */
+    modelConnectionId: string;
+};
+
+/**
+ * ModelConnectionProvider
+ */
+export type ModelConnectionProvider = 'openai' | 'openai-compatible' | 'ollama';
+
+/**
+ * ModelConnectionResponse
+ *
+ * Return only current configuration and public credential presence metadata.
+ */
+export type ModelConnectionResponse = {
+    access: ModelConnectionAccessResponse;
+    /**
+     * Connectionaccessrevision
+     */
+    connectionAccessRevision: number;
+    credential: ModelConnectionCredentialResponse;
+    /**
+     * Displayname
+     */
+    displayName: string;
+    /**
+     * Modelconnectionid
+     */
+    modelConnectionId: string;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Projectid
+     */
+    projectId: string;
+};
+
+/**
+ * ModelConnectionUsageResponse
+ *
+ * Describe a visible consumer's actual attempt and independently available validation.
+ */
+export type ModelConnectionUsageResponse = {
+    /**
+     * Consumerid
+     */
+    consumerId: string;
+    /**
+     * Consumerkind
+     */
+    consumerKind: 'pipeline-version' | 'embedding-profile' | 'processing-profile' | 'evaluation-suite';
+    lastValidation: UsageValidationResponse | null;
+    latestAttempt: UsageAttemptResponse | null;
+    /**
+     * Model
+     */
+    model: string;
+    role: ModelRole;
+};
+
+/**
+ * ModelRole
+ */
+export type ModelRole = 'generation' | 'embedding' | 'reranking';
+
+/**
  * MyOrganizationAccessResponse
  */
 export type MyOrganizationAccessResponse = {
@@ -1957,7 +2248,7 @@ export type OAuthConsentDecision = 'allow' | 'deny';
  *
  * Select a fixed current-authority check without granting permission.
  */
-export type OperationLookupAuthorityFamily = 'project_action_use' | 'project_grant_read' | 'organization_action_use' | 'organization_grant_read' | 'access_group_grant_read' | 'application_account_grant_read' | 'access_group_deletion' | 'project_deletion';
+export type OperationLookupAuthorityFamily = 'project_action_use' | 'project_grant_read' | 'organization_action_use' | 'organization_grant_read' | 'access_group_grant_read' | 'application_account_grant_read' | 'model_connection_grant_read' | 'access_group_deletion' | 'project_deletion';
 
 /**
  * OperationLookupAuthorityRequest
@@ -2192,6 +2483,48 @@ export type PageResponseGrantRecipientResponse = {
      * Items
      */
     items: Array<GrantRecipientResponse>;
+    /**
+     * Nextcursor
+     */
+    nextCursor: string | null;
+};
+
+/**
+ * PageResponse[ModelConnectionActionGrantItemResponse]
+ */
+export type PageResponseModelConnectionActionGrantItemResponse = {
+    /**
+     * Items
+     */
+    items: Array<ModelConnectionActionGrantItemResponse>;
+    /**
+     * Nextcursor
+     */
+    nextCursor: string | null;
+};
+
+/**
+ * PageResponse[ModelConnectionResponse]
+ */
+export type PageResponseModelConnectionResponse = {
+    /**
+     * Items
+     */
+    items: Array<ModelConnectionResponse>;
+    /**
+     * Nextcursor
+     */
+    nextCursor: string | null;
+};
+
+/**
+ * PageResponse[ModelConnectionUsageResponse]
+ */
+export type PageResponseModelConnectionUsageResponse = {
+    /**
+     * Items
+     */
+    items: Array<ModelConnectionUsageResponse>;
     /**
      * Nextcursor
      */
@@ -3073,6 +3406,58 @@ export type ValidationIssue = {
 export type ValidationIssueLocation = 'body' | 'path' | 'query' | 'header' | 'cookie' | 'request';
 
 /**
+ * _UsageAttemptResponse
+ */
+export type UsageAttemptResponse = {
+    /**
+     * Connectionaccessrevision
+     */
+    connectionAccessRevision: number;
+    /**
+     * Credentialrevision
+     */
+    credentialRevision: number;
+    /**
+     * Observedat
+     */
+    observedAt: string;
+    /**
+     * Outcome
+     */
+    outcome: 'accepted' | 'failed' | 'uncertain';
+    /**
+     * Source
+     */
+    source: 'preflight' | 'real-use';
+};
+
+/**
+ * _UsageValidationResponse
+ */
+export type UsageValidationResponse = {
+    /**
+     * Connectionaccessrevision
+     */
+    connectionAccessRevision: number;
+    /**
+     * Credentialrevision
+     */
+    credentialRevision: number;
+    /**
+     * Observedat
+     */
+    observedAt: string;
+    /**
+     * Source
+     */
+    source: 'preflight' | 'real-use';
+    /**
+     * Status
+     */
+    status: 'validated' | 'stale';
+};
+
+/**
  * HumanOAuthConsentRequest
  *
  * Choose a consent decision - account, access and lifetime come from the server.
@@ -3528,6 +3913,217 @@ export type RevokeInvitationResponses = {
 };
 
 export type RevokeInvitationResponse = RevokeInvitationResponses[keyof RevokeInvitationResponses];
+
+export type ListModelConnectionActionGrantsData = {
+    body?: never;
+    path: {
+        /**
+         * Model Connection Id
+         */
+        model_connection_id: string;
+    };
+    query: {
+        actionId: ModelConnectionAction;
+        /**
+         * Limit
+         */
+        limit?: number;
+        /**
+         * Cursor
+         */
+        cursor?: string | null;
+    };
+    url: '/v1/model-connections/{model_connection_id}/grants';
+};
+
+export type ListModelConnectionActionGrantsErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Revision is no longer current
+     */
+    409: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type ListModelConnectionActionGrantsError = ListModelConnectionActionGrantsErrors[keyof ListModelConnectionActionGrantsErrors];
+
+export type ListModelConnectionActionGrantsResponses = {
+    /**
+     * Successful Response
+     */
+    200: PageResponseModelConnectionActionGrantItemResponse;
+};
+
+export type ListModelConnectionActionGrantsResponse = ListModelConnectionActionGrantsResponses[keyof ListModelConnectionActionGrantsResponses];
+
+export type RemoveModelConnectionActionGrantData = {
+    body?: never;
+    headers: {
+        /**
+         * Idempotency-Key
+         */
+        'Idempotency-Key': string;
+    };
+    path: {
+        /**
+         * Model Connection Id
+         */
+        model_connection_id: string;
+        /**
+         * Recipient Principal Id
+         */
+        recipient_principal_id: string;
+        action_id: ModelConnectionAction;
+    };
+    query: {
+        /**
+         * Expectedaccessrevision
+         */
+        expectedAccessRevision: number;
+    };
+    url: '/v1/model-connections/{model_connection_id}/grants/{recipient_principal_id}/{action_id}';
+};
+
+export type RemoveModelConnectionActionGrantErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Revision is no longer current
+     */
+    409: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type RemoveModelConnectionActionGrantError = RemoveModelConnectionActionGrantErrors[keyof RemoveModelConnectionActionGrantErrors];
+
+export type RemoveModelConnectionActionGrantResponses = {
+    /**
+     * Successful Response
+     */
+    200: ModelConnectionActionGrantRemovalResponse;
+};
+
+export type RemoveModelConnectionActionGrantResponse = RemoveModelConnectionActionGrantResponses[keyof RemoveModelConnectionActionGrantResponses];
+
+export type SetModelConnectionActionGrantData = {
+    body: ModelConnectionActionGrantRequest;
+    headers: {
+        /**
+         * Idempotency-Key
+         */
+        'Idempotency-Key': string;
+    };
+    path: {
+        /**
+         * Model Connection Id
+         */
+        model_connection_id: string;
+        /**
+         * Recipient Principal Id
+         */
+        recipient_principal_id: string;
+        action_id: ModelConnectionAction;
+    };
+    query?: never;
+    url: '/v1/model-connections/{model_connection_id}/grants/{recipient_principal_id}/{action_id}';
+};
+
+export type SetModelConnectionActionGrantErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Revision is no longer current
+     */
+    409: ProblemDetails;
+    /**
+     * Content Too Large
+     */
+    413: ProblemDetails;
+    /**
+     * Unsupported Media Type
+     */
+    415: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type SetModelConnectionActionGrantError = SetModelConnectionActionGrantErrors[keyof SetModelConnectionActionGrantErrors];
+
+export type SetModelConnectionActionGrantResponses = {
+    /**
+     * Changed or unchanged assignment.
+     */
+    200: ModelConnectionActionGrantResponse;
+    /**
+     * Successful Response
+     */
+    201: ModelConnectionActionGrantResponse;
+};
+
+export type SetModelConnectionActionGrantResponse = SetModelConnectionActionGrantResponses[keyof SetModelConnectionActionGrantResponses];
 
 export type GetMyOrganizationAccessData = {
     body?: never;
@@ -6636,6 +7232,250 @@ export type UpdateProjectMetadataResponses = {
 };
 
 export type UpdateProjectMetadataResponse = UpdateProjectMetadataResponses[keyof UpdateProjectMetadataResponses];
+
+export type ListModelConnectionsData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: {
+        /**
+         * Limit
+         */
+        limit?: number;
+        /**
+         * Cursor
+         */
+        cursor?: string | null;
+    };
+    url: '/v1/projects/{project_id}/model-connections';
+};
+
+export type ListModelConnectionsErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type ListModelConnectionsError = ListModelConnectionsErrors[keyof ListModelConnectionsErrors];
+
+export type ListModelConnectionsResponses = {
+    /**
+     * Successful Response
+     */
+    200: PageResponseModelConnectionResponse;
+};
+
+export type ListModelConnectionsResponse = ListModelConnectionsResponses[keyof ListModelConnectionsResponses];
+
+export type CreateModelConnectionData = {
+    body: ModelConnectionCreationRequest;
+    headers: {
+        /**
+         * Idempotency-Key
+         */
+        'Idempotency-Key': string;
+    };
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/v1/projects/{project_id}/model-connections';
+};
+
+export type CreateModelConnectionErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Operation conflicts with current state
+     */
+    409: ProblemDetails;
+    /**
+     * Content Too Large
+     */
+    413: ProblemDetails;
+    /**
+     * Unsupported Media Type
+     */
+    415: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type CreateModelConnectionError = CreateModelConnectionErrors[keyof CreateModelConnectionErrors];
+
+export type CreateModelConnectionResponses = {
+    /**
+     * Successful Response
+     */
+    201: ModelConnectionCreationResponse;
+};
+
+export type CreateModelConnectionResponse = CreateModelConnectionResponses[keyof CreateModelConnectionResponses];
+
+export type GetModelConnectionData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Model Connection Id
+         */
+        model_connection_id: string;
+    };
+    query?: never;
+    url: '/v1/projects/{project_id}/model-connections/{model_connection_id}';
+};
+
+export type GetModelConnectionErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type GetModelConnectionError = GetModelConnectionErrors[keyof GetModelConnectionErrors];
+
+export type GetModelConnectionResponses = {
+    /**
+     * Successful Response
+     */
+    200: ModelConnectionResponse;
+};
+
+export type GetModelConnectionResponse = GetModelConnectionResponses[keyof GetModelConnectionResponses];
+
+export type ListModelConnectionUsageData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Model Connection Id
+         */
+        model_connection_id: string;
+    };
+    query?: {
+        /**
+         * Limit
+         */
+        limit?: number;
+        /**
+         * Cursor
+         */
+        cursor?: string | null;
+    };
+    url: '/v1/projects/{project_id}/model-connections/{model_connection_id}/usage';
+};
+
+export type ListModelConnectionUsageErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type ListModelConnectionUsageError = ListModelConnectionUsageErrors[keyof ListModelConnectionUsageErrors];
+
+export type ListModelConnectionUsageResponses = {
+    /**
+     * Successful Response
+     */
+    200: PageResponseModelConnectionUsageResponse;
+};
+
+export type ListModelConnectionUsageResponse = ListModelConnectionUsageResponses[keyof ListModelConnectionUsageResponses];
 
 export type GetMyProjectAccessData = {
     body?: never;

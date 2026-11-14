@@ -7,3 +7,4 @@ class GrantTargetKind(StrEnum):
     PROJECT = "project"
     ACCESS_GROUP = "access-group"
     APPLICATION_ACCOUNT = "application-account"
+    MODEL_CONNECTION = "model-connection"

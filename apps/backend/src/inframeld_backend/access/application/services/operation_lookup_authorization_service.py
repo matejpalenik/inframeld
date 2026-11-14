@@ -89,6 +89,7 @@ class OperationLookupAuthorizationService(OperationLookupAuthorizer):
                 OperationLookupAuthorityFamily.ORGANIZATION_GRANT_READ,
                 OperationLookupAuthorityFamily.ACCESS_GROUP_GRANT_READ,
                 OperationLookupAuthorityFamily.APPLICATION_ACCOUNT_GRANT_READ,
+                OperationLookupAuthorityFamily.MODEL_CONNECTION_GRANT_READ,
             }
             else facts.has_exact_action_grant
         )

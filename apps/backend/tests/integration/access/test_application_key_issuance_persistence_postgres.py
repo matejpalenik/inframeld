@@ -103,7 +103,10 @@ from inframeld_backend.shared.application.value_objects.idempotency_key import I
 from inframeld_backend.shared.application.value_objects.request_fingerprint_key import (
     RequestFingerprintKey,
 )
-from inframeld_backend.shared.infrastructure.migrations.migration_runner import ALEMBIC_CONFIG_PATH
+from inframeld_backend.shared.infrastructure.migrations.migration_runner import (
+    ALEMBIC_CONFIG_PATH,
+    SUPPORTED_SCHEMA_REVISION,
+)
 from inframeld_backend.shared.infrastructure.resources.database import Database
 from inframeld_backend.shared.infrastructure.resources.sqlalchemy_transaction_manager import (
     SqlAlchemyTransactionManager,
@@ -540,7 +543,9 @@ async def test_retained_original_prevents_destructive_downgrade(
     with pytest.raises(RuntimeError, match="Retained application-key issuance originals"):
         alembic_command.downgrade(config, "0027_invitations")
     async with database.session() as session:
-        assert await session.scalar(select(AlembicVersionRow.version_num)) == "0034_human_lifecycle"
+        assert (
+            await session.scalar(select(AlembicVersionRow.version_num)) == SUPPORTED_SCHEMA_REVISION
+        )
         assert (
             await session.get(ApplicationKeyIssuanceResultRow, first.operation.operation_id.value)
             is not None

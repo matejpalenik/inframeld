@@ -280,6 +280,59 @@ const calls = {
       },
       query: call.query as sdk.RemoveApplicationAccountActionGrantData["query"],
     }),
+  createModelConnection: (client: Client, call: SdkCall) =>
+    sdk.createModelConnection({
+      ...options(client, call),
+      path: call.path as sdk.CreateModelConnectionData["path"],
+      headers: {
+        ...call.headers,
+        "Idempotency-Key": call.headers["Idempotency-Key"]!,
+      },
+      body: call.body as sdk.CreateModelConnectionData["body"],
+    }),
+  listModelConnections: (client: Client, call: SdkCall) =>
+    sdk.listModelConnections({
+      ...options(client, call),
+      path: call.path as sdk.ListModelConnectionsData["path"],
+      query: call.query as sdk.ListModelConnectionsData["query"],
+    }),
+  getModelConnection: (client: Client, call: SdkCall) =>
+    sdk.getModelConnection({
+      ...options(client, call),
+      path: call.path as sdk.GetModelConnectionData["path"],
+    }),
+  listModelConnectionUsage: (client: Client, call: SdkCall) =>
+    sdk.listModelConnectionUsage({
+      ...options(client, call),
+      path: call.path as sdk.ListModelConnectionUsageData["path"],
+      query: call.query as sdk.ListModelConnectionUsageData["query"],
+    }),
+  listModelConnectionActionGrants: (client: Client, call: SdkCall) =>
+    sdk.listModelConnectionActionGrants({
+      ...options(client, call),
+      path: call.path as sdk.ListModelConnectionActionGrantsData["path"],
+      query: call.query as sdk.ListModelConnectionActionGrantsData["query"],
+    }),
+  setModelConnectionActionGrant: (client: Client, call: SdkCall) =>
+    sdk.setModelConnectionActionGrant({
+      ...options(client, call),
+      path: call.path as sdk.SetModelConnectionActionGrantData["path"],
+      headers: {
+        ...call.headers,
+        "Idempotency-Key": call.headers["Idempotency-Key"]!,
+      },
+      body: call.body as sdk.SetModelConnectionActionGrantData["body"],
+    }),
+  removeModelConnectionActionGrant: (client: Client, call: SdkCall) =>
+    sdk.removeModelConnectionActionGrant({
+      ...options(client, call),
+      path: call.path as sdk.RemoveModelConnectionActionGrantData["path"],
+      headers: {
+        ...call.headers,
+        "Idempotency-Key": call.headers["Idempotency-Key"]!,
+      },
+      query: call.query as sdk.RemoveModelConnectionActionGrantData["query"],
+    }),
   listProjectGrantRecipients: (client: Client, call: SdkCall) =>
     sdk.listProjectGrantRecipients({
       ...options(client, call),

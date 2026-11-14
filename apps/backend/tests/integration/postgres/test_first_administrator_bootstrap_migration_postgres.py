@@ -27,6 +27,7 @@ from inframeld_backend.access.infrastructure.rows.identity_recovery_admission_ro
 )
 from inframeld_backend.shared.infrastructure.migrations.migration_runner import (
     BACKEND_ROOT,
+    SUPPORTED_SCHEMA_REVISION,
     run_migrations,
 )
 from inframeld_backend.shared.infrastructure.resources.database import Database
@@ -110,7 +111,9 @@ async def test_retained_claim_refuses_downgrade_without_losing_original_typed_re
     with pytest.raises(RuntimeError, match="Retained first-administrator claims"):
         command.downgrade(config, "0015_artifact_allocation")
     async with database.session() as session:
-        assert await session.scalar(select(AlembicVersionRow.version_num)) == "0034_human_lifecycle"
+        assert (
+            await session.scalar(select(AlembicVersionRow.version_num)) == SUPPORTED_SCHEMA_REVISION
+        )
         receipt = await session.get(
             FirstAdministratorBootstrapReceiptRow, original.installation_id.value
         )

@@ -20,6 +20,9 @@ from inframeld_backend.access.infrastructure.rows.application_action_grant_row i
 from inframeld_backend.access.infrastructure.rows.application_key_row import ApplicationKeyRow
 from inframeld_backend.access.infrastructure.rows.group_action_grant_row import GroupActionGrantRow
 from inframeld_backend.access.infrastructure.rows.group_membership_row import GroupMembershipRow
+from inframeld_backend.access.infrastructure.rows.model_connection_action_grant_row import (
+    ModelConnectionActionGrantRow,
+)
 from inframeld_backend.access.infrastructure.rows.organization_row import OrganizationRow
 from inframeld_backend.access.infrastructure.rows.principal_row import PrincipalRow
 from inframeld_backend.access.infrastructure.rows.project_action_grant_row import (
@@ -211,6 +214,16 @@ class PostgresProjectApplicationShutdownEffectsWriter(ProjectApplicationShutdown
                     .returning(GroupActionGrantRow.recipient_principal_id)
                 )
             ).all()
+            connection_grants = (
+                await self._session.scalars(
+                    delete(ModelConnectionActionGrantRow)
+                    .where(
+                        ModelConnectionActionGrantRow.project_id == project_id.value,
+                        ModelConnectionActionGrantRow.recipient_principal_id.in_(account_ids),
+                    )
+                    .returning(ModelConnectionActionGrantRow.recipient_principal_id)
+                )
+            ).all()
             account_grants = (
                 await self._session.scalars(
                     delete(ApplicationActionGrantRow)
@@ -247,6 +260,7 @@ class PostgresProjectApplicationShutdownEffectsWriter(ProjectApplicationShutdown
                 or project_grants
                 or group_grants
                 or account_grants
+                or connection_grants
                 or group_memberships
                 or project_memberships
             )

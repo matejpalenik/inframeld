@@ -20,6 +20,7 @@ import "./human-admission.ts";
 import "./human-lifecycle.ts";
 
 import "./application-accounts.ts";
+import "./model-connections.ts";
 import "./application-key-issuance.ts";
 import "./application-key-revocation.ts";
 
