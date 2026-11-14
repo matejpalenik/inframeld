@@ -25,6 +25,7 @@ const globalVolumes =
   args[0] === "volume" && args[1] === "ls" && !args.includes("--filter")
 const startup = process.env.ACCOUNT_PROBE_STARTUP === "true"
 const proof = process.env.ACCOUNT_PROBE_PROOF ?? ""
+const webInspection = process.env.ACCOUNT_PROBE_WEB_INSPECTION || "exact"
 const bootstrap = process.env.ACCOUNT_PROBE_BOOTSTRAP === "true"
 const driverService = bootstrap ? "bootstrap-first-driver" : "proof-driver"
 const operationIndex = args.findIndex((arg) =>
@@ -116,6 +117,51 @@ if (naturalDescendant) {
     String(process.pid)
   )
   setInterval(() => {}, 1_000)
+} else if (webInspection && args[0] === "image" && args[1] === "inspect") {
+  const image = process.env.INFRAMELD_ACCOUNT_WEB_IMAGE
+  if (args.at(-1) !== image) process.exitCode = 59
+  else console.log("9".repeat(64))
+} else if (webInspection && lookupService === "web") {
+  console.log("c".repeat(64))
+} else if (
+  webInspection &&
+  (args[0] === "inspect" ||
+    (args[0] === "container" && args[1] === "inspect")) &&
+  args.at(-1) === "c".repeat(64)
+) {
+  const project = process.env.INFRAMELD_ACCOUNT_WEB_IMAGE?.replace(
+    /^localhost\//,
+    ""
+  ).replace(/-web:check$/, "")
+  console.log(
+    JSON.stringify({
+      Id: "c".repeat(64),
+      Image:
+        "sha256:" + (webInspection === "wrong-image" ? "8" : "9").repeat(64),
+      State: { Running: true, Status: "running" },
+      Config: {
+        User: webInspection === "root" ? "0:0" : "10001:10001",
+        Labels: {
+          "com.docker.compose.project": project,
+          "com.docker.compose.service": "web",
+        },
+      },
+      HostConfig: {
+        Privileged: false,
+        PublishAllPorts: false,
+        NetworkMode: project + "_default",
+        PortBindings:
+          webInspection === "port"
+            ? { "3000/tcp": [{ HostPort: "3000" }] }
+            : {},
+      },
+      Mounts: webInspection === "mount" ? [{ Type: "bind" }] : [],
+      NetworkSettings: {
+        Ports:
+          webInspection === "docker-unpublished" ? { "3000/tcp": null } : {},
+      },
+    })
+  )
 } else if (proof && unsupportedComposeLookup) {
   // Podman Compose 1.5 rejects service operands for ps before querying the engine.
   process.exitCode = 2

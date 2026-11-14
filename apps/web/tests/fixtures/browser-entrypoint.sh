@@ -32,4 +32,9 @@ if [[ "${INFRAMELD_ACCOUNT_PROOF_MODE:-0}" == 1 ]]; then
     exec node --import tsx --test --test-concurrency=1 \
         --test-name-pattern '^recipient-proof ' tests/browser/native-hydra-login-consent.test.ts
 fi
-exec node --import tsx --test --test-concurrency=1 tests/browser/*.test.ts
+login_tests=()
+for test_file in tests/browser/*.test.ts; do
+    [[ "${test_file}" == tests/browser/native-bootstrap-proof.test.ts ]] && continue
+    login_tests+=("${test_file}")
+done
+exec node --import tsx --test --test-concurrency=1 "${login_tests[@]}"

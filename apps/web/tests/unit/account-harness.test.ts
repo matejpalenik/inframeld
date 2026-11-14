@@ -126,6 +126,8 @@ type Options = {
   bootstrap?: boolean
   startupFail?: string
   startupHang?: string
+  webInspection?:
+    "exact" | "docker-unpublished" | "wrong-image" | "root" | "mount" | "port"
   volumeInventory?: "leak" | "missing" | "partial" | "fail" | "hang"
   baseline?: "partial" | "fail" | "sort-fail"
   proof?:
@@ -298,6 +300,7 @@ if (process.argv.includes("build")) {
         ACCOUNT_PROBE_PROOF: options.proof ?? "",
         ACCOUNT_PROBE_STARTUP_FAIL: options.startupFail ?? "",
         ACCOUNT_PROBE_STARTUP_HANG: options.startupHang ?? "",
+        ACCOUNT_PROBE_WEB_INSPECTION: options.webInspection ?? "",
         ACCOUNT_PROBE_BASELINE: options.baseline ?? "",
         ACCOUNT_PROBE_VOLUME_INVENTORY: options.volumeInventory ?? "",
         ACCOUNT_PROBE_PHASE: options.phase ?? "",
@@ -1033,6 +1036,82 @@ for (const volumeInventory of ["leak", "missing", "partial", "fail"] as const) {
             "original-b\n"
           )
       })
+    }
+  )
+}
+
+for (const webInspection of [
+  "exact",
+  "docker-unpublished",
+  "wrong-image",
+  "root",
+  "mount",
+  "port",
+] as const) {
+  test(
+    `the private login gates browser work on the exact isolated web image (${webInspection})`,
+    { timeout: 15_000 },
+    async () => {
+      await probe(
+        { main: true, basename: "private-web", webInspection },
+        async ({ child, directory, output }) => {
+          const admitted =
+            webInspection === "exact" || webInspection === "docker-unpublished"
+          assert.equal(
+            await completion(child, 12_000),
+            admitted ? 0 : 1,
+            output()
+          )
+          const events = (
+            await readFile(join(directory, "events.jsonl"), "utf8")
+          )
+            .trim()
+            .split("\n")
+            .map((line) => JSON.parse(line) as { kind: string; args: string[] })
+          const build = events.find((event) => event.args?.includes("build"))
+          assert.deepEqual(build?.args.slice(-4), [
+            "build",
+            "backend",
+            "web",
+            "identity-setup",
+          ])
+          const image = events.findIndex(
+            (event) =>
+              event.args?.[0] === "image" && event.args[1] === "inspect"
+          )
+          const observed = events.findIndex(
+            (event) =>
+              event.args?.[0] === "container" &&
+              event.args[1] === "inspect" &&
+              event.args.at(-1) === "c".repeat(64)
+          )
+          const browser = events.findIndex(
+            (event) =>
+              event.args?.includes("browser-tests") &&
+              event.args.includes("run")
+          )
+          assert.ok(image >= 0 && observed > image)
+          const imageReceipt = `Exact private account web image sha256:${"9".repeat(64)} and isolation confirmed.`
+          if (admitted) {
+            assert.ok(browser > observed)
+            assert.ok(output().includes(imageReceipt), output())
+            assert.ok(
+              events.some((event) =>
+                event.args?.includes(
+                  "reference=localhost/private-web-web-fixture:check"
+                )
+              )
+            )
+          } else {
+            assert.equal(browser, -1)
+            assert.ok(!output().includes(imageReceipt), output())
+          }
+          assert.equal(
+            events.filter((event) => event.kind === "down").length,
+            1
+          )
+        }
+      )
     }
   )
 }

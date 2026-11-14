@@ -4,6 +4,7 @@ import {
   mkdir,
   mkdtemp,
   readFile,
+  readdir,
   readlink,
   rm,
   symlink,
@@ -35,14 +36,20 @@ if (fs.readFileSync(0).length !== 0) process.exit(46);
 if (process.env.ACCOUNT_COMMAND_FAILURE === stage) process.exit(17);
 if (stage === "initialize") fs.writeFileSync(initialized, "empty-password\n");
 if (stage === "import") fs.writeFileSync(imported, "fixture-ca\n");
+if (stage === "suite") console.log(JSON.stringify(args));
 `
 
 async function fixture(
   check: (state: {
     home: string
-    run: (options?: { failure?: string; xdg?: string }) => Promise<{
+    run: (options?: {
+      failure?: string
+      xdg?: string
+      proofMode?: string
+    }) => Promise<{
       status: number | null
       events: string[]
+      stdout: string
     }>
   }) => Promise<void>
 ) {
@@ -72,7 +79,9 @@ async function fixture(
               XDG_DATA_HOME: options.xdg ?? "",
               ACCOUNT_COMMAND_EVENTS: events,
               ACCOUNT_COMMAND_FAILURE: options.failure ?? "",
+              INFRAMELD_ACCOUNT_PROOF_MODE: options.proofMode ?? "0",
             },
+            encoding: "utf8",
             input: "Input must not become a password answer.\n",
             timeout: 3_000,
             maxBuffer: 16_384,
@@ -100,7 +109,7 @@ async function fixture(
           ))
             throw error
         }
-        return { status: child.status, events: observed }
+        return { status: child.status, events: observed, stdout: child.stdout }
       },
     })
   } finally {
@@ -125,6 +134,35 @@ test("fresh NSS initialization precedes untrusted Chromium and CA import with cl
     )
   })
 })
+
+for (const proofMode of ["0", "bootstrap"]) {
+  test(`browser mode ${proofMode} runs only its supported test files`, async () => {
+    await fixture(async ({ run }) => {
+      const result = await run({ proofMode })
+      assert.equal(result.status, 0)
+      const bootstrap = "native-bootstrap-proof.test.ts"
+      const expected =
+        proofMode === "bootstrap"
+          ? [bootstrap]
+          : (await readdir("tests/browser")).filter(
+              (name) => name.endsWith(".test.ts") && name !== bootstrap
+            )
+      const args: string[] = JSON.parse(
+        result.stdout.trim().split("\n").at(-1)!
+      )
+      assert.deepEqual(args.slice(0, 4), [
+        "--import",
+        "tsx",
+        "--test",
+        "--test-concurrency=1",
+      ])
+      assert.deepEqual(
+        args.slice(4).sort(),
+        expected.map((name) => `tests/browser/${name}`).sort()
+      )
+    })
+  })
+}
 
 for (const location of [".pki/nssdb", ".local/share/pki/nssdb"]) {
   for (const kind of ["directory", "file", "dangling-link"] as const) {
