@@ -15,6 +15,8 @@ pnpm --filter @inframeld/backend openapi:check
 
 These commands start the host API or run checks. They do not replace the setup and migration steps. Integration tests manage a private test stack and must run one invocation at a time.
 
+The [production backend Dockerfile](Dockerfile) uses the same digest-pinned Python 3.13.18 Debian Trixie image in both stages so the installed packages see the same Python and system libraries at runtime. A separate digest pins uv 0.13.7 for the build. Application dependencies still come from `uv.lock`. The builder retrieves signed Debian packages, and the final image runs as UID and GID 10001. The complete Compose release and its runtime qualification are tracked in [#95](https://github.com/matejpalenik/inframeld/issues/95).
+
 Development Compose includes Hydra with private administration. [Configure the official CLI client](../../docs/development/getting-started/local-setup.md#configure-the-cli-client) through `pnpm dev:oauth:configure`, or let `pnpm dev:compose` run that separate setup step before the API. Native lifetime settings live in root `.env`, separate from host API settings. The [isolated development check](../../docs/development/guides/testing.md#integration-tests) verifies setup without touching your existing databases. Account pages, Rust CLI interaction and packaged runtime delivery remain unfinished.
 
 For a new component, follow [the contributor example](../../docs/development/guides/adding-a-backend-feature.md) and mandatory [Coding Standards](../../.agents/skills/inframeld-coding-standards/SKILL.md). Reusable pure conversion/validation utilities default to named static classes. Injected services, private helpers, fixtures and framework callables retain their documented roles.
