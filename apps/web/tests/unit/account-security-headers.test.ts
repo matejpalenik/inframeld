@@ -141,6 +141,35 @@ test("native form redirect policy permits only self and the current vetted Hydra
   )
 })
 
+test("managed-local form navigation permits the exact loopback issuer and configured HTTPS OIDC origins", () => {
+  const local = {
+    ...env,
+    INFRAMELD_ACCOUNT_TRANSPORT: "managed-local",
+    INFRAMELD_ACCOUNT_PUBLIC_ORIGIN: "http://127.0.0.1:8001",
+    INFRAMELD_ACCOUNT_HYDRA_ORIGIN: "http://127.0.0.1:14444",
+    INFRAMELD_ACCOUNT_OIDC_FORM_ACTION_ORIGINS:
+      '["https://login.company.example"]',
+  }
+  assert.equal(
+    accountContentSecurityPolicy(local),
+    "frame-ancestors 'none'; base-uri 'self'; form-action 'self' http://127.0.0.1:14444 https://login.company.example"
+  )
+  assert.equal(
+    accountContentSecurityPolicy({
+      ...local,
+      INFRAMELD_ACCOUNT_OIDC_FORM_ACTION_ORIGINS: '["http://127.0.0.1:3001"]',
+    }),
+    "frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+  )
+  assert.equal(
+    accountContentSecurityPolicy({
+      ...local,
+      INFRAMELD_ACCOUNT_HYDRA_ORIGIN: "http://127.0.0.1:14444; form-action *",
+    }),
+    "frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+  )
+})
+
 test("missing or malformed account configuration cannot broaden form destinations", () => {
   for (const hydra of [
     undefined,
