@@ -509,6 +509,7 @@ class MockOwnership(JobOwnership):
     def __init__(self, ledger: MockLedger) -> None:
         self.ledger = ledger
         self.failure: BaseException | None = None
+        self.issuance_failure: BaseException | None = None
         self.cancel_requested = False
 
     @override
@@ -534,6 +535,12 @@ class MockOwnership(JobOwnership):
             reason=None,
             checkpoint=context.checkpoint,
         )
+
+    @override
+    async def require_issued_attempt(self, context: JobAttemptContextDTO) -> None:
+        self.ledger.events.append("issued-attempt")
+        if self.issuance_failure is not None:
+            raise self.issuance_failure
 
 
 class MockBudgetAuthorizer(ProjectBudgetAuthorizer):
@@ -847,6 +854,27 @@ async def test_stale_fence_retains_pending_evidence_through_normal_transaction_r
     )
     assert reconciled.record.state is SpendingCallState.RELEASED
     assert reopened.state.audits == ["correction"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failure", [JobFenceLostError(), DependencyUnavailableError()])
+async def test_unconfirmed_attempt_issuance_leaves_the_original_accounting_intact(
+    failure: Exception,
+) -> None:
+    service, ledger, ownership, _, _ = accountant()
+    call = call_context()
+    reserved = await service.reserve(call=call, basis=price_basis(), operation_limit=None)
+    ownership.failure = JobFenceLostError()
+    ownership.issuance_failure = failure
+
+    with pytest.raises(type(failure)):
+        await service.record_observation(
+            call=call, observation=observation(call), expected_call_revision=0
+        )
+
+    assert ledger.state.calls[call.call_id] == reserved.record
+    assert not ledger.state.evidence
+    assert ledger.events[-1] == "rollback"
 
 
 @pytest.mark.asyncio

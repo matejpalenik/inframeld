@@ -179,6 +179,10 @@ class MockEffectStore(JobStore):
         return self.job
 
     @override
+    async def require_issued_attempt(self, context: JobAttemptContextDTO) -> None:
+        raise AssertionError("Storage effect recovery does not accept late spending evidence.")
+
+    @override
     async def peek_candidate(self) -> JobSnapshotDTO | None:
         return self.job
 
