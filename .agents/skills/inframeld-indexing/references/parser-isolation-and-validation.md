@@ -142,6 +142,31 @@ An **image digest** identifies exact container contents. The supporting packages
 
 The source observed upstream bubblewrap **0.12.0** on its research date. That observation does not select a tested command line or prove a sandbox configuration safe.
 
+#### Prepare the pinned Docling assets
+
+The [parser asset manifest](../../../../config/models/docling-parser-v1.json) records the exact publisher revisions, install directories, file sizes, and SHA-256 digests for Heron layout detection, TableFormer Accurate table structure, and the MiniLM tokenizer. MiniLM supplies tokenization for chunk boundaries. It requires no MiniLM weights or publisher code.
+
+Before building the parser image, obtain only the listed publisher files from each model's exact revision. Put the full license files at the asset root and retain each publisher's `README.md` in its own directory. The manifest gives the public sources of the [Apache 2.0](https://www.apache.org/licenses/LICENSE-2.0.txt) and [CDLA Permissive 2.0](https://cdla.dev/permissive-2-0/) texts.
+
+Write `MODEL-ATTRIBUTION.txt` in each model directory as UTF-8, with one final newline. Use its manifest `model`, `revision`, `license`, and matching license filename in the first two lines. Use the corresponding third line below.
+
+```text
+Source: https://huggingface.co/<model>/tree/<revision>
+License: <license>, included at the bundle root as <license filename>
+```
+
+| Model | Third line |
+| --- | --- |
+| `docling-project/docling-layout-heron` | `Heron layout detection. The unmodified publisher files include README.md.` |
+| `docling-project/docling-models` | `TableFormer Accurate table structure. The unmodified publisher files include README.md.` |
+| `sentence-transformers/all-MiniLM-L6-v2` | `MiniLM tokenizer only. The unmodified publisher files include README.md.` |
+
+Verify the exact file set, lengths, and digests before packaging. The installed parser must check assets against the release's trusted manifest and stay unavailable if a file is missing or changed. Requests never fetch assets. The asset manifest identifies model files only. The image, package set, sandbox, and supported host still require joint qualification.
+
+An offline Linux ARM64 component check used Python 3.13.18, Docling Slim 2.148.0, Docling Core 2.106.0, `docling-parse` 7.23.1, `docling-ibm-models` 4.0.4, Transformers 5.22.2, and Tokenizers 0.23.3. It used a trusted, one-page PDF containing native text and a ruled table with the expected rows `Item / Count`, `Amber valve / 17`, and `Cobalt gauge / 29`. Heron and TableFormer Accurate recovered the text and all table cells with OCR off. The same asset verification rejected a missing tokenizer and a same-size changed tokenizer before loading.
+
+The check loaded the verified local `tokenizer.json` with `tokenizers.Tokenizer.from_file`, disabled the file's fixed padding and 128-token truncation, and supplied the tokenizer explicitly to Docling's `HybridChunker`. It verified a 1,024-content-token limit that excludes the tokenizer's `[CLS]` and `[SEP]` markers. A 1,024-token paragraph stayed in one chunk, and a 1,025-token paragraph split without losing content. The production Ubuntu x86-64 sandbox and untrusted-input limits still require the supported-profile qualification.
+
 <a id="bound-work-and-validate-output"></a>
 
 <a id="limits"></a>
