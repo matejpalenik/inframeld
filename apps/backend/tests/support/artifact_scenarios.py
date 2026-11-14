@@ -59,6 +59,7 @@ from inframeld_backend.shared.application.dtos.unadmitted_staging_artifact_origi
     UnadmittedStagingArtifactOriginDTO,
 )
 from inframeld_backend.shared.application.enums.http_method import HttpMethod
+from inframeld_backend.shared.application.errors.artifact_errors import ArtifactCapacityError
 from inframeld_backend.shared.application.protocols.artifact_capacity_reader import (
     ArtifactCapacityReader,
 )
@@ -139,11 +140,16 @@ class ArtifactScenario:
 
 class MockArtifactCapacityReader(ArtifactCapacityReader):
     def __init__(self, observation: ArtifactCapacityDTO | None = None) -> None:
-        self._observation = observation or ArtifactCapacityDTO(1024**4, 900 * 1024**3)
+        self.observation = observation or ArtifactCapacityDTO(1024**4, 900 * 1024**3)
+        self.unavailable = False
+        self.reads = 0
 
     @override
     async def read(self) -> ArtifactCapacityDTO:
-        return self._observation
+        self.reads += 1
+        if self.unavailable:
+            raise ArtifactCapacityError("Controlled capacity is unavailable.")
+        return self.observation
 
 
 async def seed_artifact_scope(database: Database) -> ArtifactScopeDTO:
@@ -187,6 +193,7 @@ def artifact_allocator(
     *,
     capacity: int = 8,
     physical_capacity: ArtifactCapacityDTO | None = None,
+    capacity_reader: ArtifactCapacityReader | None = None,
 ) -> ArtifactAllocationService:
     return ArtifactAllocationService(
         SqlAlchemyTransactionManager(session),
@@ -197,7 +204,9 @@ def artifact_allocator(
             PostgresArtifactCleanupAuditWriter(session),
             capacity=capacity,
         ),
-        MockArtifactCapacityReader(physical_capacity),
+        capacity_reader
+        if capacity_reader is not None
+        else MockArtifactCapacityReader(physical_capacity),
     )
 
 
@@ -209,10 +218,14 @@ async def allocate_artifact(
     transfer_seconds: float = 7200,
     limit_bytes: int = 25 * 1024 * 1024,
     physical_capacity: ArtifactCapacityDTO | None = None,
+    capacity_reader: ArtifactCapacityReader | None = None,
 ) -> ArtifactAllocationDTO:
     async with database.session() as session:
         return await artifact_allocator(
-            session, capacity=capacity, physical_capacity=physical_capacity
+            session,
+            capacity=capacity,
+            physical_capacity=physical_capacity,
+            capacity_reader=capacity_reader,
         ).allocate(
             scope=scenario.scope,
             artifact_id=scenario.artifact_id,
