@@ -51,6 +51,9 @@ from inframeld_backend.access.application.dtos.invitation_issuer_facts_dto impor
 from inframeld_backend.access.application.dtos.invitation_model_connection_target_dto import (
     InvitationModelConnectionTargetDTO,
 )
+from inframeld_backend.access.application.dtos.invitation_processing_profile_target_dto import (
+    InvitationProcessingProfileTargetDTO,
+)
 from inframeld_backend.access.application.dtos.invitation_project_access_revision_dto import (
     InvitationProjectAccessRevisionDTO,
 )
@@ -65,6 +68,9 @@ from inframeld_backend.access.application.dtos.organization_grant_management_fac
 )
 from inframeld_backend.access.application.dtos.organization_grant_target_dto import (
     OrganizationGrantTargetDTO,
+)
+from inframeld_backend.access.application.dtos.processing_profile_grant_facts_dto import (
+    ProcessingProfileGrantFactsDTO,
 )
 from inframeld_backend.access.application.dtos.project_action_grant_management_facts_dto import (
     ProjectActionGrantManagementFactsDTO,
@@ -93,6 +99,9 @@ from inframeld_backend.access.application.protocols.invitation_model_connection_
 )
 from inframeld_backend.access.application.protocols.invitation_organization_grant_writer import (
     InvitationOrganizationGrantWriter,
+)
+from inframeld_backend.access.application.protocols.invitation_processing_profile_grant_writer import (
+    InvitationProcessingProfileGrantWriter,
 )
 from inframeld_backend.access.application.protocols.invitation_project_membership_writer import (
     InvitationProjectMembershipWriter,
@@ -153,6 +162,9 @@ from inframeld_backend.access.domain.value_objects.access_group_relationships im
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
+from inframeld_backend.indexing.domain.enums.processing_profile_action import (
+    ProcessingProfileAction,
+)
 from inframeld_backend.shared.application.errors.application_errors import ConflictError
 from inframeld_backend.shared.domain.validation.revision_validation import RevisionValidation
 from inframeld_backend.shared.domain.value_objects.installation_id import InstallationId
@@ -177,6 +189,8 @@ class InvitationAssignmentService:
         project_membership_repository: ProjectMembershipRepository,
         invitation_model_connection_grant_writer: InvitationModelConnectionGrantWriter
         | None = None,
+        invitation_processing_profile_grant_writer: InvitationProcessingProfileGrantWriter
+        | None = None,
     ) -> None:
         self._invitation_assignment_facts_reader = invitation_assignment_facts_reader
         self._invitation_project_membership_writer = invitation_project_membership_writer
@@ -186,6 +200,9 @@ class InvitationAssignmentService:
         self._invitation_application_grant_writer = invitation_application_grant_writer
         self._project_membership_repository = project_membership_repository
         self._invitation_model_connection_grant_writer = invitation_model_connection_grant_writer
+        self._invitation_processing_profile_grant_writer = (
+            invitation_processing_profile_grant_writer
+        )
 
     async def prepare(
         self, *, facts: InvitationActivationFactsDTO, issuer: InvitationIssuerFactsDTO
@@ -355,6 +372,17 @@ class InvitationAssignmentService:
                     after = await writer.apply_invitation_grant(
                         binding, native, principal.id, assignment
                     )
+                elif isinstance(native, ProcessingProfileGrantFactsDTO):
+                    writer = self._invitation_processing_profile_grant_writer
+                    if writer is None:
+                        raise RuntimeError(
+                            "The Processing Profile invitation writer is unavailable."
+                        )
+                    assignment = native.assignment.set_level(can_grant=intent.can_grant)
+                    changed = assignment != native.assignment
+                    after = await writer.apply_invitation_grant(
+                        binding, native, principal.id, assignment
+                    )
                 elif isinstance(native, ProjectActionGrantManagementFactsDTO):
                     membership = await self._membership(state, principal)
                     changed = membership.set_action_grant(
@@ -408,7 +436,7 @@ class InvitationAssignmentService:
 
     @staticmethod
     def _state_project_id(state: InvitationAssignmentStateDTO) -> ProjectId | None:
-        if isinstance(state.facts, ModelConnectionGrantFactsDTO):
+        if isinstance(state.facts, (ModelConnectionGrantFactsDTO, ProcessingProfileGrantFactsDTO)):
             return state.facts.project_id
         return InvitationAssignmentService._project_id(state.intent)
 
@@ -490,6 +518,12 @@ class InvitationAssignmentService:
                     and native.model_connection_id.value == intent.target.model_connection_id
                     and native.action.value == intent.action_id.value
                 )
+            elif isinstance(intent.target, InvitationProcessingProfileTargetDTO):
+                paired = (
+                    isinstance(native, ProcessingProfileGrantFactsDTO)
+                    and native.processing_profile_id.value == intent.target.processing_profile_id
+                    and native.action.value == intent.action_id.value
+                )
         if not paired or native.organization_id != organization_id:
             raise RuntimeError(
                 "Assignment observations changed their closed native pairing or Organization."
@@ -567,7 +601,10 @@ class InvitationAssignmentService:
             (
                 not (
                     isinstance(intent, InvitationActionGrantIntentDTO)
-                    and isinstance(intent.target, InvitationModelConnectionTargetDTO)
+                    and isinstance(
+                        intent.target,
+                        (InvitationModelConnectionTargetDTO, InvitationProcessingProfileTargetDTO),
+                    )
                 )
                 and project.project_id != InvitationAssignmentService._project_id(intent)
             )
@@ -615,9 +652,17 @@ class InvitationAssignmentService:
                     is_group_member=observed.actor_is_group_member,
                     is_group_manager=observed.actor_is_group_manager,
                 )
-            elif isinstance(intent.target, InvitationModelConnectionTargetDTO):
+            elif isinstance(
+                intent.target,
+                (InvitationModelConnectionTargetDTO, InvitationProcessingProfileTargetDTO),
+            ):
+                action = (
+                    ModelConnectionAction
+                    if isinstance(intent.target, InvitationModelConnectionTargetDTO)
+                    else ProcessingProfileAction
+                )
                 allowed = (
-                    intent.action_id.value in ModelConnectionAction
+                    intent.action_id.value in action
                     and ProjectGrantDelegationPolicy.may_delegate_project_action(
                         actor_access=current,
                         actor_is_project_member=project.action.is_project_member,
@@ -712,6 +757,14 @@ class InvitationAssignmentService:
                 application_is_project_bound=False,
                 can_grant=isinstance(intent, InvitationActionGrantIntentDTO) and intent.can_grant,
             )
+        elif isinstance(native, ProcessingProfileGrantFactsDTO):
+            allowed = ProjectGrantDelegationPolicy.may_assign_to_project_member(
+                recipient_access=eligibility,
+                is_project_member=native.recipient_is_project_member,
+                has_coherent_identity=native.recipient_has_coherent_identity,
+                application_is_project_bound=False,
+                can_grant=isinstance(intent, InvitationActionGrantIntentDTO) and intent.can_grant,
+            )
         elif isinstance(native, ApplicationAccountGrantManagementFactsDTO):
             allowed = ApplicationAccountGrantPolicy.may_receive(
                 recipient_access=eligibility,
@@ -776,6 +829,7 @@ class InvitationAssignmentService:
                 AccessGroupGrantManagementFactsDTO,
                 ApplicationAccountGrantManagementFactsDTO,
                 ModelConnectionGrantFactsDTO,
+                ProcessingProfileGrantFactsDTO,
             ),
         ):
             before = native.assignment.can_grant
@@ -818,6 +872,8 @@ class InvitationAssignmentService:
                     if isinstance(native, AccessGroupGrantManagementFactsDTO)
                     else ProjectDepartureTargetKind.MODEL_CONNECTION
                     if isinstance(native, ModelConnectionGrantFactsDTO)
+                    else ProjectDepartureTargetKind.PROCESSING_PROFILE
+                    if isinstance(native, ProcessingProfileGrantFactsDTO)
                     else ProjectDepartureTargetKind.APPLICATION_ACCOUNT
                 )
             )
@@ -909,6 +965,7 @@ class InvitationAssignmentService:
                     AccessGroupGrantManagementFactsDTO,
                     ApplicationAccountGrantManagementFactsDTO,
                     ModelConnectionGrantFactsDTO,
+                    ProcessingProfileGrantFactsDTO,
                 ),
             ) and isinstance(intent, InvitationActionGrantIntentDTO):
                 changed = native.assignment.can_grant is not intent.can_grant

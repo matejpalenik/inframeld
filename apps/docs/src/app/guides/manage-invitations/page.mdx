@@ -30,13 +30,15 @@ Choose explicit effects for Bob:
 - Admission only, without memberships or action grants.
 - Membership in an existing Project.
 - Ordinary membership or management of an existing access group.
-- An exact action grant on an Organization, Project, access group, application account or model connection.
+- An exact action grant on an Organization, Project, access group, application account, model connection or processing profile.
 
 Admission-only intent must stand alone. Other invitations contain 1–100 unique effects. Do not request both grant levels for the same action and target. Group management includes ordinary membership in that group. It never silently supplies Project membership. Each group or Project-scoped action requires Bob's existing eligible Project membership or an explicit membership effect in the same invitation.
 
 For example, inviting Bob to SupportKnowledge while he does not belong to Support requires both Support Project membership and the intended group relationship. A group-only invitation cannot fill that missing prerequisite. [Group membership and management](/guides/manage-access-groups) and [exact grants](/guides/manage-action-grants) explain the separate relationships. An administration grant over SupportBot gives Bob authority over that account, not permissions to the application itself.
 
 To invite Bob to use `company-gateway`, choose an `action-grant` with target kind `model-connection`, its permanent `modelConnectionId`, `actionId: use-model-connection` and `canGrant: false`. Alice needs current use-and-grant authority for that exact connection action and the invitation's ordinary Organization authority. Include the connection's owning Project in the reviewed revisions. Bob needs eligible membership in that Project or an explicit membership effect in the same invitation.
+
+To invite Bob to inspect `support-chunks`, choose an `action-grant` with `target.kind: processing-profile`, the permanent `processingProfileId`, `actionId: view-processing-profile` and `canGrant: false`. Include the owning Project in the reviewed revisions and add an explicit membership effect if Bob needs to join it. Alice needs current invitation authority and permission to grant the exact profile action.
 
 Preview shows permitted intent and grants nothing. Fresh activation checks the current issuer, Bob's Project membership or the explicit membership intent, and the current target before recording any effect. If a prerequisite has changed, activation fails as a whole. An authorized completed replay returns the original result without assigning the grant again.
 

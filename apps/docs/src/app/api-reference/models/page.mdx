@@ -311,9 +311,25 @@ One currently eligible Project grant candidate, with only safe principal ID, dis
 
 ## GrantTargetKind
 
-The closed Project-recipient discovery selector uses `project`, `access-group`, `application-account` or `model-connection`. The server checks the target's authoritative Project binding.
+The closed Project-recipient discovery selector uses `project`, `access-group`, `application-account`, `model-connection` or `processing-profile`. The server checks the target's authoritative Project binding.
 
 <ApiSchema name="GrantTargetKind" />
+
+<a id="DoclingProcessingDefinitionRequest" />
+
+## DoclingProcessingDefinitionRequest
+
+The exact pinned Docling source and explicit chunk options for creation.
+
+<ApiSchema name="DoclingProcessingDefinitionRequest" />
+
+<a id="DoclingProcessingDefinitionResponse" />
+
+## DoclingProcessingDefinitionResponse
+
+The pinned Docling source and effective chunk options saved on the profile.
+
+<ApiSchema name="DoclingProcessingDefinitionResponse" />
 
 <a id="HumanAdmissionRequest" />
 
@@ -406,6 +422,14 @@ Records the original local block and the cleanup obligation accepted with it. `c
 One original use-and-grant assignment to the human creator on the new application account. The three assignments do not belong to the application.
 
 <ApiSchema name="InitialApplicationAccountGrantResponse" />
+
+<a id="InitialProcessingProfileGrantResponse" />
+
+## InitialProcessingProfileGrantResponse
+
+One of the two original creator grants on the profile.
+
+<ApiSchema name="InitialProcessingProfileGrantResponse" />
 
 <a id="InitialProjectGrantResponse" />
 
@@ -579,7 +603,7 @@ Intended effects, expiry and authoritative scope labels. Preview performs no pas
 
 ## InvitationProcessingProfileTargetRequest
 
-Use the exact typed target identity. A future resource variant does not supply a currently available producer or invitation integration.
+Use `processing-profile` and the permanent `processingProfileId`. The server resolves its Project and verifies the exact View or Use action.
 
 <ApiSchema name="InvitationProcessingProfileTargetRequest" />
 
@@ -649,7 +673,7 @@ Use the exact typed target identity. A future resource variant does not supply a
 
 ## InvitationTargetRequest
 
-The supported invitation targets are Organization, Project, access group, application account and model connection. Other schema variants describe future integrations.
+The supported invitation targets are Organization, Project, access group, application account, model connection and processing profile. Other schema variants describe future integrations.
 
 <ApiSchema name="InvitationTargetRequest" />
 
@@ -885,6 +909,8 @@ Identifies one actual own group membership or management relationship by `access
 
 `model_connection_grant_read` requires current exact use-and-grant authority for the original connection action. Include the authoritative Project ID alongside the original grant route.
 
+`processing_profile_grant_read` requires current exact use-and-grant authority for the original profile action. Include the owning Project ID and the original concrete PUT or DELETE grant route.
+
 <ApiSchema name="OperationLookupAuthorityFamily" />
 
 <a id="OperationLookupAuthorityRequest" />
@@ -1009,6 +1035,22 @@ Stored assignments for one Organization action, including retained suspended-rec
 
 <ApiSchema name="PageResponse_OrganizationActionGrantItemResponse_" />
 
+<a id="PageResponse_ProcessingProfileActionGrantItemResponse_" />
+
+## Processing profile action-grant page
+
+A bounded page of stored assignments for one exact profile action.
+
+<ApiSchema name="PageResponse_ProcessingProfileActionGrantItemResponse_" />
+
+<a id="PageResponse_ProcessingProfileResponse_" />
+
+## Processing profile page
+
+A bounded page of profiles visible to the current caller.
+
+<ApiSchema name="PageResponse_ProcessingProfileResponse_" />
+
 <a id="PageResponse_ProjectActionGrantItemResponse_" />
 
 ## Project action-grant page
@@ -1034,6 +1076,78 @@ Contains stored exact-action assignments and a required nullable continuation cu
 ## ProblemDetails
 
 <ApiSchema name="ProblemDetails" />
+
+<a id="ProcessingProfileAction" />
+
+## ProcessingProfileAction
+
+The separate exact View and Use actions.
+
+<ApiSchema name="ProcessingProfileAction" />
+
+<a id="ProcessingProfileActionGrantItemResponse" />
+
+## ProcessingProfileActionGrantItemResponse
+
+A stored assignment for one profile action and recipient.
+
+<ApiSchema name="ProcessingProfileActionGrantItemResponse" />
+
+<a id="ProcessingProfileActionGrantRemovalResponse" />
+
+## ProcessingProfileActionGrantRemovalResponse
+
+The original removal outcome and Access revision.
+
+<ApiSchema name="ProcessingProfileActionGrantRemovalResponse" />
+
+<a id="ProcessingProfileActionGrantRequest" />
+
+## ProcessingProfileActionGrantRequest
+
+The grant level and reviewed Access revision of the owning Project.
+
+<ApiSchema name="ProcessingProfileActionGrantRequest" />
+
+<a id="ProcessingProfileActionGrantResponse" />
+
+## ProcessingProfileActionGrantResponse
+
+The original assignment outcome, grant level and Access revision.
+
+<ApiSchema name="ProcessingProfileActionGrantResponse" />
+
+<a id="ProcessingProfileCreationRequest" />
+
+## ProcessingProfileCreationRequest
+
+The Project-unique Name, display name and complete processing definition.
+
+<ApiSchema name="ProcessingProfileCreationRequest" />
+
+<a id="ProcessingProfileCreationResponse" />
+
+## ProcessingProfileCreationResponse
+
+The original immutable profile and its two initial creator assignments.
+
+<ApiSchema name="ProcessingProfileCreationResponse" />
+
+<a id="ProcessingProfileGrantTargetResponse" />
+
+## ProcessingProfileGrantTargetResponse
+
+The permanent profile ID in the original creator assignment.
+
+<ApiSchema name="ProcessingProfileGrantTargetResponse" />
+
+<a id="ProcessingProfileResponse" />
+
+## ProcessingProfileResponse
+
+The saved profile, its owning Project and immutable definition.
+
+<ApiSchema name="ProcessingProfileResponse" />
 
 <a id="ProjectActionGrantItemResponse" />
 

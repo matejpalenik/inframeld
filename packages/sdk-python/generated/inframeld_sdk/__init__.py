@@ -21,6 +21,7 @@ __all__ = [
     "AccessApi",
     "DiscoveryApi",
     "HealthApi",
+    "IndexingApi",
     "OperationsApi",
     "ApiResponse",
     "ApiClient",
@@ -71,6 +72,8 @@ __all__ = [
     "CurrentApplicationSessionResponse",
     "CurrentSessionResponse",
     "DeletionStatusResponse",
+    "DoclingProcessingDefinitionRequest",
+    "DoclingProcessingDefinitionResponse",
     "GrantRecipientResponse",
     "GrantTargetKind",
     "HttpMethod",
@@ -88,6 +91,7 @@ __all__ = [
     "InframeldDiscoveryResponse",
     "InitialApplicationAccountGrantResponse",
     "InitialModelConnectionGrantResponse",
+    "InitialProcessingProfileGrantResponse",
     "InitialProjectGrantResponse",
     "InvitationAccessGroupTargetRequest",
     "InvitationActionGrantRequest",
@@ -165,11 +169,22 @@ __all__ = [
     "PageResponseModelConnectionResponse",
     "PageResponseModelConnectionUsageResponse",
     "PageResponseOrganizationActionGrantItemResponse",
+    "PageResponseProcessingProfileActionGrantItemResponse",
+    "PageResponseProcessingProfileResponse",
     "PageResponseProjectActionGrantItemResponse",
     "PathInner",
     "PrincipalKind",
     "PrincipalStatus",
     "ProblemDetails",
+    "ProcessingProfileAction",
+    "ProcessingProfileActionGrantItemResponse",
+    "ProcessingProfileActionGrantRemovalResponse",
+    "ProcessingProfileActionGrantRequest",
+    "ProcessingProfileActionGrantResponse",
+    "ProcessingProfileCreationRequest",
+    "ProcessingProfileCreationResponse",
+    "ProcessingProfileGrantTargetResponse",
+    "ProcessingProfileResponse",
     "ProjectAction",
     "ProjectActionGrantItemResponse",
     "ProjectActionGrantRemovalResponse",
@@ -208,6 +223,7 @@ __all__ = [
 from inframeld_sdk.api.access_api import AccessApi as AccessApi
 from inframeld_sdk.api.discovery_api import DiscoveryApi as DiscoveryApi
 from inframeld_sdk.api.health_api import HealthApi as HealthApi
+from inframeld_sdk.api.indexing_api import IndexingApi as IndexingApi
 from inframeld_sdk.api.operations_api import OperationsApi as OperationsApi
 
 # import ApiClient
@@ -262,6 +278,8 @@ from inframeld_sdk.models.completed_operation_lookup_response import CompletedOp
 from inframeld_sdk.models.current_application_session_response import CurrentApplicationSessionResponse as CurrentApplicationSessionResponse
 from inframeld_sdk.models.current_session_response import CurrentSessionResponse as CurrentSessionResponse
 from inframeld_sdk.models.deletion_status_response import DeletionStatusResponse as DeletionStatusResponse
+from inframeld_sdk.models.docling_processing_definition_request import DoclingProcessingDefinitionRequest as DoclingProcessingDefinitionRequest
+from inframeld_sdk.models.docling_processing_definition_response import DoclingProcessingDefinitionResponse as DoclingProcessingDefinitionResponse
 from inframeld_sdk.models.grant_recipient_response import GrantRecipientResponse as GrantRecipientResponse
 from inframeld_sdk.models.grant_target_kind import GrantTargetKind as GrantTargetKind
 from inframeld_sdk.models.http_method import HttpMethod as HttpMethod
@@ -279,6 +297,7 @@ from inframeld_sdk.models.in_progress_operation_lookup_response import InProgres
 from inframeld_sdk.models.inframeld_discovery_response import InframeldDiscoveryResponse as InframeldDiscoveryResponse
 from inframeld_sdk.models.initial_application_account_grant_response import InitialApplicationAccountGrantResponse as InitialApplicationAccountGrantResponse
 from inframeld_sdk.models.initial_model_connection_grant_response import InitialModelConnectionGrantResponse as InitialModelConnectionGrantResponse
+from inframeld_sdk.models.initial_processing_profile_grant_response import InitialProcessingProfileGrantResponse as InitialProcessingProfileGrantResponse
 from inframeld_sdk.models.initial_project_grant_response import InitialProjectGrantResponse as InitialProjectGrantResponse
 from inframeld_sdk.models.invitation_access_group_target_request import InvitationAccessGroupTargetRequest as InvitationAccessGroupTargetRequest
 from inframeld_sdk.models.invitation_action_grant_request import InvitationActionGrantRequest as InvitationActionGrantRequest
@@ -356,11 +375,22 @@ from inframeld_sdk.models.page_response_model_connection_action_grant_item_respo
 from inframeld_sdk.models.page_response_model_connection_response import PageResponseModelConnectionResponse as PageResponseModelConnectionResponse
 from inframeld_sdk.models.page_response_model_connection_usage_response import PageResponseModelConnectionUsageResponse as PageResponseModelConnectionUsageResponse
 from inframeld_sdk.models.page_response_organization_action_grant_item_response import PageResponseOrganizationActionGrantItemResponse as PageResponseOrganizationActionGrantItemResponse
+from inframeld_sdk.models.page_response_processing_profile_action_grant_item_response import PageResponseProcessingProfileActionGrantItemResponse as PageResponseProcessingProfileActionGrantItemResponse
+from inframeld_sdk.models.page_response_processing_profile_response import PageResponseProcessingProfileResponse as PageResponseProcessingProfileResponse
 from inframeld_sdk.models.page_response_project_action_grant_item_response import PageResponseProjectActionGrantItemResponse as PageResponseProjectActionGrantItemResponse
 from inframeld_sdk.models.path_inner import PathInner as PathInner
 from inframeld_sdk.models.principal_kind import PrincipalKind as PrincipalKind
 from inframeld_sdk.models.principal_status import PrincipalStatus as PrincipalStatus
 from inframeld_sdk.models.problem_details import ProblemDetails as ProblemDetails
+from inframeld_sdk.models.processing_profile_action import ProcessingProfileAction as ProcessingProfileAction
+from inframeld_sdk.models.processing_profile_action_grant_item_response import ProcessingProfileActionGrantItemResponse as ProcessingProfileActionGrantItemResponse
+from inframeld_sdk.models.processing_profile_action_grant_removal_response import ProcessingProfileActionGrantRemovalResponse as ProcessingProfileActionGrantRemovalResponse
+from inframeld_sdk.models.processing_profile_action_grant_request import ProcessingProfileActionGrantRequest as ProcessingProfileActionGrantRequest
+from inframeld_sdk.models.processing_profile_action_grant_response import ProcessingProfileActionGrantResponse as ProcessingProfileActionGrantResponse
+from inframeld_sdk.models.processing_profile_creation_request import ProcessingProfileCreationRequest as ProcessingProfileCreationRequest
+from inframeld_sdk.models.processing_profile_creation_response import ProcessingProfileCreationResponse as ProcessingProfileCreationResponse
+from inframeld_sdk.models.processing_profile_grant_target_response import ProcessingProfileGrantTargetResponse as ProcessingProfileGrantTargetResponse
+from inframeld_sdk.models.processing_profile_response import ProcessingProfileResponse as ProcessingProfileResponse
 from inframeld_sdk.models.project_action import ProjectAction as ProjectAction
 from inframeld_sdk.models.project_action_grant_item_response import ProjectActionGrantItemResponse as ProjectActionGrantItemResponse
 from inframeld_sdk.models.project_action_grant_removal_response import ProjectActionGrantRemovalResponse as ProjectActionGrantRemovalResponse

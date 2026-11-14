@@ -1,10 +1,24 @@
 export const pageMetadata = {
   title: "Processing and search",
-  description: "Find API availability for this product area.",
+  description: "Create and inspect immutable processing profiles.",
 }
 
 # Processing and search
 
-No public operations for this area are delivered in the current OpenAPI contract.
+## Create a processing profile
 
-[Read the product model](/product/models-and-search) for the accepted concepts. This reference entry will display the native contracts and supported client examples when the public operations are delivered. Use [the API overview](/api-reference) for available operations today.
+<ApiOperation operationId="createProcessingProfile" />
+
+Require current human `create-processing-profiles` authority in the Project, an `Idempotency-Key` and the complete supported definition. A fresh HTTP `201` saves the immutable profile, the two initial creator assignments and the original result together and advances the Project Access revision once. Exact authorized replay returns the original `201` receipt and expiry. [Create a processing profile](/guides/models-and-processing#create-a-processing-profile).
+
+## List processing profiles
+
+<ApiOperation operationId="listProcessingProfiles" />
+
+Returns HTTP `200` with `items` and nullable `nextCursor`. Each page filters by current Project eligibility and exact `view-processing-profile` authority. `limit` defaults to 25 and accepts 1 to 100. Continue with the opaque cursor on the same installation and Project. The page has no hidden-profile count.
+
+## Read a processing profile
+
+<ApiOperation operationId="getProcessingProfile" />
+
+Use the permanent profile ID in its owning Project with current `view-processing-profile` authority. HTTP `200` returns the saved definition and safe IDs. A hidden, missing or wrong-Project profile receives the same resource-not-found response. These operations use no-store responses. [Read or share a processing profile](/guides/models-and-processing#read-or-share-a-processing-profile).

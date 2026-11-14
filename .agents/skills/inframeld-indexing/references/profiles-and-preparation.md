@@ -59,7 +59,7 @@ Another model remains possible through a distinct appropriate immutable profile/
 
 Portable processing profiles use the supported Docling hybrid-chunking option and preserve complete embedding settings. Reject silent truncation. Changed meaning needs a distinct named immutable profile. Export transfers settings rather than vectors or proof that an alias is unchanged.
 
-Exact profile View/Use actions and creator assignments are accepted. No profile Edit or force-deletion workflow follows. Schemas, assets and limits still need qualification.
+Working Processing Profile creation saves the complete supported Docling definition and the exact initial View and Use assignments together. Current reads filter by Project and exact View authority. Use the [profile guide](../../../../apps/docs/src/app/guides/models-and-processing/page.mdx#create-a-processing-profile) to create, read or copy one definition. A saved profile establishes its settings. Parser execution, runtime isolation and prepared-data readiness require their own evidence.
 
 Indexing supplies source-version/artifact spans and mappings for text actually returned, including truncation. Evaluation owns full-union passage coverage. Changed chunk boundaries can still cover the same passage. Chunk IDs or fuzzy resemblance cannot prove that. Missing mappings are unscorable.
 

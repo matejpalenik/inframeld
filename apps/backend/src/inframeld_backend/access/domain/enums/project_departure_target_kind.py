@@ -8,3 +8,4 @@ class ProjectDepartureTargetKind(StrEnum):
     ACCESS_GROUP = "access_group"
     APPLICATION_ACCOUNT = "application_account"
     MODEL_CONNECTION = "model_connection"
+    PROCESSING_PROFILE = "processing_profile"

@@ -12,6 +12,9 @@ from inframeld_backend.access.application.dtos.grant_recipients_page_dto import 
 from inframeld_backend.access.application.dtos.model_connection_grant_target_dto import (
     ModelConnectionGrantTargetDTO,
 )
+from inframeld_backend.access.application.dtos.processing_profile_grant_target_dto import (
+    ProcessingProfileGrantTargetDTO,
+)
 from inframeld_backend.access.application.dtos.project_grant_target_dto import ProjectGrantTargetDTO
 from inframeld_backend.access.application.queries.list_project_grant_recipients_query import (
     ListProjectGrantRecipientsQuery,
@@ -22,6 +25,9 @@ from inframeld_backend.access.domain.value_objects.principal_id import Principal
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
 from inframeld_backend.access.http.enums.grant_target_kind import GrantTargetKind
 from inframeld_backend.access.http.responses.grant_recipient_response import GrantRecipientResponse
+from inframeld_backend.indexing.domain.value_objects.processing_profile_id import (
+    ProcessingProfileId,
+)
 from inframeld_backend.shared.application.errors.application_errors import InvalidInputError
 from inframeld_backend.shared.application.value_objects.model_connection_id import ModelConnectionId
 from inframeld_backend.shared.http.requests.pagination_query import PaginationQuery
@@ -46,6 +52,7 @@ class ProjectGrantRecipientsMapper:
             | AccessGroupGrantTargetDTO
             | ApplicationAccountGrantTargetDTO
             | ModelConnectionGrantTargetDTO
+            | ProcessingProfileGrantTargetDTO
         )
         if target_kind is GrantTargetKind.PROJECT:
             target = ProjectGrantTargetDTO(project_id=ProjectId(target_id))
@@ -55,6 +62,8 @@ class ProjectGrantRecipientsMapper:
             )
         elif target_kind is GrantTargetKind.MODEL_CONNECTION:
             target = ModelConnectionGrantTargetDTO(project, ModelConnectionId(target_id))
+        elif target_kind is GrantTargetKind.PROCESSING_PROFILE:
+            target = ProcessingProfileGrantTargetDTO(project, ProcessingProfileId(target_id))
         else:
             target = ApplicationAccountGrantTargetDTO(
                 project_id=project, application_principal_id=PrincipalId(target_id)

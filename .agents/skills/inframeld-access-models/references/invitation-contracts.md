@@ -25,6 +25,8 @@ Every integration preserves current issuer delegation and recipient prerequisite
 
 For a Model Connection, submit the exact `{kind: "model-connection", modelConnectionId}` target and action. The owner resolves its Project, checks the matching reviewed Project revision on issuance and discloses the current permitted connection label in preview. Activation requires the issuer's current exact delegation and the recipient's existing or intended membership in that Project. Preview reserves no grant. Completed replay does not rerun those writes. [Connection routes and action IDs](../../inframeld-application-contracts/references/model-contract-examples.md#create-and-inspect-a-connection) use the same target and permissions.
 
+For a Processing Profile, submit the exact `{kind: "processing-profile", processingProfileId}` target and `view-processing-profile` or `use-processing-profile`. The server resolves the owning Project and checks the reviewed Project revision at issuance. Preview discloses only the permitted intended scope. Fresh activation rechecks the issuer's current exact delegation, the authoritative target and the recipient's existing or intended Project membership. The protected completed-replay path returns the original result without reapplying the grant.
+
 ## Typed design blocks
 
 **Design notation, not production implementation.** The following blocks replace prose field lists in this reference. They preserve the documented wire names. `GrantTarget` is defined once in [the exact target contract](grant-target-contract.md). No importable module is implied. An annotation, `Never`, or a comment does not perform input validation. In these blocks UUID and datetime denote the corresponding serialized JSON strings.

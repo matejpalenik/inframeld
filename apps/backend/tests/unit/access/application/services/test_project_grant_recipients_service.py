@@ -26,6 +26,9 @@ from inframeld_backend.access.application.dtos.human_credential_facts_dto import
 from inframeld_backend.access.application.dtos.model_connection_grant_target_dto import (
     ModelConnectionGrantTargetDTO,
 )
+from inframeld_backend.access.application.dtos.processing_profile_grant_target_dto import (
+    ProcessingProfileGrantTargetDTO,
+)
 from inframeld_backend.access.application.dtos.project_action_facts_dto import ProjectActionFactsDTO
 from inframeld_backend.access.application.dtos.project_grant_target_dto import ProjectGrantTargetDTO
 from inframeld_backend.access.application.errors.human_oauth_credential_rejected_error import (
@@ -58,6 +61,9 @@ from inframeld_backend.access.domain.value_objects.human_credential_version impo
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
+from inframeld_backend.indexing.domain.value_objects.processing_profile_id import (
+    ProcessingProfileId,
+)
 from inframeld_backend.shared.application.errors.application_errors import (
     AccessDeniedError,
     AuthenticationRequiredError,
@@ -129,7 +135,8 @@ class MockRecipientsFacts(GrantRecipientsFactsReader):
         target: ProjectGrantTargetDTO
         | AccessGroupGrantTargetDTO
         | ApplicationAccountGrantTargetDTO
-        | ModelConnectionGrantTargetDTO,
+        | ModelConnectionGrantTargetDTO
+        | ProcessingProfileGrantTargetDTO,
         action_id: ActionId,
         eligible_kinds: tuple[PrincipalKind, ...],
         after: PrincipalId | None,
@@ -173,6 +180,11 @@ async def test_same_group_manager_reads_only_safe_bounded_eligible_choices() -> 
         ),
         (ProjectGrantTargetDTO(project_id=PROJECT), "manage-budget", (PrincipalKind.HUMAN,)),
         (
+            ProcessingProfileGrantTargetDTO(PROJECT, ProcessingProfileId(UUID(int=31))),
+            "use-processing-profile",
+            (PrincipalKind.HUMAN, PrincipalKind.APPLICATION),
+        ),
+        (
             ApplicationAccountGrantTargetDTO(
                 project_id=PROJECT, application_principal_id=PrincipalId(UUID(int=30))
             ),
@@ -185,7 +197,8 @@ async def test_existing_catalogue_supplies_eligible_kinds_before_the_reader_limi
     target: ProjectGrantTargetDTO
     | AccessGroupGrantTargetDTO
     | ApplicationAccountGrantTargetDTO
-    | ModelConnectionGrantTargetDTO,
+    | ModelConnectionGrantTargetDTO
+    | ProcessingProfileGrantTargetDTO,
     action: str,
     kinds: tuple[PrincipalKind, ...],
 ) -> None:

@@ -818,3 +818,71 @@ problems!(
     ListProjectGrantRecipientsApiError::Status422,
     ListProjectGrantRecipientsApiError::Status503
 );
+
+problems!(
+    CreateProcessingProfileApiError,
+    CreateProcessingProfileApiError::Status400,
+    CreateProcessingProfileApiError::Status401,
+    CreateProcessingProfileApiError::Status403,
+    CreateProcessingProfileApiError::Status404,
+    CreateProcessingProfileApiError::Status409,
+    CreateProcessingProfileApiError::Status413,
+    CreateProcessingProfileApiError::Status415,
+    CreateProcessingProfileApiError::Status422,
+    CreateProcessingProfileApiError::Status503
+);
+
+problems!(
+    GetProcessingProfileApiError,
+    GetProcessingProfileApiError::Status400,
+    GetProcessingProfileApiError::Status401,
+    GetProcessingProfileApiError::Status403,
+    GetProcessingProfileApiError::Status404,
+    GetProcessingProfileApiError::Status422,
+    GetProcessingProfileApiError::Status503
+);
+
+problems!(
+    ListProcessingProfilesApiError,
+    ListProcessingProfilesApiError::Status400,
+    ListProcessingProfilesApiError::Status401,
+    ListProcessingProfilesApiError::Status403,
+    ListProcessingProfilesApiError::Status404,
+    ListProcessingProfilesApiError::Status422,
+    ListProcessingProfilesApiError::Status503
+);
+
+problems!(
+    ListProcessingProfileActionGrantsApiError,
+    ListProcessingProfileActionGrantsApiError::Status400,
+    ListProcessingProfileActionGrantsApiError::Status401,
+    ListProcessingProfileActionGrantsApiError::Status403,
+    ListProcessingProfileActionGrantsApiError::Status404,
+    ListProcessingProfileActionGrantsApiError::Status409,
+    ListProcessingProfileActionGrantsApiError::Status422,
+    ListProcessingProfileActionGrantsApiError::Status503
+);
+
+problems!(
+    SetProcessingProfileActionGrantApiError,
+    SetProcessingProfileActionGrantApiError::Status400,
+    SetProcessingProfileActionGrantApiError::Status401,
+    SetProcessingProfileActionGrantApiError::Status403,
+    SetProcessingProfileActionGrantApiError::Status404,
+    SetProcessingProfileActionGrantApiError::Status409,
+    SetProcessingProfileActionGrantApiError::Status413,
+    SetProcessingProfileActionGrantApiError::Status415,
+    SetProcessingProfileActionGrantApiError::Status422,
+    SetProcessingProfileActionGrantApiError::Status503
+);
+
+problems!(
+    RemoveProcessingProfileActionGrantApiError,
+    RemoveProcessingProfileActionGrantApiError::Status400,
+    RemoveProcessingProfileActionGrantApiError::Status401,
+    RemoveProcessingProfileActionGrantApiError::Status403,
+    RemoveProcessingProfileActionGrantApiError::Status404,
+    RemoveProcessingProfileActionGrantApiError::Status409,
+    RemoveProcessingProfileActionGrantApiError::Status422,
+    RemoveProcessingProfileActionGrantApiError::Status503
+);

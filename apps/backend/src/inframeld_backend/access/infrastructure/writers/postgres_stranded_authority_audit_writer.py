@@ -15,6 +15,9 @@ from inframeld_backend.access.application.dtos.model_connection_grant_target_dto
 from inframeld_backend.access.application.dtos.organization_grant_target_dto import (
     OrganizationGrantTargetDTO,
 )
+from inframeld_backend.access.application.dtos.processing_profile_grant_target_dto import (
+    ProcessingProfileGrantTargetDTO,
+)
 from inframeld_backend.access.application.dtos.project_grant_target_dto import ProjectGrantTargetDTO
 from inframeld_backend.access.application.dtos.project_metadata_authority_repaired_audit_event_dto import (
     ProjectMetadataAuthorityRepairedAuditEventDTO,
@@ -89,6 +92,9 @@ class PostgresStrandedAuthorityAuditWriter(StrandedAuthorityAuditWriter):
             elif isinstance(target, ModelConnectionGrantTargetDTO):
                 project_id = target.project_id.value
                 target_kind, target_id = "model_connection", target.model_connection_id.value
+            elif isinstance(target, ProcessingProfileGrantTargetDTO):
+                project_id = target.project_id.value
+                target_kind, target_id = "processing_profile", target.processing_profile_id.value
             else:
                 project_id = target.project_id.value
                 target_kind, target_id = (

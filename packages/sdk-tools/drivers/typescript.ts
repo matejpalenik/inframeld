@@ -358,6 +358,53 @@ const calls = {
       },
       query: call.query as sdk.RemoveModelConnectionActionGrantData["query"],
     }),
+  createProcessingProfile: (client: Client, call: SdkCall) =>
+    sdk.createProcessingProfile({
+      ...options(client, call),
+      path: call.path as sdk.CreateProcessingProfileData["path"],
+      headers: {
+        ...call.headers,
+        "Idempotency-Key": call.headers["Idempotency-Key"]!,
+      },
+      body: call.body as sdk.CreateProcessingProfileData["body"],
+    }),
+  getProcessingProfile: (client: Client, call: SdkCall) =>
+    sdk.getProcessingProfile({
+      ...options(client, call),
+      path: call.path as sdk.GetProcessingProfileData["path"],
+    }),
+  listProcessingProfiles: (client: Client, call: SdkCall) =>
+    sdk.listProcessingProfiles({
+      ...options(client, call),
+      path: call.path as sdk.ListProcessingProfilesData["path"],
+      query: call.query as sdk.ListProcessingProfilesData["query"],
+    }),
+  listProcessingProfileActionGrants: (client: Client, call: SdkCall) =>
+    sdk.listProcessingProfileActionGrants({
+      ...options(client, call),
+      path: call.path as sdk.ListProcessingProfileActionGrantsData["path"],
+      query: call.query as sdk.ListProcessingProfileActionGrantsData["query"],
+    }),
+  setProcessingProfileActionGrant: (client: Client, call: SdkCall) =>
+    sdk.setProcessingProfileActionGrant({
+      ...options(client, call),
+      path: call.path as sdk.SetProcessingProfileActionGrantData["path"],
+      headers: {
+        ...call.headers,
+        "Idempotency-Key": call.headers["Idempotency-Key"]!,
+      },
+      body: call.body as sdk.SetProcessingProfileActionGrantData["body"],
+    }),
+  removeProcessingProfileActionGrant: (client: Client, call: SdkCall) =>
+    sdk.removeProcessingProfileActionGrant({
+      ...options(client, call),
+      path: call.path as sdk.RemoveProcessingProfileActionGrantData["path"],
+      headers: {
+        ...call.headers,
+        "Idempotency-Key": call.headers["Idempotency-Key"]!,
+      },
+      query: call.query as sdk.RemoveProcessingProfileActionGrantData["query"],
+    }),
   listProjectGrantRecipients: (client: Client, call: SdkCall) =>
     sdk.listProjectGrantRecipients({
       ...options(client, call),

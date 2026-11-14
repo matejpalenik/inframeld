@@ -30,6 +30,7 @@ class GrantTargetKind(str, Enum):
     ACCESS_MINUS_GROUP = 'access-group'
     APPLICATION_MINUS_ACCOUNT = 'application-account'
     MODEL_MINUS_CONNECTION = 'model-connection'
+    PROCESSING_MINUS_PROFILE = 'processing-profile'
 
     @classmethod
     def from_json(cls, json_str: str) -> Self:

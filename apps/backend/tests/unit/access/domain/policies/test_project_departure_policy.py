@@ -48,6 +48,22 @@ def test_each_exact_responsibility_needs_a_remaining_eligible_human() -> None:
     assert ProjectDeparturePolicy.may_depart(())
 
 
+@pytest.mark.parametrize("action", ["view-processing-profile", "use-processing-profile"])
+def test_processing_profile_departure_requires_an_exact_eligible_grantor(action: str) -> None:
+    responsibility = ProjectDepartureResponsibilityPolicyInput(
+        target_kind=ProjectDepartureTargetKind.PROCESSING_PROFILE,
+        action_id=ActionId(action),
+        candidates=(CANDIDATE,),
+    )
+    assert ProjectDeparturePolicy.may_depart((responsibility,))
+    assert not ProjectDeparturePolicy.may_depart(
+        (replace(responsibility, candidates=(replace(CANDIDATE, can_grant=False),)),)
+    )
+    assert not ProjectDeparturePolicy.may_depart(
+        (replace(responsibility, action_id=ActionId("manage-model-connection")),)
+    )
+
+
 @pytest.mark.parametrize(
     "field", ["has_pending_recovery", "is_project_member", "has_coherent_identity"]
 )

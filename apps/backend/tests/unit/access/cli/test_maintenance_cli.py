@@ -95,6 +95,7 @@ class MockRepairOperation(StrandedAuthorityRepairer):
         self, *, access: AccessContextDTO, command: RepairStrandedAuthorityCommand
     ) -> StrandedAuthorityRepairResultDTO:
         self.events.append("repair")
+        assert isinstance(command.responsibility, ActionGrantorRepairResponsibilityDTO)
         return StrandedAuthorityRepairResultDTO(
             operation_id=command.operation_id,
             installation_id=command.expected_installation_id,
@@ -319,6 +320,14 @@ def test_mode_dispatch_accepts_the_fixed_first_administrator_claim() -> None:
             },
             "actionId": "use-model-connection",
         },
+        {
+            "kind": "action-grantor",
+            "target": {
+                "kind": "processing-profile",
+                "processingProfileId": "00000000-0000-0000-0000-00000000000a",
+            },
+            "actionId": "use-processing-profile",
+        },
     ],
 )
 def test_private_dispatch_accepts_each_delivered_access_responsibility(
@@ -341,3 +350,44 @@ def test_private_dispatch_accepts_each_delivered_access_responsibility(
     assert command.responsibility.kind.value == responsibility["kind"]
     assert command.operation_id.value == "dispatch-original"
     assert "private-proof" not in repr(command)
+
+
+@pytest.mark.parametrize(
+    ("target_fields", "action"),
+    [
+        (
+            {"projectId": str(UUID(int=3)), "processingProfileId": str(UUID(int=9))},
+            "use-processing-profile",
+        ),
+        (
+            {"projectId": str(UUID(int=3)), "modelConnectionId": str(UUID(int=9))},
+            "use-processing-profile",
+        ),
+        (
+            {"processingProfileId": str(UUID(int=9))},
+            "use-model-connection",
+        ),
+        ({}, "use-processing-profile"),
+    ],
+)
+def test_profile_repair_rejects_missing_or_cross_kind_scope(
+    target_fields: dict[str, str], action: str
+) -> None:
+    request = {
+        "schemaVersion": 1,
+        "mode": "repair-stranded-authority",
+        "expectedInstallationId": str(UUID(int=4)),
+        "operationId": "dispatch-original",
+        "operatorLabel": "Host operator",
+        "reason": "Repair exact reviewed Access responsibility",
+        "expectedAccessRevision": 0,
+        "expectedIdentityId": str(UUID(int=5)),
+        "identityProof": {"kind": "hydra-access-token", "accessToken": "private-proof"},
+        "responsibility": {
+            "kind": "action-grantor",
+            "target": {"kind": "processing-profile", **target_fields},
+            "actionId": action,
+        },
+    }
+    with pytest.raises(StrandedAuthorityMaintenanceInputError):
+        MaintenanceCli.read(io.BytesIO(json.dumps(request).encode()))

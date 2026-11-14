@@ -32,6 +32,12 @@ from inframeld_backend.access.application.dtos.model_connection_grant_target_dto
 from inframeld_backend.access.application.dtos.organization_grant_target_dto import (
     OrganizationGrantTargetDTO,
 )
+from inframeld_backend.access.application.dtos.processing_profile_grant_target_dto import (
+    ProcessingProfileGrantTargetDTO,
+)
+from inframeld_backend.access.application.dtos.processing_profile_repair_request_dto import (
+    ProcessingProfileRepairRequestDTO,
+)
 from inframeld_backend.access.application.dtos.project_grant_target_dto import ProjectGrantTargetDTO
 from inframeld_backend.access.application.dtos.stranded_authority_repair_facts_dto import (
     StrandedAuthorityRepairFactsDTO,
@@ -118,6 +124,15 @@ from inframeld_backend.access.infrastructure.rows.project_row import ProjectRow
 from inframeld_backend.access.infrastructure.rows.stranded_authority_repair_receipt_row import (
     StrandedAuthorityRepairReceiptRow,
 )
+from inframeld_backend.indexing.domain.value_objects.processing_profile_id import (
+    ProcessingProfileId,
+)
+from inframeld_backend.indexing.infrastructure.rows.processing_profile_action_grant_row import (
+    ProcessingProfileActionGrantRow,
+)
+from inframeld_backend.indexing.infrastructure.rows.processing_profile_row import (
+    ProcessingProfileRow,
+)
 from inframeld_backend.shared.application.value_objects.model_connection_id import ModelConnectionId
 from inframeld_backend.shared.application.value_objects.operation_id import OperationId
 from inframeld_backend.shared.application.value_objects.request_fingerprint import (
@@ -172,9 +187,32 @@ class PostgresStrandedAuthorityRepairFactsReader(StrandedAuthorityRepairFactsRea
             )
             if organization is None:
                 return None
+            locked = await self._session.scalar(
+                select(OrganizationRow.id)
+                .where(OrganizationRow.id == organization)
+                .with_for_update()
+            )
+            if locked is None:
+                return None
             responsibility = command.responsibility
             project_id: ProjectId | None
-            if isinstance(responsibility, GroupManagerRepairResponsibilityDTO):
+            if isinstance(responsibility, ProcessingProfileRepairRequestDTO):
+                parent = await self._session.scalar(
+                    select(ProcessingProfileRow.project_id).where(
+                        ProcessingProfileRow.id == responsibility.processing_profile_id.value,
+                        ProcessingProfileRow.organization_id == organization,
+                    )
+                )
+                if parent is None:
+                    return None
+                project_id = ProjectId(parent)
+                responsibility = ActionGrantorRepairResponsibilityDTO(
+                    ProcessingProfileGrantTargetDTO(
+                        project_id, responsibility.processing_profile_id
+                    ),
+                    ActionId(responsibility.action.value),
+                )
+            elif isinstance(responsibility, GroupManagerRepairResponsibilityDTO):
                 project_id = responsibility.project_id
             else:
                 target = responsibility.target
@@ -184,13 +222,6 @@ class PostgresStrandedAuthorityRepairFactsReader(StrandedAuthorityRepairFactsRea
                     project_id = None
                 else:
                     project_id = target.project_id
-            locked = await self._session.scalar(
-                select(OrganizationRow.id)
-                .where(OrganizationRow.id == organization)
-                .with_for_update()
-            )
-            if locked is None:
-                return None
             if project_id is None:
                 observed = (
                     await self._session.execute(
@@ -280,7 +311,7 @@ class PostgresStrandedAuthorityRepairFactsReader(StrandedAuthorityRepairFactsRea
                 status = current.project_status
                 revision = project.access_revision
                 target_exists, target_accepts_assignment = await self._target_facts(
-                    command, OrganizationId(organization)
+                    responsibility, OrganizationId(organization)
                 )
             if (
                 principal.kind is not PrincipalKind.HUMAN
@@ -288,7 +319,7 @@ class PostgresStrandedAuthorityRepairFactsReader(StrandedAuthorityRepairFactsRea
             ):
                 return None
             grantor = await self._eligible_holder(
-                command, OrganizationId(organization), installation, project_id
+                responsibility, OrganizationId(organization), installation, project_id
             )
             observed_at = await self._session.scalar(
                 select(func.clock_timestamp(type_=ProjectRow.created_at.type))
@@ -311,10 +342,11 @@ class PostgresStrandedAuthorityRepairFactsReader(StrandedAuthorityRepairFactsRea
             )
 
     async def _target_facts(
-        self, command: RepairStrandedAuthorityCommand, organization: OrganizationId
+        self,
+        responsibility: GroupManagerRepairResponsibilityDTO | ActionGrantorRepairResponsibilityDTO,
+        organization: OrganizationId,
     ) -> tuple[bool, bool]:
         """Separate a retained target from eligibility for a new assignment."""
-        responsibility = command.responsibility
         if isinstance(responsibility, GroupManagerRepairResponsibilityDTO):
             project, group = responsibility.project_id, responsibility.access_group_id
         elif isinstance(responsibility.target, AccessGroupGrantTargetDTO):
@@ -357,6 +389,20 @@ class PostgresStrandedAuthorityRepairFactsReader(StrandedAuthorityRepairFactsRea
                 )
             )
             return active is not None, active is True
+        elif isinstance(responsibility.target, ProcessingProfileGrantTargetDTO):
+            target = responsibility.target
+            exists_in_project = bool(
+                await self._session.scalar(
+                    select(
+                        exists().where(
+                            ProcessingProfileRow.id == target.processing_profile_id.value,
+                            ProcessingProfileRow.project_id == target.project_id.value,
+                            ProcessingProfileRow.organization_id == organization.value,
+                        )
+                    )
+                )
+            )
+            return exists_in_project, exists_in_project
         else:
             return True, True
         group_exists = bool(
@@ -372,12 +418,11 @@ class PostgresStrandedAuthorityRepairFactsReader(StrandedAuthorityRepairFactsRea
 
     async def _eligible_holder(
         self,
-        command: RepairStrandedAuthorityCommand,
+        responsibility: GroupManagerRepairResponsibilityDTO | ActionGrantorRepairResponsibilityDTO,
         organization: OrganizationId,
         installation: InstallationId,
         project: ProjectId | None,
     ) -> bool | None:
-        responsibility = command.responsibility
         manager: ColumnElement[bool] = literal(False)
         group_member: ColumnElement[bool] = literal(False)
         delegated: ColumnElement[bool] = literal(False)
@@ -465,6 +510,20 @@ class PostgresStrandedAuthorityRepairFactsReader(StrandedAuthorityRepairFactsRea
                     .where(
                         grant.project_id == target.project_id.value,
                         grant.model_connection_id == target.model_connection_id.value,
+                        grant.recipient_principal_id == PrincipalRow.id,
+                        grant.recipient_kind == PrincipalKind.HUMAN,
+                        grant.action == action,
+                        grant.can_grant.is_(True),
+                    )
+                    .correlate(PrincipalRow)
+                )
+            elif isinstance(target, ProcessingProfileGrantTargetDTO):
+                grant = ProcessingProfileActionGrantRow
+                delegated = (
+                    exists()
+                    .where(
+                        grant.project_id == target.project_id.value,
+                        grant.processing_profile_id == target.processing_profile_id.value,
                         grant.recipient_principal_id == PrincipalRow.id,
                         grant.recipient_kind == PrincipalKind.HUMAN,
                         grant.action == action,
@@ -621,6 +680,23 @@ class PostgresStrandedAuthorityRepairFactsReader(StrandedAuthorityRepairFactsRea
     def _decode_responsibility(
         row: StrandedAuthorityRepairReceiptRow,
     ) -> GroupManagerRepairResponsibilityDTO | ActionGrantorRepairResponsibilityDTO:
+        if row.processing_profile_id is not None:
+            if (
+                row.responsibility_kind != RepairResponsibilityKind.ACTION_GRANTOR.value
+                or row.target_kind != "processing-profile"
+                or row.project_id is None
+                or row.access_group_id is not None
+                or row.application_account_id is not None
+                or row.model_connection_id is not None
+                or row.action_id is None
+            ):
+                raise ValueError("Incoherent retained Processing Profile scope.")
+            return ActionGrantorRepairResponsibilityDTO(
+                ProcessingProfileGrantTargetDTO(
+                    ProjectId(row.project_id), ProcessingProfileId(row.processing_profile_id)
+                ),
+                ActionId(row.action_id),
+            )
         if (
             row.responsibility_kind == RepairResponsibilityKind.GROUP_MANAGER.value
             and row.target_kind == "access-group"

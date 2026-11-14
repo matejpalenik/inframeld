@@ -10,4 +10,4 @@ class InvitationScopeDTO:
 
     target: InvitationTargetDTO
     display_name: str
-    model_project_id: ProjectId | None = None
+    resolved_project_id: ProjectId | None = None

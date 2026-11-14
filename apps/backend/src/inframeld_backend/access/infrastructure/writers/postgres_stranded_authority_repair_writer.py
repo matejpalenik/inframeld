@@ -20,6 +20,9 @@ from inframeld_backend.access.application.dtos.model_connection_grant_target_dto
 from inframeld_backend.access.application.dtos.organization_grant_target_dto import (
     OrganizationGrantTargetDTO,
 )
+from inframeld_backend.access.application.dtos.processing_profile_grant_target_dto import (
+    ProcessingProfileGrantTargetDTO,
+)
 from inframeld_backend.access.application.dtos.project_grant_target_dto import ProjectGrantTargetDTO
 from inframeld_backend.access.application.dtos.stranded_authority_repair_facts_dto import (
     StrandedAuthorityRepairFactsDTO,
@@ -72,6 +75,9 @@ from inframeld_backend.access.infrastructure.rows.project_metadata_repair_receip
 from inframeld_backend.access.infrastructure.rows.project_row import ProjectRow
 from inframeld_backend.access.infrastructure.rows.stranded_authority_repair_receipt_row import (
     StrandedAuthorityRepairReceiptRow,
+)
+from inframeld_backend.indexing.infrastructure.rows.processing_profile_action_grant_row import (
+    ProcessingProfileActionGrantRow,
 )
 from inframeld_backend.shared.domain.validation.revision_validation import RevisionValidation
 
@@ -173,6 +179,7 @@ class PostgresStrandedAuthorityRepairWriter(StrandedAuthorityRepairWriter):
         group: UUID | None = None
         application: UUID | None = None
         model_connection: UUID | None = None
+        processing_profile: UUID | None = None
         action: str | None = None
         if isinstance(responsibility, GroupManagerRepairResponsibilityDTO):
             target_kind = "access-group"
@@ -196,6 +203,12 @@ class PostgresStrandedAuthorityRepairWriter(StrandedAuthorityRepairWriter):
                     target.project_id.value,
                     target.model_connection_id.value,
                 )
+            elif isinstance(target, ProcessingProfileGrantTargetDTO):
+                target_kind, project, processing_profile = (
+                    "processing-profile",
+                    target.project_id.value,
+                    target.processing_profile_id.value,
+                )
             else:
                 target_kind, project, application = (
                     "application-account",
@@ -217,6 +230,7 @@ class PostgresStrandedAuthorityRepairWriter(StrandedAuthorityRepairWriter):
             access_group_id=group,
             application_account_id=application,
             model_connection_id=model_connection,
+            processing_profile_id=processing_profile,
             action_id=action,
         )
 
@@ -415,6 +429,29 @@ class PostgresStrandedAuthorityRepairWriter(StrandedAuthorityRepairWriter):
                         index_elements=[
                             grant.project_id,
                             grant.model_connection_id,
+                            grant.recipient_principal_id,
+                            grant.action,
+                        ],
+                        set_=replacement,
+                    )
+                )
+            elif isinstance(target, ProcessingProfileGrantTargetDTO):
+                grant = ProcessingProfileActionGrantRow
+                statement = (
+                    insert(grant)
+                    .values(
+                        project_id=target.project_id.value,
+                        processing_profile_id=target.processing_profile_id.value,
+                        recipient_principal_id=recipient,
+                        recipient_kind=PrincipalKind.HUMAN,
+                        action=action,
+                        can_grant=True,
+                        assigned_by_principal_id=None,
+                    )
+                    .on_conflict_do_update(
+                        index_elements=[
+                            grant.project_id,
+                            grant.processing_profile_id,
                             grant.recipient_principal_id,
                             grant.action,
                         ],

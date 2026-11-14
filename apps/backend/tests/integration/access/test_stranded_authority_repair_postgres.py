@@ -10,7 +10,7 @@ from collections.abc import Awaitable
 from dataclasses import replace
 from datetime import datetime
 from typing import override
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from sqlalchemy import delete, event, func, select, update
@@ -21,7 +21,13 @@ from tests.support.first_administrator_bootstrap_scenarios import (
     bootstrap_scenario,
     bootstrap_service,
 )
+from tests.support.processing_profile_scenarios import (
+    grant_profile_creation,
+    profile_command,
+    profile_context,
+)
 from tests.support.project_metadata_scenarios import (
+    seed_metadata_repair_recipient,
     seed_stranded_repair_target,
     stranded_repair_service,
 )
@@ -52,6 +58,9 @@ from inframeld_backend.access.application.dtos.human_oauth_credential_binding_dt
 from inframeld_backend.access.application.dtos.organization_grant_target_dto import (
     OrganizationGrantTargetDTO,
 )
+from inframeld_backend.access.application.dtos.processing_profile_repair_request_dto import (
+    ProcessingProfileRepairRequestDTO,
+)
 from inframeld_backend.access.application.dtos.project_grant_target_dto import ProjectGrantTargetDTO
 from inframeld_backend.access.application.dtos.stranded_authority_repair_facts_dto import (
     StrandedAuthorityRepairFactsDTO,
@@ -64,6 +73,9 @@ from inframeld_backend.access.application.dtos.stranded_authority_repair_result_
 )
 from inframeld_backend.access.application.dtos.stranded_authority_repaired_audit_event_dto import (
     StrandedAuthorityRepairedAuditEventDTO,
+)
+from inframeld_backend.access.application.dtos.verified_human_identity_dto import (
+    VerifiedHumanIdentityDTO,
 )
 from inframeld_backend.access.application.enums.stranded_authority_maintenance_error_code import (
     StrandedAuthorityMaintenanceErrorCode as Code,
@@ -88,6 +100,9 @@ from inframeld_backend.access.domain.policies.human_authentication_policy import
     HumanAuthenticationPolicy,
 )
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
+from inframeld_backend.access.domain.value_objects.identity_authority import IdentityAuthority
+from inframeld_backend.access.domain.value_objects.identity_subject import IdentitySubject
+from inframeld_backend.access.domain.value_objects.project_id import ProjectId
 from inframeld_backend.access.infrastructure.readers.postgres_stranded_authority_repair_facts_reader import (
     PostgresStrandedAuthorityRepairFactsReader,
 )
@@ -139,6 +154,15 @@ from inframeld_backend.access.infrastructure.writers.postgres_stranded_authority
 from inframeld_backend.bootstrap.access_group_composition import open_access_group_deletion
 from inframeld_backend.bootstrap.application_account_composition import (
     open_application_account_deletion,
+)
+from inframeld_backend.bootstrap.processing_profile_composition import (
+    open_processing_profile_creation,
+)
+from inframeld_backend.indexing.domain.enums.processing_profile_action import (
+    ProcessingProfileAction,
+)
+from inframeld_backend.indexing.infrastructure.rows.processing_profile_action_grant_row import (
+    ProcessingProfileActionGrantRow,
 )
 from inframeld_backend.shared.application.dtos.idempotency_context_dto import IdempotencyContextDTO
 from inframeld_backend.shared.application.enums.http_method import HttpMethod
@@ -329,7 +353,7 @@ async def test_operator_audit_preserves_exact_responsibility_and_safe_attributio
         event = StrandedAuthorityRepairedAuditEventDTO(
             original.result.organization_id,
             original.result.recipient_id,
-            request.responsibility,
+            facts.responsibility,
             request.operation_id,
             request.operator_label,
             request.reason,
@@ -389,6 +413,7 @@ async def test_repair_replays_original_after_exact_assignment_removal_without_re
             )
             project = responsibility.project_id
         else:
+            assert isinstance(responsibility, ActionGrantorRepairResponsibilityDTO)
             target, action = responsibility.target, responsibility.action_id.value
             if isinstance(target, OrganizationGrantTargetDTO):
                 await session.execute(
@@ -568,27 +593,83 @@ async def test_current_group_manager_prevents_document_action_repair_without_exp
         )
 
 
-async def test_audit_failure_rolls_back_all_broader_repair_effects(database: Database) -> None:
+async def _seed_group_or_profile_repair(
+    database: Database, profile: bool
+) -> tuple[AccessContextDTO, RepairStrandedAuthorityCommand, ProjectId]:
+    if not profile:
+        access, command, _ = await seed_stranded_repair_target(database, "group-manager")
+        assert isinstance(command.responsibility, GroupManagerRepairResponsibilityDTO)
+        return access, command, command.responsibility.project_id
+
+    identity = VerifiedHumanIdentityDTO(
+        IdentityAuthority("kratos:test"), IdentitySubject(str(uuid4()))
+    )
+    seed, binding = await seed_metadata_repair_recipient(database, identity)
+    access = AccessContextDTO(seed.principal_id, binding)
+    await grant_profile_creation(database, access, seed.project_id)
+    fingerprints = RequestFingerprintService(RequestFingerprintKey(b"P" * 32))
+    async with open_processing_profile_creation(database, fingerprints) as creator:
+        created = await creator.create(
+            access=access,
+            command=profile_command(seed.project_id),
+            context=profile_context(seed.project_id, "repair-target"),
+        )
+    action = ProcessingProfileAction.USE
+    async with database.session() as session, session.begin():
+        row = await session.get(
+            ProcessingProfileActionGrantRow,
+            (
+                seed.project_id.value,
+                created.profile.id.value,
+                seed.principal_id.value,
+                action.value,
+            ),
+        )
+        assert row is not None
+        await session.delete(row)
+        revision = await session.scalar(
+            update(ProjectRow)
+            .where(ProjectRow.id == seed.project_id.value)
+            .values(access_revision=ProjectRow.access_revision + 1)
+            .returning(ProjectRow.access_revision)
+        )
+        assert revision is not None and revision == created.project_access_revision + 1
+    return (
+        access,
+        RepairStrandedAuthorityCommand(
+            binding.installation_id,
+            OperationId("profile-repair"),
+            ProcessingProfileRepairRequestDTO(created.profile.id, action),
+            revision,
+            UUID(identity.subject.value),
+            "Host operator",
+            "Controlled verified repair for strand and concurrency checks",
+            HumanAccessTokenCredential("controlled-verification-proof"),
+        ),
+        seed.project_id,
+    )
+
+
+@pytest.mark.parametrize("profile", [False, True], ids=["group-manager", "profile"])
+async def test_audit_failure_rolls_back_all_broader_repair_effects(
+    database: Database, profile: bool
+) -> None:
     class FailingAudit(PostgresStrandedAuthorityAuditWriter):
         @override
         async def repaired(self, event: StrandedAuthorityRepairedAuditEventDTO) -> None:
             await super().repaired(event)
             raise RuntimeError("Controlled repair audit failure")
 
-    access, request, _ = await seed_stranded_repair_target(database, "group-manager")
+    access, request, project = await _seed_group_or_profile_repair(database, profile)
     async with database.session() as session:
         with pytest.raises(RuntimeError, match="Controlled repair audit failure"):
             await stranded_repair_service(
                 session, FailingAudit(session, PostgresProjectMetadataAuditWriter(session))
             ).repair(access=access, command=request)
-    responsibility = request.responsibility
-    assert isinstance(responsibility, GroupManagerRepairResponsibilityDTO)
     async with database.session() as session:
         assert (
             await session.scalar(
-                select(ProjectRow.access_revision).where(
-                    ProjectRow.id == responsibility.project_id.value
-                )
+                select(ProjectRow.access_revision).where(ProjectRow.id == project.value)
             )
             == request.expected_access_revision
         )
@@ -603,6 +684,20 @@ async def test_audit_failure_rolls_back_all_broader_repair_effects(database: Dat
         )
         assert await session.scalar(select(func.count()).select_from(GroupManagerRow)) == 0
         assert await session.scalar(select(func.count()).select_from(GroupMembershipRow)) == 0
+        request_target = request.responsibility
+        if isinstance(request_target, ProcessingProfileRepairRequestDTO):
+            assert (
+                await session.get(
+                    ProcessingProfileActionGrantRow,
+                    (
+                        project.value,
+                        request_target.processing_profile_id.value,
+                        access.actor_principal_id.value,
+                        request_target.action.value,
+                    ),
+                )
+                is None
+            )
         assert (
             await session.scalar(
                 select(func.count())
@@ -841,10 +936,11 @@ async def test_new_metadata_repair_preserves_legacy_row_audit_and_original_recov
 
 
 @pytest.mark.parametrize("same_original", [False, True], ids=["distinct-requests", "same-original"])
+@pytest.mark.parametrize("profile", [False, True], ids=["group-manager", "profile"])
 async def test_competing_host_repairs_hold_real_turns_and_commit_one_assignment(
-    database: Database, same_original: bool
+    database: Database, same_original: bool, profile: bool
 ) -> None:
-    access, request, _ = await seed_stranded_repair_target(database, "group-manager")
+    access, request, project = await _seed_group_or_profile_repair(database, profile)
 
     async def repair(key: str) -> StrandedAuthorityRepairResultDTO:
         async with database.session() as session:
@@ -926,7 +1022,32 @@ async def test_competing_host_repairs_hold_real_turns_and_commit_one_assignment(
             )
             == 1
         )
-        assert await session.scalar(select(func.count()).select_from(GroupManagerRow)) == 1
+        request_target = request.responsibility
+        if isinstance(request_target, ProcessingProfileRepairRequestDTO):
+            grant = await session.get(
+                ProcessingProfileActionGrantRow,
+                (
+                    project.value,
+                    request_target.processing_profile_id.value,
+                    access.actor_principal_id.value,
+                    request_target.action.value,
+                ),
+            )
+            assert grant is not None and grant.can_grant and grant.assigned_by_principal_id is None
+        else:
+            assert await session.scalar(select(func.count()).select_from(GroupManagerRow)) == 1
+        revision = await session.scalar(
+            select(ProjectRow.access_revision).where(ProjectRow.id == project.value)
+        )
+        assert revision == request.expected_access_revision + 1
+        assert (
+            await session.scalar(
+                select(func.count())
+                .select_from(AccessAuditEventRow)
+                .where(AccessAuditEventRow.event_type == "stranded_authority_repaired")
+            )
+            == 1
+        )
 
 
 async def test_current_version_and_utc_are_observed_after_identity_turn_wait(

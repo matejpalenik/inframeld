@@ -1546,6 +1546,104 @@
           }
         ]
       },
+      "DoclingProcessingDefinitionRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "assetManifestSha256": {
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Assetmanifestsha256",
+            "type": "string"
+          },
+          "doclingCoreVersion": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Doclingcoreversion",
+            "type": "string"
+          },
+          "doclingSlimVersion": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Doclingslimversion",
+            "type": "string"
+          },
+          "maxContentTokens": {
+            "maximum": 1024.0,
+            "minimum": 1.0,
+            "title": "Maxcontenttokens",
+            "type": "integer"
+          },
+          "mergePeers": {
+            "title": "Mergepeers",
+            "type": "boolean"
+          },
+          "ocrEnabled": {
+            "const": false,
+            "title": "Ocrenabled",
+            "type": "boolean"
+          },
+          "repeatTableHeader": {
+            "title": "Repeattableheader",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "doclingSlimVersion",
+          "doclingCoreVersion",
+          "assetManifestSha256",
+          "maxContentTokens",
+          "mergePeers",
+          "repeatTableHeader",
+          "ocrEnabled"
+        ],
+        "title": "DoclingProcessingDefinitionRequest",
+        "type": "object"
+      },
+      "DoclingProcessingDefinitionResponse": {
+        "properties": {
+          "assetManifestSha256": {
+            "title": "Assetmanifestsha256",
+            "type": "string"
+          },
+          "doclingCoreVersion": {
+            "title": "Doclingcoreversion",
+            "type": "string"
+          },
+          "doclingSlimVersion": {
+            "title": "Doclingslimversion",
+            "type": "string"
+          },
+          "maxContentTokens": {
+            "maximum": 1024.0,
+            "minimum": 1.0,
+            "title": "Maxcontenttokens",
+            "type": "integer"
+          },
+          "mergePeers": {
+            "title": "Mergepeers",
+            "type": "boolean"
+          },
+          "ocrEnabled": {
+            "const": false,
+            "title": "Ocrenabled",
+            "type": "boolean"
+          },
+          "repeatTableHeader": {
+            "title": "Repeattableheader",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "doclingSlimVersion",
+          "doclingCoreVersion",
+          "assetManifestSha256",
+          "maxContentTokens",
+          "mergePeers",
+          "repeatTableHeader",
+          "ocrEnabled"
+        ],
+        "title": "DoclingProcessingDefinitionResponse",
+        "type": "object"
+      },
       "GrantRecipientResponse": {
         "properties": {
           "displayName": {
@@ -1575,7 +1673,8 @@
           "project",
           "access-group",
           "application-account",
-          "model-connection"
+          "model-connection",
+          "processing-profile"
         ],
         "title": "GrantTargetKind",
         "type": "string"
@@ -2004,6 +2103,28 @@
           "canGrant"
         ],
         "title": "InitialModelConnectionGrantResponse",
+        "type": "object"
+      },
+      "InitialProcessingProfileGrantResponse": {
+        "properties": {
+          "actionId": {
+            "$ref": "#/components/schemas/ProcessingProfileAction"
+          },
+          "canGrant": {
+            "const": true,
+            "title": "Cangrant",
+            "type": "boolean"
+          },
+          "target": {
+            "$ref": "#/components/schemas/ProcessingProfileGrantTargetResponse"
+          }
+        },
+        "required": [
+          "target",
+          "actionId",
+          "canGrant"
+        ],
+        "title": "InitialProcessingProfileGrantResponse",
         "type": "object"
       },
       "InitialProjectGrantResponse": {
@@ -3703,6 +3824,7 @@
           "access_group_grant_read",
           "application_account_grant_read",
           "model_connection_grant_read",
+          "processing_profile_grant_read",
           "access_group_deletion",
           "project_deletion"
         ],
@@ -4234,6 +4356,62 @@
         "title": "PageResponse[OrganizationActionGrantItemResponse]",
         "type": "object"
       },
+      "PageResponse_ProcessingProfileActionGrantItemResponse_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ProcessingProfileActionGrantItemResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nextcursor"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "title": "PageResponse[ProcessingProfileActionGrantItemResponse]",
+        "type": "object"
+      },
+      "PageResponse_ProcessingProfileResponse_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ProcessingProfileResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nextcursor"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "title": "PageResponse[ProcessingProfileResponse]",
+        "type": "object"
+      },
       "PageResponse_ProjectActionGrantItemResponse_": {
         "properties": {
           "items": {
@@ -4367,6 +4545,299 @@
           "requestId"
         ],
         "title": "ProblemDetails",
+        "type": "object"
+      },
+      "ProcessingProfileAction": {
+        "enum": [
+          "view-processing-profile",
+          "use-processing-profile"
+        ],
+        "title": "ProcessingProfileAction",
+        "type": "string"
+      },
+      "ProcessingProfileActionGrantItemResponse": {
+        "properties": {
+          "actionId": {
+            "$ref": "#/components/schemas/ProcessingProfileAction"
+          },
+          "canGrant": {
+            "title": "Cangrant",
+            "type": "boolean"
+          },
+          "processingProfileId": {
+            "format": "uuid",
+            "title": "Processingprofileid",
+            "type": "string"
+          },
+          "recipientPrincipalId": {
+            "format": "uuid",
+            "title": "Recipientprincipalid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "processingProfileId",
+          "recipientPrincipalId",
+          "actionId",
+          "canGrant"
+        ],
+        "title": "ProcessingProfileActionGrantItemResponse",
+        "type": "object"
+      },
+      "ProcessingProfileActionGrantRemovalResponse": {
+        "properties": {
+          "accessRevision": {
+            "format": "int64",
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "title": "Accessrevision",
+            "type": "integer"
+          },
+          "actionId": {
+            "$ref": "#/components/schemas/ProcessingProfileAction"
+          },
+          "changed": {
+            "title": "Changed",
+            "type": "boolean"
+          },
+          "idempotencyExpiresAt": {
+            "format": "date-time",
+            "title": "Idempotencyexpiresat",
+            "type": "string"
+          },
+          "operationId": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Operationid",
+            "type": "string"
+          },
+          "processingProfileId": {
+            "format": "uuid",
+            "title": "Processingprofileid",
+            "type": "string"
+          },
+          "recipientPrincipalId": {
+            "format": "uuid",
+            "title": "Recipientprincipalid",
+            "type": "string"
+          },
+          "removed": {
+            "const": true,
+            "title": "Removed",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "operationId",
+          "idempotencyExpiresAt",
+          "processingProfileId",
+          "recipientPrincipalId",
+          "actionId",
+          "removed",
+          "accessRevision",
+          "changed"
+        ],
+        "title": "ProcessingProfileActionGrantRemovalResponse",
+        "type": "object"
+      },
+      "ProcessingProfileActionGrantRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "canGrant": {
+            "title": "Cangrant",
+            "type": "boolean"
+          },
+          "expectedAccessRevision": {
+            "format": "int64",
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "title": "Expectedaccessrevision",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "canGrant",
+          "expectedAccessRevision"
+        ],
+        "title": "ProcessingProfileActionGrantRequest",
+        "type": "object"
+      },
+      "ProcessingProfileActionGrantResponse": {
+        "properties": {
+          "accessRevision": {
+            "format": "int64",
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "title": "Accessrevision",
+            "type": "integer"
+          },
+          "actionId": {
+            "$ref": "#/components/schemas/ProcessingProfileAction"
+          },
+          "canGrant": {
+            "title": "Cangrant",
+            "type": "boolean"
+          },
+          "changed": {
+            "title": "Changed",
+            "type": "boolean"
+          },
+          "idempotencyExpiresAt": {
+            "format": "date-time",
+            "title": "Idempotencyexpiresat",
+            "type": "string"
+          },
+          "operationId": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Operationid",
+            "type": "string"
+          },
+          "processingProfileId": {
+            "format": "uuid",
+            "title": "Processingprofileid",
+            "type": "string"
+          },
+          "recipientPrincipalId": {
+            "format": "uuid",
+            "title": "Recipientprincipalid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "operationId",
+          "idempotencyExpiresAt",
+          "processingProfileId",
+          "recipientPrincipalId",
+          "actionId",
+          "canGrant",
+          "accessRevision",
+          "changed"
+        ],
+        "title": "ProcessingProfileActionGrantResponse",
+        "type": "object"
+      },
+      "ProcessingProfileCreationRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "definition": {
+            "$ref": "#/components/schemas/DoclingProcessingDefinitionRequest"
+          },
+          "displayName": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Displayname",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 63,
+            "minLength": 1,
+            "pattern": "^[a-z](?:[a-z0-9-]*[a-z0-9])?$",
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "displayName",
+          "definition"
+        ],
+        "title": "ProcessingProfileCreationRequest",
+        "type": "object"
+      },
+      "ProcessingProfileCreationResponse": {
+        "properties": {
+          "idempotencyExpiresAt": {
+            "format": "date-time",
+            "title": "Idempotencyexpiresat",
+            "type": "string"
+          },
+          "initialGrants": {
+            "items": {
+              "$ref": "#/components/schemas/InitialProcessingProfileGrantResponse"
+            },
+            "maxItems": 2,
+            "minItems": 2,
+            "title": "Initialgrants",
+            "type": "array"
+          },
+          "operationId": {
+            "title": "Operationid",
+            "type": "string"
+          },
+          "profile": {
+            "$ref": "#/components/schemas/ProcessingProfileResponse"
+          },
+          "projectAccessRevision": {
+            "format": "int64",
+            "maximum": 9007199254740991,
+            "minimum": 1,
+            "title": "Projectaccessrevision",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "profile",
+          "operationId",
+          "idempotencyExpiresAt",
+          "projectAccessRevision",
+          "initialGrants"
+        ],
+        "title": "ProcessingProfileCreationResponse",
+        "type": "object"
+      },
+      "ProcessingProfileGrantTargetResponse": {
+        "properties": {
+          "kind": {
+            "const": "processing-profile",
+            "title": "Kind",
+            "type": "string"
+          },
+          "processingProfileId": {
+            "format": "uuid",
+            "title": "Processingprofileid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "processingProfileId"
+        ],
+        "title": "ProcessingProfileGrantTargetResponse",
+        "type": "object"
+      },
+      "ProcessingProfileResponse": {
+        "properties": {
+          "definition": {
+            "$ref": "#/components/schemas/DoclingProcessingDefinitionResponse"
+          },
+          "displayName": {
+            "title": "Displayname",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "processingProfileId": {
+            "format": "uuid",
+            "title": "Processingprofileid",
+            "type": "string"
+          },
+          "projectId": {
+            "format": "uuid",
+            "title": "Projectid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId",
+          "processingProfileId",
+          "name",
+          "displayName",
+          "definition"
+        ],
+        "title": "ProcessingProfileResponse",
         "type": "object"
       },
       "ProjectAction": {
@@ -8652,6 +9123,536 @@
           }
         ],
         "summary": "Suspend",
+        "tags": [
+          "access"
+        ]
+      }
+    },
+    "/v1/processing-profiles/{processing_profile_id}/grants": {
+      "get": {
+        "operationId": "listProcessingProfileActionGrants",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "processing_profile_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Processing Profile Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "actionId",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProcessingProfileAction"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 25,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 1024,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9_-]+$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageResponse_ProcessingProfileActionGrantItemResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Invalid authentication request",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Trusted Bearer challenge when applicable.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Unauthorized",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Trusted Bearer challenge when applicable.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Access denied"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Resource not found"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Revision is no longer current"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Dependency unavailable"
+          }
+        },
+        "security": [
+          {
+            "KratosSession": []
+          },
+          {
+            "ProductBearer": []
+          }
+        ],
+        "summary": "Grants",
+        "tags": [
+          "access"
+        ]
+      }
+    },
+    "/v1/processing-profiles/{processing_profile_id}/grants/{recipient_principal_id}/{action_id}": {
+      "delete": {
+        "operationId": "removeProcessingProfileActionGrant",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "processing_profile_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Processing Profile Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "recipient_principal_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Recipient Principal Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "action_id",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProcessingProfileAction"
+            }
+          },
+          {
+            "in": "query",
+            "name": "expectedAccessRevision",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "title": "Expectedaccessrevision",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": ".*\\S.*",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProcessingProfileActionGrantRemovalResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Invalid authentication request",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Trusted Bearer challenge when applicable.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Unauthorized",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Trusted Bearer challenge when applicable.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Access denied"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Resource not found"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Revision is no longer current"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Dependency unavailable"
+          }
+        },
+        "security": [
+          {
+            "KratosSession": []
+          },
+          {
+            "ProductBearer": []
+          }
+        ],
+        "summary": "Remove",
+        "tags": [
+          "access"
+        ]
+      },
+      "put": {
+        "operationId": "setProcessingProfileActionGrant",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "processing_profile_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Processing Profile Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "recipient_principal_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Recipient Principal Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "action_id",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProcessingProfileAction"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": ".*\\S.*",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProcessingProfileActionGrantRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProcessingProfileActionGrantResponse"
+                }
+              }
+            },
+            "description": "Changed or unchanged assignment."
+          },
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProcessingProfileActionGrantResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Invalid authentication request",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Trusted Bearer challenge when applicable.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Unauthorized",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Trusted Bearer challenge when applicable.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Access denied"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Resource not found"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Revision is no longer current"
+          },
+          "413": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Content Too Large"
+          },
+          "415": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Unsupported Media Type"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Dependency unavailable"
+          }
+        },
+        "security": [
+          {
+            "KratosSession": []
+          },
+          {
+            "ProductBearer": []
+          }
+        ],
+        "summary": "Put",
         "tags": [
           "access"
         ]
@@ -15889,6 +16890,448 @@
         "summary": "Own Access",
         "tags": [
           "access"
+        ]
+      }
+    },
+    "/v1/projects/{project_id}/processing-profiles": {
+      "get": {
+        "operationId": "listProcessingProfiles",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 25,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 1024,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9_-]+$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageResponse_ProcessingProfileResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Invalid authentication request",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Trusted Bearer challenge when applicable.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Unauthorized",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Trusted Bearer challenge when applicable.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Access denied"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Resource not found"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Dependency unavailable"
+          }
+        },
+        "security": [
+          {
+            "KratosSession": []
+          },
+          {
+            "ProductBearer": []
+          }
+        ],
+        "summary": "List Profiles",
+        "tags": [
+          "indexing"
+        ]
+      },
+      "post": {
+        "operationId": "createProcessingProfile",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": ".*\\S.*",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProcessingProfileCreationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProcessingProfileCreationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Invalid authentication request",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Trusted Bearer challenge when applicable.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Unauthorized",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Trusted Bearer challenge when applicable.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Access denied"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Resource not found"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Operation conflicts with current state"
+          },
+          "413": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Content Too Large"
+          },
+          "415": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Unsupported Media Type"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Dependency unavailable"
+          }
+        },
+        "security": [
+          {
+            "KratosSession": []
+          },
+          {
+            "ProductBearer": []
+          }
+        ],
+        "summary": "Create",
+        "tags": [
+          "indexing"
+        ]
+      }
+    },
+    "/v1/projects/{project_id}/processing-profiles/{processing_profile_id}": {
+      "get": {
+        "operationId": "getProcessingProfile",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "processing_profile_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Processing Profile Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProcessingProfileResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Invalid authentication request",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Trusted Bearer challenge when applicable.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Unauthorized",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Trusted Bearer challenge when applicable.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Access denied"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Resource not found"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Dependency unavailable"
+          }
+        },
+        "security": [
+          {
+            "KratosSession": []
+          },
+          {
+            "ProductBearer": []
+          }
+        ],
+        "summary": "Get",
+        "tags": [
+          "indexing"
         ]
       }
     },

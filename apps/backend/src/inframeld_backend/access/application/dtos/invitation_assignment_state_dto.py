@@ -18,6 +18,9 @@ from inframeld_backend.access.application.dtos.model_connection_grant_facts_dto 
 from inframeld_backend.access.application.dtos.organization_grant_management_facts_dto import (
     OrganizationGrantManagementFactsDTO,
 )
+from inframeld_backend.access.application.dtos.processing_profile_grant_facts_dto import (
+    ProcessingProfileGrantFactsDTO,
+)
 from inframeld_backend.access.application.dtos.project_action_grant_management_facts_dto import (
     ProjectActionGrantManagementFactsDTO,
 )
@@ -44,4 +47,5 @@ class InvitationAssignmentStateDTO:
         | AccessGroupGrantManagementFactsDTO
         | ApplicationAccountGrantManagementFactsDTO
         | ModelConnectionGrantFactsDTO
+        | ProcessingProfileGrantFactsDTO
     )

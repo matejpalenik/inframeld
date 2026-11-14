@@ -23,6 +23,12 @@ from inframeld_backend.access.application.dtos.model_connection_grant_target_dto
 from inframeld_backend.access.application.dtos.organization_grant_target_dto import (
     OrganizationGrantTargetDTO,
 )
+from inframeld_backend.access.application.dtos.processing_profile_grant_target_dto import (
+    ProcessingProfileGrantTargetDTO,
+)
+from inframeld_backend.access.application.dtos.processing_profile_repair_request_dto import (
+    ProcessingProfileRepairRequestDTO,
+)
 from inframeld_backend.access.application.dtos.project_grant_target_dto import ProjectGrantTargetDTO
 from inframeld_backend.access.application.dtos.stranded_authority_repair_result_dto import (
     StrandedAuthorityRepairResultDTO,
@@ -39,6 +45,12 @@ from inframeld_backend.access.domain.value_objects.action_id import ActionId
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
+from inframeld_backend.indexing.domain.enums.processing_profile_action import (
+    ProcessingProfileAction,
+)
+from inframeld_backend.indexing.domain.value_objects.processing_profile_id import (
+    ProcessingProfileId,
+)
 from inframeld_backend.shared.application.value_objects.model_connection_id import ModelConnectionId
 from inframeld_backend.shared.application.value_objects.operation_id import OperationId
 from inframeld_backend.shared.domain.value_objects.installation_id import InstallationId
@@ -104,7 +116,11 @@ class StrandedAuthorityMaintenanceMapper:
     @staticmethod
     def _responsibility(
         value: object,
-    ) -> GroupManagerRepairResponsibilityDTO | ActionGrantorRepairResponsibilityDTO:
+    ) -> (
+        GroupManagerRepairResponsibilityDTO
+        | ActionGrantorRepairResponsibilityDTO
+        | ProcessingProfileRepairRequestDTO
+    ):
         values = TypeAdapter(dict[str, object]).validate_python(value, strict=True)
         if values.get("kind") == "group-manager":
             if set(values) != {"kind", "projectId", "accessGroupId"}:
@@ -146,6 +162,14 @@ class StrandedAuthorityMaintenanceMapper:
                 ProjectId(UUID(_text(target["projectId"]))),
                 ModelConnectionId(UUID(_text(target["modelConnectionId"]))),
             )
+        elif kind == "processing-profile" and set(target) == {
+            "kind",
+            "processingProfileId",
+        }:
+            return ProcessingProfileRepairRequestDTO(
+                ProcessingProfileId(UUID(_text(target["processingProfileId"]))),
+                ProcessingProfileAction(_text(values["actionId"])),
+            )
         else:
             raise ValueError("Unsupported exact repair target.")
         return ActionGrantorRepairResponsibilityDTO(exact, ActionId(_text(values["actionId"])))
@@ -180,6 +204,11 @@ class StrandedAuthorityMaintenanceMapper:
                     "kind": "model-connection",
                     "projectId": str(target.project_id.value),
                     "modelConnectionId": str(target.model_connection_id.value),
+                }
+            elif isinstance(target, ProcessingProfileGrantTargetDTO):
+                scope = {
+                    "kind": "processing-profile",
+                    "processingProfileId": str(target.processing_profile_id.value),
                 }
             else:
                 scope = {

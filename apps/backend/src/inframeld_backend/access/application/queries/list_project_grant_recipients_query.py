@@ -10,6 +10,9 @@ from inframeld_backend.access.application.dtos.application_account_grant_target_
 from inframeld_backend.access.application.dtos.model_connection_grant_target_dto import (
     ModelConnectionGrantTargetDTO,
 )
+from inframeld_backend.access.application.dtos.processing_profile_grant_target_dto import (
+    ProcessingProfileGrantTargetDTO,
+)
 from inframeld_backend.access.application.dtos.project_grant_target_dto import ProjectGrantTargetDTO
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
@@ -25,6 +28,7 @@ class ListProjectGrantRecipientsQuery:
         | AccessGroupGrantTargetDTO
         | ApplicationAccountGrantTargetDTO
         | ModelConnectionGrantTargetDTO
+        | ProcessingProfileGrantTargetDTO
     )
     action_id: ActionId
     limit: int = 25

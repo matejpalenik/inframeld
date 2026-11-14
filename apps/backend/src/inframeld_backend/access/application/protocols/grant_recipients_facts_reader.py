@@ -14,6 +14,9 @@ from inframeld_backend.access.application.dtos.grant_recipients_page_facts_dto i
 from inframeld_backend.access.application.dtos.model_connection_grant_target_dto import (
     ModelConnectionGrantTargetDTO,
 )
+from inframeld_backend.access.application.dtos.processing_profile_grant_target_dto import (
+    ProcessingProfileGrantTargetDTO,
+)
 from inframeld_backend.access.application.dtos.project_grant_target_dto import ProjectGrantTargetDTO
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
@@ -31,7 +34,8 @@ class GrantRecipientsFactsReader(Protocol):
         target: ProjectGrantTargetDTO
         | AccessGroupGrantTargetDTO
         | ApplicationAccountGrantTargetDTO
-        | ModelConnectionGrantTargetDTO,
+        | ModelConnectionGrantTargetDTO
+        | ProcessingProfileGrantTargetDTO,
         action_id: ActionId,
         eligible_kinds: tuple[PrincipalKind, ...],
         after: PrincipalId | None,

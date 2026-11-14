@@ -53,7 +53,9 @@ SDK_INPUTS = {
     "apps/backend/tests/unit/conftest.py",
     "apps/backend/tests/support/__init__.py",
     "apps/backend/tests/support/authentication_evidence.py",
+    "apps/backend/tests/support/mock_sdk_processing_profiles.py",
     "apps/backend/tests/support/openapi_schema_fixture.py",
+    "apps/backend/tests/support/processing_profile_scenarios.py",
     "apps/backend/tests/support/sdk_conformance_app.py",
     "apps/backend/tests/support/sdk_server.py",
 }

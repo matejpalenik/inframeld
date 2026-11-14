@@ -89,6 +89,7 @@ async def test_safe_broader_repair_storage_is_available(database: Database) -> N
         "access_group_id",
         "application_account_id",
         "model_connection_id",
+        "processing_profile_id",
         "action_id",
     }
     # Historical target and recipient IDs cannot restrict normal resource/relationship deletion.
@@ -115,6 +116,10 @@ async def broader_original(database: Database) -> StrandedAuthorityRepairResultD
         "null-project",
         "null-group",
         "extra-account",
+        "extra-profile",
+        "profile-missing-id",
+        "profile-cross-kind-action",
+        "profile-competing-model",
         "manager-action",
         "unknown-kind",
         "unknown-target",
@@ -145,6 +150,23 @@ async def test_broader_original_constraints_are_null_safe_and_parent_bound(
             change = change.values(access_group_id=None)
         elif invalid == "extra-account":
             change = change.values(application_account_id=uuid4())
+        elif invalid == "extra-profile":
+            change = change.values(processing_profile_id=uuid4())
+        elif invalid in {
+            "profile-missing-id",
+            "profile-cross-kind-action",
+            "profile-competing-model",
+        }:
+            change = change.values(
+                responsibility_kind="action-grantor",
+                target_kind="processing-profile",
+                access_group_id=None,
+                processing_profile_id=None if invalid == "profile-missing-id" else uuid4(),
+                model_connection_id=uuid4() if invalid == "profile-competing-model" else None,
+                action_id="use-model-connection"
+                if invalid == "profile-cross-kind-action"
+                else "use-processing-profile",
+            )
         elif invalid == "manager-action":
             change = change.values(action_id="add-documents")
         elif invalid == "unknown-kind":
@@ -181,6 +203,32 @@ def _config(settings: DatabaseSettings) -> Config:
     config = Config(str(ALEMBIC_CONFIG_PATH))
     config.attributes["database_settings"] = settings
     return config
+
+
+async def test_retained_profile_repair_original_refuses_destructive_downgrade(
+    database: Database,
+    temporary_postgres_settings: DatabaseSettings,
+    broader_original: StrandedAuthorityRepairResultDTO,
+) -> None:
+    profile_id = uuid4()
+    key = (broader_original.installation_id.value, broader_original.operation_id.value)
+    async with database.session() as session, session.begin():
+        row = await session.get(StrandedAuthorityRepairReceiptRow, key)
+        assert row is not None and row.project_id is not None
+        # Retained scope IDs must survive independently of the live target table.
+        row.responsibility_kind = "action-grantor"
+        row.target_kind = "processing-profile"
+        row.access_group_id = None
+        row.processing_profile_id = profile_id
+        row.action_id = "use-processing-profile"
+    with pytest.raises(RuntimeError, match="Retained Processing Profile repair originals"):
+        command.downgrade(_config(temporary_postgres_settings), "0036_provider_credentials")
+    async with database.session() as session:
+        assert (
+            await session.scalar(select(AlembicVersionRow.version_num)) == SUPPORTED_SCHEMA_REVISION
+        )
+        stored = await session.get(StrandedAuthorityRepairReceiptRow, key)
+        assert stored is not None and stored.processing_profile_id == profile_id
 
 
 async def test_retained_broader_original_refuses_destructive_downgrade(

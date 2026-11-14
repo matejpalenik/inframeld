@@ -10,6 +10,7 @@ import inframeld_sdk_fixtures
 from inframeld_sdk.api.access_api import AccessApi
 from inframeld_sdk.api.discovery_api import DiscoveryApi
 from inframeld_sdk.api.health_api import HealthApi
+from inframeld_sdk.api.indexing_api import IndexingApi
 from inframeld_sdk.api.operations_api import OperationsApi
 from inframeld_sdk.models.access_group_action_grant_request import AccessGroupActionGrantRequest
 from inframeld_sdk.models.access_group_creation_request import AccessGroupCreationRequest
@@ -42,6 +43,13 @@ from inframeld_sdk.models.model_connection_credential_request import (
 )
 from inframeld_sdk.models.organization_action_grant_request import OrganizationActionGrantRequest
 from inframeld_sdk.models.original_operation_lookup_request import OriginalOperationLookupRequest
+from inframeld_sdk.models.processing_profile_action import ProcessingProfileAction
+from inframeld_sdk.models.processing_profile_action_grant_request import (
+    ProcessingProfileActionGrantRequest,
+)
+from inframeld_sdk.models.processing_profile_creation_request import (
+    ProcessingProfileCreationRequest,
+)
 from inframeld_sdk.models.project_action_grant_request import ProjectActionGrantRequest
 from inframeld_sdk.models.project_creation_request import ProjectCreationRequest
 from inframeld_sdk.models.project_membership_request import ProjectMembershipRequest
@@ -444,6 +452,148 @@ async def list_model_connection_usage_async(clients: Clients, call: Call) -> Nat
         model_connection_id=UUID(call.path["model_connection_id"]),
         limit=integer(call.query["limit"]) if "limit" in call.query else None,
         cursor=string(call.query["cursor"]) if "cursor" in call.query else None,
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+def create_processing_profile_sync(clients: Clients, call: Call) -> NativeResponse:
+    return IndexingApi(clients.production).create_processing_profile_sync_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        idempotency_key=call.headers["Idempotency-Key"],
+        processing_profile_creation_request=ProcessingProfileCreationRequest.model_validate(
+            call.body
+        ),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def create_processing_profile_async(clients: Clients, call: Call) -> NativeResponse:
+    return await IndexingApi(clients.production).create_processing_profile_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        idempotency_key=call.headers["Idempotency-Key"],
+        processing_profile_creation_request=ProcessingProfileCreationRequest.model_validate(
+            call.body
+        ),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+def get_processing_profile_sync(clients: Clients, call: Call) -> NativeResponse:
+    return IndexingApi(clients.production).get_processing_profile_sync_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        processing_profile_id=UUID(call.path["processing_profile_id"]),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def get_processing_profile_async(clients: Clients, call: Call) -> NativeResponse:
+    return await IndexingApi(clients.production).get_processing_profile_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        processing_profile_id=UUID(call.path["processing_profile_id"]),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+def list_processing_profiles_sync(clients: Clients, call: Call) -> NativeResponse:
+    return IndexingApi(clients.production).list_processing_profiles_sync_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        limit=integer(call.query["limit"]) if "limit" in call.query else None,
+        cursor=string(call.query["cursor"]) if "cursor" in call.query else None,
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def list_processing_profiles_async(clients: Clients, call: Call) -> NativeResponse:
+    return await IndexingApi(clients.production).list_processing_profiles_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        limit=integer(call.query["limit"]) if "limit" in call.query else None,
+        cursor=string(call.query["cursor"]) if "cursor" in call.query else None,
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+def list_processing_profile_action_grants_sync(clients: Clients, call: Call) -> NativeResponse:
+    return AccessApi(clients.production).list_processing_profile_action_grants_sync_with_http_info(
+        processing_profile_id=UUID(call.path["processing_profile_id"]),
+        action_id=ProcessingProfileAction(string(call.query["actionId"])),
+        limit=integer(call.query["limit"]) if "limit" in call.query else None,
+        cursor=string(call.query["cursor"]) if "cursor" in call.query else None,
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def list_processing_profile_action_grants_async(
+    clients: Clients, call: Call
+) -> NativeResponse:
+    return await AccessApi(clients.production).list_processing_profile_action_grants_with_http_info(
+        processing_profile_id=UUID(call.path["processing_profile_id"]),
+        action_id=ProcessingProfileAction(string(call.query["actionId"])),
+        limit=integer(call.query["limit"]) if "limit" in call.query else None,
+        cursor=string(call.query["cursor"]) if "cursor" in call.query else None,
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+def set_processing_profile_action_grant_sync(clients: Clients, call: Call) -> NativeResponse:
+    return AccessApi(clients.production).set_processing_profile_action_grant_sync_with_http_info(
+        processing_profile_id=UUID(call.path["processing_profile_id"]),
+        recipient_principal_id=UUID(call.path["recipient_principal_id"]),
+        action_id=ProcessingProfileAction(call.path["action_id"]),
+        idempotency_key=call.headers["Idempotency-Key"],
+        processing_profile_action_grant_request=ProcessingProfileActionGrantRequest.model_validate(
+            call.body
+        ),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def set_processing_profile_action_grant_async(clients: Clients, call: Call) -> NativeResponse:
+    return await AccessApi(clients.production).set_processing_profile_action_grant_with_http_info(
+        processing_profile_id=UUID(call.path["processing_profile_id"]),
+        recipient_principal_id=UUID(call.path["recipient_principal_id"]),
+        action_id=ProcessingProfileAction(call.path["action_id"]),
+        idempotency_key=call.headers["Idempotency-Key"],
+        processing_profile_action_grant_request=ProcessingProfileActionGrantRequest.model_validate(
+            call.body
+        ),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+def remove_processing_profile_action_grant_sync(clients: Clients, call: Call) -> NativeResponse:
+    return AccessApi(clients.production).remove_processing_profile_action_grant_sync_with_http_info(
+        processing_profile_id=UUID(call.path["processing_profile_id"]),
+        recipient_principal_id=UUID(call.path["recipient_principal_id"]),
+        action_id=ProcessingProfileAction(call.path["action_id"]),
+        expected_access_revision=integer(call.query["expectedAccessRevision"]),
+        idempotency_key=call.headers["Idempotency-Key"],
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def remove_processing_profile_action_grant_async(
+    clients: Clients, call: Call
+) -> NativeResponse:
+    return await AccessApi(
+        clients.production
+    ).remove_processing_profile_action_grant_with_http_info(
+        processing_profile_id=UUID(call.path["processing_profile_id"]),
+        recipient_principal_id=UUID(call.path["recipient_principal_id"]),
+        action_id=ProcessingProfileAction(call.path["action_id"]),
+        expected_access_revision=integer(call.query["expectedAccessRevision"]),
+        idempotency_key=call.headers["Idempotency-Key"],
         _headers=call.headers,
         _request_timeout=call.timeout / 1000,
     )
@@ -1767,6 +1917,24 @@ BINDINGS: dict[Operation, Binding] = {
     ),
     Operation.REMOVE_MODEL_CONNECTION_ACTION_GRANT: Binding(
         remove_model_connection_action_grant_sync, remove_model_connection_action_grant_async
+    ),
+    Operation.CREATE_PROCESSING_PROFILE: Binding(
+        create_processing_profile_sync, create_processing_profile_async
+    ),
+    Operation.GET_PROCESSING_PROFILE: Binding(
+        get_processing_profile_sync, get_processing_profile_async
+    ),
+    Operation.LIST_PROCESSING_PROFILES: Binding(
+        list_processing_profiles_sync, list_processing_profiles_async
+    ),
+    Operation.LIST_PROCESSING_PROFILE_ACTION_GRANTS: Binding(
+        list_processing_profile_action_grants_sync, list_processing_profile_action_grants_async
+    ),
+    Operation.SET_PROCESSING_PROFILE_ACTION_GRANT: Binding(
+        set_processing_profile_action_grant_sync, set_processing_profile_action_grant_async
+    ),
+    Operation.REMOVE_PROCESSING_PROFILE_ACTION_GRANT: Binding(
+        remove_processing_profile_action_grant_sync, remove_processing_profile_action_grant_async
     ),
     Operation.LIST_PROJECT_GRANT_RECIPIENTS: Binding(
         project_grant_recipients_sync, project_grant_recipients_async

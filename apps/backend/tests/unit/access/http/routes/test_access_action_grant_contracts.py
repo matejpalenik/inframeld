@@ -25,6 +25,11 @@ def test_registered_exact_grant_contracts_keep_flat_receipts_and_safe_numeric_bo
             {"projectId", "applicationPrincipalId"},
         ),
         ("ModelConnection", "/v1/model-connections/{model_connection_id}", {"modelConnectionId"}),
+        (
+            "ProcessingProfile",
+            "/v1/processing-profiles/{processing_profile_id}",
+            {"processingProfileId"},
+        ),
     ):
         request = models[stem + "ActionGrantRequest"]
         assert set(request["required"]) == {"canGrant", "expectedAccessRevision"}
@@ -76,6 +81,7 @@ def test_registered_exact_grant_contracts_keep_flat_receipts_and_safe_numeric_bo
         "access-group",
         "application-account",
         "model-connection",
+        "processing-profile",
     ]
     assert set(models["GrantRecipientResponse"]["properties"]) == {
         "principalId",

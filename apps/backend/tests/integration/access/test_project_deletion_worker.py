@@ -17,6 +17,7 @@ from tests.integration.access.test_project_deletion_postgres import (
     seed_deletion_scenario,
 )
 from tests.support.application_worker_process import application_worker_process
+from tests.support.processing_profile_scenarios import profile_command, profile_context
 from tests.support.project_creation_scenarios import create_project, seed_project_creator
 from tests.support.seaweedfs_fixture import storage_settings
 
@@ -38,6 +39,7 @@ from inframeld_backend.access.application.services.project_deletion_job_handler 
 from inframeld_backend.access.application.services.project_deletion_shutdown_service import (
     ProjectDeletionShutdownService,
 )
+from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.enums.principal_status import PrincipalStatus
 from inframeld_backend.access.domain.enums.project_status import ProjectStatus
 from inframeld_backend.access.infrastructure.readers.postgres_admitted_work_facts_reader import (
@@ -75,6 +77,15 @@ from inframeld_backend.bootstrap.application_worker_application_settings import 
     ApplicationWorkerApplicationSettings,
 )
 from inframeld_backend.bootstrap.application_worker_operations import ApplicationWorkerOperations
+from inframeld_backend.bootstrap.processing_profile_composition import (
+    open_processing_profile_creation,
+)
+from inframeld_backend.indexing.domain.enums.processing_profile_action import (
+    ProcessingProfileAction,
+)
+from inframeld_backend.indexing.infrastructure.rows.processing_profile_action_grant_row import (
+    ProcessingProfileActionGrantRow,
+)
 from inframeld_backend.shared.application.dtos.job_attempt_context_dto import JobAttemptContextDTO
 from inframeld_backend.shared.application.dtos.project_deletion_job_binding_dto import (
     ProjectDeletionJobBindingDTO,
@@ -100,7 +111,13 @@ from inframeld_backend.shared.application.services.job_recovery_service import J
 from inframeld_backend.shared.application.services.project_deletion_job_authorization_service import (
     ProjectDeletionJobAuthorizationService,
 )
+from inframeld_backend.shared.application.services.request_fingerprint_service import (
+    RequestFingerprintService,
+)
 from inframeld_backend.shared.application.value_objects.job_fence import JobFence
+from inframeld_backend.shared.application.value_objects.request_fingerprint_key import (
+    RequestFingerprintKey,
+)
 from inframeld_backend.shared.application.value_objects.request_id import RequestId
 from inframeld_backend.shared.infrastructure.readers.postgres_artifact_cleanup_facts_reader import (
     PostgresArtifactCleanupFactsReader,
@@ -235,6 +252,38 @@ async def test_real_handler_succeeds_child_without_completing_or_expiring_parent
     deletion_scope: DeletionScenario,
     missing_membership: bool,
 ) -> None:
+    profile_grant = None
+    if not missing_membership:
+        project = deletion_scope.defaults.project_id
+        actor = deletion_scope.defaults.actor.access
+        async with open_processing_profile_creation(
+            database, RequestFingerprintService(RequestFingerprintKey(b"P" * 32))
+        ) as creator:
+            profile = await creator.create(
+                access=actor,
+                command=profile_command(project),
+                context=profile_context(project, "shutdown-profile"),
+            )
+        account = deletion_scope.account.principal_id
+        profile_grant = (
+            project.value,
+            profile.profile.id.value,
+            account.value,
+            ProcessingProfileAction.USE.value,
+        )
+        async with database.session() as session, session.begin():
+            session.add(
+                ProcessingProfileActionGrantRow(
+                    project_id=project.value,
+                    processing_profile_id=profile.profile.id.value,
+                    recipient_principal_id=account.value,
+                    recipient_kind=PrincipalKind.APPLICATION,
+                    action=ProcessingProfileAction.USE.value,
+                    can_grant=False,
+                    assigned_by_principal_id=actor.actor_principal_id.value,
+                )
+            )
+        deletion_scope = replace(deletion_scope, revision=profile.project_access_revision)
     accepted = await admit_deletion(database, deletion_scope)
     if missing_membership:
         async with database.session() as session, session.begin():
@@ -277,6 +326,8 @@ async def test_real_handler_succeeds_child_without_completing_or_expiring_parent
         actor = await session.get(
             PrincipalRow, deletion_scope.defaults.actor.access.actor_principal_id.value
         )
+        if profile_grant is not None:
+            assert await session.get(ProcessingProfileActionGrantRow, profile_grant) is None
         assert key is not None and key.revoked_at is not None
         assert principal is not None and principal.status is PrincipalStatus.RETIRED
         assert actor is not None and actor.status is PrincipalStatus.ACTIVE
