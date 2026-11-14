@@ -53,6 +53,13 @@ const BINDINGS: &[&str] = &[
     "listApplicationAccountActionGrants",
     "setApplicationAccountActionGrant",
     "removeApplicationAccountActionGrant",
+    "createModelConnection",
+    "listModelConnections",
+    "getModelConnection",
+    "listModelConnectionUsage",
+    "listModelConnectionActionGrants",
+    "setModelConnectionActionGrant",
+    "removeModelConnectionActionGrant",
     "listProjectGrantRecipients",
     "getMyProjectAccess",
     "setProjectActionGrant",
@@ -156,6 +163,13 @@ async fn main() {
                 | "listApplicationAccountActionGrants"
                 | "setApplicationAccountActionGrant"
                 | "removeApplicationAccountActionGrant"
+                | "createModelConnection"
+                | "listModelConnections"
+                | "getModelConnection"
+                | "listModelConnectionUsage"
+                | "listModelConnectionActionGrants"
+                | "setModelConnectionActionGrant"
+                | "removeModelConnectionActionGrant"
                 | "listProjectGrantRecipients"
                 | "getMyProjectAccess"
                 | "setProjectActionGrant"
@@ -193,6 +207,9 @@ async fn main() {
                 | "deleteAccessGroup"
                 | "deleteProject"
                 | "createApplicationAccount"
+                | "createModelConnection"
+                | "setModelConnectionActionGrant"
+                | "removeModelConnectionActionGrant"
                 | "deleteApplicationAccount"
                 | "issueApplicationKey"
                 | "revokeApplicationKey"

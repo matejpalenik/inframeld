@@ -1574,7 +1574,8 @@
         "enum": [
           "project",
           "access-group",
-          "application-account"
+          "application-account",
+          "model-connection"
         ],
         "title": "GrantTargetKind",
         "type": "string"
@@ -1981,6 +1982,28 @@
           "canGrant"
         ],
         "title": "InitialApplicationAccountGrantResponse",
+        "type": "object"
+      },
+      "InitialModelConnectionGrantResponse": {
+        "properties": {
+          "actionId": {
+            "$ref": "#/components/schemas/ModelConnectionAction"
+          },
+          "canGrant": {
+            "const": true,
+            "title": "Cangrant",
+            "type": "boolean"
+          },
+          "target": {
+            "$ref": "#/components/schemas/ModelConnectionGrantTargetResponse"
+          }
+        },
+        "required": [
+          "target",
+          "actionId",
+          "canGrant"
+        ],
+        "title": "InitialModelConnectionGrantResponse",
         "type": "object"
       },
       "InitialProjectGrantResponse": {
@@ -2903,6 +2926,488 @@
         "title": "KnownJobReferenceResponse",
         "type": "object"
       },
+      "ModelConnectionAccessRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "apiVersion": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Apiversion"
+          },
+          "authentication": {
+            "$ref": "#/components/schemas/ModelConnectionAuthentication"
+          },
+          "baseUrl": {
+            "maxLength": 2048,
+            "minLength": 1,
+            "title": "Baseurl",
+            "type": "string"
+          },
+          "provider": {
+            "$ref": "#/components/schemas/ModelConnectionProvider"
+          }
+        },
+        "required": [
+          "provider",
+          "baseUrl",
+          "apiVersion",
+          "authentication"
+        ],
+        "title": "ModelConnectionAccessRequest",
+        "type": "object"
+      },
+      "ModelConnectionAccessResponse": {
+        "properties": {
+          "apiVersion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Apiversion"
+          },
+          "authentication": {
+            "$ref": "#/components/schemas/ModelConnectionAuthentication"
+          },
+          "baseUrl": {
+            "title": "Baseurl",
+            "type": "string"
+          },
+          "provider": {
+            "$ref": "#/components/schemas/ModelConnectionProvider"
+          }
+        },
+        "required": [
+          "provider",
+          "baseUrl",
+          "apiVersion",
+          "authentication"
+        ],
+        "title": "ModelConnectionAccessResponse",
+        "type": "object"
+      },
+      "ModelConnectionAction": {
+        "enum": [
+          "view-model-connection-configuration",
+          "use-model-connection",
+          "manage-model-connection",
+          "delete-model-connection"
+        ],
+        "title": "ModelConnectionAction",
+        "type": "string"
+      },
+      "ModelConnectionActionGrantItemResponse": {
+        "properties": {
+          "actionId": {
+            "$ref": "#/components/schemas/ModelConnectionAction"
+          },
+          "canGrant": {
+            "title": "Cangrant",
+            "type": "boolean"
+          },
+          "modelConnectionId": {
+            "format": "uuid",
+            "title": "Modelconnectionid",
+            "type": "string"
+          },
+          "recipientPrincipalId": {
+            "format": "uuid",
+            "title": "Recipientprincipalid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "modelConnectionId",
+          "recipientPrincipalId",
+          "actionId",
+          "canGrant"
+        ],
+        "title": "ModelConnectionActionGrantItemResponse",
+        "type": "object"
+      },
+      "ModelConnectionActionGrantRemovalResponse": {
+        "properties": {
+          "accessRevision": {
+            "format": "int64",
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "title": "Accessrevision",
+            "type": "integer"
+          },
+          "actionId": {
+            "$ref": "#/components/schemas/ModelConnectionAction"
+          },
+          "changed": {
+            "title": "Changed",
+            "type": "boolean"
+          },
+          "idempotencyExpiresAt": {
+            "format": "date-time",
+            "title": "Idempotencyexpiresat",
+            "type": "string"
+          },
+          "modelConnectionId": {
+            "format": "uuid",
+            "title": "Modelconnectionid",
+            "type": "string"
+          },
+          "operationId": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Operationid",
+            "type": "string"
+          },
+          "recipientPrincipalId": {
+            "format": "uuid",
+            "title": "Recipientprincipalid",
+            "type": "string"
+          },
+          "removed": {
+            "const": true,
+            "title": "Removed",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "operationId",
+          "idempotencyExpiresAt",
+          "modelConnectionId",
+          "recipientPrincipalId",
+          "actionId",
+          "removed",
+          "accessRevision",
+          "changed"
+        ],
+        "title": "ModelConnectionActionGrantRemovalResponse",
+        "type": "object"
+      },
+      "ModelConnectionActionGrantRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "canGrant": {
+            "title": "Cangrant",
+            "type": "boolean"
+          },
+          "expectedAccessRevision": {
+            "format": "int64",
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "title": "Expectedaccessrevision",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "canGrant",
+          "expectedAccessRevision"
+        ],
+        "title": "ModelConnectionActionGrantRequest",
+        "type": "object"
+      },
+      "ModelConnectionActionGrantResponse": {
+        "properties": {
+          "accessRevision": {
+            "format": "int64",
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "title": "Accessrevision",
+            "type": "integer"
+          },
+          "actionId": {
+            "$ref": "#/components/schemas/ModelConnectionAction"
+          },
+          "canGrant": {
+            "title": "Cangrant",
+            "type": "boolean"
+          },
+          "changed": {
+            "title": "Changed",
+            "type": "boolean"
+          },
+          "idempotencyExpiresAt": {
+            "format": "date-time",
+            "title": "Idempotencyexpiresat",
+            "type": "string"
+          },
+          "modelConnectionId": {
+            "format": "uuid",
+            "title": "Modelconnectionid",
+            "type": "string"
+          },
+          "operationId": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Operationid",
+            "type": "string"
+          },
+          "recipientPrincipalId": {
+            "format": "uuid",
+            "title": "Recipientprincipalid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "operationId",
+          "idempotencyExpiresAt",
+          "modelConnectionId",
+          "recipientPrincipalId",
+          "actionId",
+          "canGrant",
+          "accessRevision",
+          "changed"
+        ],
+        "title": "ModelConnectionActionGrantResponse",
+        "type": "object"
+      },
+      "ModelConnectionAuthentication": {
+        "enum": [
+          "api-key",
+          "none"
+        ],
+        "title": "ModelConnectionAuthentication",
+        "type": "string"
+      },
+      "ModelConnectionCreationRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "access": {
+            "$ref": "#/components/schemas/ModelConnectionAccessRequest"
+          },
+          "displayName": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Displayname",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 63,
+            "minLength": 1,
+            "pattern": "^[a-z](?:[a-z0-9-]*[a-z0-9])?$",
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "displayName",
+          "access"
+        ],
+        "title": "ModelConnectionCreationRequest",
+        "type": "object"
+      },
+      "ModelConnectionCreationResponse": {
+        "properties": {
+          "connection": {
+            "$ref": "#/components/schemas/ModelConnectionResponse"
+          },
+          "idempotencyExpiresAt": {
+            "format": "date-time",
+            "title": "Idempotencyexpiresat",
+            "type": "string"
+          },
+          "initialGrants": {
+            "items": {
+              "$ref": "#/components/schemas/InitialModelConnectionGrantResponse"
+            },
+            "maxItems": 4,
+            "minItems": 4,
+            "title": "Initialgrants",
+            "type": "array"
+          },
+          "operationId": {
+            "title": "Operationid",
+            "type": "string"
+          },
+          "projectAccessRevision": {
+            "format": "int64",
+            "maximum": 9007199254740991,
+            "minimum": 1,
+            "title": "Projectaccessrevision",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "connection",
+          "operationId",
+          "idempotencyExpiresAt",
+          "projectAccessRevision",
+          "initialGrants"
+        ],
+        "title": "ModelConnectionCreationResponse",
+        "type": "object"
+      },
+      "ModelConnectionCredentialResponse": {
+        "properties": {
+          "present": {
+            "title": "Present",
+            "type": "boolean"
+          },
+          "revision": {
+            "format": "int64",
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "title": "Revision",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "present",
+          "revision"
+        ],
+        "title": "ModelConnectionCredentialResponse",
+        "type": "object"
+      },
+      "ModelConnectionGrantTargetResponse": {
+        "properties": {
+          "kind": {
+            "const": "model-connection",
+            "title": "Kind",
+            "type": "string"
+          },
+          "modelConnectionId": {
+            "format": "uuid",
+            "title": "Modelconnectionid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "modelConnectionId"
+        ],
+        "title": "ModelConnectionGrantTargetResponse",
+        "type": "object"
+      },
+      "ModelConnectionProvider": {
+        "enum": [
+          "openai",
+          "openai-compatible",
+          "ollama"
+        ],
+        "title": "ModelConnectionProvider",
+        "type": "string"
+      },
+      "ModelConnectionResponse": {
+        "description": "Return only current configuration and public credential presence metadata.",
+        "properties": {
+          "access": {
+            "$ref": "#/components/schemas/ModelConnectionAccessResponse"
+          },
+          "connectionAccessRevision": {
+            "format": "int64",
+            "maximum": 9007199254740991,
+            "minimum": 0,
+            "title": "Connectionaccessrevision",
+            "type": "integer"
+          },
+          "credential": {
+            "$ref": "#/components/schemas/ModelConnectionCredentialResponse"
+          },
+          "displayName": {
+            "title": "Displayname",
+            "type": "string"
+          },
+          "modelConnectionId": {
+            "format": "uuid",
+            "title": "Modelconnectionid",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "projectId": {
+            "format": "uuid",
+            "title": "Projectid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId",
+          "modelConnectionId",
+          "name",
+          "displayName",
+          "access",
+          "connectionAccessRevision",
+          "credential"
+        ],
+        "title": "ModelConnectionResponse",
+        "type": "object"
+      },
+      "ModelConnectionUsageResponse": {
+        "description": "Describe a visible consumer's actual attempt and independently available validation.",
+        "properties": {
+          "consumerId": {
+            "format": "uuid",
+            "title": "Consumerid",
+            "type": "string"
+          },
+          "consumerKind": {
+            "enum": [
+              "pipeline-version",
+              "embedding-profile",
+              "processing-profile",
+              "evaluation-suite"
+            ],
+            "title": "Consumerkind",
+            "type": "string"
+          },
+          "lastValidation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/_UsageValidationResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "latestAttempt": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/_UsageAttemptResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "role": {
+            "$ref": "#/components/schemas/ModelRole"
+          }
+        },
+        "required": [
+          "consumerKind",
+          "consumerId",
+          "role",
+          "model",
+          "latestAttempt",
+          "lastValidation"
+        ],
+        "title": "ModelConnectionUsageResponse",
+        "type": "object"
+      },
+      "ModelRole": {
+        "enum": [
+          "generation",
+          "embedding",
+          "reranking"
+        ],
+        "title": "ModelRole",
+        "type": "string"
+      },
       "MyOrganizationAccessResponse": {
         "properties": {
           "accessRevision": {
@@ -3076,6 +3581,7 @@
           "organization_grant_read",
           "access_group_grant_read",
           "application_account_grant_read",
+          "model_connection_grant_read",
           "access_group_deletion",
           "project_deletion"
         ],
@@ -3493,6 +3999,90 @@
           "nextCursor"
         ],
         "title": "PageResponse[GrantRecipientResponse]",
+        "type": "object"
+      },
+      "PageResponse_ModelConnectionActionGrantItemResponse_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ModelConnectionActionGrantItemResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nextcursor"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "title": "PageResponse[ModelConnectionActionGrantItemResponse]",
+        "type": "object"
+      },
+      "PageResponse_ModelConnectionResponse_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ModelConnectionResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nextcursor"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "title": "PageResponse[ModelConnectionResponse]",
+        "type": "object"
+      },
+      "PageResponse_ModelConnectionUsageResponse_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ModelConnectionUsageResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nextcursor"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "title": "PageResponse[ModelConnectionUsageResponse]",
         "type": "object"
       },
       "PageResponse_OrganizationActionGrantItemResponse_": {
@@ -4812,6 +5402,103 @@
         ],
         "title": "ValidationIssueLocation",
         "type": "string"
+      },
+      "_UsageAttemptResponse": {
+        "properties": {
+          "connectionAccessRevision": {
+            "format": "int64",
+            "maximum": 9007199254740991.0,
+            "minimum": 0.0,
+            "title": "Connectionaccessrevision",
+            "type": "integer"
+          },
+          "credentialRevision": {
+            "format": "int64",
+            "maximum": 9007199254740991.0,
+            "minimum": 0.0,
+            "title": "Credentialrevision",
+            "type": "integer"
+          },
+          "observedAt": {
+            "format": "date-time",
+            "title": "Observedat",
+            "type": "string"
+          },
+          "outcome": {
+            "enum": [
+              "accepted",
+              "failed",
+              "uncertain"
+            ],
+            "title": "Outcome",
+            "type": "string"
+          },
+          "source": {
+            "enum": [
+              "preflight",
+              "real-use"
+            ],
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "connectionAccessRevision",
+          "credentialRevision",
+          "observedAt",
+          "outcome"
+        ],
+        "title": "_UsageAttemptResponse",
+        "type": "object"
+      },
+      "_UsageValidationResponse": {
+        "properties": {
+          "connectionAccessRevision": {
+            "format": "int64",
+            "maximum": 9007199254740991.0,
+            "minimum": 0.0,
+            "title": "Connectionaccessrevision",
+            "type": "integer"
+          },
+          "credentialRevision": {
+            "format": "int64",
+            "maximum": 9007199254740991.0,
+            "minimum": 0.0,
+            "title": "Credentialrevision",
+            "type": "integer"
+          },
+          "observedAt": {
+            "format": "date-time",
+            "title": "Observedat",
+            "type": "string"
+          },
+          "source": {
+            "enum": [
+              "preflight",
+              "real-use"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "validated",
+              "stale"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "connectionAccessRevision",
+          "credentialRevision",
+          "observedAt",
+          "status"
+        ],
+        "title": "_UsageValidationResponse",
+        "type": "object"
       }
     },
     "securitySchemes": {
@@ -5818,6 +6505,536 @@
           }
         ],
         "summary": "Revoke",
+        "tags": [
+          "access"
+        ]
+      }
+    },
+    "/v1/model-connections/{model_connection_id}/grants": {
+      "get": {
+        "operationId": "listModelConnectionActionGrants",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "model_connection_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Model Connection Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "actionId",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ModelConnectionAction"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 25,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 1024,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9_-]+$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageResponse_ModelConnectionActionGrantItemResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Invalid authentication request",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Trusted Bearer challenge when applicable.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Unauthorized",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Trusted Bearer challenge when applicable.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Access denied"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Resource not found"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Revision is no longer current"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Dependency unavailable"
+          }
+        },
+        "security": [
+          {
+            "KratosSession": []
+          },
+          {
+            "ProductBearer": []
+          }
+        ],
+        "summary": "Grants",
+        "tags": [
+          "access"
+        ]
+      }
+    },
+    "/v1/model-connections/{model_connection_id}/grants/{recipient_principal_id}/{action_id}": {
+      "delete": {
+        "operationId": "removeModelConnectionActionGrant",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "model_connection_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Model Connection Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "recipient_principal_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Recipient Principal Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "action_id",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ModelConnectionAction"
+            }
+          },
+          {
+            "in": "query",
+            "name": "expectedAccessRevision",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "title": "Expectedaccessrevision",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": ".*\\S.*",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelConnectionActionGrantRemovalResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Invalid authentication request",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Trusted Bearer challenge when applicable.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Unauthorized",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Trusted Bearer challenge when applicable.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Access denied"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Resource not found"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Revision is no longer current"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Dependency unavailable"
+          }
+        },
+        "security": [
+          {
+            "KratosSession": []
+          },
+          {
+            "ProductBearer": []
+          }
+        ],
+        "summary": "Remove",
+        "tags": [
+          "access"
+        ]
+      },
+      "put": {
+        "operationId": "setModelConnectionActionGrant",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "model_connection_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Model Connection Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "recipient_principal_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Recipient Principal Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "action_id",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ModelConnectionAction"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": ".*\\S.*",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelConnectionActionGrantRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelConnectionActionGrantResponse"
+                }
+              }
+            },
+            "description": "Changed or unchanged assignment."
+          },
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelConnectionActionGrantResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Invalid authentication request",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Trusted Bearer challenge when applicable.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Unauthorized",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Trusted Bearer challenge when applicable.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Access denied"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Resource not found"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Revision is no longer current"
+          },
+          "413": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Content Too Large"
+          },
+          "415": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Unsupported Media Type"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Dependency unavailable"
+          }
+        },
+        "security": [
+          {
+            "KratosSession": []
+          },
+          {
+            "ProductBearer": []
+          }
+        ],
+        "summary": "Put",
         "tags": [
           "access"
         ]
@@ -13338,6 +14555,606 @@
           }
         ],
         "summary": "Update",
+        "tags": [
+          "access"
+        ]
+      }
+    },
+    "/v1/projects/{project_id}/model-connections": {
+      "get": {
+        "operationId": "listModelConnections",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 25,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 1024,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9_-]+$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageResponse_ModelConnectionResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Invalid authentication request",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Trusted Bearer challenge when applicable.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Unauthorized",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Trusted Bearer challenge when applicable.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Access denied"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Resource not found"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Dependency unavailable"
+          }
+        },
+        "security": [
+          {
+            "KratosSession": []
+          },
+          {
+            "ProductBearer": []
+          }
+        ],
+        "summary": "List Connections",
+        "tags": [
+          "access"
+        ]
+      },
+      "post": {
+        "operationId": "createModelConnection",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": ".*\\S.*",
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelConnectionCreationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelConnectionCreationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Invalid authentication request",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Trusted Bearer challenge when applicable.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Unauthorized",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Trusted Bearer challenge when applicable.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Access denied"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Resource not found"
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Operation conflicts with current state"
+          },
+          "413": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Content Too Large"
+          },
+          "415": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Unsupported Media Type"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Dependency unavailable"
+          }
+        },
+        "security": [
+          {
+            "KratosSession": []
+          },
+          {
+            "ProductBearer": []
+          }
+        ],
+        "summary": "Create",
+        "tags": [
+          "access"
+        ]
+      }
+    },
+    "/v1/projects/{project_id}/model-connections/{model_connection_id}": {
+      "get": {
+        "operationId": "getModelConnection",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "model_connection_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Model Connection Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelConnectionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Invalid authentication request",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Trusted Bearer challenge when applicable.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Unauthorized",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Trusted Bearer challenge when applicable.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Access denied"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Resource not found"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Dependency unavailable"
+          }
+        },
+        "security": [
+          {
+            "KratosSession": []
+          },
+          {
+            "ProductBearer": []
+          }
+        ],
+        "summary": "Get",
+        "tags": [
+          "access"
+        ]
+      }
+    },
+    "/v1/projects/{project_id}/model-connections/{model_connection_id}/usage": {
+      "get": {
+        "operationId": "listModelConnectionUsage",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "model_connection_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Model Connection Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 25,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 1024,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9_-]+$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageResponse_ModelConnectionUsageResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Invalid authentication request",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Trusted Bearer challenge when applicable.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Unauthorized",
+            "headers": {
+              "WWW-Authenticate": {
+                "description": "Trusted Bearer challenge when applicable.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Access denied"
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Resource not found"
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Request validation failed"
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            },
+            "description": "Dependency unavailable"
+          }
+        },
+        "security": [
+          {
+            "KratosSession": []
+          },
+          {
+            "ProductBearer": []
+          }
+        ],
+        "summary": "List Usage",
         "tags": [
           "access"
         ]

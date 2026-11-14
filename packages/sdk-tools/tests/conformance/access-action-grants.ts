@@ -14,6 +14,7 @@ const recipientPrincipalId = "00000000-0000-4000-8000-000000000004";
 const unchangedRecipient = "00000000-0000-4000-8000-000000000005";
 const groupId = "00000000-0000-4000-8000-000000000007";
 const applicationPrincipalId = "00000000-0000-4000-8000-000000000008";
+const modelConnectionId = "00000000-0000-4000-8000-000000000030";
 const bearer = { Authorization: "Bearer sdk-human" };
 const expires = "2030-01-01T00:00:00Z";
 
@@ -55,6 +56,18 @@ const families = [
     set: "setApplicationAccountActionGrant",
     remove: "removeApplicationAccountActionGrant",
     lookup: "application_account_grant_read",
+    lookupProject: projectId,
+  },
+  {
+    slug: "model-connection",
+    path: { model_connection_id: modelConnectionId },
+    scope: { modelConnectionId },
+    route: `/v1/model-connections/${modelConnectionId}/grants`,
+    actionId: "use-model-connection",
+    list: "listModelConnectionActionGrants",
+    set: "setModelConnectionActionGrant",
+    remove: "removeModelConnectionActionGrant",
+    lookup: "model_connection_grant_read",
     lookupProject: projectId,
   },
 ] as const;
@@ -230,6 +243,7 @@ for (const [targetKind, targetId, actionId] of [
   ["project", projectId, "create-access-groups"],
   ["access-group", groupId, "add-documents"],
   ["application-account", applicationPrincipalId, "issue-application-keys"],
+  ["model-connection", modelConnectionId, "use-model-connection"],
 ] as const)
   sdkTest(
     {

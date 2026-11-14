@@ -119,6 +119,9 @@ from inframeld_backend.access.application.dtos.human_restoration_result_dto impo
 from inframeld_backend.access.application.dtos.human_suspension_result_dto import (
     HumanSuspensionResultDTO,
 )
+from inframeld_backend.access.application.dtos.model_connection_grant_target_dto import (
+    ModelConnectionGrantTargetDTO,
+)
 from inframeld_backend.access.application.dtos.my_organization_access_dto import (
     MyOrganizationAccessDTO,
 )
@@ -388,6 +391,12 @@ from inframeld_backend.access.http.routes.human_oauth_consent_routes import (
     create_human_oauth_consent_router,
 )
 from inframeld_backend.access.http.routes.invitation_routes import create_invitation_router
+from inframeld_backend.access.http.routes.model_connection_grant_routes import (
+    create_model_connection_grant_router,
+)
+from inframeld_backend.access.http.routes.model_connection_routes import (
+    create_model_connection_router,
+)
 from inframeld_backend.access.http.routes.my_project_access_routes import (
     create_my_project_access_router,
 )
@@ -496,6 +505,7 @@ from tests.support.mock_sdk_application_key_issuer import MockSDKApplicationKeyI
 from tests.support.mock_sdk_application_key_revoker import MockSDKApplicationKeyRevoker
 from tests.support.mock_sdk_application_session_reader import MockSDKApplicationSessionReader
 from tests.support.mock_sdk_invitations import MockSDKInvitations
+from tests.support.mock_sdk_model_connections import SDK_MODEL_CONNECTION_ID, open_model_connections
 from tests.support.mock_sdk_project_upload_defaults import MockSDKProjectUploadDefaults
 from tests.support.openapi_schema_fixture import create_schema_fixture_app
 
@@ -1024,6 +1034,10 @@ class MockSDKGrantRecipients(ProjectGrantRecipientsReader):
             query.target, ApplicationAccountGrantTargetDTO
         ) and query.target.application_principal_id.value != UUID(
             "00000000-0000-4000-8000-000000000008"
+        ):
+            raise ResourceNotFoundError()
+        if isinstance(query.target, ModelConnectionGrantTargetDTO) and (
+            query.target.model_connection_id != SDK_MODEL_CONNECTION_ID
         ):
             raise ResourceNotFoundError()
         return GrantRecipientsPageDTO(
@@ -1756,6 +1770,7 @@ class MockSDKOriginalOperationLookup(OriginalOperationLookup):
             OperationLookupAuthorityFamily.ORGANIZATION_GRANT_READ,
             OperationLookupAuthorityFamily.ACCESS_GROUP_GRANT_READ,
             OperationLookupAuthorityFamily.APPLICATION_ACCOUNT_GRANT_READ,
+            OperationLookupAuthorityFamily.MODEL_CONNECTION_GRANT_READ,
         }:
             organization = "00000000-0000-4000-8000-000000000002"
             project = "00000000-0000-4000-8000-000000000003"
@@ -1776,6 +1791,14 @@ class MockSDKOriginalOperationLookup(OriginalOperationLookup):
                     "access-group",
                     "add-documents",
                     f"/v1/projects/{project}/access-groups/00000000-0000-4000-8000-000000000007",
+                )
+                if query.project_id != ProjectId(UUID(project)):
+                    return UnresolvedOperationDTO()
+            elif family is OperationLookupAuthorityFamily.MODEL_CONNECTION_GRANT_READ:
+                slug, action, base = (
+                    "model-connection",
+                    "use-model-connection",
+                    f"/v1/model-connections/{SDK_MODEL_CONNECTION_ID.value}",
                 )
                 if query.project_id != ProjectId(UUID(project)):
                     return UnresolvedOperationDTO()
@@ -2078,6 +2101,14 @@ def create_sdk_conformance_app(browser_origin: str | None = None) -> FastAPI:
             authenticate,
             _open_application_account_grants_changer,
             _open_application_account_grants_reader,
+        )
+    )
+    application.include_router(
+        create_model_connection_router(authenticate, open_model_connections, open_model_connections)
+    )
+    application.include_router(
+        create_model_connection_grant_router(
+            authenticate, open_model_connections, open_model_connections
         )
     )
     application.include_router(

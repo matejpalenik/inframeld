@@ -43,7 +43,10 @@ from inframeld_backend.shared.application.value_objects.deletion_status_retentio
 )
 from inframeld_backend.shared.application.value_objects.idempotency_key import IdempotencyKey
 from inframeld_backend.shared.application.value_objects.request_id import RequestId
-from inframeld_backend.shared.infrastructure.migrations.migration_runner import ALEMBIC_CONFIG_PATH
+from inframeld_backend.shared.infrastructure.migrations.migration_runner import (
+    ALEMBIC_CONFIG_PATH,
+    SUPPORTED_SCHEMA_REVISION,
+)
 from inframeld_backend.shared.infrastructure.resources.database import Database
 from inframeld_backend.shared.infrastructure.rows.alembic_version_row import AlembicVersionRow
 from inframeld_backend.shared.infrastructure.rows.deletion_status_binding_row import (
@@ -94,7 +97,7 @@ def test_legacy_group_label_survives_upgrade_downgrade_and_repeat_upgrade(
     with database_session(settings) as session:
         stored = session.get(AccessGroupRow, group)
         assert stored is not None and stored.resource_name is None and stored.name == label
-        assert session.scalar(select(AlembicVersionRow.version_num)) == "0034_human_lifecycle"
+        assert session.scalar(select(AlembicVersionRow.version_num)) == SUPPORTED_SCHEMA_REVISION
     command.downgrade(config, "0024_application_accounts")
     with database_session(settings) as session:
         assert session.scalar(select(legacy.c.name).where(legacy.c.id == group)) == label
@@ -190,7 +193,7 @@ def test_named_group_requires_its_exact_scoped_binding_and_retirement_keeps_name
             )
         )
     with database_session(settings) as session:
-        assert session.scalar(select(AlembicVersionRow.version_num)) == "0034_human_lifecycle"
+        assert session.scalar(select(AlembicVersionRow.version_num)) == SUPPORTED_SCHEMA_REVISION
 
 
 @pytest.mark.asyncio
@@ -258,6 +261,8 @@ async def test_retained_legacy_group_deletion_status_prevents_unsafe_downgrade(
     with pytest.raises(RuntimeError, match="Retained group"):
         command.downgrade(_config(temporary_postgres_settings), "0024_application_accounts")
     async with database.session() as session:
-        assert await session.scalar(select(AlembicVersionRow.version_num)) == "0034_human_lifecycle"
+        assert (
+            await session.scalar(select(AlembicVersionRow.version_num)) == SUPPORTED_SCHEMA_REVISION
+        )
         assert await session.get(DeletionStatusBindingRow, operation_id) is not None
         assert await session.get(DeletionStatusObservationRow, operation_id) is not None

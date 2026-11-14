@@ -87,6 +87,7 @@ __all__ = [
     "InProgressOperationLookupResponse",
     "InframeldDiscoveryResponse",
     "InitialApplicationAccountGrantResponse",
+    "InitialModelConnectionGrantResponse",
     "InitialProjectGrantResponse",
     "InvitationAccessGroupTargetRequest",
     "InvitationActionGrantRequest",
@@ -122,6 +123,22 @@ __all__ = [
     "JobStatus",
     "Jobreference",
     "KnownJobReferenceResponse",
+    "ModelConnectionAccessRequest",
+    "ModelConnectionAccessResponse",
+    "ModelConnectionAction",
+    "ModelConnectionActionGrantItemResponse",
+    "ModelConnectionActionGrantRemovalResponse",
+    "ModelConnectionActionGrantRequest",
+    "ModelConnectionActionGrantResponse",
+    "ModelConnectionAuthentication",
+    "ModelConnectionCreationRequest",
+    "ModelConnectionCreationResponse",
+    "ModelConnectionCredentialResponse",
+    "ModelConnectionGrantTargetResponse",
+    "ModelConnectionProvider",
+    "ModelConnectionResponse",
+    "ModelConnectionUsageResponse",
+    "ModelRole",
     "MyOrganizationAccessResponse",
     "MyProjectAccessGrantResponse",
     "MyProjectAccessGroupResponse",
@@ -141,6 +158,9 @@ __all__ = [
     "PageResponseApplicationAccountActionGrantItemResponse",
     "PageResponseApplicationKeyMetadataResponse",
     "PageResponseGrantRecipientResponse",
+    "PageResponseModelConnectionActionGrantItemResponse",
+    "PageResponseModelConnectionResponse",
+    "PageResponseModelConnectionUsageResponse",
     "PageResponseOrganizationActionGrantItemResponse",
     "PageResponseProjectActionGrantItemResponse",
     "PathInner",
@@ -175,6 +195,8 @@ __all__ = [
     "UnknownJobReference",
     "UnresolvedDeletionStatusResponse",
     "UnresolvedOperationLookupResponse",
+    "UsageAttemptResponse",
+    "UsageValidationResponse",
     "ValidationIssue",
     "ValidationIssueLocation",
 ]
@@ -253,6 +275,7 @@ from inframeld_sdk.models.human_suspension_response import HumanSuspensionRespon
 from inframeld_sdk.models.in_progress_operation_lookup_response import InProgressOperationLookupResponse as InProgressOperationLookupResponse
 from inframeld_sdk.models.inframeld_discovery_response import InframeldDiscoveryResponse as InframeldDiscoveryResponse
 from inframeld_sdk.models.initial_application_account_grant_response import InitialApplicationAccountGrantResponse as InitialApplicationAccountGrantResponse
+from inframeld_sdk.models.initial_model_connection_grant_response import InitialModelConnectionGrantResponse as InitialModelConnectionGrantResponse
 from inframeld_sdk.models.initial_project_grant_response import InitialProjectGrantResponse as InitialProjectGrantResponse
 from inframeld_sdk.models.invitation_access_group_target_request import InvitationAccessGroupTargetRequest as InvitationAccessGroupTargetRequest
 from inframeld_sdk.models.invitation_action_grant_request import InvitationActionGrantRequest as InvitationActionGrantRequest
@@ -288,6 +311,22 @@ from inframeld_sdk.models.invitation_target_request import InvitationTargetReque
 from inframeld_sdk.models.job_status import JobStatus as JobStatus
 from inframeld_sdk.models.jobreference import Jobreference as Jobreference
 from inframeld_sdk.models.known_job_reference_response import KnownJobReferenceResponse as KnownJobReferenceResponse
+from inframeld_sdk.models.model_connection_access_request import ModelConnectionAccessRequest as ModelConnectionAccessRequest
+from inframeld_sdk.models.model_connection_access_response import ModelConnectionAccessResponse as ModelConnectionAccessResponse
+from inframeld_sdk.models.model_connection_action import ModelConnectionAction as ModelConnectionAction
+from inframeld_sdk.models.model_connection_action_grant_item_response import ModelConnectionActionGrantItemResponse as ModelConnectionActionGrantItemResponse
+from inframeld_sdk.models.model_connection_action_grant_removal_response import ModelConnectionActionGrantRemovalResponse as ModelConnectionActionGrantRemovalResponse
+from inframeld_sdk.models.model_connection_action_grant_request import ModelConnectionActionGrantRequest as ModelConnectionActionGrantRequest
+from inframeld_sdk.models.model_connection_action_grant_response import ModelConnectionActionGrantResponse as ModelConnectionActionGrantResponse
+from inframeld_sdk.models.model_connection_authentication import ModelConnectionAuthentication as ModelConnectionAuthentication
+from inframeld_sdk.models.model_connection_creation_request import ModelConnectionCreationRequest as ModelConnectionCreationRequest
+from inframeld_sdk.models.model_connection_creation_response import ModelConnectionCreationResponse as ModelConnectionCreationResponse
+from inframeld_sdk.models.model_connection_credential_response import ModelConnectionCredentialResponse as ModelConnectionCredentialResponse
+from inframeld_sdk.models.model_connection_grant_target_response import ModelConnectionGrantTargetResponse as ModelConnectionGrantTargetResponse
+from inframeld_sdk.models.model_connection_provider import ModelConnectionProvider as ModelConnectionProvider
+from inframeld_sdk.models.model_connection_response import ModelConnectionResponse as ModelConnectionResponse
+from inframeld_sdk.models.model_connection_usage_response import ModelConnectionUsageResponse as ModelConnectionUsageResponse
+from inframeld_sdk.models.model_role import ModelRole as ModelRole
 from inframeld_sdk.models.my_organization_access_response import MyOrganizationAccessResponse as MyOrganizationAccessResponse
 from inframeld_sdk.models.my_project_access_grant_response import MyProjectAccessGrantResponse as MyProjectAccessGrantResponse
 from inframeld_sdk.models.my_project_access_group_response import MyProjectAccessGroupResponse as MyProjectAccessGroupResponse
@@ -307,6 +346,9 @@ from inframeld_sdk.models.page_response_access_group_action_grant_item_response 
 from inframeld_sdk.models.page_response_application_account_action_grant_item_response import PageResponseApplicationAccountActionGrantItemResponse as PageResponseApplicationAccountActionGrantItemResponse
 from inframeld_sdk.models.page_response_application_key_metadata_response import PageResponseApplicationKeyMetadataResponse as PageResponseApplicationKeyMetadataResponse
 from inframeld_sdk.models.page_response_grant_recipient_response import PageResponseGrantRecipientResponse as PageResponseGrantRecipientResponse
+from inframeld_sdk.models.page_response_model_connection_action_grant_item_response import PageResponseModelConnectionActionGrantItemResponse as PageResponseModelConnectionActionGrantItemResponse
+from inframeld_sdk.models.page_response_model_connection_response import PageResponseModelConnectionResponse as PageResponseModelConnectionResponse
+from inframeld_sdk.models.page_response_model_connection_usage_response import PageResponseModelConnectionUsageResponse as PageResponseModelConnectionUsageResponse
 from inframeld_sdk.models.page_response_organization_action_grant_item_response import PageResponseOrganizationActionGrantItemResponse as PageResponseOrganizationActionGrantItemResponse
 from inframeld_sdk.models.page_response_project_action_grant_item_response import PageResponseProjectActionGrantItemResponse as PageResponseProjectActionGrantItemResponse
 from inframeld_sdk.models.path_inner import PathInner as PathInner
@@ -341,6 +383,8 @@ from inframeld_sdk.models.target import Target as Target
 from inframeld_sdk.models.unknown_job_reference import UnknownJobReference as UnknownJobReference
 from inframeld_sdk.models.unresolved_deletion_status_response import UnresolvedDeletionStatusResponse as UnresolvedDeletionStatusResponse
 from inframeld_sdk.models.unresolved_operation_lookup_response import UnresolvedOperationLookupResponse as UnresolvedOperationLookupResponse
+from inframeld_sdk.models.usage_attempt_response import UsageAttemptResponse as UsageAttemptResponse
+from inframeld_sdk.models.usage_validation_response import UsageValidationResponse as UsageValidationResponse
 from inframeld_sdk.models.validation_issue import ValidationIssue as ValidationIssue
 from inframeld_sdk.models.validation_issue_location import ValidationIssueLocation as ValidationIssueLocation
 

@@ -13,7 +13,10 @@ from inframeld_backend.access.infrastructure.rows.application_account_row import
 )
 from inframeld_backend.access.infrastructure.rows.application_key_row import ApplicationKeyRow
 from inframeld_backend.access.infrastructure.rows.principal_row import PrincipalRow
-from inframeld_backend.shared.infrastructure.migrations.migration_runner import ALEMBIC_CONFIG_PATH
+from inframeld_backend.shared.infrastructure.migrations.migration_runner import (
+    ALEMBIC_CONFIG_PATH,
+    SUPPORTED_SCHEMA_REVISION,
+)
 from inframeld_backend.shared.infrastructure.resources.database import Database
 from inframeld_backend.shared.infrastructure.rows.alembic_version_row import AlembicVersionRow
 from inframeld_backend.shared.infrastructure.settings.database_settings import DatabaseSettings
@@ -68,7 +71,9 @@ async def test_empty_retirement_history_round_trips_without_changing_live_accoun
     command.downgrade(config, "0031_project_deletion")
     command.upgrade(config, "head")
     async with database.session() as session:
-        assert await session.scalar(select(AlembicVersionRow.version_num)) == "0034_human_lifecycle"
+        assert (
+            await session.scalar(select(AlembicVersionRow.version_num)) == SUPPORTED_SCHEMA_REVISION
+        )
         account = await session.get(ApplicationAccountRow, metadata.application_principal_id.value)
         principal = await session.get(PrincipalRow, metadata.application_principal_id.value)
         key = await session.get(ApplicationKeyRow, metadata.key_id.value)

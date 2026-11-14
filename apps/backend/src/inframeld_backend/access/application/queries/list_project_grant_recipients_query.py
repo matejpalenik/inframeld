@@ -7,6 +7,9 @@ from inframeld_backend.access.application.dtos.access_group_grant_target_dto imp
 from inframeld_backend.access.application.dtos.application_account_grant_target_dto import (
     ApplicationAccountGrantTargetDTO,
 )
+from inframeld_backend.access.application.dtos.model_connection_grant_target_dto import (
+    ModelConnectionGrantTargetDTO,
+)
 from inframeld_backend.access.application.dtos.project_grant_target_dto import ProjectGrantTargetDTO
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
@@ -17,7 +20,12 @@ class ListProjectGrantRecipientsQuery:
     """Select eligible members for one concrete target and exact action."""
 
     project_id: ProjectId
-    target: ProjectGrantTargetDTO | AccessGroupGrantTargetDTO | ApplicationAccountGrantTargetDTO
+    target: (
+        ProjectGrantTargetDTO
+        | AccessGroupGrantTargetDTO
+        | ApplicationAccountGrantTargetDTO
+        | ModelConnectionGrantTargetDTO
+    )
     action_id: ActionId
     limit: int = 25
     cursor: str | None = field(default=None, repr=False)

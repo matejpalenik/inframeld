@@ -1,5 +1,6 @@
 import asyncio
 from typing import override
+from uuid import UUID
 
 from sqlalchemy import ColumnElement, DateTime, String, exists, func, literal, or_, select
 from sqlalchemy.exc import OperationalError
@@ -48,10 +49,16 @@ from inframeld_backend.access.application.dtos.invitation_group_membership_inten
 from inframeld_backend.access.application.dtos.invitation_issuer_facts_dto import (
     InvitationIssuerFactsDTO,
 )
+from inframeld_backend.access.application.dtos.invitation_model_connection_target_dto import (
+    InvitationModelConnectionTargetDTO,
+)
 from inframeld_backend.access.application.dtos.invitation_project_membership_intent_dto import (
     InvitationProjectMembershipIntentDTO,
 )
 from inframeld_backend.access.application.dtos.invitation_record_dto import InvitationRecordDTO
+from inframeld_backend.access.application.dtos.model_connection_grant_facts_dto import (
+    ModelConnectionGrantFactsDTO,
+)
 from inframeld_backend.access.application.dtos.organization_access_facts_dto import (
     OrganizationAccessFactsDTO,
 )
@@ -85,6 +92,7 @@ from inframeld_backend.access.application.protocols.invitation_assignment_facts_
     InvitationAssignmentFactsReader,
 )
 from inframeld_backend.access.domain.entities.principal import Principal
+from inframeld_backend.access.domain.enums.model_connection_action import ModelConnectionAction
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.enums.principal_status import PrincipalStatus
 from inframeld_backend.access.domain.enums.project_action import ProjectAction
@@ -113,6 +121,9 @@ from inframeld_backend.access.infrastructure.mappers.postgres_human_credential_s
 from inframeld_backend.access.infrastructure.readers.human_credential_state_queries import (
     HumanCredentialStateQueries,
 )
+from inframeld_backend.access.infrastructure.readers.model_connection_grant_queries import (
+    ModelConnectionGrantQueries,
+)
 from inframeld_backend.access.infrastructure.readers.postgres_invitation_facts_reader import (
     PostgresInvitationFactsReader,
 )
@@ -136,6 +147,9 @@ from inframeld_backend.access.infrastructure.rows.human_identity_link_row import
     HumanIdentityLinkRow,
 )
 from inframeld_backend.access.infrastructure.rows.invitation_row import InvitationRow
+from inframeld_backend.access.infrastructure.rows.model_connection_action_grant_row import (
+    ModelConnectionActionGrantRow,
+)
 from inframeld_backend.access.infrastructure.rows.organization_action_grant_row import (
     OrganizationActionGrantRow,
 )
@@ -149,6 +163,7 @@ from inframeld_backend.access.infrastructure.rows.project_row import ProjectRow
 from inframeld_backend.shared.application.errors.application_errors import (
     DependencyUnavailableError,
 )
+from inframeld_backend.shared.application.value_objects.model_connection_id import ModelConnectionId
 from inframeld_backend.shared.domain.value_objects.installation_id import InstallationId
 from inframeld_backend.shared.infrastructure.rows.installation_identity_row import (
     InstallationIdentityRow,
@@ -218,6 +233,13 @@ class PostgresInvitationAssignmentFactsReader(InvitationAssignmentFactsReader):
                         for intent in invitation.assignments
                         if (project := self._project_id(intent)) is not None
                     }
+                    projects.update(
+                        (
+                            await reader.model_projects(
+                                invitation.organization_id, invitation.assignments
+                            )
+                        ).values()
+                    )
                     for project in sorted(projects, key=lambda item: item.value.int):
                         # Missing or deleted targets do not preempt eligible original lookup.
                         await self._session.scalar(
@@ -395,9 +417,14 @@ class PostgresInvitationAssignmentFactsReader(InvitationAssignmentFactsReader):
             .tuples()
             .all()
         )
+        model_projects = await PostgresInvitationFactsReader(self._session).model_projects(
+            invitation.organization_id, intents
+        )
         assignments = tuple(
             [
-                await self._assignment(invitation, principal, installation, recovering, intent)
+                await self._assignment(
+                    invitation, principal, installation, recovering, intent, model_projects
+                )
                 for intent in intents
             ]
         )
@@ -423,9 +450,15 @@ class PostgresInvitationAssignmentFactsReader(InvitationAssignmentFactsReader):
         installation: InstallationId,
         recovering: bool,
         intent: InvitationAssignmentDTO,
+        model_projects: dict[UUID, ProjectId],
     ) -> InvitationAssignmentFactsDTO:
         organization = invitation.organization_id
-        project_id = self._project_id(intent)
+        project_id = (
+            model_projects.get(intent.target.model_connection_id)
+            if isinstance(intent, InvitationActionGrantIntentDTO)
+            and isinstance(intent.target, InvitationModelConnectionTargetDTO)
+            else self._project_id(intent)
+        )
         project = None
         target_exists = isinstance(intent, InvitationAdmissionOnlyIntentDTO) or (
             isinstance(intent, InvitationActionGrantIntentDTO)
@@ -576,6 +609,21 @@ class PostgresInvitationAssignmentFactsReader(InvitationAssignmentFactsReader):
                             )
                         )
                         is True
+                    )
+                elif isinstance(intent, InvitationActionGrantIntentDTO) and isinstance(
+                    intent.target, InvitationModelConnectionTargetDTO
+                ):
+                    (
+                        target_exists,
+                        delegated,
+                    ) = await ModelConnectionGrantQueries.invitation_authority(
+                        self._session,
+                        organization,
+                        project_id,
+                        intent.target,
+                        principal.id,
+                        principal.kind,
+                        intent.action_id,
                     )
                 project = ProjectMembershipObservationDTO(
                     installation_id=installation,
@@ -957,6 +1005,41 @@ class PostgresInvitationAssignmentFactsReader(InvitationAssignmentFactsReader):
                     grantors=grantors,
                 ),
             )
+        if isinstance(target, InvitationModelConnectionTargetDTO):
+            grant = ModelConnectionActionGrantRow
+            before = (
+                await self._session.scalar(
+                    select(grant.can_grant).where(
+                        grant.project_id == project.project_id.value,
+                        grant.model_connection_id == target.model_connection_id,
+                        grant.recipient_principal_id == recipient.id.value,
+                        grant.recipient_kind == recipient.kind,
+                        grant.action == intent.action_id.value,
+                    )
+                )
+                if recipient is not None
+                else None
+            )
+            return InvitationAssignmentStateDTO(
+                intent,
+                ModelConnectionGrantFactsDTO(
+                    installation,
+                    organization,
+                    project.project_id,
+                    ModelConnectionId(target.model_connection_id),
+                    ModelConnectionAction(intent.action_id.value),
+                    project.access_revision,
+                    project.action,
+                    observed.actor_can_grant,
+                    recipient,
+                    member,
+                    pending,
+                    coherent,
+                    False,
+                    ActionGrantState(before),
+                    grantors,
+                ),
+            )
         return None
 
     @staticmethod
@@ -1019,6 +1102,19 @@ class PostgresInvitationAssignmentFactsReader(InvitationAssignmentFactsReader):
                     ApplicationActionGrantRow.recipient_kind == PrincipalRow.kind,
                     ApplicationActionGrantRow.action == intent.action_id.value,
                     ApplicationActionGrantRow.can_grant.is_(True),
+                )
+                .correlate(PrincipalRow)
+            )
+        if isinstance(target, InvitationModelConnectionTargetDTO):
+            grant = ModelConnectionActionGrantRow
+            return (
+                exists()
+                .where(
+                    grant.model_connection_id == target.model_connection_id,
+                    grant.recipient_principal_id == PrincipalRow.id,
+                    grant.recipient_kind == PrincipalRow.kind,
+                    grant.action == intent.action_id.value,
+                    grant.can_grant.is_(True),
                 )
                 .correlate(PrincipalRow)
             )

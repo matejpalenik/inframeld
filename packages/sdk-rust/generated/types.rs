@@ -321,6 +321,33 @@ pub struct OrganizationActionGrantItemResponse {
     pub recipient_principal_id: uuid::Uuid,
 }
 #[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct PageResponseModelConnectionUsageResponse {
+    pub items: Vec<ModelConnectionUsageResponse>,
+    #[serde(
+        rename = "nextCursor",
+        deserialize_with = "presence_serde::required_nullable"
+    )]
+    pub next_cursor: Option<String>,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct PageResponseModelConnectionResponse {
+    pub items: Vec<ModelConnectionResponse>,
+    #[serde(
+        rename = "nextCursor",
+        deserialize_with = "presence_serde::required_nullable"
+    )]
+    pub next_cursor: Option<String>,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct PageResponseModelConnectionActionGrantItemResponse {
+    pub items: Vec<ModelConnectionActionGrantItemResponse>,
+    #[serde(
+        rename = "nextCursor",
+        deserialize_with = "presence_serde::required_nullable"
+    )]
+    pub next_cursor: Option<String>,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct PageResponseGrantRecipientResponse {
     pub items: Vec<GrantRecipientResponse>,
     #[serde(
@@ -1554,6 +1581,8 @@ pub enum OperationLookupAuthorityFamily {
     AccessGroupGrantRead,
     #[serde(rename = "application_account_grant_read")]
     ApplicationAccountGrantRead,
+    #[serde(rename = "model_connection_grant_read")]
+    ModelConnectionGrantRead,
     #[serde(rename = "access_group_deletion")]
     AccessGroupDeletion,
     #[serde(rename = "project_deletion")]
@@ -1568,6 +1597,7 @@ impl OperationLookupAuthorityFamily {
             Self::OrganizationGrantRead => "organization_grant_read",
             Self::AccessGroupGrantRead => "access_group_grant_read",
             Self::ApplicationAccountGrantRead => "application_account_grant_read",
+            Self::ModelConnectionGrantRead => "model_connection_grant_read",
             Self::AccessGroupDeletion => "access_group_deletion",
             Self::ProjectDeletion => "project_deletion",
         }
@@ -2027,6 +2057,395 @@ impl ::std::fmt::Display for OrganizationAction {
     }
 }
 impl AsRef<str> for OrganizationAction {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+///Describe a visible consumer's actual attempt and independently available validation.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ModelConnectionUsageResponse {
+    #[serde(rename = "consumerId")]
+    pub consumer_id: uuid::Uuid,
+    #[serde(rename = "consumerKind")]
+    pub consumer_kind: ModelConnectionUsageResponseConsumerKind,
+    #[serde(
+        rename = "lastValidation",
+        deserialize_with = "presence_serde::required_nullable"
+    )]
+    pub last_validation: Option<UsageValidationResponse>,
+    #[serde(
+        rename = "latestAttempt",
+        deserialize_with = "presence_serde::required_nullable"
+    )]
+    pub latest_attempt: Option<UsageAttemptResponse>,
+    pub model: String,
+    pub role: ModelRole,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct UsageValidationResponse {
+    ///Constraint: minimum=0, maximum=9007199254740991
+    #[serde(rename = "connectionAccessRevision")]
+    pub connection_access_revision: i64,
+    ///Constraint: minimum=0, maximum=9007199254740991
+    #[serde(rename = "credentialRevision")]
+    pub credential_revision: i64,
+    #[serde(rename = "observedAt")]
+    pub observed_at: chrono::DateTime<chrono::Utc>,
+    pub source: UsageValidationResponseSource,
+    pub status: UsageValidationResponseStatus,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum UsageValidationResponseStatus {
+    #[default]
+    #[serde(rename = "validated")]
+    Validated,
+    #[serde(rename = "stale")]
+    Stale,
+}
+impl UsageValidationResponseStatus {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Validated => "validated",
+            Self::Stale => "stale",
+        }
+    }
+}
+impl ::std::fmt::Display for UsageValidationResponseStatus {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for UsageValidationResponseStatus {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum UsageValidationResponseSource {
+    #[default]
+    #[serde(rename = "preflight")]
+    Preflight,
+    #[serde(rename = "real-use")]
+    RealUse,
+}
+impl UsageValidationResponseSource {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Preflight => "preflight",
+            Self::RealUse => "real-use",
+        }
+    }
+}
+impl ::std::fmt::Display for UsageValidationResponseSource {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for UsageValidationResponseSource {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct UsageAttemptResponse {
+    ///Constraint: minimum=0, maximum=9007199254740991
+    #[serde(rename = "connectionAccessRevision")]
+    pub connection_access_revision: i64,
+    ///Constraint: minimum=0, maximum=9007199254740991
+    #[serde(rename = "credentialRevision")]
+    pub credential_revision: i64,
+    #[serde(rename = "observedAt")]
+    pub observed_at: chrono::DateTime<chrono::Utc>,
+    pub outcome: UsageAttemptResponseOutcome,
+    pub source: UsageAttemptResponseSource,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum UsageAttemptResponseSource {
+    #[default]
+    #[serde(rename = "preflight")]
+    Preflight,
+    #[serde(rename = "real-use")]
+    RealUse,
+}
+impl UsageAttemptResponseSource {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Preflight => "preflight",
+            Self::RealUse => "real-use",
+        }
+    }
+}
+impl ::std::fmt::Display for UsageAttemptResponseSource {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for UsageAttemptResponseSource {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum UsageAttemptResponseOutcome {
+    #[default]
+    #[serde(rename = "accepted")]
+    Accepted,
+    #[serde(rename = "failed")]
+    Failed,
+    #[serde(rename = "uncertain")]
+    Uncertain,
+}
+impl UsageAttemptResponseOutcome {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Accepted => "accepted",
+            Self::Failed => "failed",
+            Self::Uncertain => "uncertain",
+        }
+    }
+}
+impl ::std::fmt::Display for UsageAttemptResponseOutcome {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for UsageAttemptResponseOutcome {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum ModelRole {
+    #[default]
+    #[serde(rename = "generation")]
+    Generation,
+    #[serde(rename = "embedding")]
+    Embedding,
+    #[serde(rename = "reranking")]
+    Reranking,
+}
+impl ModelRole {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Generation => "generation",
+            Self::Embedding => "embedding",
+            Self::Reranking => "reranking",
+        }
+    }
+}
+impl ::std::fmt::Display for ModelRole {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for ModelRole {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum ModelConnectionUsageResponseConsumerKind {
+    #[default]
+    #[serde(rename = "pipeline-version")]
+    PipelineVersion,
+    #[serde(rename = "embedding-profile")]
+    EmbeddingProfile,
+    #[serde(rename = "processing-profile")]
+    ProcessingProfile,
+    #[serde(rename = "evaluation-suite")]
+    EvaluationSuite,
+}
+impl ModelConnectionUsageResponseConsumerKind {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::PipelineVersion => "pipeline-version",
+            Self::EmbeddingProfile => "embedding-profile",
+            Self::ProcessingProfile => "processing-profile",
+            Self::EvaluationSuite => "evaluation-suite",
+        }
+    }
+}
+impl ::std::fmt::Display for ModelConnectionUsageResponseConsumerKind {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for ModelConnectionUsageResponseConsumerKind {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ModelConnectionCreationResponse {
+    pub connection: ModelConnectionResponse,
+    #[serde(rename = "idempotencyExpiresAt")]
+    pub idempotency_expires_at: chrono::DateTime<chrono::Utc>,
+    ///Constraint: minItems=4, maxItems=4
+    #[serde(rename = "initialGrants")]
+    pub initial_grants: Vec<InitialModelConnectionGrantResponse>,
+    #[serde(rename = "operationId")]
+    pub operation_id: String,
+    ///Constraint: minimum=1, maximum=9007199254740991
+    #[serde(rename = "projectAccessRevision")]
+    pub project_access_revision: i64,
+}
+///Return only current configuration and public credential presence metadata.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ModelConnectionResponse {
+    pub access: ModelConnectionAccessResponse,
+    ///Constraint: minimum=0, maximum=9007199254740991
+    #[serde(rename = "connectionAccessRevision")]
+    pub connection_access_revision: i64,
+    pub credential: ModelConnectionCredentialResponse,
+    #[serde(rename = "displayName")]
+    pub display_name: String,
+    #[serde(rename = "modelConnectionId")]
+    pub model_connection_id: uuid::Uuid,
+    pub name: String,
+    #[serde(rename = "projectId")]
+    pub project_id: uuid::Uuid,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ModelConnectionCredentialResponse {
+    pub present: bool,
+    ///Constraint: minimum=0, maximum=9007199254740991
+    pub revision: i64,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ModelConnectionCreationRequest {
+    pub access: ModelConnectionAccessRequest,
+    ///Constraint: minLength=1, maxLength=128
+    #[serde(rename = "displayName")]
+    pub display_name: String,
+    ///Constraint: minLength=1, maxLength=63, pattern=`^[a-z](?:[a-z0-9-]*[a-z0-9])?$`
+    pub name: String,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ModelConnectionActionGrantResponse {
+    ///Constraint: minimum=0, maximum=9007199254740991
+    #[serde(rename = "accessRevision")]
+    pub access_revision: i64,
+    #[serde(rename = "actionId")]
+    pub action_id: ModelConnectionAction,
+    #[serde(rename = "canGrant")]
+    pub can_grant: bool,
+    pub changed: bool,
+    #[serde(rename = "idempotencyExpiresAt")]
+    pub idempotency_expires_at: chrono::DateTime<chrono::Utc>,
+    #[serde(rename = "modelConnectionId")]
+    pub model_connection_id: uuid::Uuid,
+    ///Constraint: minLength=1, maxLength=128
+    #[serde(rename = "operationId")]
+    pub operation_id: String,
+    #[serde(rename = "recipientPrincipalId")]
+    pub recipient_principal_id: uuid::Uuid,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ModelConnectionActionGrantRemovalResponse {
+    ///Constraint: minimum=0, maximum=9007199254740991
+    #[serde(rename = "accessRevision")]
+    pub access_revision: i64,
+    #[serde(rename = "actionId")]
+    pub action_id: ModelConnectionAction,
+    pub changed: bool,
+    #[serde(rename = "idempotencyExpiresAt")]
+    pub idempotency_expires_at: chrono::DateTime<chrono::Utc>,
+    #[serde(rename = "modelConnectionId")]
+    pub model_connection_id: uuid::Uuid,
+    ///Constraint: minLength=1, maxLength=128
+    #[serde(rename = "operationId")]
+    pub operation_id: String,
+    #[serde(rename = "recipientPrincipalId")]
+    pub recipient_principal_id: uuid::Uuid,
+    pub removed: BooleanConstant<true>,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ModelConnectionActionGrantItemResponse {
+    #[serde(rename = "actionId")]
+    pub action_id: ModelConnectionAction,
+    #[serde(rename = "canGrant")]
+    pub can_grant: bool,
+    #[serde(rename = "modelConnectionId")]
+    pub model_connection_id: uuid::Uuid,
+    #[serde(rename = "recipientPrincipalId")]
+    pub recipient_principal_id: uuid::Uuid,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ModelConnectionAccessResponse {
+    #[serde(
+        rename = "apiVersion",
+        deserialize_with = "presence_serde::required_nullable"
+    )]
+    pub api_version: Option<String>,
+    pub authentication: ModelConnectionAuthentication,
+    #[serde(rename = "baseUrl")]
+    pub base_url: String,
+    pub provider: ModelConnectionProvider,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ModelConnectionAccessRequest {
+    #[serde(
+        rename = "apiVersion",
+        deserialize_with = "presence_serde::required_nullable"
+    )]
+    pub api_version: Option<String>,
+    pub authentication: ModelConnectionAuthentication,
+    ///Constraint: minLength=1, maxLength=2048
+    #[serde(rename = "baseUrl")]
+    pub base_url: String,
+    pub provider: ModelConnectionProvider,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum ModelConnectionProvider {
+    #[default]
+    #[serde(rename = "openai")]
+    Openai,
+    #[serde(rename = "openai-compatible")]
+    OpenaiCompatible,
+    #[serde(rename = "ollama")]
+    Ollama,
+}
+impl ModelConnectionProvider {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Openai => "openai",
+            Self::OpenaiCompatible => "openai-compatible",
+            Self::Ollama => "ollama",
+        }
+    }
+}
+impl ::std::fmt::Display for ModelConnectionProvider {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for ModelConnectionProvider {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum ModelConnectionAuthentication {
+    #[default]
+    #[serde(rename = "api-key")]
+    ApiKey,
+    #[serde(rename = "none")]
+    None,
+}
+impl ModelConnectionAuthentication {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::ApiKey => "api-key",
+            Self::None => "none",
+        }
+    }
+}
+impl ::std::fmt::Display for ModelConnectionAuthentication {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for ModelConnectionAuthentication {
     fn as_ref(&self) -> &str {
         self.as_str()
     }
@@ -6638,6 +7057,77 @@ impl AsRef<str> for ProjectAction {
         self.as_str()
     }
 }
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct InitialModelConnectionGrantResponse {
+    #[serde(rename = "actionId")]
+    pub action_id: ModelConnectionAction,
+    #[serde(rename = "canGrant")]
+    pub can_grant: BooleanConstant<true>,
+    pub target: ModelConnectionGrantTargetResponse,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ModelConnectionGrantTargetResponse {
+    pub kind: ModelConnectionGrantTargetResponseKind,
+    #[serde(rename = "modelConnectionId")]
+    pub model_connection_id: uuid::Uuid,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum ModelConnectionGrantTargetResponseKind {
+    #[default]
+    #[serde(rename = "model-connection")]
+    ModelConnection,
+}
+impl ModelConnectionGrantTargetResponseKind {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::ModelConnection => "model-connection",
+        }
+    }
+}
+impl ::std::fmt::Display for ModelConnectionGrantTargetResponseKind {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for ModelConnectionGrantTargetResponseKind {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum ModelConnectionAction {
+    #[default]
+    #[serde(rename = "view-model-connection-configuration")]
+    ViewModelConnectionConfiguration,
+    #[serde(rename = "use-model-connection")]
+    UseModelConnection,
+    #[serde(rename = "manage-model-connection")]
+    ManageModelConnection,
+    #[serde(rename = "delete-model-connection")]
+    DeleteModelConnection,
+}
+impl ModelConnectionAction {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::ViewModelConnectionConfiguration => {
+                "view-model-connection-configuration"
+            }
+            Self::UseModelConnection => "use-model-connection",
+            Self::ManageModelConnection => "manage-model-connection",
+            Self::DeleteModelConnection => "delete-model-connection",
+        }
+    }
+}
+impl ::std::fmt::Display for ModelConnectionAction {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for ModelConnectionAction {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
 ///Bind the fixed CLI profile to the persistent public installation identity.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct InframeldDiscoveryResponse {
@@ -8308,6 +8798,8 @@ pub enum GrantTargetKind {
     AccessGroup,
     #[serde(rename = "application-account")]
     ApplicationAccount,
+    #[serde(rename = "model-connection")]
+    ModelConnection,
 }
 impl GrantTargetKind {
     pub fn as_str(&self) -> &'static str {
@@ -8315,6 +8807,7 @@ impl GrantTargetKind {
             Self::Project => "project",
             Self::AccessGroup => "access-group",
             Self::ApplicationAccount => "application-account",
+            Self::ModelConnection => "model-connection",
         }
     }
 }
@@ -8450,6 +8943,14 @@ pub struct InvitationRevocationResponse {
         deserialize_with = "presence_serde::optional_nonnull"
     )]
     pub revoked: Option<BooleanConstant<true>>,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ModelConnectionActionGrantRequest {
+    #[serde(rename = "canGrant")]
+    pub can_grant: bool,
+    ///Constraint: minimum=0, maximum=9007199254740991
+    #[serde(rename = "expectedAccessRevision")]
+    pub expected_access_revision: i64,
 }
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct OrganizationActionGrantRemovalResponse {

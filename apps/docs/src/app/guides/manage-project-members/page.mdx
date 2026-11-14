@@ -106,7 +106,7 @@ EOF_HEADERS
 
 DELETE takes one `expectedAccessRevision` query value and no body. Stored inactive human members can be removed subject to the same departure guards.
 
-A fresh `200` with `removed: true` and `changed: true` removes Bob's Project membership, received Project/group/application-account action grants, and group membership/management within this Project. Those changes, the audit and original result commit together. The Project Access revision advances once, while Project metadata stays unchanged.
+A fresh `200` with `removed: true` and `changed: true` removes Bob's Project membership, received Project, group, application-account and model-connection action grants, and group membership/management within this Project. Those changes, the audit and original result commit together. The Project Access revision advances once, while Project metadata stays unchanged.
 
 Removal preserves Bob's installation admission, other Projects, Project-owned resources and grants he gave other recipients. It does not delete application accounts or their keys. If he is already absent, a fresh `200` with `changed: false` leaves the Access revision unchanged.
 

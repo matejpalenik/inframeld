@@ -22,6 +22,9 @@ from inframeld_backend.access.infrastructure.settings.human_authentication_setti
 from inframeld_backend.access.infrastructure.settings.hydra_settings import HydraSettings
 from inframeld_backend.access.infrastructure.settings.invitation_settings import InvitationSettings
 from inframeld_backend.access.infrastructure.settings.kratos_settings import KratosSettings
+from inframeld_backend.access.infrastructure.settings.model_connection_destination_settings import (
+    ModelConnectionDestinationSettings,
+)
 from inframeld_backend.access.infrastructure.verifiers.pydantic_discovery_url_verifier import (
     PydanticDiscoveryURLVerifier,
 )
@@ -69,6 +72,9 @@ class ApplicationSettings(BaseSettings):
         default_factory=DeletionStatusRetentionSettings
     )
     invitation: InvitationSettings = Field(default_factory=InvitationSettings)
+    model_connection_destinations: ModelConnectionDestinationSettings = Field(
+        default_factory=ModelConnectionDestinationSettings
+    )
     discovery: DiscoverySettings | None = None
     csrf: CSRFSettings = Field(default_factory=CSRFSettings)
 

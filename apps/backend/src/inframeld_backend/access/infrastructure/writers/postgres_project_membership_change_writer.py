@@ -38,6 +38,9 @@ from inframeld_backend.access.infrastructure.rows.application_action_grant_row i
 from inframeld_backend.access.infrastructure.rows.group_action_grant_row import GroupActionGrantRow
 from inframeld_backend.access.infrastructure.rows.group_manager_row import GroupManagerRow
 from inframeld_backend.access.infrastructure.rows.group_membership_row import GroupMembershipRow
+from inframeld_backend.access.infrastructure.rows.model_connection_action_grant_row import (
+    ModelConnectionActionGrantRow,
+)
 from inframeld_backend.access.infrastructure.rows.project_action_grant_row import (
     ProjectActionGrantRow,
 )
@@ -237,6 +240,12 @@ class PostgresProjectMembershipChangeWriter(
                 delete(GroupActionGrantRow).where(
                     GroupActionGrantRow.project_id == project,
                     GroupActionGrantRow.recipient_principal_id == recipient,
+                )
+            )
+            await self._session.execute(
+                delete(ModelConnectionActionGrantRow).where(
+                    ModelConnectionActionGrantRow.project_id == project,
+                    ModelConnectionActionGrantRow.recipient_principal_id == recipient,
                 )
             )
             await self._session.execute(

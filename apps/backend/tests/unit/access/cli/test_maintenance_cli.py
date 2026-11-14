@@ -310,6 +310,15 @@ def test_mode_dispatch_accepts_the_fixed_first_administrator_claim() -> None:
             },
             "actionId": "revoke-application-keys",
         },
+        {
+            "kind": "action-grantor",
+            "target": {
+                "kind": "model-connection",
+                "projectId": "00000000-0000-0000-0000-000000000003",
+                "modelConnectionId": "00000000-0000-0000-0000-00000000000a",
+            },
+            "actionId": "use-model-connection",
+        },
     ],
 )
 def test_private_dispatch_accepts_each_delivered_access_responsibility(

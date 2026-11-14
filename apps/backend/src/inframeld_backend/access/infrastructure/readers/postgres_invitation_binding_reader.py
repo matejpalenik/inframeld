@@ -1,5 +1,6 @@
 import asyncio
 from typing import override
+from uuid import UUID
 
 from sqlalchemy import String, exists, func, select, tuple_
 from sqlalchemy.exc import OperationalError
@@ -29,6 +30,9 @@ from inframeld_backend.access.application.dtos.invitation_group_manager_intent_d
 )
 from inframeld_backend.access.application.dtos.invitation_group_membership_intent_dto import (
     InvitationGroupMembershipIntentDTO,
+)
+from inframeld_backend.access.application.dtos.invitation_model_connection_target_dto import (
+    InvitationModelConnectionTargetDTO,
 )
 from inframeld_backend.access.application.dtos.invitation_preview_facts_dto import (
     InvitationPreviewFactsDTO,
@@ -84,6 +88,7 @@ from inframeld_backend.access.infrastructure.rows.invitation_activation_operatio
     InvitationActivationOperationRow,
 )
 from inframeld_backend.access.infrastructure.rows.invitation_row import InvitationRow
+from inframeld_backend.access.infrastructure.rows.model_connection_row import ModelConnectionRow
 from inframeld_backend.access.infrastructure.rows.organization_row import OrganizationRow
 from inframeld_backend.access.infrastructure.rows.principal_row import PrincipalRow
 from inframeld_backend.access.infrastructure.rows.project_membership_row import ProjectMembershipRow
@@ -174,7 +179,9 @@ class PostgresInvitationBindingReader(InvitationPreviewFactsReader):
         return principal, state, state_row[3]
 
     @staticmethod
-    def _targets(invitation: InvitationRecordDTO) -> set[InvitationTargetDTO] | None:
+    def _targets(
+        invitation: InvitationRecordDTO, model_projects: dict[UUID, ProjectId]
+    ) -> set[InvitationTargetDTO] | None:
         targets: set[InvitationTargetDTO] = {
             OrganizationGrantTargetDTO(organization_id=invitation.organization_id)
         }
@@ -206,6 +213,11 @@ class PostgresInvitationBindingReader(InvitationPreviewFactsReader):
                     ),
                 ):
                     targets.add(ProjectGrantTargetDTO(project_id=target.project_id))
+                elif isinstance(target, InvitationModelConnectionTargetDTO):
+                    project = model_projects.get(target.model_connection_id)
+                    if project is None:
+                        return None
+                    targets.add(ProjectGrantTargetDTO(project))
                 else:
                     return None
                 targets.add(target)
@@ -214,7 +226,10 @@ class PostgresInvitationBindingReader(InvitationPreviewFactsReader):
     async def _scopes(
         self, invitation: InvitationRecordDTO
     ) -> tuple[InvitationScopeDTO, ...] | None:
-        targets = self._targets(invitation)
+        model_projects = await PostgresInvitationFactsReader(self._session).model_projects(
+            invitation.organization_id, invitation.assignments
+        )
+        targets = self._targets(invitation, model_projects)
         if targets is None:
             return None
         organization = await self._session.scalar(
@@ -335,10 +350,45 @@ class PostgresInvitationBindingReader(InvitationPreviewFactsReader):
                         application_principal_id=PrincipalId(principal_id),
                     )
                 ] = name
+        model_ids = [
+            target.model_connection_id
+            for target in targets
+            if isinstance(target, InvitationModelConnectionTargetDTO)
+        ]
+        if model_ids:
+            rows = (
+                await self._session.execute(
+                    select(
+                        ModelConnectionRow.id,
+                        ModelConnectionRow.project_id,
+                        ModelConnectionRow.display_name,
+                    )
+                    .join(ProjectRow, ProjectRow.id == ModelConnectionRow.project_id)
+                    .where(
+                        ModelConnectionRow.id.in_(model_ids),
+                        ModelConnectionRow.organization_id == invitation.organization_id.value,
+                        ProjectRow.organization_id == invitation.organization_id.value,
+                        ProjectRow.status == ProjectStatus.ACTIVE,
+                        ModelConnectionRow.retired_at.is_(None),
+                    )
+                    .order_by(ModelConnectionRow.id)
+                )
+            ).tuples()
+            for connection_id, project_id, label in rows:
+                if model_projects.get(connection_id) != ProjectId(project_id):
+                    return None
+                labels[InvitationModelConnectionTargetDTO(connection_id)] = label
         if set(labels) != targets:
             return None
         return tuple(
-            InvitationScopeDTO(target=target, display_name=name) for target, name in labels.items()
+            InvitationScopeDTO(
+                target=target,
+                display_name=name,
+                model_project_id=model_projects[target.model_connection_id]
+                if isinstance(target, InvitationModelConnectionTargetDTO)
+                else None,
+            )
+            for target, name in labels.items()
         )
 
     async def require_pending_activation(

@@ -1,5 +1,5 @@
 import json
-from typing import override
+from typing import ClassVar, override
 
 from fastapi.routing import APIRoute
 from starlette.requests import Request
@@ -26,6 +26,11 @@ def _reject_constant(_value: str) -> object:
 class ActionGrantRoute(APIRoute):
     """Bound exact-grant inputs and prevent caching private assignment results."""
 
+    _json_methods: ClassVar[frozenset[str]] = frozenset({"PUT"})
+
+    def _allowed_read_query(self) -> frozenset[str]:
+        return frozenset({"actionId", "limit", "cursor"})
+
     @override
     async def handle(self, scope: Scope, receive: Receive, send: Send) -> None:
         async def private_response(message: Message) -> None:
@@ -44,9 +49,9 @@ class ActionGrantRoute(APIRoute):
             await super().handle(scope, receive, private_response)
             return
         if method == "GET":
+            allowed = self._allowed_read_query()
             invalid = any(
-                key not in {"actionId", "limit", "cursor"}
-                or len(request.query_params.getlist(key)) != 1
+                key not in allowed or len(request.query_params.getlist(key)) != 1
                 for key in request.query_params
             )
             if not invalid:
@@ -86,7 +91,7 @@ class ActionGrantRoute(APIRoute):
                 return
             await super().handle(scope, receive, private_response)
             return
-        if method != "PUT":
+        if method not in self._json_methods:
             await super().handle(scope, receive, private_response)
             return
         if request.query_params:

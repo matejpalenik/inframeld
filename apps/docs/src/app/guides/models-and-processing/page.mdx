@@ -1,20 +1,197 @@
 export const pageMetadata = {
   title: "Configure models and processing",
-  description:
-    "Find the current interface availability and the relevant product model.",
+  description: "Save a model connection and inspect its allowed configuration.",
 }
 
 # Configure models and processing
 
-<Note>
-  Public model-connection and processing-profile commands are not delivered in
-  this preview.
-</Note>
+Create a model connection to save where a Project can reach a provider. You can inspect the saved configuration and grant someone permission to use the connection. Setup creates no provider key and makes no model request.
 
-## Understand the workflow
+## Prepare the Project and destination
 
-[Read the product model](/product/models-and-search) for the resources, ordinary permissions and result boundaries this workflow uses. This entry will hold the supported procedure as its public interfaces are delivered.
+You need a current human credential, membership in the Project, and permission to use its `create-model-connections` action. Use the Project's permanent ID. Follow [HTTP setup](/clients/http#call-protected-operations) for `INFRAMELD_URL` and `INFRAMELD_TOKEN`. Set `PROJECT_ID` to the actual UUID and choose a `CONNECTION_CREATE_KEY` once for this request.
 
-## Use the available preview
+Ask your installation operator for the exact approved base URL and the supported provider settings. [Approved model destinations](/self-hosting/security#approve-model-destinations) explains the deployment allowlist and local Ollama exception.
 
-You can [set up a client](/clients/http), inspect [the delivered API](/api-reference), and work with [existing Project metadata](/guides/name-and-rename-project) under current authority. For a broad first-use path, start with [Get started](/get-started).
+Save this request as `model-connection.json`. The example uses an OpenAI-compatible gateway. Replace its base URL with the exact approved URL before sending.
+
+<CodeGroup>
+
+```json
+{
+  "name": "company-gateway",
+  "displayName": "Company gateway",
+  "access": {
+    "provider": "openai-compatible",
+    "baseUrl": "https://models.example.test/v1",
+    "apiVersion": null,
+    "authentication": "api-key"
+  }
+}
+```
+
+</CodeGroup>
+
+Choose a Name of 1 to 63 characters. Use an ASCII lowercase letter first, then lowercase letters, digits and hyphens, ending with a letter or digit. Use a display name of 1 to 128 characters. The Name is unique within the Project. Keep the returned connection ID for later requests. `apiVersion` is required and currently takes `null`. `authentication: "api-key"` selects the authentication method. Supply no credential value in this request.
+
+## Create the connection
+
+Choose one alternative. For SDKs, follow the source-package setup for [Python](/clients/python#install-from-a-checkout), [TypeScript](/clients/typescript#build-and-install-the-package) or [Rust](/clients/rust#set-up-an-example-project). Save the complete program beside `model-connection.json` as `create_connection.py`, `create-connection.ts` or `src/main.rs` in the Rust example project, and run it from the directory containing the JSON file.
+
+<CodeGroup>
+
+```shell {{ title: "cURL" }}
+curl --fail-with-body --silent --show-error --max-time 5 \
+  --url "$INFRAMELD_URL/v1/projects/$PROJECT_ID/model-connections" \
+  --header @- \
+  --header "Idempotency-Key: $CONNECTION_CREATE_KEY" \
+  --header 'Content-Type: application/json' \
+  --data-binary @model-connection.json <<EOF_HEADERS
+Authorization: Bearer $INFRAMELD_TOKEN
+EOF_HEADERS
+```
+
+```python
+import asyncio
+import os
+from pathlib import Path
+from uuid import UUID
+
+import httpx
+from inframeld_sdk import ApiClient, Configuration
+from inframeld_sdk.api.access_api import AccessApi
+from inframeld_sdk.exceptions import ApiException
+from inframeld_sdk.models.model_connection_creation_request import (
+    ModelConnectionCreationRequest,
+)
+
+
+async def main() -> None:
+    request = ModelConnectionCreationRequest.model_validate_json(
+        Path("model-connection.json").read_text(encoding="utf-8")
+    )
+    configuration = Configuration(
+        host=os.environ["INFRAMELD_URL"],
+        access_token=os.environ["INFRAMELD_TOKEN"],
+    )
+    async with ApiClient(configuration) as client:
+        try:
+            receipt = await AccessApi(client).create_model_connection(
+                project_id=UUID(os.environ["PROJECT_ID"]),
+                idempotency_key=os.environ["CONNECTION_CREATE_KEY"],
+                model_connection_creation_request=request,
+                _request_timeout=5.0,
+            )
+        except ApiException as error:
+            print(f"No usable receipt. HTTP {error.status}. Keep the original request and key.")
+            raise SystemExit(1) from None
+        except httpx.HTTPError:
+            print("No usable response. Keep the original request and key.")
+            raise SystemExit(1) from None
+    print(receipt.to_json())
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+```typescript
+import { readFileSync } from "node:fs"
+import {
+  createClient,
+  createModelConnection,
+  type ModelConnectionCreationRequest,
+} from "@inframeld/sdk"
+
+const baseUrl = process.env.INFRAMELD_URL
+const token = process.env.INFRAMELD_TOKEN
+const projectId = process.env.PROJECT_ID
+const key = process.env.CONNECTION_CREATE_KEY
+if (!baseUrl || !token || !projectId || !key) {
+  throw new Error(
+    "Set INFRAMELD_URL, INFRAMELD_TOKEN, PROJECT_ID and CONNECTION_CREATE_KEY"
+  )
+}
+
+const body: ModelConnectionCreationRequest = JSON.parse(
+  readFileSync("model-connection.json", "utf8")
+)
+const result = await createModelConnection({
+  client: createClient({ baseUrl, timeoutMs: 5000 }),
+  path: { project_id: projectId },
+  body,
+  headers: { Authorization: "Bearer " + token, "Idempotency-Key": key },
+  responseStyle: "fields",
+  throwOnError: false,
+})
+
+if (result.error || !result.data) {
+  console.error(
+    "No usable receipt. Keep the original request and key.",
+    result.response?.status
+  )
+  process.exitCode = 1
+} else {
+  console.log(JSON.stringify(result.data, null, 2))
+}
+```
+
+```rust
+use inframeld_sdk::{HttpClient, ModelConnectionCreationRequest};
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let request: ModelConnectionCreationRequest =
+        serde_json::from_str(&std::fs::read_to_string("model-connection.json")?)?;
+    let token = std::env::var("INFRAMELD_TOKEN")?;
+    let client = HttpClient::new()
+        .with_base_url(std::env::var("INFRAMELD_URL")?)
+        .with_header("Authorization", format!("Bearer {token}"));
+    match client
+        .create_model_connection(
+            std::env::var("PROJECT_ID")?,
+            std::env::var("CONNECTION_CREATE_KEY")?,
+            request,
+        )
+        .await
+    {
+        Ok(response) => {
+            println!("{}", serde_json::to_string_pretty(&response.body)?);
+            Ok(())
+        }
+        Err(_) => Err("No usable receipt. Keep the original request and key.".into()),
+    }
+}
+```
+
+</CodeGroup>
+
+Run `.venv/bin/python create_connection.py`, `node create-connection.ts` with Node 26 in the TypeScript example project, or `cargo run` in the Rust example project.
+
+A successful `201` returns the permanent `connection.modelConnectionId`, the original operation ID and expiry, the resulting Project Access revision, and four original creator grants. Each initial grant has `canGrant: true` for its exact action on this connection. [Model connection grants](/guides/manage-action-grants#grant-use-of-a-model-connection) lists the actions and the recipients you can choose.
+
+## Check current settings and recorded use
+
+Set `MODEL_CONNECTION_ID` to the returned ID. If you only have the Project ID, list the connections you can inspect by sending GET to the same Project collection URL used for creation. With a current `view-model-connection-configuration` grant, read that connection:
+
+<CodeGroup>
+
+```shell {{ title: "cURL" }}
+curl --fail-with-body --silent --show-error --max-time 5 \
+  --header @- \
+  "$INFRAMELD_URL/v1/projects/$PROJECT_ID/model-connections/$MODEL_CONNECTION_ID" <<EOF_HEADERS
+Authorization: Bearer $INFRAMELD_TOKEN
+EOF_HEADERS
+```
+
+</CodeGroup>
+
+The response reports the saved base URL, selected authentication method and connection settings revision. `credential.present: false` with revision `0` is expected for a new connection. The [API reference](/api-reference/projects-and-access#list-model-connections) shows how to continue a connection list.
+
+Use the [usage read](/api-reference/projects-and-access#list-model-connection-usage) to inspect permitted saved observations. Append `/usage` to the connection URL and send the same authenticated GET. In this version the page has empty `items` and `nextCursor: null`. An empty page means there are no recorded observations to show. It gives no provider reachability or validation result. [Models, processing and search](/product/models-and-search) explains where consumer model and role settings belong.
+
+## Recover an uncertain creation
+
+Keep the original installation, Project, method, route, request body and key. A timeout, disconnect or unusable response can occur after creation. Within the retained period, explicitly repeat the original POST with those inputs and a current credential for the same human. Current `create-model-connections` authority still applies. The receipt describes the original connection and creator assignments. Later changes stay in force. Use GET for current configuration.
+
+If a fresh request rejects the destination, ask the operator to confirm the exact URL and provider selection. Keep the original request separate if you have already sent it and its result is uncertain. Use a new key only for a deliberately changed, reviewed request.

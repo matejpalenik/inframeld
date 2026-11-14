@@ -77,6 +77,8 @@ Connection updates themselves are conditional, idempotent commands. Recheck revi
 
 Connection creation, management/credential changes and deletion are human-only in v1. Applications may receive `view-model-connection-configuration` and `use-model-connection` on an existing connection, without provider secret access or management. Creation uses Project `create-model-connections` and the [four fixed human creator assignments](../../inframeld-access-models/references/actions-and-initial-grants.md#initial-assignments).
 
+The [implemented creation and inspection routes](model-contract-examples.md#create-and-inspect-a-connection) save deployment-approved non-secret access settings and report credential presence as false with revision zero. The deployment's configured destination allowlists govern exact base URLs, including the separately approved local Ollama profile. Guarded shared updates, retirement, credential writes and model calls have their own delivery and qualification.
+
 Alice uses `company-gateway` for Contracts and Support. Updating its supported access settings changes future calls from both Pipelines, including already released versions. It does not edit their prompts, change their selected model IDs, create versions or move Deployment pointers. Manual release mode controls Pipeline publication, not shared connection administration.
 
 | Owner | Settings and identity |

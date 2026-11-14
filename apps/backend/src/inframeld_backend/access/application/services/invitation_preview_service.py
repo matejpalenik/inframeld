@@ -20,6 +20,9 @@ from inframeld_backend.access.application.dtos.invitation_group_manager_intent_d
 from inframeld_backend.access.application.dtos.invitation_group_membership_intent_dto import (
     InvitationGroupMembershipIntentDTO,
 )
+from inframeld_backend.access.application.dtos.invitation_model_connection_target_dto import (
+    InvitationModelConnectionTargetDTO,
+)
 from inframeld_backend.access.application.dtos.invitation_preview_result_dto import (
     InvitationPreviewResultDTO,
 )
@@ -39,6 +42,7 @@ from inframeld_backend.access.application.protocols.invitation_previewer import 
 from inframeld_backend.access.application.queries.preview_invitation_query import (
     PreviewInvitationQuery,
 )
+from inframeld_backend.access.domain.enums.model_connection_action import ModelConnectionAction
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.policies.access_group_grant_policy import (
     AccessGroupGrantPolicy,
@@ -112,6 +116,15 @@ class InvitationPreviewService(InvitationPreviewer):
                     raise ConflictError("The intended invitation scope is no longer available.")
                 required = self._required_targets(invitation)
                 observed = {scope.target for scope in facts.scopes}
+                for scope in facts.scopes:
+                    if isinstance(scope.target, InvitationModelConnectionTargetDTO):
+                        if scope.model_project_id is None:
+                            raise RuntimeError(
+                                "Preview lost the model connection's owning Project."
+                            )
+                        required.add(ProjectGrantTargetDTO(scope.model_project_id))
+                    elif scope.model_project_id is not None:
+                        raise RuntimeError("Preview attached a model binding to another target.")
                 if (
                     len(facts.scopes) > 201
                     or len(observed) != len(facts.scopes)
@@ -167,6 +180,8 @@ class InvitationPreviewService(InvitationPreviewer):
                 supported = ApplicationAccountGrantPolicy.supports_recipient(
                     action_id=intent.action_id, kind=PrincipalKind.HUMAN
                 )
+            elif isinstance(target, InvitationModelConnectionTargetDTO):
+                supported = intent.action_id.value in ModelConnectionAction
             else:
                 # Real future owners add their authoritative integration, never a placeholder target.
                 supported = False

@@ -12,6 +12,9 @@ from inframeld_backend.access.application.dtos.access_group_grant_target_dto imp
 from inframeld_backend.access.application.dtos.application_account_grant_target_dto import (
     ApplicationAccountGrantTargetDTO,
 )
+from inframeld_backend.access.application.dtos.model_connection_grant_target_dto import (
+    ModelConnectionGrantTargetDTO,
+)
 from inframeld_backend.access.application.dtos.organization_grant_target_dto import (
     OrganizationGrantTargetDTO,
 )
@@ -20,6 +23,7 @@ from inframeld_backend.access.domain.value_objects.action_id import ActionId
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
+from inframeld_backend.shared.application.value_objects.model_connection_id import ModelConnectionId
 from inframeld_backend.shared.domain.value_objects.installation_id import InstallationId
 
 
@@ -30,7 +34,10 @@ class AccessActionGrantsCursor:
     installation_id: InstallationId
     organization_id: OrganizationId
     target: (
-        OrganizationGrantTargetDTO | AccessGroupGrantTargetDTO | ApplicationAccountGrantTargetDTO
+        OrganizationGrantTargetDTO
+        | AccessGroupGrantTargetDTO
+        | ApplicationAccountGrantTargetDTO
+        | ModelConnectionGrantTargetDTO
     )
     action_id: ActionId
     after: PrincipalId
@@ -72,6 +79,11 @@ class AccessActionGrantsCursor:
                                 project_id=ProjectId(UUID(project_id)),
                                 application_principal_id=PrincipalId(UUID(target)),
                             )
+                        case "model-connection", str() as project_id:
+                            selected = ModelConnectionGrantTargetDTO(
+                                project_id=ProjectId(UUID(project_id)),
+                                model_connection_id=ModelConnectionId(UUID(target)),
+                            )
                         case _:
                             raise ValueError("Incompatible target binding.")
                     return cls(
@@ -103,6 +115,12 @@ class AccessActionGrantsCursor:
                     "application-account",
                     str(target.project_id.value),
                     target.application_principal_id.value,
+                )
+            case ModelConnectionGrantTargetDTO() as target:
+                kind, project, identity = (
+                    "model-connection",
+                    str(target.project_id.value),
+                    target.model_connection_id.value,
                 )
         parts = [
             1,

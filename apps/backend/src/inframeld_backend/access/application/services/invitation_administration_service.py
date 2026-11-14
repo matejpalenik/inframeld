@@ -32,6 +32,9 @@ from inframeld_backend.access.application.dtos.invitation_group_membership_inten
 from inframeld_backend.access.application.dtos.invitation_issue_result_dto import (
     InvitationIssueResultDTO,
 )
+from inframeld_backend.access.application.dtos.invitation_model_connection_target_dto import (
+    InvitationModelConnectionTargetDTO,
+)
 from inframeld_backend.access.application.dtos.invitation_project_membership_intent_dto import (
     InvitationProjectMembershipIntentDTO,
 )
@@ -58,6 +61,7 @@ from inframeld_backend.access.application.services.invitation_fingerprint_servic
 from inframeld_backend.access.application.services.principal_access_evaluation_service import (
     PrincipalAccessEvaluationService,
 )
+from inframeld_backend.access.domain.enums.model_connection_action import ModelConnectionAction
 from inframeld_backend.access.domain.enums.organization_action import OrganizationAction
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.policies.access_group_grant_policy import (
@@ -463,7 +467,13 @@ class InvitationAdministrationService(InvitationIssuer, InvitationRevoker):
                 ):
                     raise AccessDeniedError()
                 continue
-            if isinstance(intent, InvitationActionGrantIntentDTO):
+            if isinstance(intent, InvitationActionGrantIntentDTO) and isinstance(
+                intent.target, InvitationModelConnectionTargetDTO
+            ):
+                if observed.project is None:
+                    raise ResourceNotFoundError()
+                requested_project = observed.project.project_id
+            elif isinstance(intent, InvitationActionGrantIntentDTO):
                 if not isinstance(
                     intent.target,
                     (
@@ -535,15 +545,16 @@ class InvitationAdministrationService(InvitationIssuer, InvitationRevoker):
                     is_group_manager=observed.actor_is_group_manager,
                 )
             else:
-                supported = (
-                    ProjectActionEligibilityPolicy.may_use(
+                if isinstance(intent.target, InvitationModelConnectionTargetDTO):
+                    supported = intent.action_id.value in ModelConnectionAction
+                elif isinstance(intent.target, ProjectGrantTargetDTO):
+                    supported = ProjectActionEligibilityPolicy.may_use(
                         action_id=intent.action_id, principal_kind=PrincipalKind.HUMAN
                     )
-                    if isinstance(intent.target, ProjectGrantTargetDTO)
-                    else ApplicationAccountGrantPolicy.supports_recipient(
+                else:
+                    supported = ApplicationAccountGrantPolicy.supports_recipient(
                         action_id=intent.action_id, kind=PrincipalKind.HUMAN
                     )
-                )
                 if not supported:
                     raise InvalidInputError()
                 allowed = ProjectGrantDelegationPolicy.may_delegate_project_action(

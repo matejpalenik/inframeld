@@ -311,7 +311,7 @@ One currently eligible Project grant candidate, with only safe principal ID, dis
 
 ## GrantTargetKind
 
-The closed Project-recipient discovery selector uses `project`, `access-group` or `application-account`. The server checks the target's authoritative Project binding.
+The closed Project-recipient discovery selector uses `project`, `access-group`, `application-account` or `model-connection`. The server checks the target's authoritative Project binding.
 
 <ApiSchema name="GrantTargetKind" />
 
@@ -539,7 +539,7 @@ A boolean-discriminated first-delivery or replay union. The replay alternative f
 
 ## InvitationModelConnectionTargetRequest
 
-Use the exact typed target identity. A future resource variant does not supply a currently available producer or invitation integration.
+Use the permanent model connection ID. The server resolves the owning Project and checks current authority for the exact action.
 
 <ApiSchema name="InvitationModelConnectionTargetRequest" />
 
@@ -649,7 +649,7 @@ Use the exact typed target identity. A future resource variant does not supply a
 
 ## InvitationTargetRequest
 
-Closed target representations. Only actual Access-owned Organization, Project, group and application-account producers currently support invitation effects. Other variants describe future integrations, not available resources.
+The supported invitation targets are Organization, Project, access group, application account and model connection. Other schema variants describe future integrations.
 
 <ApiSchema name="InvitationTargetRequest" />
 
@@ -664,6 +664,158 @@ Closed target representations. Only actual Access-owned Organization, Project, g
 ## KnownJobReferenceResponse
 
 <ApiSchema name="KnownJobReferenceResponse" />
+
+<a id="InitialModelConnectionGrantResponse" />
+
+## InitialModelConnectionGrantResponse
+
+One original creator assignment against the exact connection.
+
+<ApiSchema name="InitialModelConnectionGrantResponse" />
+
+<a id="ModelConnectionAccessRequest" />
+
+## ModelConnectionAccessRequest
+
+Explicit provider, base URL, API version and authentication selection.
+
+<ApiSchema name="ModelConnectionAccessRequest" />
+
+<a id="ModelConnectionAccessResponse" />
+
+## ModelConnectionAccessResponse
+
+Saved non-secret access settings.
+
+<ApiSchema name="ModelConnectionAccessResponse" />
+
+<a id="ModelConnectionAction" />
+
+## ModelConnectionAction
+
+The four exact actions on one connection.
+
+<ApiSchema name="ModelConnectionAction" />
+
+<a id="ModelConnectionActionGrantItemResponse" />
+
+## ModelConnectionActionGrantItemResponse
+
+One stored recipient assignment.
+
+<ApiSchema name="ModelConnectionActionGrantItemResponse" />
+
+<a id="ModelConnectionActionGrantRemovalResponse" />
+
+## ModelConnectionActionGrantRemovalResponse
+
+Original result of removing an exact assignment.
+
+<ApiSchema name="ModelConnectionActionGrantRemovalResponse" />
+
+<a id="ModelConnectionActionGrantRequest" />
+
+## ModelConnectionActionGrantRequest
+
+Strict level and reviewed Project Access revision for a set request.
+
+<ApiSchema name="ModelConnectionActionGrantRequest" />
+
+<a id="ModelConnectionActionGrantResponse" />
+
+## ModelConnectionActionGrantResponse
+
+Original set result, status-dependent effect and captured revision.
+
+<ApiSchema name="ModelConnectionActionGrantResponse" />
+
+<a id="ModelConnectionAuthentication" />
+
+## ModelConnectionAuthentication
+
+The supported saved authentication methods.
+
+<ApiSchema name="ModelConnectionAuthentication" />
+
+<a id="ModelConnectionCreationRequest" />
+
+## ModelConnectionCreationRequest
+
+The Name, display name and reviewed access settings for creation.
+
+<ApiSchema name="ModelConnectionCreationRequest" />
+
+<a id="ModelConnectionCreationResponse" />
+
+## ModelConnectionCreationResponse
+
+Original safe creation receipt and four original assignments.
+
+<ApiSchema name="ModelConnectionCreationResponse" />
+
+<a id="ModelConnectionCredentialResponse" />
+
+## ModelConnectionCredentialResponse
+
+Credential presence and revision.
+
+<ApiSchema name="ModelConnectionCredentialResponse" />
+
+<a id="ModelConnectionGrantTargetResponse" />
+
+## ModelConnectionGrantTargetResponse
+
+The permanent connection ID in the typed model-connection grant target.
+
+<ApiSchema name="ModelConnectionGrantTargetResponse" />
+
+<a id="ModelConnectionProvider" />
+
+## ModelConnectionProvider
+
+The supported provider choices.
+
+<ApiSchema name="ModelConnectionProvider" />
+
+<a id="ModelConnectionResponse" />
+
+## ModelConnectionResponse
+
+Currently permitted safe configuration and revision metadata.
+
+<ApiSchema name="ModelConnectionResponse" />
+
+<a id="ModelConnectionUsageResponse" />
+
+## ModelConnectionUsageResponse
+
+A permitted usage observation with separate latest-attempt and last-validation fields.
+
+<ApiSchema name="ModelConnectionUsageResponse" />
+
+<a id="ModelRole" />
+
+## ModelRole
+
+The consumer role associated with an available model usage observation.
+
+<ApiSchema name="ModelRole" />
+
+<a id="_UsageAttemptResponse" />
+
+## Model usage attempt
+
+The outcome of the latest observed attempt, tied to its access and credential revisions.
+
+<ApiSchema name="_UsageAttemptResponse" />
+
+<a id="_UsageValidationResponse" />
+
+## Model usage validation
+
+The latest recorded validation and its independently observed revisions. A later failed attempt does not turn that attempt into a validation.
+
+<ApiSchema name="_UsageValidationResponse" />
 
 <a id="MyOrganizationAccessResponse" />
 
@@ -706,6 +858,8 @@ Identifies one actual own group membership or management relationship by `access
 ## OperationLookupAuthorityFamily
 
 `project_deletion` is lookup-only, paired with `delete-project` and the original concrete Project DELETE route. It permits only the original eligible human’s content-free retained status, without recreating ordinary Project authority.
+
+`model_connection_grant_read` requires current exact use-and-grant authority for the original connection action. Include the authoritative Project ID alongside the original grant route.
 
 <ApiSchema name="OperationLookupAuthorityFamily" />
 
@@ -798,6 +952,30 @@ Stored human administration assignments for one exact account/action. These rows
 Eligible candidates for the exact Project-bound target and action, filtered before pagination. A candidate is not a committed assignment.
 
 <ApiSchema name="PageResponse_GrantRecipientResponse_" />
+
+<a id="PageResponse_ModelConnectionActionGrantItemResponse_" />
+
+## Model connection action-grant page
+
+Bounded page of exact stored grants.
+
+<ApiSchema name="PageResponse_ModelConnectionActionGrantItemResponse_" />
+
+<a id="PageResponse_ModelConnectionResponse_" />
+
+## Model connection page
+
+Bounded page of currently visible connections.
+
+<ApiSchema name="PageResponse_ModelConnectionResponse_" />
+
+<a id="PageResponse_ModelConnectionUsageResponse_" />
+
+## Model connection usage page
+
+Bounded page of available usage observations.
+
+<ApiSchema name="PageResponse_ModelConnectionUsageResponse_" />
 
 <a id="PageResponse_OrganizationActionGrantItemResponse_" />
 

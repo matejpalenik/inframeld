@@ -1,7 +1,7 @@
 import asyncio
 from typing import final, override
 
-from sqlalchemy import Nullable, String, and_, exists, func, select
+from sqlalchemy import Nullable, String, and_, exists, false, func, select
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.exc import TimeoutError as SqlAlchemyTimeoutError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -88,6 +88,17 @@ class PostgresProjectActionFactsReader(ProjectActionFactsReader):
     async def read_action_facts(
         self, *, access: AccessContextDTO, action_id: ActionId, target: ProjectActionTargetDTO
     ) -> ProjectActionFactsDTO | None:
+        return await self._read_facts(access, action_id, target)
+
+    async def read_scope_facts(
+        self, *, access: AccessContextDTO, target: ProjectActionTargetDTO
+    ) -> ProjectActionFactsDTO | None:
+        """Read current Project eligibility for an operation with a separate exact resource grant."""
+        return await self._read_facts(access, None, target)
+
+    async def _read_facts(
+        self, access: AccessContextDTO, action_id: ActionId | None, target: ProjectActionTargetDTO
+    ) -> ProjectActionFactsDTO | None:
         if isinstance(access.authentication_evidence, ApplicationKeyAuthenticationDTO):
             return await self._read_application_facts(access, action_id, target)
 
@@ -96,10 +107,14 @@ class PostgresProjectActionFactsReader(ProjectActionFactsReader):
             ProjectMembershipRow.principal_id == PrincipalRow.id,
         )
 
-        has_exact_action_grant = exists().where(
-            ProjectActionGrantRow.project_id == ProjectRow.id,
-            ProjectActionGrantRow.recipient_principal_id == PrincipalRow.id,
-            ProjectActionGrantRow.action == action_id.value,
+        has_exact_action_grant = (
+            exists().where(
+                ProjectActionGrantRow.project_id == ProjectRow.id,
+                ProjectActionGrantRow.recipient_principal_id == PrincipalRow.id,
+                ProjectActionGrantRow.action == action_id.value,
+            )
+            if action_id is not None
+            else false()
         )
 
         installation_available = exists().where(
@@ -198,7 +213,7 @@ class PostgresProjectActionFactsReader(ProjectActionFactsReader):
         )
 
     async def _read_application_facts(
-        self, access: AccessContextDTO, action_id: ActionId, target: ProjectActionTargetDTO
+        self, access: AccessContextDTO, action_id: ActionId | None, target: ProjectActionTargetDTO
     ) -> ProjectActionFactsDTO | None:
         profile = self._application_key_profile
         if profile is None:
@@ -286,16 +301,21 @@ class PostgresProjectActionFactsReader(ProjectActionFactsReader):
                     if local is None:
                         return None
                     principal, _project_id, project_status, member, coherent = local
-                    granted = await self._session.scalar(
-                        select(
-                            exists().where(
-                                ProjectActionGrantRow.project_id == target.project_id.value,
-                                ProjectActionGrantRow.recipient_principal_id
-                                == access.actor_principal_id.value,
-                                ProjectActionGrantRow.recipient_kind == PrincipalKind.APPLICATION,
-                                ProjectActionGrantRow.action == action_id.value,
+                    granted = (
+                        await self._session.scalar(
+                            select(
+                                exists().where(
+                                    ProjectActionGrantRow.project_id == target.project_id.value,
+                                    ProjectActionGrantRow.recipient_principal_id
+                                    == access.actor_principal_id.value,
+                                    ProjectActionGrantRow.recipient_kind
+                                    == PrincipalKind.APPLICATION,
+                                    ProjectActionGrantRow.action == action_id.value,
+                                )
                             )
                         )
+                        if action_id is not None
+                        else False
                     )
                     # Last observation uses current database UTC after all coordination waits.
                     key = (

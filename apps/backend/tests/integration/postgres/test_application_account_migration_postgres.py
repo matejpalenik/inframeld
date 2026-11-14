@@ -30,7 +30,10 @@ from inframeld_backend.access.infrastructure.rows.organization_row import Organi
 from inframeld_backend.access.infrastructure.rows.principal_row import PrincipalRow
 from inframeld_backend.access.infrastructure.rows.project_membership_row import ProjectMembershipRow
 from inframeld_backend.access.infrastructure.rows.project_row import ProjectRow
-from inframeld_backend.shared.infrastructure.migrations.migration_runner import ALEMBIC_CONFIG_PATH
+from inframeld_backend.shared.infrastructure.migrations.migration_runner import (
+    ALEMBIC_CONFIG_PATH,
+    SUPPORTED_SCHEMA_REVISION,
+)
 from inframeld_backend.shared.infrastructure.readers.postgres_installation_identity_reader import (
     PostgresInstallationIdentityReader,
 )
@@ -149,7 +152,9 @@ async def test_retained_account_outcome_prevents_destructive_downgrade(
     with pytest.raises(RuntimeError, match="Retained application"):
         command.downgrade(_config(temporary_postgres_settings), "0023_safe_numeric_revisions")
     async with database.session() as session:
-        assert await session.scalar(select(AlembicVersionRow.version_num)) == "0034_human_lifecycle"
+        assert (
+            await session.scalar(select(AlembicVersionRow.version_num)) == SUPPORTED_SCHEMA_REVISION
+        )
         assert (
             await session.get(
                 ApplicationAccountCreationResultRow, created.operation.operation_id.value

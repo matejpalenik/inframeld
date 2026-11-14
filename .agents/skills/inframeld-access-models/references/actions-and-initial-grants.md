@@ -173,7 +173,7 @@ Creation checks current human eligibility and the matching Project Create action
 | Deployment | Seven: `query`, `inspect-query-traces`, `manage-releases`, `view-deployment-configuration`, `edit-deployment-configuration`, `delete-deployment`, `feedback:write`. A ready compatible initial version is required. |
 | Collection | `view-collection`, `edit-collection`, `delete-collection`. |
 | Source | `view-source-configuration`, `edit-source-configuration`, `sync-source`, `manage-source-credentials`, `delete-source`. |
-| Model connection | `view-model-connection-configuration`, `use-model-connection`, `manage-model-connection`, `delete-model-connection`. |
+| [Model connection](../../inframeld-application-contracts/references/model-contract-examples.md#create-and-inspect-a-connection) | `view-model-connection-configuration`, `use-model-connection`, `manage-model-connection`, `delete-model-connection`. |
 | Processing profile | `view-processing-profile`, `use-processing-profile`. |
 | Embedding profile | `view-embedding-profile`, `use-embedding-profile`. |
 | Application account | `issue-application-keys`, `revoke-application-keys`, `delete-application-account`, assigned to the human creator. The application receives no initial actions, groups or key. |

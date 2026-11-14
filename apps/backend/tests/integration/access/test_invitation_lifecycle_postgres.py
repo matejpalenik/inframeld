@@ -38,6 +38,12 @@ from inframeld_backend.access.application.commands.activate_invitation_command i
 from inframeld_backend.access.application.commands.change_access_group_relationship_command import (
     ChangeAccessGroupRelationshipCommand,
 )
+from inframeld_backend.access.application.commands.change_model_connection_grant_command import (
+    ChangeModelConnectionGrantCommand,
+)
+from inframeld_backend.access.application.commands.create_model_connection_command import (
+    CreateModelConnectionCommand,
+)
 from inframeld_backend.access.application.commands.issue_invitation_command import (
     IssueInvitationCommand,
 )
@@ -101,6 +107,9 @@ from inframeld_backend.access.application.dtos.invitation_group_manager_intent_d
 from inframeld_backend.access.application.dtos.invitation_group_membership_intent_dto import (
     InvitationGroupMembershipIntentDTO,
 )
+from inframeld_backend.access.application.dtos.invitation_model_connection_target_dto import (
+    InvitationModelConnectionTargetDTO,
+)
 from inframeld_backend.access.application.dtos.invitation_project_access_revision_dto import (
     InvitationProjectAccessRevisionDTO,
 )
@@ -110,6 +119,9 @@ from inframeld_backend.access.application.dtos.invitation_project_membership_int
 from inframeld_backend.access.application.dtos.invitation_record_dto import InvitationRecordDTO
 from inframeld_backend.access.application.dtos.invitation_revocation_result_dto import (
     InvitationRevocationResultDTO,
+)
+from inframeld_backend.access.application.dtos.model_connection_access_dto import (
+    ModelConnectionAccessDTO,
 )
 from inframeld_backend.access.application.dtos.organization_grant_management_facts_dto import (
     OrganizationGrantManagementFactsDTO,
@@ -161,6 +173,11 @@ from inframeld_backend.access.domain.entities.principal import Principal
 from inframeld_backend.access.domain.enums.identity_recovery_cleanup_state import (
     IdentityRecoveryCleanupState,
 )
+from inframeld_backend.access.domain.enums.model_connection_action import ModelConnectionAction
+from inframeld_backend.access.domain.enums.model_connection_authentication import (
+    ModelConnectionAuthentication,
+)
+from inframeld_backend.access.domain.enums.model_connection_provider import ModelConnectionProvider
 from inframeld_backend.access.domain.enums.organization_action import OrganizationAction
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.enums.principal_status import PrincipalStatus
@@ -249,6 +266,9 @@ from inframeld_backend.access.infrastructure.rows.invitation_revocation_result_r
     InvitationRevocationResultRow,
 )
 from inframeld_backend.access.infrastructure.rows.invitation_row import InvitationRow
+from inframeld_backend.access.infrastructure.rows.model_connection_action_grant_row import (
+    ModelConnectionActionGrantRow,
+)
 from inframeld_backend.access.infrastructure.rows.organization_action_grant_row import (
     OrganizationActionGrantRow,
 )
@@ -264,6 +284,9 @@ from inframeld_backend.access.infrastructure.settings.application_key_authentica
 )
 from inframeld_backend.access.infrastructure.settings.csrf_settings import CSRFSettings
 from inframeld_backend.access.infrastructure.settings.kratos_settings import KratosSettings
+from inframeld_backend.access.infrastructure.settings.model_connection_destination_settings import (
+    ModelConnectionDestinationSettings,
+)
 from inframeld_backend.access.infrastructure.verifiers.kratos_browser_session_verifier import (
     KratosBrowserSessionVerifier,
 )
@@ -302,6 +325,11 @@ from inframeld_backend.bootstrap.access_group_grant_composition import (
 )
 from inframeld_backend.bootstrap.application_factory import create_app
 from inframeld_backend.bootstrap.application_settings import ApplicationSettings, get_settings
+from inframeld_backend.bootstrap.invitation_composition import open_invitation_activation
+from inframeld_backend.bootstrap.model_connection_composition import (
+    open_model_connection_creation,
+    open_model_connection_grant_change,
+)
 from inframeld_backend.bootstrap.organization_grant_composition import (
     open_organization_grant_change,
 )
@@ -337,6 +365,10 @@ from inframeld_backend.shared.application.value_objects.request_fingerprint impo
 )
 from inframeld_backend.shared.application.value_objects.request_fingerprint_key import (
     RequestFingerprintKey,
+)
+from inframeld_backend.shared.domain.value_objects.resource_name import ResourceName
+from inframeld_backend.shared.domain.value_objects.submitted_display_name import (
+    SubmittedDisplayName,
 )
 from inframeld_backend.shared.infrastructure.resources.database import Database
 from inframeld_backend.shared.infrastructure.resources.sqlalchemy_transaction_manager import (
@@ -5823,3 +5855,244 @@ async def test_registered_invitation_recipient_profiles_fail_without_partial_sta
         for response in (csrf, competing, bearer, preview, unavailable, activated, replay):
             assert response.headers["cache-control"] == "no-store"
             assert token.value not in response.text
+
+
+@pytest.mark.parametrize("blocked", ["membership", "issuer", None])
+async def test_model_connection_invitation_preserves_exact_preview_activation_and_replay(
+    database: Database,
+    blocked: str | None,
+) -> None:
+    membership = await seed_membership_project(database)
+    seed, project = membership.actor, membership.project
+    route = f"/v1/projects/{project.project_id.value}/model-connections"
+    base_url = "https://models.example.test/v1"
+    fingerprints = RequestFingerprintService(RequestFingerprintKey(b"F" * 32))
+    async with open_model_connection_creation(
+        database,
+        fingerprints,
+        ModelConnectionDestinationSettings(https_base_urls=frozenset({base_url})),
+    ) as creator:
+        connection = await creator.create(
+            access=seed.access,
+            command=CreateModelConnectionCommand(
+                project.project_id,
+                ResourceName("invited-connection"),
+                SubmittedDisplayName("Invited connection"),
+                ModelConnectionAccessDTO(
+                    ModelConnectionProvider.OPENAI_COMPATIBLE,
+                    base_url,
+                    None,
+                    ModelConnectionAuthentication.API_KEY,
+                ),
+            ),
+            context=IdempotencyContextDTO(
+                HttpMethod.POST, route, IdempotencyKey("create-invited-model")
+            ),
+        )
+    connection_id = connection.connection.connection_id
+    model_id = connection_id.value
+    target = InvitationModelConnectionTargetDTO(model_id)
+    action = ModelConnectionAction.USE.value
+    intent = InvitationActionGrantIntentDTO(target, ActionId(action), False)
+    assignments = (
+        (intent,)
+        if blocked == "membership"
+        else (
+            InvitationProjectMembershipIntentDTO(project.project_id),
+            intent,
+        )
+    )
+    issuer = seed.access
+    if blocked is None:
+        joined = await change_membership(
+            database, membership, revision=connection.project_access_revision, key="join-issuer"
+        )
+        delegated = await change_project_grant(
+            database,
+            membership,
+            revision=joined.access_revision,
+            key="issuer-manage-members",
+            action_id=ActionId("manage-project-members"),
+            can_grant=True,
+        )
+        async with open_model_connection_grant_change(database, fingerprints) as changer:
+            await changer.change(
+                seed.access,
+                ChangeModelConnectionGrantCommand(
+                    connection_id,
+                    membership.bob_id,
+                    ModelConnectionAction.USE,
+                    delegated.access_revision,
+                    True,
+                ),
+                IdempotencyContextDTO(
+                    HttpMethod.PUT,
+                    f"/v1/model-connections/{model_id}/grants/{membership.bob_id.value}/{action}",
+                    IdempotencyKey("issuer-model-delegation"),
+                ),
+            )
+        async with open_organization_grant_change(database, fingerprints) as changer:
+            await changer.set_grant(
+                access=seed.access,
+                command=SetOrganizationActionGrantCommand(
+                    seed.organization_id,
+                    membership.bob_id,
+                    ActionId("admit-users"),
+                    False,
+                    await _current_org_revision(database, seed),
+                ),
+                context=IdempotencyContextDTO(
+                    HttpMethod.PUT,
+                    f"/v1/organizations/{seed.organization_id.value}/grants/{membership.bob_id.value}/admit-users",
+                    IdempotencyKey("issuer-admit-users"),
+                ),
+            )
+        issuer = membership.bob_access
+    reviewed = await _review(database, seed, assignments, (project.project_id,))
+    async with database.session() as session:
+        issued = await _administration(session).issue(
+            access=issuer,
+            command=reviewed,
+            context=_context("invite-for-model"),
+        )
+    assert issued.token is not None
+    proof = _unadmitted_invitation_proof(seed)
+    async with database.session() as session:
+        preview = await _preview_service(session).preview(
+            proof=proof,
+            query=PreviewInvitationQuery(token=issued.token),
+        )
+        assert (
+            await session.scalar(
+                select(HumanIdentityLinkRow.principal_id).where(
+                    HumanIdentityLinkRow.subject == proof.identity.subject.value,
+                )
+            )
+            is None
+        )
+        assert (
+            await session.scalar(select(func.count()).select_from(InvitationActivationOperationRow))
+            == 0
+        )
+    assert preview.assignments == assignments
+    assert {
+        scope.target: scope.display_name for scope in preview.scopes if scope.target == target
+    } == {
+        target: "Invited connection",
+    }
+    assert any(
+        scope.target == ProjectGrantTargetDTO(project.project_id) for scope in preview.scopes
+    )
+
+    grant = ModelConnectionActionGrantRow
+    if blocked == "issuer":
+        async with database.session() as session, session.begin():
+            await session.execute(
+                delete(grant).where(
+                    grant.model_connection_id == model_id,
+                    grant.recipient_principal_id == seed.access.actor_principal_id.value,
+                    grant.action == action,
+                )
+            )
+    context = IdempotencyContextDTO(
+        HttpMethod.POST, "/v1/invitations/activate", IdempotencyKey("activate-model")
+    )
+    proof = replace(proof, password_completed=True)
+    command = ActivateInvitationCommand(token=issued.token)
+    if blocked is not None:
+        async with open_invitation_activation(
+            database, InvitationFingerprintService(fingerprints)
+        ) as activation:
+            with pytest.raises(ConflictError):
+                await activation.activate(proof=proof, command=command, context=context)
+        async with database.session() as session:
+            assert (
+                await session.scalar(
+                    select(HumanIdentityLinkRow.principal_id).where(
+                        HumanIdentityLinkRow.subject == proof.identity.subject.value,
+                    )
+                )
+                is None
+            )
+            invite = await session.get(InvitationRow, issued.invitation_id.value)
+            assert invite is not None and invite.consumed_at is None
+            assert (
+                await session.scalar(
+                    select(func.count()).select_from(InvitationActivationOperationRow)
+                )
+                == 0
+            )
+        return
+
+    async with open_invitation_activation(
+        database, InvitationFingerprintService(fingerprints)
+    ) as activation:
+        result = await activation.activate(proof=proof, command=command, context=context)
+    assert result.operation.created
+    assert result.project_access_revisions == (
+        InvitationProjectAccessRevisionDTO(
+            project.project_id, reviewed.expected_project_access_revisions[0].access_revision + 2
+        ),
+    )
+    key = (project.project_id.value, model_id, result.principal_id.value, action)
+    async with database.session() as session:
+        assignment = await session.get(grant, key)
+        assert assignment is not None and assignment.can_grant is False
+        assert assignment.assigned_by_principal_id == issuer.actor_principal_id.value
+
+    departed = await change_membership(
+        database,
+        membership,
+        revision=result.project_access_revisions[0].access_revision,
+        key="issuer-departure",
+        remove=True,
+    )
+    assert departed.changed
+    async with open_model_connection_grant_change(database, fingerprints) as changer:
+        removed = await changer.change(
+            seed.access,
+            ChangeModelConnectionGrantCommand(
+                connection_id,
+                result.principal_id,
+                ModelConnectionAction.USE,
+                departed.access_revision,
+                None,
+            ),
+            IdempotencyContextDTO(
+                HttpMethod.DELETE,
+                f"/v1/model-connections/{model_id}/grants/{result.principal_id.value}/{action}",
+                IdempotencyKey("remove-invited-model-grant"),
+            ),
+        )
+    assert removed.changed
+    async with database.session() as session, session.begin():
+        now = await session.scalar(select(func.clock_timestamp(type_=DateTime(timezone=True))))
+        assert now is not None
+        await session.execute(
+            update(InvitationRow)
+            .where(InvitationRow.id == issued.invitation_id.value)
+            .values(
+                issued_at=now - timedelta(hours=2),
+                expires_at=now - timedelta(hours=1),
+            )
+        )
+        assert await session.scalar(
+            select(InvitationRow.expires_at < func.clock_timestamp()).where(
+                InvitationRow.id == issued.invitation_id.value
+            )
+        )
+    async with open_invitation_activation(
+        database, InvitationFingerprintService(fingerprints)
+    ) as activation:
+        replay = await activation.activate(
+            proof=replace(proof, password_completed=None), command=command, context=context
+        )
+    assert replay == replace(result, operation=replace(result.operation, created=False))
+    async with database.session() as session:
+        assert await session.get(grant, key) is None
+        assert (
+            await session.get(
+                ProjectMembershipRow, (project.project_id.value, membership.bob_id.value)
+            )
+            is None
+        )

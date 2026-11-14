@@ -34,7 +34,10 @@ from inframeld_backend.shared.application.enums.operation_replay_kind import Ope
 from inframeld_backend.shared.application.enums.operation_reservation_state import (
     OperationReservationState,
 )
-from inframeld_backend.shared.infrastructure.migrations.migration_runner import ALEMBIC_CONFIG_PATH
+from inframeld_backend.shared.infrastructure.migrations.migration_runner import (
+    ALEMBIC_CONFIG_PATH,
+    SUPPORTED_SCHEMA_REVISION,
+)
 from inframeld_backend.shared.infrastructure.resources.database import Database
 from inframeld_backend.shared.infrastructure.rows.alembic_version_row import AlembicVersionRow
 from inframeld_backend.shared.infrastructure.rows.durable_job_row import DurableJobRow
@@ -480,7 +483,9 @@ async def test_retained_lifecycle_storage_refuses_destructive_downgrade(
             _configuration(temporary_postgres_settings), "0033_stranded_authority_repair"
         )
     async with database.session() as session:
-        assert await session.scalar(select(AlembicVersionRow.version_num)) == "0034_human_lifecycle"
+        assert (
+            await session.scalar(select(AlembicVersionRow.version_num)) == SUPPORTED_SCHEMA_REVISION
+        )
         if retained in {"obligation", "child"}:
             assert await session.get(HumanSuspensionObligationRow, parent.id) is not None
             if retained == "child":

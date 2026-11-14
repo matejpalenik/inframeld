@@ -102,6 +102,9 @@ from inframeld_backend.access.http.requests.invitation_preview_request import (
 from inframeld_backend.access.http.requests.invitation_revocation_request import (
     InvitationRevocationRequest,
 )
+from inframeld_backend.access.http.requests.model_connection_action_grant_request import (
+    ModelConnectionActionGrantRequest,
+)
 from inframeld_backend.access.http.requests.organization_action_grant_request import (
     OrganizationActionGrantRequest,
 )
@@ -202,6 +205,19 @@ from inframeld_backend.access.http.responses.invitation_preview_response import 
 from inframeld_backend.access.http.responses.invitation_revocation_response import (
     InvitationRevocationResponse,
 )
+from inframeld_backend.access.http.responses.model_connection_action_grant_removal_response import (
+    ModelConnectionActionGrantRemovalResponse,
+)
+from inframeld_backend.access.http.responses.model_connection_action_grant_response import (
+    ModelConnectionActionGrantResponse,
+)
+from inframeld_backend.access.http.responses.model_connection_creation_response import (
+    ModelConnectionCreationResponse,
+)
+from inframeld_backend.access.http.responses.model_connection_response import (
+    ModelConnectionCredentialResponse,
+    ModelConnectionResponse,
+)
 from inframeld_backend.access.http.responses.my_organization_access_response import (
     MyOrganizationAccessResponse,
 )
@@ -260,6 +276,12 @@ from inframeld_backend.access.http.routes.human_oauth_consent_routes import (
     create_human_oauth_consent_router,
 )
 from inframeld_backend.access.http.routes.invitation_routes import create_invitation_router
+from inframeld_backend.access.http.routes.model_connection_grant_routes import (
+    create_model_connection_grant_router,
+)
+from inframeld_backend.access.http.routes.model_connection_routes import (
+    create_model_connection_router,
+)
 from inframeld_backend.access.http.routes.my_project_access_routes import (
     create_my_project_access_router,
 )
@@ -343,6 +365,12 @@ from inframeld_backend.bootstrap.invitation_composition import (
     open_invitation_activation,
     open_invitation_administration,
     open_invitation_preview,
+)
+from inframeld_backend.bootstrap.model_connection_composition import (
+    open_model_connection_creation,
+    open_model_connection_grant_change,
+    open_model_connection_grant_read,
+    open_model_connection_read,
 )
 from inframeld_backend.bootstrap.my_project_access_composition import open_my_project_access
 from inframeld_backend.bootstrap.organization_access_composition import open_my_organization_access
@@ -520,6 +548,7 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
                 OrganizationActionGrantRequest,
                 AccessGroupActionGrantRequest,
                 ApplicationAccountActionGrantRequest,
+                ModelConnectionActionGrantRequest,
             ),
             serialization_models=(
                 InvitationIssueResponse,
@@ -558,6 +587,11 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
                 AccessGroupActionGrantRemovalResponse,
                 ApplicationAccountActionGrantResponse,
                 ApplicationAccountActionGrantRemovalResponse,
+                ModelConnectionActionGrantResponse,
+                ModelConnectionActionGrantRemovalResponse,
+                ModelConnectionCreationResponse,
+                ModelConnectionResponse,
+                ModelConnectionCredentialResponse,
             ),
         )
         application.include_router(health_router)
@@ -677,6 +711,25 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
                     request_fingerprints,
                     resolved_settings.deletion_status_retention.to_profile(),
                 ),
+            )
+        )
+        application.include_router(
+            create_model_connection_grant_router(
+                product_access,
+                partial(open_model_connection_grant_change, database, request_fingerprints),
+                partial(open_model_connection_grant_read, database),
+            )
+        )
+        application.include_router(
+            create_model_connection_router(
+                product_access,
+                partial(
+                    open_model_connection_creation,
+                    database,
+                    request_fingerprints,
+                    resolved_settings.model_connection_destinations,
+                ),
+                partial(open_model_connection_read, database, http_application_key_profile),
             )
         )
         application.include_router(

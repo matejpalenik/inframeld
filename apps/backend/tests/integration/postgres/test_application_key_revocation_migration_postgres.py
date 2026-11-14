@@ -26,7 +26,10 @@ from inframeld_backend.shared.application.dtos.idempotency_context_dto import Id
 from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.value_objects.idempotency_key import IdempotencyKey
 from inframeld_backend.shared.domain.validation.revision_validation import RevisionValidation
-from inframeld_backend.shared.infrastructure.migrations.migration_runner import ALEMBIC_CONFIG_PATH
+from inframeld_backend.shared.infrastructure.migrations.migration_runner import (
+    ALEMBIC_CONFIG_PATH,
+    SUPPORTED_SCHEMA_REVISION,
+)
 from inframeld_backend.shared.infrastructure.resources.database import Database
 from inframeld_backend.shared.infrastructure.rows.alembic_version_row import AlembicVersionRow
 from inframeld_backend.shared.infrastructure.settings.database_settings import DatabaseSettings
@@ -202,7 +205,7 @@ async def test_empty_revocation_history_round_trips_without_changing_existing_is
             ) == before
             assert (
                 await session.scalar(select(AlembicVersionRow.version_num))
-                == "0034_human_lifecycle"
+                == SUPPORTED_SCHEMA_REVISION
             )
 
 
@@ -214,7 +217,9 @@ async def test_retained_revocation_original_prevents_lossy_downgrade(
     with pytest.raises(RuntimeError, match="Retained application-key revocation originals"):
         command.downgrade(_config(temporary_postgres_settings), "0028_application_key_issuance")
     async with database.session() as session:
-        assert await session.scalar(select(AlembicVersionRow.version_num)) == "0034_human_lifecycle"
+        assert (
+            await session.scalar(select(AlembicVersionRow.version_num)) == SUPPORTED_SCHEMA_REVISION
+        )
         original = await session.get(
             ApplicationKeyRevocationResultRow, revoked_original.operation.operation_id.value
         )

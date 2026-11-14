@@ -49,6 +49,10 @@ from inframeld_backend.access.infrastructure.rows.human_identity_link_row import
 from inframeld_backend.access.infrastructure.rows.identity_recovery_admission_row import (
     IdentityRecoveryAdmissionRow,
 )
+from inframeld_backend.access.infrastructure.rows.model_connection_action_grant_row import (
+    ModelConnectionActionGrantRow,
+)
+from inframeld_backend.access.infrastructure.rows.model_connection_row import ModelConnectionRow
 from inframeld_backend.access.infrastructure.rows.organization_action_grant_row import (
     OrganizationActionGrantRow,
 )
@@ -117,6 +121,30 @@ class PostgresOperationLookupFactsReader(OperationLookupFactsReader):
                 )
                 granted = exists().where(*grant_scope)
                 can_grant = exists().where(*grant_scope, GroupActionGrantRow.can_grant.is_(True))
+            elif family is OperationLookupAuthorityFamily.MODEL_CONNECTION_GRANT_READ:
+                connection = UUID(query.requested_route.split("/")[3])
+                target_exists = (
+                    exists()
+                    .where(
+                        ModelConnectionRow.id == connection,
+                        ModelConnectionRow.project_id == ProjectRow.id,
+                        ModelConnectionRow.organization_id == ProjectRow.organization_id,
+                        ModelConnectionRow.retired_at.is_(None),
+                    )
+                    .correlate(ProjectRow)
+                )
+                grant_scope = (
+                    ModelConnectionActionGrantRow.project_id == ProjectRow.id,
+                    ModelConnectionActionGrantRow.model_connection_id == connection,
+                    ModelConnectionActionGrantRow.recipient_principal_id == PrincipalRow.id,
+                    ModelConnectionActionGrantRow.recipient_kind == PrincipalRow.kind,
+                    ModelConnectionActionGrantRow.action
+                    == query.expected_authority.action_id.value,
+                )
+                granted = exists().where(*grant_scope)
+                can_grant = exists().where(
+                    *grant_scope, ModelConnectionActionGrantRow.can_grant.is_(True)
+                )
             elif family is OperationLookupAuthorityFamily.APPLICATION_ACCOUNT_GRANT_READ:
                 application = UUID(query.requested_route.split("/")[5])
                 target_principal = aliased(PrincipalRow)
