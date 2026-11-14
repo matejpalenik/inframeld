@@ -9,10 +9,12 @@ from enum import StrEnum
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import func, select, update
+from sqlalchemy import Integer, String, column, func, select, table, update
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.exc import IntegrityError
 from tests.support.artifact_scenarios import (
     ArtifactScenario,
+    MockArtifactCapacityReader,
     allocate_artifact,
     artifact_scenario,
     completed_product_origin,
@@ -289,17 +291,89 @@ async def test_same_allocation_retry_recovers_original_job_deadline_and_single_a
     database: Database,
 ) -> None:
     scenario = artifact_scenario(await seed_artifact_scope(database))
-    first = await allocate_artifact(database, scenario)
-    second = await allocate_artifact(database, scenario)
-    assert second.cleanup_job_id == first.cleanup_job_id
-    assert second.reservation.expires_at == first.reservation.expires_at
-    async with database.session() as session:
-        assert await session.scalar(select(func.count()).select_from(DurableJobRow)) == 1
-        assert (
-            await session.scalar(select(func.count()).select_from(ArtifactCleanupObligationRow))
-            == 1
-        )
-        assert await session.scalar(select(func.count()).select_from(AccessAuditEventRow)) == 1
+    reader = MockArtifactCapacityReader()
+    original = await allocate_artifact(database, scenario, capacity_reader=reader)
+    assert reader.reads == 1
+    before = await _allocation_state(database, scenario.scope)
+    reader.unavailable = True
+
+    replay = await allocate_artifact(database, scenario, capacity_reader=reader)
+    assert replay.cleanup_job_id == original.cleanup_job_id
+    assert replay.cleanup_binding == original.cleanup_binding
+    assert replay.reservation.observed_at >= original.reservation.observed_at
+    assert (
+        replace(replay.reservation, observed_at=original.reservation.observed_at)
+        == original.reservation
+    )
+    assert reader.reads == 1
+    assert await _allocation_state(database, scenario.scope) == before
+    assert before[0] == (1, 1, 1, 1, 1, 1, 0)
+
+    rejected = artifact_scenario(scenario.scope)
+    with pytest.raises(ArtifactCapacityError, match="Controlled capacity is unavailable"):
+        await allocate_artifact(database, rejected, capacity_reader=reader)
+    assert reader.reads == 2
+    assert await _allocation_state(database, scenario.scope) == before
+    await _assert_allocation_absent(database, rejected)
+
+
+@pytest.mark.asyncio
+async def test_fresh_allocation_measures_capacity_only_after_its_ledger_turn(
+    database: Database,
+) -> None:
+    scope = await seed_artifact_scope(database)
+    scenario = artifact_scenario(scope)
+    reader = MockArtifactCapacityReader()
+    async with database.session() as session, session.begin():
+        session.add(ArtifactStorageCapacityRow(installation_id=scope.installation_id.value))
+    before = await _allocation_state(database, scope)
+
+    pid = column("pid", Integer)
+    name = column("datname", String)
+    activity = table("pg_stat_activity", pid, name)
+
+    async def allocate_with_observation() -> ArtifactAllocationDTO | ArtifactCapacityError:
+        try:
+            return await allocate_artifact(database, scenario, capacity_reader=reader)
+        except ArtifactCapacityError as error:
+            return error
+
+    # The outer deadline also contains the task when a test assertion fails.
+    async with asyncio.timeout(10), asyncio.TaskGroup() as tasks:
+        async with database.session() as holder, holder.begin():
+            locked = await holder.scalar(
+                select(ArtifactStorageCapacityRow)
+                .where(ArtifactStorageCapacityRow.installation_id == scope.installation_id.value)
+                .with_for_update()
+            )
+            assert locked is not None
+            holder_pid = await holder.scalar(select(func.pg_backend_pid(type_=Integer)))
+            assert holder_pid is not None
+            allocation = tasks.create_task(allocate_with_observation())
+            async with database.session() as observer, asyncio.timeout(3):
+                while not allocation.done():
+                    blocked = await observer.scalar(
+                        select(pid)
+                        .select_from(activity)
+                        .where(
+                            name == func.current_database(type_=String()),
+                            func.pg_blocking_pids(pid, type_=ARRAY(Integer)).contains([holder_pid]),
+                        )
+                    )
+                    if blocked is not None:
+                        break
+                    await asyncio.sleep(0.01)
+                else:
+                    pytest.fail("Allocation did not wait for the held capacity ledger.")
+            assert reader.reads == 0, "Capacity was read before acquiring the ledger."
+            reader.observation = ArtifactCapacityDTO(100 * 1024**3, 20 * 1024**3)
+        result = await allocation
+        assert isinstance(result, ArtifactCapacityError)
+        assert "no safe artifact capacity" in str(result)
+
+    assert reader.reads == 1
+    assert await _allocation_state(database, scope) == before
+    await _assert_allocation_absent(database, scenario)
 
 
 @pytest.mark.asyncio

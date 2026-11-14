@@ -7,7 +7,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from inframeld_backend.access.domain.enums.project_status import ProjectStatus
 from inframeld_backend.access.infrastructure.rows.project_row import ProjectRow
-from inframeld_backend.shared.application.dtos.artifact_capacity_dto import ArtifactCapacityDTO
 from inframeld_backend.shared.application.dtos.artifact_scope_dto import ArtifactScopeDTO
 from inframeld_backend.shared.application.dtos.artifact_staging_reservation_dto import (
     ArtifactStagingReservationDTO,
@@ -18,6 +17,9 @@ from inframeld_backend.shared.application.errors.artifact_errors import (
 )
 from inframeld_backend.shared.application.protocols.artifact_attempt_repository import (
     ArtifactAttemptRepository,
+)
+from inframeld_backend.shared.application.protocols.artifact_capacity_reader import (
+    ArtifactCapacityReader,
 )
 from inframeld_backend.shared.application.value_objects.artifact_attempt_id import ArtifactAttemptId
 from inframeld_backend.shared.application.value_objects.artifact_id import ArtifactId
@@ -56,7 +58,7 @@ class PostgresArtifactAttemptRepository(ArtifactAttemptRepository):
         reservation_id: ArtifactStagingReservationId,
         limit_bytes: int,
         transfer_seconds: float,
-        capacity: ArtifactCapacityDTO,
+        capacity_reader: ArtifactCapacityReader,
     ) -> ArtifactStagingReservationDTO:
         if not self._session.in_transaction():
             raise RuntimeError("Artifact allocation requires its caller transaction.")
@@ -113,6 +115,13 @@ class PostgresArtifactAttemptRepository(ArtifactAttemptRepository):
             return PostgresArtifactAttemptMapper.reservation(attempt, existing, now)
         if project.status is not ProjectStatus.ACTIVE:
             raise ArtifactReservationError("New private bytes require an active Project.")
+        ledger = await self._session.scalar(
+            select(ArtifactStorageCapacityRow)
+            .where(ArtifactStorageCapacityRow.installation_id == scope.installation_id.value)
+            .with_for_update()
+        )
+        # The queue lock also serializes a first allocation without a ledger row.
+        capacity = await capacity_reader.read()
         if (
             any(
                 type(value) is not int or value < 0
@@ -127,11 +136,6 @@ class PostgresArtifactAttemptRepository(ArtifactAttemptRepository):
         ):
             raise ArtifactCapacityError("Physical capacity cannot be confirmed.")
 
-        ledger = await self._session.scalar(
-            select(ArtifactStorageCapacityRow)
-            .where(ArtifactStorageCapacityRow.installation_id == scope.installation_id.value)
-            .with_for_update()
-        )
         if ledger is None:
             ledger = ArtifactStorageCapacityRow(installation_id=scope.installation_id.value)
             self._session.add(ledger)
