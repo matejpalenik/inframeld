@@ -25,8 +25,14 @@ from inframeld_backend.access.cli.mappers.maintenance_input_mapper import Mainte
 from inframeld_backend.access.cli.mappers.recovery_maintenance_mapper import (
     RecoveryMaintenanceMapper,
 )
+from inframeld_backend.access.cli.mappers.restored_job_quarantine_mapper import (
+    RestoredJobQuarantineMapper,
+)
 from inframeld_backend.access.cli.mappers.stranded_authority_maintenance_mapper import (
     StrandedAuthorityMaintenanceMapper,
+)
+from inframeld_backend.shared.application.commands.restored_job_quarantine_command import (
+    RestoredJobQuarantineCommand,
 )
 
 
@@ -39,11 +45,14 @@ class MaintenanceCli:
         | RepairStrandedAuthorityCommand
         | BootstrapFirstAdministratorCommand
         | HumanSuspensionCleanupMaintenanceCommand
+        | RestoredJobQuarantineCommand
     ):
         operation_id = None
         try:
             payload = source.read(65_537)
             values = MaintenanceInputMapper.read(payload)
+            if values.get("mode") == "quarantine-restored-job":
+                return RestoredJobQuarantineMapper.read(values)
             operation_id = MaintenanceInputMapper.correlation(values)
             if values.get("mode") == "resume-recovery-cleanup":
                 return RecoveryMaintenanceMapper.read(payload)
