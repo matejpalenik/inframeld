@@ -378,7 +378,6 @@ test(
       phase = "verification-code-submit"
       await page.locator('button[name="method"][value="code"]').click()
       phase = "verification-submit-ready"
-      await page.waitForLoadState("networkidle")
       await page
         .getByRole("status")
         .getByText("You successfully verified your email address.", {

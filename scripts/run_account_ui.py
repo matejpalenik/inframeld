@@ -244,10 +244,19 @@ class AccountUIRunner:
     def _environment(self) -> dict[str, str]:
         """Give the isolated Compose project its own image and proof-context bindings."""
         assert self.directory is not None
+        proof_mode = self.recipient_proof or self.bootstrap_proof
+        web_image = f"localhost/{self.project}-web:check"
         return {
             **os.environ,
             "INFRAMELD_ACCOUNT_BACKEND_IMAGE": f"localhost/{self.project}-backend:check",
-            "INFRAMELD_ACCOUNT_WEB_IMAGE": f"localhost/{self.project}-web:check",
+            "INFRAMELD_ACCOUNT_WEB_IMAGE": web_image,
+            "INFRAMELD_ACCOUNT_WEB_FIXTURE_IMAGE": web_image
+            if proof_mode
+            else f"localhost/{self.project}-web-fixture:check",
+            "INFRAMELD_ACCOUNT_WEB_DOCKERFILE": "apps/web/tests/fixtures/Dockerfile"
+            if proof_mode
+            else "apps/web/Dockerfile",
+            "INFRAMELD_ACCOUNT_FIXTURE_BUILD_WEB": "1" if proof_mode else "0",
             "INFRAMELD_ACCOUNT_WEB_CONTEXT": str(self.directory / "web-context"),
             "INFRAMELD_ACCOUNT_PROOF_IMAGE": f"localhost/{self.project}-proof:check",
             "INFRAMELD_ACCOUNT_PROOF_CONTEXT": str(self.directory / "proof-context"),
@@ -381,19 +390,7 @@ account_compose=("$account_runtime" compose -p "$account_project" -f "$account_c
             ("compose-version", [self.runtime, "compose", "version"], 30),
             (
                 "build",
-                self._shell("build_stack")
-                if self.recipient_proof or self.bootstrap_proof
-                else [
-                    self.runtime,
-                    "compose",
-                    "-p",
-                    self.project,
-                    "-f",
-                    str(self.root / "compose.account-ui.test.yaml"),
-                    "build",
-                    "backend",
-                    "web",
-                ],
+                self._shell("build_stack"),
                 600,
             ),
             ("startup", self._shell("startup_stack"), 180),
@@ -426,6 +423,9 @@ account_compose=("$account_runtime" compose -p "$account_project" -f "$account_c
             "compose_file": str(self.root / "compose.account-ui.test.yaml"),
             "backend_image": environment["INFRAMELD_ACCOUNT_BACKEND_IMAGE"],
             "web_image": environment["INFRAMELD_ACCOUNT_WEB_IMAGE"],
+            "web_fixture_image": environment["INFRAMELD_ACCOUNT_WEB_FIXTURE_IMAGE"],
+            "web_dockerfile": environment["INFRAMELD_ACCOUNT_WEB_DOCKERFILE"],
+            "web_fixture_build_web": environment["INFRAMELD_ACCOUNT_FIXTURE_BUILD_WEB"],
             "web_context": environment["INFRAMELD_ACCOUNT_WEB_CONTEXT"],
             "volume_baseline_complete": str(self.volume_baseline_complete).lower(),
             "cleanup": cleanup_state,
