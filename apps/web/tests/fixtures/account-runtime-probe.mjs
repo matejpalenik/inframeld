@@ -129,10 +129,14 @@ if (naturalDescendant) {
     (args[0] === "container" && args[1] === "inspect")) &&
   args.at(-1) === "c".repeat(64)
 ) {
-  const project = process.env.INFRAMELD_ACCOUNT_WEB_IMAGE?.replace(
-    /^localhost\//,
-    ""
-  ).replace(/-web:check$/, "")
+  if (
+    process.env.INFRAMELD_ACCOUNT_WEB_IMAGE !==
+    "localhost/private-web-web:check"
+  ) {
+    console.error("Controlled image binding rejected")
+    process.exit(59)
+  }
+  const project = "private-web"
   console.log(
     JSON.stringify({
       Id: "c".repeat(64),

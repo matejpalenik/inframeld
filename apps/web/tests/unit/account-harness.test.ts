@@ -416,24 +416,37 @@ test(
       assert.equal(await exists(join(directory, "fuse-fired")), false)
       await rm(directory, { recursive: true })
     })
-    for (const [image, project] of [
-      ["localhost/inframeld-account-ui-private-sentinel-web:check", undefined],
-      [undefined, undefined],
+    for (const [profile, image, project] of [
       [
+        "proof",
+        "localhost/inframeld-account-ui-private-sentinel-web:check",
+        undefined,
+      ],
+      ["proof", undefined, undefined],
+      [
+        "proof",
         "localhost/inframeld-account-ui-probe-web:check",
         "inframeld-account-ui-probe",
       ],
       [
+        "proof",
         "localhost/inframeld-account-ui--660m7cn-web:check",
         "inframeld-account-ui--660m7cn",
       ],
+      ["login", "localhost/private-sentinel-web:check", undefined],
+      ["login", undefined, undefined],
+      ["login", "localhost/private-web-web:check", "private-web"],
     ] as const) {
-      child = spawn(process.execPath, [fixture, "inspect", "a".repeat(64)], {
+      const proof = profile === "proof"
+      const args = proof
+        ? ["inspect", "a".repeat(64)]
+        : ["container", "inspect", "c".repeat(64)]
+      child = spawn(process.execPath, [fixture, ...args], {
         stdio: ["ignore", "pipe", "pipe"],
         env: {
           ...process.env,
           ACCOUNT_PROBE_DIRECTORY: directory,
-          ACCOUNT_PROBE_PROOF: "success",
+          ACCOUNT_PROBE_PROOF: proof ? "success" : "",
           INFRAMELD_ACCOUNT_WEB_IMAGE: image,
         },
       })
@@ -448,7 +461,7 @@ test(
       const status = await completion(child, 5_000)
       if (project === undefined) {
         assert.equal(
-          output.includes("private-sentinel"),
+          (output + errors).includes("private-sentinel"),
           false,
           "Controlled inspection reflected an unrecognized image binding"
         )
