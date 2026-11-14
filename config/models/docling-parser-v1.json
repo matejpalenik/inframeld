@@ -1,0 +1,104 @@
+{
+  "assets": [
+    {
+      "model": "docling-project/docling-layout-heron",
+      "revision": "8f39ad3c0b4c58e9c2d2c84a38465abf757272d8",
+      "directory": "docling-project--docling-layout-heron",
+      "license": "Apache-2.0",
+      "files": [
+        {
+          "path": "MODEL-ATTRIBUTION.txt",
+          "bytes": 259,
+          "sha256": "ab8b839c67f8b82bde4203b7f2f32630156bf5bdb3ccf1a1695f059d7badd6d1"
+        },
+        {
+          "path": "README.md",
+          "bytes": 3219,
+          "sha256": "175700839bc7808eac6af1d0c23e4f483606ab2276fe01122f4093e61a1a65b6"
+        },
+        {
+          "path": "config.json",
+          "bytes": 3268,
+          "sha256": "fdea30805ce2f5666b147fca941dcdd27ad468e27d6ed21902207d3da056a97d"
+        },
+        {
+          "path": "model.safetensors",
+          "bytes": 171658996,
+          "sha256": "00333a43451945aaf89db8ca9c0a17e75d1537c17db60fdb91aa95f4c7929e0c"
+        },
+        {
+          "path": "preprocessor_config.json",
+          "bytes": 444,
+          "sha256": "cd38cd59999e7a95d68e487fbe5132df3d4e5c32a0836add57e6126ba0c4eaf1"
+        }
+      ]
+    },
+    {
+      "model": "docling-project/docling-models",
+      "revision": "fc0f2d45e2218ea24bce5045f58a389aed16dc23",
+      "directory": "docling-project--docling-models",
+      "license": "CDLA-Permissive-2.0",
+      "files": [
+        {
+          "path": "MODEL-ATTRIBUTION.txt",
+          "bytes": 285,
+          "sha256": "f2e3da1c1b37b4be6a068765c5c745b0b2e7f467204fc253c11d912fa8c484f4"
+        },
+        {
+          "path": "README.md",
+          "bytes": 3413,
+          "sha256": "d17f233378eff1240b623b36da76ee8b40afcca05d505949713bf03f7e00822a"
+        },
+        {
+          "path": "model_artifacts/tableformer/accurate/tableformer_accurate.safetensors",
+          "bytes": 212758388,
+          "sha256": "2a7d6c924b3cd12fb99a09280ca9c33a89c5d60b93253617d2e088c1a40374d9"
+        },
+        {
+          "path": "model_artifacts/tableformer/accurate/tm_config.json",
+          "bytes": 7060,
+          "sha256": "984e122ceb8ccf84d84c9d2882f6f2302a44b4f1e577babd6289892c36f3cffd"
+        }
+      ]
+    },
+    {
+      "model": "sentence-transformers/all-MiniLM-L6-v2",
+      "revision": "1110a243fdf4706b3f48f1d95db1a4f5529b4d41",
+      "directory": "sentence-transformers--all-MiniLM-L6-v2",
+      "license": "Apache-2.0",
+      "files": [
+        {
+          "path": "MODEL-ATTRIBUTION.txt",
+          "bytes": 260,
+          "sha256": "a16f3a48799539d7c6e50bfa706dc7291d1d44b213668ae1fa3b962e2106c6e8"
+        },
+        {
+          "path": "README.md",
+          "bytes": 10502,
+          "sha256": "dcd602d2fd35c203a247304a06fec6654a12f7941b739f9221a064fe8dc3b7f0"
+        },
+        {
+          "path": "tokenizer.json",
+          "bytes": 466247,
+          "sha256": "be50c3628f2bf5bb5e3a7f17b1f74611b2561a3a27eeab05e5aa30f411572037"
+        }
+      ]
+    }
+  ],
+  "licenseFiles": [
+    {
+      "license": "Apache-2.0",
+      "source": "https://www.apache.org/licenses/LICENSE-2.0.txt",
+      "path": "LICENSE-APACHE-2.0",
+      "bytes": 11358,
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    {
+      "license": "CDLA-Permissive-2.0",
+      "source": "https://raw.githubusercontent.com/Community-Data-License-Agreements/Releases/693e4b2e0d3469e40ff84dfd11f08d39ac57ddbc/CDLA-Permissive-2.0.txt",
+      "path": "LICENSE-CDLA-PERMISSIVE-2.0",
+      "bytes": 2354,
+      "sha256": "4531a67d443284d93ffed0803df5b10634aff21c3d77e381f2d48af01d875868"
+    }
+  ]
+}
