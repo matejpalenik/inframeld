@@ -21,6 +21,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional
 from typing_extensions import Annotated
 from uuid import UUID
+from collections.abc import Iterator
 from typing import Optional, Set
 from typing_extensions import Self
 from pydantic_core import to_jsonable_python
@@ -62,7 +63,12 @@ class ProjectMetadataResponse(BaseModel):
             raise ValueError("projectId cannot be null")
         return value
 
+    _protected_fields: ClassVar[frozenset[str]] = frozenset((
+
+    ))
+
     model_config = ConfigDict(
+        hide_input_in_errors=bool(_protected_fields),
         validate_by_name=True,
         validate_by_alias=True,
         validate_assignment=True,
@@ -70,9 +76,16 @@ class ProjectMetadataResponse(BaseModel):
     )
 
 
+    def __repr_args__(self) -> Iterator[tuple[str | None, object]]:
+        return (
+            (name, value)
+            for name, value in super().__repr_args__()
+            if name not in self._protected_fields
+        )
+
     def to_str(self) -> str:
         """Returns the string representation of the model using alias"""
-        return pprint.pformat(self.model_dump(by_alias=True))
+        return pprint.pformat(self.model_dump(by_alias=True, exclude=set(self._protected_fields)))
 
     def to_json(self) -> str:
         """Returns the JSON representation of the model using alias"""

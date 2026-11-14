@@ -924,11 +924,47 @@ export const zModelConnectionActionGrantResponse = z.object({
 export const zModelConnectionAuthentication = z.enum(['api-key', 'none']);
 
 /**
+ * ModelConnectionCredentialDetailsResponse
+ *
+ * Safe details of the exact credential slot at the observed revision.
+ */
+export const zModelConnectionCredentialDetailsResponse = z.object({
+    changedAt: z.iso.datetime().nullable(),
+    credentialId: z.uuid().nullable(),
+    modelConnectionId: z.uuid(),
+    present: z.boolean(),
+    projectId: z.uuid(),
+    revision: z.int().gte(0).lte(9007199254740991)
+});
+
+/**
+ * ModelConnectionCredentialRequest
+ *
+ * Submit one provider key over the protected credential-management route.
+ */
+export const zModelConnectionCredentialRequest = z.object({
+    expectedCredentialRevision: z.int().gte(0).lte(9007199254740991)
+});
+
+/**
  * ModelConnectionCredentialResponse
  */
 export const zModelConnectionCredentialResponse = z.object({
     present: z.boolean(),
     revision: z.int().gte(0).lte(9007199254740991)
+});
+
+/**
+ * ModelConnectionCredentialResultResponse
+ *
+ * Original safe receipt and whether this response recovered a completed request.
+ */
+export const zModelConnectionCredentialResultResponse = z.object({
+    changed: z.boolean(),
+    credential: zModelConnectionCredentialDetailsResponse,
+    idempotencyExpiresAt: z.iso.datetime(),
+    operationId: z.string(),
+    replayed: z.boolean()
 });
 
 /**
@@ -1818,6 +1854,16 @@ export const zHumanOAuthConsentRequestWritable = z.object({
     consentChallenge: z.string().min(1),
     decision: zOAuthConsentDecision,
     remember: z.boolean().optional().default(false)
+});
+
+/**
+ * ModelConnectionCredentialRequest
+ *
+ * Submit one provider key over the protected credential-management route.
+ */
+export const zModelConnectionCredentialRequestWritable = z.object({
+    expectedCredentialRevision: z.int().gte(0).lte(9007199254740991),
+    value: z.string().min(1).max(16384)
 });
 
 /**
@@ -5249,6 +5295,175 @@ export const zGetModelConnection503Representation0Response = zProblemDetails;
  * Successful Response
  */
 export const zGetModelConnectionResponse = zModelConnectionResponse;
+
+export const zRemoveModelConnectionCredentialHeaders = z.object({
+    'Idempotency-Key': z.string().min(1).max(128).regex(/.*\S.*/)
+});
+
+export const zRemoveModelConnectionCredentialPath = z.object({
+    project_id: z.uuid(),
+    model_connection_id: z.uuid()
+});
+
+export const zRemoveModelConnectionCredentialQuery = z.object({
+    expectedCredentialRevision: z.int().gte(0).lte(9007199254740991)
+});
+
+/**
+ * Successful Response
+ */
+export const zRemoveModelConnectionCredential200Representation0Response = zModelConnectionCredentialResultResponse;
+
+/**
+ * Invalid authentication request
+ */
+export const zRemoveModelConnectionCredential400Representation0Response = zProblemDetails;
+
+/**
+ * Unauthorized
+ */
+export const zRemoveModelConnectionCredential401Representation0Response = zProblemDetails;
+
+/**
+ * Access denied
+ */
+export const zRemoveModelConnectionCredential403Representation0Response = zProblemDetails;
+
+/**
+ * Resource not found
+ */
+export const zRemoveModelConnectionCredential404Representation0Response = zProblemDetails;
+
+/**
+ * Operation conflicts with current state
+ */
+export const zRemoveModelConnectionCredential409Representation0Response = zProblemDetails;
+
+/**
+ * Request validation failed
+ */
+export const zRemoveModelConnectionCredential422Representation0Response = zProblemDetails;
+
+/**
+ * Dependency unavailable
+ */
+export const zRemoveModelConnectionCredential503Representation0Response = zProblemDetails;
+
+/**
+ * Successful Response
+ */
+export const zRemoveModelConnectionCredentialResponse = zModelConnectionCredentialResultResponse;
+
+export const zGetModelConnectionCredentialPath = z.object({
+    project_id: z.uuid(),
+    model_connection_id: z.uuid()
+});
+
+/**
+ * Successful Response
+ */
+export const zGetModelConnectionCredential200Representation0Response = zModelConnectionCredentialDetailsResponse;
+
+/**
+ * Invalid authentication request
+ */
+export const zGetModelConnectionCredential400Representation0Response = zProblemDetails;
+
+/**
+ * Unauthorized
+ */
+export const zGetModelConnectionCredential401Representation0Response = zProblemDetails;
+
+/**
+ * Access denied
+ */
+export const zGetModelConnectionCredential403Representation0Response = zProblemDetails;
+
+/**
+ * Resource not found
+ */
+export const zGetModelConnectionCredential404Representation0Response = zProblemDetails;
+
+/**
+ * Request validation failed
+ */
+export const zGetModelConnectionCredential422Representation0Response = zProblemDetails;
+
+/**
+ * Dependency unavailable
+ */
+export const zGetModelConnectionCredential503Representation0Response = zProblemDetails;
+
+/**
+ * Successful Response
+ */
+export const zGetModelConnectionCredentialResponse = zModelConnectionCredentialDetailsResponse;
+
+export const zPutModelConnectionCredentialBody = zModelConnectionCredentialRequestWritable;
+
+export const zPutModelConnectionCredentialHeaders = z.object({
+    'Idempotency-Key': z.string().min(1).max(128).regex(/.*\S.*/)
+});
+
+export const zPutModelConnectionCredentialPath = z.object({
+    project_id: z.uuid(),
+    model_connection_id: z.uuid()
+});
+
+/**
+ * Successful Response
+ */
+export const zPutModelConnectionCredential200Representation0Response = zModelConnectionCredentialResultResponse;
+
+/**
+ * Invalid authentication request
+ */
+export const zPutModelConnectionCredential400Representation0Response = zProblemDetails;
+
+/**
+ * Unauthorized
+ */
+export const zPutModelConnectionCredential401Representation0Response = zProblemDetails;
+
+/**
+ * Access denied
+ */
+export const zPutModelConnectionCredential403Representation0Response = zProblemDetails;
+
+/**
+ * Resource not found
+ */
+export const zPutModelConnectionCredential404Representation0Response = zProblemDetails;
+
+/**
+ * Operation conflicts with current state
+ */
+export const zPutModelConnectionCredential409Representation0Response = zProblemDetails;
+
+/**
+ * Content Too Large
+ */
+export const zPutModelConnectionCredential413Representation0Response = zProblemDetails;
+
+/**
+ * Unsupported Media Type
+ */
+export const zPutModelConnectionCredential415Representation0Response = zProblemDetails;
+
+/**
+ * Request validation failed
+ */
+export const zPutModelConnectionCredential422Representation0Response = zProblemDetails;
+
+/**
+ * Dependency unavailable
+ */
+export const zPutModelConnectionCredential503Representation0Response = zProblemDetails;
+
+/**
+ * Successful Response
+ */
+export const zPutModelConnectionCredentialResponse = zModelConnectionCredentialResultResponse;
 
 export const zListModelConnectionUsagePath = z.object({
     project_id: z.uuid(),

@@ -4,7 +4,7 @@
 
 Alice saves a model provider key so the backend can call that provider later. Unlike an incoming application key, its original value must be recoverable. Encryption, resource binding and current permission each protect a different boundary.
 
-> **Status:** accepted behavior is stated separately from proposed representations and qualification work. Existing Python types, generated OpenAPI and migrations own implemented shapes. Pending decisions are not accepted by this reference.
+> **Status:** the API implements protected credential management with PostgreSQL persistence. ModelGateway dispatch and coherent restore remain separate qualification work.
 
 ## Approved management and qualification contract
 
@@ -119,28 +119,28 @@ Ordinary query integrations cannot manage provider credentials. Access's default
 
 ### Expose a narrow, metadata-only management API
 
-The recommended resource path is:
+Use the Project-owned credential resource path:
 
 ```text
 /v1/projects/{projectId}/model-connections/{connectionId}/credential
 ```
 
-These routes are recommended implementation details, not existing endpoints. Their required behavior is defined below.
+All three methods require the current eligible human `manage-model-connection` action on the exact connection. Delegation is unnecessary. Ordinary configuration View exposes only current presence and revision.
 
 | Operation | Required behavior |
 | --- | --- |
-| **`PUT`** | Create or replace a bounded opaque provider value. Require credential-management authority, an `Idempotency-Key`, and the expected credential revision. Revision **0** means no credential exists. Return only credential/connection identity, revision, presence, and timestamps. |
+| **`PUT`** | Create or replace a bounded opaque provider value. Require credential-management authority, an `Idempotency-Key`, and the expected credential revision. Revision **0** identifies a never-written slot. Return only credential/connection identity, revision, presence, and timestamps. |
 | **`GET`** | Return authorized safe metadata and the current revision. There is no reveal flag, encrypted-value download, or plaintext field. |
-| **`DELETE`** | Require the same management authority, idempotency key, and expected revision. Mark the credential unavailable and remove its ciphertext in one transaction. Retain the non-secret identity needed to explain existing references. |
+| **`DELETE`** | Require the same management authority, idempotency key, and expected revision. Mark the credential unavailable, advance the revision and remove its ciphertext in one transaction. Retain the slot identity and new revision. A fresh request for an already empty slot records an unchanged outcome. |
 | **Connection validation command** | Run bounded, explicitly requested role probes through `ModelGateway` using current access settings and the saved credential. Record sanitized results against the actual access revision, credential revision, and tested role/model. Never echo provider headers or raw error bodies. |
 
-The idempotency key identifies a retry, while the expected credential revision detects someone else's intervening change. [Saving changes and retry outcomes](#coordination) explains how they work together.
+The idempotency key identifies a retry. The expected credential revision detects someone else's intervening change. After a lost response, resubmit the same method, exact path, original key and reviewed revision. For a PUT, supply the same protected value. The original receipt reports whether that operation changed the slot and whether this response recovered the retained result. Current authority is rechecked before recovery. [Saving changes and retry outcomes](#coordination) explains how the checks work together.
 
 <a id="accept-a-credential-value-not-arbitrary-outbound-configuration"></a>
 
 ### Accept a credential value, not arbitrary outbound configuration
 
-Accept a small, opaque API-key or token value. **16 KiB of UTF-8 text** is a proposed byte limit, not yet finalized. UTF-8 defines how text is encoded into bytes.
+Submit the raw bearer value in the PUT JSON `value` field. The API accepts **1–16,384 ASCII bytes** using letters, digits, period, underscore, tilde, plus, slash or hyphen, with optional trailing equals padding. The JSON request itself has a **100 KiB** limit before decoding, including space for escaped values. The API preserves the accepted value exactly.
 
 The provider adapter chooses its known authentication header. This field cannot configure arbitrary headers or proxies. All [destination and SSRF checks](../../inframeld-application-contracts/references/model-dispatch-and-destinations.md#destinations) still apply.
 
@@ -234,7 +234,7 @@ One-time setup may create the file exclusively, with restricted permissions and 
 
 **Never generate a replacement key on every container start or when a configured key file is missing.** Container recreation must not change the key needed to decrypt existing rows.
 
-Mount the file read-only into only the API and worker. Neither the parser nor Studio's web container gets it or direct credential-store access.
+Supply the key as a private regular file, readable exclusively by the owning user. Configure the lowercase SHA-256 recorded at trusted provisioning independently of the mounted bytes. A valid-shaped file with a different identity fails even before the first write. The [local setup guide](../../../../docs/development/getting-started/local-setup.md#provider-credential-encryption-key) shows the API setup. The worker will receive a separate read-only mount when it owns actual call-time resolution.
 
 <a id="keep-the-encryption-key-and-request-fingerprint-key-distinct"></a>
 

@@ -71,6 +71,9 @@ from inframeld_sdk.models.model_connection_action_grant_request import ModelConn
 from inframeld_sdk.models.model_connection_action_grant_response import ModelConnectionActionGrantResponse
 from inframeld_sdk.models.model_connection_creation_request import ModelConnectionCreationRequest
 from inframeld_sdk.models.model_connection_creation_response import ModelConnectionCreationResponse
+from inframeld_sdk.models.model_connection_credential_details_response import ModelConnectionCredentialDetailsResponse
+from inframeld_sdk.models.model_connection_credential_request import ModelConnectionCredentialRequest
+from inframeld_sdk.models.model_connection_credential_result_response import ModelConnectionCredentialResultResponse
 from inframeld_sdk.models.model_connection_response import ModelConnectionResponse
 from inframeld_sdk.models.my_organization_access_response import MyOrganizationAccessResponse
 from inframeld_sdk.models.my_project_access_response import MyProjectAccessResponse
@@ -125,7 +128,7 @@ class AccessApi:
         self.api_client = api_client
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def activate_invitation(
         self,
         idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
@@ -244,7 +247,7 @@ class AccessApi:
         ).data
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def activate_invitation_with_http_info(
         self,
         idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
@@ -363,7 +366,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def activate_invitation_without_preload_content(
         self,
         idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
@@ -478,7 +481,7 @@ class AccessApi:
         return response_data.response
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def activate_invitation_sync(
         self,
         idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
@@ -514,7 +517,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def activate_invitation_sync_with_http_info(
         self,
         idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
@@ -550,7 +553,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def activate_invitation_sync_without_preload_content(
         self,
         idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
@@ -667,7 +670,7 @@ class AccessApi:
 
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def add_access_group_member(
         self,
         project_id: UUID,
@@ -803,7 +806,7 @@ class AccessApi:
         ).data
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def add_access_group_member_with_http_info(
         self,
         project_id: UUID,
@@ -939,7 +942,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def add_access_group_member_without_preload_content(
         self,
         project_id: UUID,
@@ -1071,7 +1074,7 @@ class AccessApi:
         return response_data.response
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def add_access_group_member_sync(
         self,
         project_id: UUID,
@@ -1113,7 +1116,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def add_access_group_member_sync_with_http_info(
         self,
         project_id: UUID,
@@ -1155,7 +1158,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def add_access_group_member_sync_without_preload_content(
         self,
         project_id: UUID,
@@ -1288,7 +1291,7 @@ class AccessApi:
 
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def add_project_member(
         self,
         project_id: UUID,
@@ -1420,7 +1423,7 @@ class AccessApi:
         ).data
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def add_project_member_with_http_info(
         self,
         project_id: UUID,
@@ -1552,7 +1555,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def add_project_member_without_preload_content(
         self,
         project_id: UUID,
@@ -1680,7 +1683,7 @@ class AccessApi:
         return response_data.response
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def add_project_member_sync(
         self,
         project_id: UUID,
@@ -1720,7 +1723,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def add_project_member_sync_with_http_info(
         self,
         project_id: UUID,
@@ -1760,7 +1763,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def add_project_member_sync_without_preload_content(
         self,
         project_id: UUID,
@@ -1888,7 +1891,7 @@ class AccessApi:
 
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def admit_human(
         self,
         organization_id: UUID,
@@ -2016,7 +2019,7 @@ class AccessApi:
         ).data
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def admit_human_with_http_info(
         self,
         organization_id: UUID,
@@ -2144,7 +2147,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def admit_human_without_preload_content(
         self,
         organization_id: UUID,
@@ -2268,7 +2271,7 @@ class AccessApi:
         return response_data.response
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def admit_human_sync(
         self,
         organization_id: UUID,
@@ -2306,7 +2309,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def admit_human_sync_with_http_info(
         self,
         organization_id: UUID,
@@ -2344,7 +2347,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def admit_human_sync_without_preload_content(
         self,
         organization_id: UUID,
@@ -2467,7 +2470,7 @@ class AccessApi:
 
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def appoint_access_group_manager(
         self,
         project_id: UUID,
@@ -2603,7 +2606,7 @@ class AccessApi:
         ).data
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def appoint_access_group_manager_with_http_info(
         self,
         project_id: UUID,
@@ -2739,7 +2742,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def appoint_access_group_manager_without_preload_content(
         self,
         project_id: UUID,
@@ -2871,7 +2874,7 @@ class AccessApi:
         return response_data.response
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def appoint_access_group_manager_sync(
         self,
         project_id: UUID,
@@ -2913,7 +2916,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def appoint_access_group_manager_sync_with_http_info(
         self,
         project_id: UUID,
@@ -2955,7 +2958,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def appoint_access_group_manager_sync_without_preload_content(
         self,
         project_id: UUID,
@@ -3088,7 +3091,7 @@ class AccessApi:
 
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def create_access_group(
         self,
         project_id: UUID,
@@ -3211,7 +3214,7 @@ class AccessApi:
         ).data
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def create_access_group_with_http_info(
         self,
         project_id: UUID,
@@ -3334,7 +3337,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def create_access_group_without_preload_content(
         self,
         project_id: UUID,
@@ -3453,7 +3456,7 @@ class AccessApi:
         return response_data.response
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def create_access_group_sync(
         self,
         project_id: UUID,
@@ -3491,7 +3494,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def create_access_group_sync_with_http_info(
         self,
         project_id: UUID,
@@ -3529,7 +3532,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def create_access_group_sync_without_preload_content(
         self,
         project_id: UUID,
@@ -3652,7 +3655,7 @@ class AccessApi:
 
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def create_application_account(
         self,
         project_id: UUID,
@@ -3775,7 +3778,7 @@ class AccessApi:
         ).data
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def create_application_account_with_http_info(
         self,
         project_id: UUID,
@@ -3898,7 +3901,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def create_application_account_without_preload_content(
         self,
         project_id: UUID,
@@ -4017,7 +4020,7 @@ class AccessApi:
         return response_data.response
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def create_application_account_sync(
         self,
         project_id: UUID,
@@ -4055,7 +4058,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def create_application_account_sync_with_http_info(
         self,
         project_id: UUID,
@@ -4093,7 +4096,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def create_application_account_sync_without_preload_content(
         self,
         project_id: UUID,
@@ -4216,7 +4219,7 @@ class AccessApi:
 
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def create_model_connection(
         self,
         project_id: UUID,
@@ -4339,7 +4342,7 @@ class AccessApi:
         ).data
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def create_model_connection_with_http_info(
         self,
         project_id: UUID,
@@ -4462,7 +4465,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def create_model_connection_without_preload_content(
         self,
         project_id: UUID,
@@ -4581,7 +4584,7 @@ class AccessApi:
         return response_data.response
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def create_model_connection_sync(
         self,
         project_id: UUID,
@@ -4619,7 +4622,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def create_model_connection_sync_with_http_info(
         self,
         project_id: UUID,
@@ -4657,7 +4660,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def create_model_connection_sync_without_preload_content(
         self,
         project_id: UUID,
@@ -4780,7 +4783,7 @@ class AccessApi:
 
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def create_project(
         self,
         idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
@@ -4899,7 +4902,7 @@ class AccessApi:
         ).data
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def create_project_with_http_info(
         self,
         idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
@@ -5018,7 +5021,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def create_project_without_preload_content(
         self,
         idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
@@ -5133,7 +5136,7 @@ class AccessApi:
         return response_data.response
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def create_project_sync(
         self,
         idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
@@ -5169,7 +5172,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def create_project_sync_with_http_info(
         self,
         idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
@@ -5205,7 +5208,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def create_project_sync_without_preload_content(
         self,
         idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
@@ -5323,7 +5326,7 @@ class AccessApi:
 
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([True,])})
     async def decide_human_o_auth_consent(
         self,
         human_o_auth_consent_request: HumanOAuthConsentRequest,
@@ -5423,7 +5426,7 @@ class AccessApi:
         ).data
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([True,])})
     async def decide_human_o_auth_consent_with_http_info(
         self,
         human_o_auth_consent_request: HumanOAuthConsentRequest,
@@ -5523,7 +5526,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([True,])})
     async def decide_human_o_auth_consent_without_preload_content(
         self,
         human_o_auth_consent_request: HumanOAuthConsentRequest,
@@ -5619,7 +5622,7 @@ class AccessApi:
         return response_data.response
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([True,])})
     def decide_human_o_auth_consent_sync(
         self,
         human_o_auth_consent_request: HumanOAuthConsentRequest,
@@ -5653,7 +5656,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([True,])})
     def decide_human_o_auth_consent_sync_with_http_info(
         self,
         human_o_auth_consent_request: HumanOAuthConsentRequest,
@@ -5687,7 +5690,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([True,])})
     def decide_human_o_auth_consent_sync_without_preload_content(
         self,
         human_o_auth_consent_request: HumanOAuthConsentRequest,
@@ -10242,6 +10245,491 @@ class AccessApi:
 
 
     @validate_call
+    async def get_model_connection_credential(
+        self,
+        project_id: UUID,
+        model_connection_id: UUID,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> Union[response_models.ModelConnectionCredentialDetailsResponse, ]:
+        """Get
+
+
+        :param project_id: (required)
+        :type project_id: UUID
+        :param model_connection_id: (required)
+        :type model_connection_id: UUID
+        :param _request_timeout: timeout setting for this request. If one
+                                 number provided, it will be total request
+                                 timeout. It can also be a pair (tuple) of
+                                 (connection, read) timeouts.
+        :type _request_timeout: int, tuple(int, int), optional
+        :param _request_auth: set to override the auth_settings for an a single
+                              request; this effectively ignores the
+                              authentication in the spec for a single request.
+        :type _request_auth: dict, optional
+        :param _content_type: force content-type for the request.
+        :type _content_type: str, Optional
+        :param _headers: set to override the headers for a single
+                         request; this effectively ignores the headers
+                         in the spec for a single request.
+        :type _headers: dict, optional
+        :param _host_index: set to override the host_index for a single
+                            request; this effectively ignores the host_index
+                            in the spec for a single request.
+        :type _host_index: int, optional
+        :return: Returns the result object.
+        """ # noqa: E501
+
+        _param = self._get_model_connection_credential_serialize(
+            project_id=project_id,
+            model_connection_id=model_connection_id,
+            _request_auth=_request_auth,
+            _content_type=_content_type,
+            _headers=_headers,
+            _host_index=_host_index
+        )
+
+        _response_types_map: Dict[str, Dict[str, Optional[str]]] = {
+            '200': {
+                
+                'application/json': "ModelConnectionCredentialDetailsResponse",
+                
+            },
+            '400': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '401': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '403': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '404': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '422': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '503': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+        }
+        response_data = await self.api_client.call_api(
+            *_param,
+            _request_timeout=_request_timeout
+        )
+        await response_data.read()
+        return self.api_client.response_deserialize(
+            response_data=response_data,
+            response_types_map=_response_types_map,
+        ).data
+
+
+    @validate_call
+    async def get_model_connection_credential_with_http_info(
+        self,
+        project_id: UUID,
+        model_connection_id: UUID,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> ApiResponse[Union[response_models.ModelConnectionCredentialDetailsResponse, ]]:
+        """Get
+
+
+        :param project_id: (required)
+        :type project_id: UUID
+        :param model_connection_id: (required)
+        :type model_connection_id: UUID
+        :param _request_timeout: timeout setting for this request. If one
+                                 number provided, it will be total request
+                                 timeout. It can also be a pair (tuple) of
+                                 (connection, read) timeouts.
+        :type _request_timeout: int, tuple(int, int), optional
+        :param _request_auth: set to override the auth_settings for an a single
+                              request; this effectively ignores the
+                              authentication in the spec for a single request.
+        :type _request_auth: dict, optional
+        :param _content_type: force content-type for the request.
+        :type _content_type: str, Optional
+        :param _headers: set to override the headers for a single
+                         request; this effectively ignores the headers
+                         in the spec for a single request.
+        :type _headers: dict, optional
+        :param _host_index: set to override the host_index for a single
+                            request; this effectively ignores the host_index
+                            in the spec for a single request.
+        :type _host_index: int, optional
+        :return: Returns the result object.
+        """ # noqa: E501
+
+        _param = self._get_model_connection_credential_serialize(
+            project_id=project_id,
+            model_connection_id=model_connection_id,
+            _request_auth=_request_auth,
+            _content_type=_content_type,
+            _headers=_headers,
+            _host_index=_host_index
+        )
+
+        _response_types_map: Dict[str, Dict[str, Optional[str]]] = {
+            '200': {
+                
+                'application/json': "ModelConnectionCredentialDetailsResponse",
+                
+            },
+            '400': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '401': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '403': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '404': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '422': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '503': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+        }
+        response_data = await self.api_client.call_api(
+            *_param,
+            _request_timeout=_request_timeout
+        )
+        await response_data.read()
+        return self.api_client.response_deserialize(
+            response_data=response_data,
+            response_types_map=_response_types_map,
+        )
+
+
+    @validate_call
+    async def get_model_connection_credential_without_preload_content(
+        self,
+        project_id: UUID,
+        model_connection_id: UUID,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> RESTResponseType:
+        """Get
+
+
+        :param project_id: (required)
+        :type project_id: UUID
+        :param model_connection_id: (required)
+        :type model_connection_id: UUID
+        :param _request_timeout: timeout setting for this request. If one
+                                 number provided, it will be total request
+                                 timeout. It can also be a pair (tuple) of
+                                 (connection, read) timeouts.
+        :type _request_timeout: int, tuple(int, int), optional
+        :param _request_auth: set to override the auth_settings for an a single
+                              request; this effectively ignores the
+                              authentication in the spec for a single request.
+        :type _request_auth: dict, optional
+        :param _content_type: force content-type for the request.
+        :type _content_type: str, Optional
+        :param _headers: set to override the headers for a single
+                         request; this effectively ignores the headers
+                         in the spec for a single request.
+        :type _headers: dict, optional
+        :param _host_index: set to override the host_index for a single
+                            request; this effectively ignores the host_index
+                            in the spec for a single request.
+        :type _host_index: int, optional
+        :return: Returns the result object.
+        """ # noqa: E501
+
+        _param = self._get_model_connection_credential_serialize(
+            project_id=project_id,
+            model_connection_id=model_connection_id,
+            _request_auth=_request_auth,
+            _content_type=_content_type,
+            _headers=_headers,
+            _host_index=_host_index
+        )
+
+        _response_types_map: Dict[str, Dict[str, Optional[str]]] = {
+            '200': {
+                
+                'application/json': "ModelConnectionCredentialDetailsResponse",
+                
+            },
+            '400': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '401': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '403': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '404': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '422': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '503': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+        }
+        response_data = await self.api_client.call_api(
+            *_param,
+            _request_timeout=_request_timeout
+        )
+        return response_data.response
+
+
+    @validate_call
+    def get_model_connection_credential_sync(
+        self,
+        project_id: UUID,
+        model_connection_id: UUID,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> Union[response_models.ModelConnectionCredentialDetailsResponse, ]:
+        """Get (synchronous)
+
+        Synchronous variant of :meth:`get_model_connection_credential`. It calls the asynchronous
+        method and blocks until it completes.
+        """ # noqa: E501
+        return run_sync(
+            self.get_model_connection_credential(
+                project_id=project_id,
+                model_connection_id=model_connection_id,
+                _request_timeout=_request_timeout,
+                _request_auth=_request_auth,
+                _content_type=_content_type,
+                _headers=_headers,
+                _host_index=_host_index,
+            )
+        )
+
+
+    @validate_call
+    def get_model_connection_credential_sync_with_http_info(
+        self,
+        project_id: UUID,
+        model_connection_id: UUID,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> ApiResponse[Union[response_models.ModelConnectionCredentialDetailsResponse, ]]:
+        """Get (synchronous)
+
+        Synchronous variant of :meth:`get_model_connection_credential_with_http_info`. It calls the
+        asynchronous method and blocks until it completes.
+        """ # noqa: E501
+        return run_sync(
+            self.get_model_connection_credential_with_http_info(
+                project_id=project_id,
+                model_connection_id=model_connection_id,
+                _request_timeout=_request_timeout,
+                _request_auth=_request_auth,
+                _content_type=_content_type,
+                _headers=_headers,
+                _host_index=_host_index,
+            )
+        )
+
+
+    @validate_call
+    def get_model_connection_credential_sync_without_preload_content(
+        self,
+        project_id: UUID,
+        model_connection_id: UUID,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> RESTResponseType:
+        """Get (synchronous)
+
+        Synchronous variant of :meth:`get_model_connection_credential_without_preload_content`. It calls
+        the asynchronous method and blocks until it completes.
+        """ # noqa: E501
+        return run_sync(
+            self.get_model_connection_credential_without_preload_content(
+                project_id=project_id,
+                model_connection_id=model_connection_id,
+                _request_timeout=_request_timeout,
+                _request_auth=_request_auth,
+                _content_type=_content_type,
+                _headers=_headers,
+                _host_index=_host_index,
+            )
+        )
+
+
+    def _get_model_connection_credential_serialize(
+        self,
+        project_id,
+        model_connection_id,
+        _request_auth,
+        _content_type,
+        _headers,
+        _host_index,
+    ) -> RequestSerialized:
+
+        _host = None
+
+        _collection_formats: Dict[str, str] = {
+        }
+
+        _path_params: Dict[str, str] = {}
+        _query_params: List[Tuple[str, str]] = []
+        _header_params: Dict[str, Optional[str]] = _headers or {}
+        _form_params: List[Tuple[str, str]] = []
+        _files: Dict[
+            str, Union[str, bytes, List[str], List[bytes], List[Tuple[str, bytes]]]
+        ] = {}
+        _body_params: Optional[bytes] = None
+
+        # process the path parameters
+        if project_id is not None:
+            _path_params['project_id'] = project_id
+        if model_connection_id is not None:
+            _path_params['model_connection_id'] = model_connection_id
+        # process the query parameters
+        # process the header parameters
+        # process the form parameters
+        # process the body parameter
+
+
+        # set the HTTP header `Accept`
+        if not any(name.lower() == 'accept' for name in _header_params):
+            _header_params['Accept'] = self.api_client.select_header_accept(
+                [
+                    'application/json', 
+                    'application/problem+json'
+                ]
+            )
+
+
+        # authentication setting
+        _auth_settings: List[str] = [
+            'KratosSession', 
+            'ProductBearer'
+        ]
+
+        return self.api_client.param_serialize(
+            method='GET',
+            resource_path='/v1/projects/{project_id}/model-connections/{model_connection_id}/credential',
+            path_params=_path_params,
+            query_params=_query_params,
+            header_params=_header_params,
+            body=_body_params,
+            post_params=_form_params,
+            files=_files,
+            auth_settings=_auth_settings,
+            collection_formats=_collection_formats,
+            _host=_host,
+            _request_auth=_request_auth
+        )
+
+
+
+
+    @validate_call
     async def get_my_organization_access(
         self,
         _request_timeout: Union[
@@ -12602,7 +13090,7 @@ class AccessApi:
 
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def issue_application_key(
         self,
         project_id: UUID,
@@ -12729,7 +13217,7 @@ class AccessApi:
         ).data
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def issue_application_key_with_http_info(
         self,
         project_id: UUID,
@@ -12856,7 +13344,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def issue_application_key_without_preload_content(
         self,
         project_id: UUID,
@@ -12979,7 +13467,7 @@ class AccessApi:
         return response_data.response
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def issue_application_key_sync(
         self,
         project_id: UUID,
@@ -13019,7 +13507,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def issue_application_key_sync_with_http_info(
         self,
         project_id: UUID,
@@ -13059,7 +13547,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def issue_application_key_sync_without_preload_content(
         self,
         project_id: UUID,
@@ -13187,7 +13675,7 @@ class AccessApi:
 
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def issue_invitation(
         self,
         idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
@@ -13306,7 +13794,7 @@ class AccessApi:
         ).data
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def issue_invitation_with_http_info(
         self,
         idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
@@ -13425,7 +13913,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def issue_invitation_without_preload_content(
         self,
         idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
@@ -13540,7 +14028,7 @@ class AccessApi:
         return response_data.response
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def issue_invitation_sync(
         self,
         idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
@@ -13576,7 +14064,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def issue_invitation_sync_with_http_info(
         self,
         idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
@@ -13612,7 +14100,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def issue_invitation_sync_without_preload_content(
         self,
         idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
@@ -20265,7 +20753,7 @@ class AccessApi:
 
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def preview_invitation(
         self,
         invitation_preview_request: InvitationPreviewRequest,
@@ -20380,7 +20868,7 @@ class AccessApi:
         ).data
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def preview_invitation_with_http_info(
         self,
         invitation_preview_request: InvitationPreviewRequest,
@@ -20495,7 +20983,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def preview_invitation_without_preload_content(
         self,
         invitation_preview_request: InvitationPreviewRequest,
@@ -20606,7 +21094,7 @@ class AccessApi:
         return response_data.response
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def preview_invitation_sync(
         self,
         invitation_preview_request: InvitationPreviewRequest,
@@ -20640,7 +21128,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def preview_invitation_sync_with_http_info(
         self,
         invitation_preview_request: InvitationPreviewRequest,
@@ -20674,7 +21162,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def preview_invitation_sync_without_preload_content(
         self,
         invitation_preview_request: InvitationPreviewRequest,
@@ -20771,6 +21259,591 @@ class AccessApi:
         return self.api_client.param_serialize(
             method='POST',
             resource_path='/v1/invitations/preview',
+            path_params=_path_params,
+            query_params=_query_params,
+            header_params=_header_params,
+            body=_body_params,
+            post_params=_form_params,
+            files=_files,
+            auth_settings=_auth_settings,
+            collection_formats=_collection_formats,
+            _host=_host,
+            _request_auth=_request_auth
+        )
+
+
+
+
+    @validate_call(config={"hide_input_in_errors": bool([True,])})
+    async def put_model_connection_credential(
+        self,
+        project_id: UUID,
+        model_connection_id: UUID,
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        model_connection_credential_request: ModelConnectionCredentialRequest,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> Union[response_models.ModelConnectionCredentialResultResponse, ]:
+        """Put
+
+
+        :param project_id: (required)
+        :type project_id: UUID
+        :param model_connection_id: (required)
+        :type model_connection_id: UUID
+        :param idempotency_key: (required)
+        :type idempotency_key: str
+        :param model_connection_credential_request: (required)
+        :type model_connection_credential_request: ModelConnectionCredentialRequest
+        :param _request_timeout: timeout setting for this request. If one
+                                 number provided, it will be total request
+                                 timeout. It can also be a pair (tuple) of
+                                 (connection, read) timeouts.
+        :type _request_timeout: int, tuple(int, int), optional
+        :param _request_auth: set to override the auth_settings for an a single
+                              request; this effectively ignores the
+                              authentication in the spec for a single request.
+        :type _request_auth: dict, optional
+        :param _content_type: force content-type for the request.
+        :type _content_type: str, Optional
+        :param _headers: set to override the headers for a single
+                         request; this effectively ignores the headers
+                         in the spec for a single request.
+        :type _headers: dict, optional
+        :param _host_index: set to override the host_index for a single
+                            request; this effectively ignores the host_index
+                            in the spec for a single request.
+        :type _host_index: int, optional
+        :return: Returns the result object.
+        """ # noqa: E501
+
+        _param = self._put_model_connection_credential_serialize(
+            project_id=project_id,
+            model_connection_id=model_connection_id,
+            idempotency_key=idempotency_key,
+            model_connection_credential_request=model_connection_credential_request,
+            _request_auth=_request_auth,
+            _content_type=_content_type,
+            _headers=_headers,
+            _host_index=_host_index
+        )
+
+        _response_types_map: Dict[str, Dict[str, Optional[str]]] = {
+            '200': {
+                
+                'application/json': "ModelConnectionCredentialResultResponse",
+                
+            },
+            '400': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '401': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '403': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '404': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '409': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '413': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '415': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '422': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '503': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+        }
+        response_data = await self.api_client.call_api(
+            *_param,
+            _request_timeout=_request_timeout
+        )
+        await response_data.read()
+        return self.api_client.response_deserialize(
+            response_data=response_data,
+            response_types_map=_response_types_map,
+        ).data
+
+
+    @validate_call(config={"hide_input_in_errors": bool([True,])})
+    async def put_model_connection_credential_with_http_info(
+        self,
+        project_id: UUID,
+        model_connection_id: UUID,
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        model_connection_credential_request: ModelConnectionCredentialRequest,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> ApiResponse[Union[response_models.ModelConnectionCredentialResultResponse, ]]:
+        """Put
+
+
+        :param project_id: (required)
+        :type project_id: UUID
+        :param model_connection_id: (required)
+        :type model_connection_id: UUID
+        :param idempotency_key: (required)
+        :type idempotency_key: str
+        :param model_connection_credential_request: (required)
+        :type model_connection_credential_request: ModelConnectionCredentialRequest
+        :param _request_timeout: timeout setting for this request. If one
+                                 number provided, it will be total request
+                                 timeout. It can also be a pair (tuple) of
+                                 (connection, read) timeouts.
+        :type _request_timeout: int, tuple(int, int), optional
+        :param _request_auth: set to override the auth_settings for an a single
+                              request; this effectively ignores the
+                              authentication in the spec for a single request.
+        :type _request_auth: dict, optional
+        :param _content_type: force content-type for the request.
+        :type _content_type: str, Optional
+        :param _headers: set to override the headers for a single
+                         request; this effectively ignores the headers
+                         in the spec for a single request.
+        :type _headers: dict, optional
+        :param _host_index: set to override the host_index for a single
+                            request; this effectively ignores the host_index
+                            in the spec for a single request.
+        :type _host_index: int, optional
+        :return: Returns the result object.
+        """ # noqa: E501
+
+        _param = self._put_model_connection_credential_serialize(
+            project_id=project_id,
+            model_connection_id=model_connection_id,
+            idempotency_key=idempotency_key,
+            model_connection_credential_request=model_connection_credential_request,
+            _request_auth=_request_auth,
+            _content_type=_content_type,
+            _headers=_headers,
+            _host_index=_host_index
+        )
+
+        _response_types_map: Dict[str, Dict[str, Optional[str]]] = {
+            '200': {
+                
+                'application/json': "ModelConnectionCredentialResultResponse",
+                
+            },
+            '400': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '401': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '403': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '404': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '409': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '413': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '415': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '422': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '503': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+        }
+        response_data = await self.api_client.call_api(
+            *_param,
+            _request_timeout=_request_timeout
+        )
+        await response_data.read()
+        return self.api_client.response_deserialize(
+            response_data=response_data,
+            response_types_map=_response_types_map,
+        )
+
+
+    @validate_call(config={"hide_input_in_errors": bool([True,])})
+    async def put_model_connection_credential_without_preload_content(
+        self,
+        project_id: UUID,
+        model_connection_id: UUID,
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        model_connection_credential_request: ModelConnectionCredentialRequest,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> RESTResponseType:
+        """Put
+
+
+        :param project_id: (required)
+        :type project_id: UUID
+        :param model_connection_id: (required)
+        :type model_connection_id: UUID
+        :param idempotency_key: (required)
+        :type idempotency_key: str
+        :param model_connection_credential_request: (required)
+        :type model_connection_credential_request: ModelConnectionCredentialRequest
+        :param _request_timeout: timeout setting for this request. If one
+                                 number provided, it will be total request
+                                 timeout. It can also be a pair (tuple) of
+                                 (connection, read) timeouts.
+        :type _request_timeout: int, tuple(int, int), optional
+        :param _request_auth: set to override the auth_settings for an a single
+                              request; this effectively ignores the
+                              authentication in the spec for a single request.
+        :type _request_auth: dict, optional
+        :param _content_type: force content-type for the request.
+        :type _content_type: str, Optional
+        :param _headers: set to override the headers for a single
+                         request; this effectively ignores the headers
+                         in the spec for a single request.
+        :type _headers: dict, optional
+        :param _host_index: set to override the host_index for a single
+                            request; this effectively ignores the host_index
+                            in the spec for a single request.
+        :type _host_index: int, optional
+        :return: Returns the result object.
+        """ # noqa: E501
+
+        _param = self._put_model_connection_credential_serialize(
+            project_id=project_id,
+            model_connection_id=model_connection_id,
+            idempotency_key=idempotency_key,
+            model_connection_credential_request=model_connection_credential_request,
+            _request_auth=_request_auth,
+            _content_type=_content_type,
+            _headers=_headers,
+            _host_index=_host_index
+        )
+
+        _response_types_map: Dict[str, Dict[str, Optional[str]]] = {
+            '200': {
+                
+                'application/json': "ModelConnectionCredentialResultResponse",
+                
+            },
+            '400': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '401': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '403': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '404': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '409': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '413': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '415': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '422': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '503': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+        }
+        response_data = await self.api_client.call_api(
+            *_param,
+            _request_timeout=_request_timeout
+        )
+        return response_data.response
+
+
+    @validate_call(config={"hide_input_in_errors": bool([True,])})
+    def put_model_connection_credential_sync(
+        self,
+        project_id: UUID,
+        model_connection_id: UUID,
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        model_connection_credential_request: ModelConnectionCredentialRequest,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> Union[response_models.ModelConnectionCredentialResultResponse, ]:
+        """Put (synchronous)
+
+        Synchronous variant of :meth:`put_model_connection_credential`. It calls the asynchronous
+        method and blocks until it completes.
+        """ # noqa: E501
+        return run_sync(
+            self.put_model_connection_credential(
+                project_id=project_id,
+                model_connection_id=model_connection_id,
+                idempotency_key=idempotency_key,
+                model_connection_credential_request=model_connection_credential_request,
+                _request_timeout=_request_timeout,
+                _request_auth=_request_auth,
+                _content_type=_content_type,
+                _headers=_headers,
+                _host_index=_host_index,
+            )
+        )
+
+
+    @validate_call(config={"hide_input_in_errors": bool([True,])})
+    def put_model_connection_credential_sync_with_http_info(
+        self,
+        project_id: UUID,
+        model_connection_id: UUID,
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        model_connection_credential_request: ModelConnectionCredentialRequest,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> ApiResponse[Union[response_models.ModelConnectionCredentialResultResponse, ]]:
+        """Put (synchronous)
+
+        Synchronous variant of :meth:`put_model_connection_credential_with_http_info`. It calls the
+        asynchronous method and blocks until it completes.
+        """ # noqa: E501
+        return run_sync(
+            self.put_model_connection_credential_with_http_info(
+                project_id=project_id,
+                model_connection_id=model_connection_id,
+                idempotency_key=idempotency_key,
+                model_connection_credential_request=model_connection_credential_request,
+                _request_timeout=_request_timeout,
+                _request_auth=_request_auth,
+                _content_type=_content_type,
+                _headers=_headers,
+                _host_index=_host_index,
+            )
+        )
+
+
+    @validate_call(config={"hide_input_in_errors": bool([True,])})
+    def put_model_connection_credential_sync_without_preload_content(
+        self,
+        project_id: UUID,
+        model_connection_id: UUID,
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        model_connection_credential_request: ModelConnectionCredentialRequest,
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> RESTResponseType:
+        """Put (synchronous)
+
+        Synchronous variant of :meth:`put_model_connection_credential_without_preload_content`. It calls
+        the asynchronous method and blocks until it completes.
+        """ # noqa: E501
+        return run_sync(
+            self.put_model_connection_credential_without_preload_content(
+                project_id=project_id,
+                model_connection_id=model_connection_id,
+                idempotency_key=idempotency_key,
+                model_connection_credential_request=model_connection_credential_request,
+                _request_timeout=_request_timeout,
+                _request_auth=_request_auth,
+                _content_type=_content_type,
+                _headers=_headers,
+                _host_index=_host_index,
+            )
+        )
+
+
+    def _put_model_connection_credential_serialize(
+        self,
+        project_id,
+        model_connection_id,
+        idempotency_key,
+        model_connection_credential_request,
+        _request_auth,
+        _content_type,
+        _headers,
+        _host_index,
+    ) -> RequestSerialized:
+
+        _host = None
+
+        _collection_formats: Dict[str, str] = {
+        }
+
+        _path_params: Dict[str, str] = {}
+        _query_params: List[Tuple[str, str]] = []
+        _header_params: Dict[str, Optional[str]] = _headers or {}
+        _form_params: List[Tuple[str, str]] = []
+        _files: Dict[
+            str, Union[str, bytes, List[str], List[bytes], List[Tuple[str, bytes]]]
+        ] = {}
+        _body_params: Optional[bytes] = None
+
+        # process the path parameters
+        if project_id is not None:
+            _path_params['project_id'] = project_id
+        if model_connection_id is not None:
+            _path_params['model_connection_id'] = model_connection_id
+        # process the query parameters
+        # process the header parameters
+        if idempotency_key is not None:
+            _header_params['Idempotency-Key'] = idempotency_key
+        # process the form parameters
+        # process the body parameter
+        if model_connection_credential_request is not None:
+            _body_params = model_connection_credential_request
+
+
+        # set the HTTP header `Accept`
+        if not any(name.lower() == 'accept' for name in _header_params):
+            _header_params['Accept'] = self.api_client.select_header_accept(
+                [
+                    'application/json', 
+                    'application/problem+json'
+                ]
+            )
+
+        # set the HTTP header `Content-Type`
+        if _content_type:
+            _header_params['Content-Type'] = _content_type
+        else:
+            _default_content_type = (
+                self.api_client.select_header_content_type(
+                    [
+                        'application/json'
+                    ]
+                )
+            )
+            if _default_content_type is not None:
+                _header_params['Content-Type'] = _default_content_type
+
+        # authentication setting
+        _auth_settings: List[str] = [
+            'KratosSession', 
+            'ProductBearer'
+        ]
+
+        return self.api_client.param_serialize(
+            method='PUT',
+            resource_path='/v1/projects/{project_id}/model-connections/{model_connection_id}/credential',
             path_params=_path_params,
             query_params=_query_params,
             header_params=_header_params,
@@ -23638,6 +24711,550 @@ class AccessApi:
         return self.api_client.param_serialize(
             method='DELETE',
             resource_path='/v1/model-connections/{model_connection_id}/grants/{recipient_principal_id}/{action_id}',
+            path_params=_path_params,
+            query_params=_query_params,
+            header_params=_header_params,
+            body=_body_params,
+            post_params=_form_params,
+            files=_files,
+            auth_settings=_auth_settings,
+            collection_formats=_collection_formats,
+            _host=_host,
+            _request_auth=_request_auth
+        )
+
+
+
+
+    @validate_call
+    async def remove_model_connection_credential(
+        self,
+        project_id: UUID,
+        model_connection_id: UUID,
+        expected_credential_revision: Annotated[int, Field(le=9007199254740991, strict=True, ge=0)],
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> Union[response_models.ModelConnectionCredentialResultResponse, ]:
+        """Remove
+
+
+        :param project_id: (required)
+        :type project_id: UUID
+        :param model_connection_id: (required)
+        :type model_connection_id: UUID
+        :param expected_credential_revision: (required)
+        :type expected_credential_revision: int
+        :param idempotency_key: (required)
+        :type idempotency_key: str
+        :param _request_timeout: timeout setting for this request. If one
+                                 number provided, it will be total request
+                                 timeout. It can also be a pair (tuple) of
+                                 (connection, read) timeouts.
+        :type _request_timeout: int, tuple(int, int), optional
+        :param _request_auth: set to override the auth_settings for an a single
+                              request; this effectively ignores the
+                              authentication in the spec for a single request.
+        :type _request_auth: dict, optional
+        :param _content_type: force content-type for the request.
+        :type _content_type: str, Optional
+        :param _headers: set to override the headers for a single
+                         request; this effectively ignores the headers
+                         in the spec for a single request.
+        :type _headers: dict, optional
+        :param _host_index: set to override the host_index for a single
+                            request; this effectively ignores the host_index
+                            in the spec for a single request.
+        :type _host_index: int, optional
+        :return: Returns the result object.
+        """ # noqa: E501
+
+        _param = self._remove_model_connection_credential_serialize(
+            project_id=project_id,
+            model_connection_id=model_connection_id,
+            expected_credential_revision=expected_credential_revision,
+            idempotency_key=idempotency_key,
+            _request_auth=_request_auth,
+            _content_type=_content_type,
+            _headers=_headers,
+            _host_index=_host_index
+        )
+
+        _response_types_map: Dict[str, Dict[str, Optional[str]]] = {
+            '200': {
+                
+                'application/json': "ModelConnectionCredentialResultResponse",
+                
+            },
+            '400': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '401': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '403': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '404': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '409': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '422': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '503': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+        }
+        response_data = await self.api_client.call_api(
+            *_param,
+            _request_timeout=_request_timeout
+        )
+        await response_data.read()
+        return self.api_client.response_deserialize(
+            response_data=response_data,
+            response_types_map=_response_types_map,
+        ).data
+
+
+    @validate_call
+    async def remove_model_connection_credential_with_http_info(
+        self,
+        project_id: UUID,
+        model_connection_id: UUID,
+        expected_credential_revision: Annotated[int, Field(le=9007199254740991, strict=True, ge=0)],
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> ApiResponse[Union[response_models.ModelConnectionCredentialResultResponse, ]]:
+        """Remove
+
+
+        :param project_id: (required)
+        :type project_id: UUID
+        :param model_connection_id: (required)
+        :type model_connection_id: UUID
+        :param expected_credential_revision: (required)
+        :type expected_credential_revision: int
+        :param idempotency_key: (required)
+        :type idempotency_key: str
+        :param _request_timeout: timeout setting for this request. If one
+                                 number provided, it will be total request
+                                 timeout. It can also be a pair (tuple) of
+                                 (connection, read) timeouts.
+        :type _request_timeout: int, tuple(int, int), optional
+        :param _request_auth: set to override the auth_settings for an a single
+                              request; this effectively ignores the
+                              authentication in the spec for a single request.
+        :type _request_auth: dict, optional
+        :param _content_type: force content-type for the request.
+        :type _content_type: str, Optional
+        :param _headers: set to override the headers for a single
+                         request; this effectively ignores the headers
+                         in the spec for a single request.
+        :type _headers: dict, optional
+        :param _host_index: set to override the host_index for a single
+                            request; this effectively ignores the host_index
+                            in the spec for a single request.
+        :type _host_index: int, optional
+        :return: Returns the result object.
+        """ # noqa: E501
+
+        _param = self._remove_model_connection_credential_serialize(
+            project_id=project_id,
+            model_connection_id=model_connection_id,
+            expected_credential_revision=expected_credential_revision,
+            idempotency_key=idempotency_key,
+            _request_auth=_request_auth,
+            _content_type=_content_type,
+            _headers=_headers,
+            _host_index=_host_index
+        )
+
+        _response_types_map: Dict[str, Dict[str, Optional[str]]] = {
+            '200': {
+                
+                'application/json': "ModelConnectionCredentialResultResponse",
+                
+            },
+            '400': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '401': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '403': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '404': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '409': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '422': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '503': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+        }
+        response_data = await self.api_client.call_api(
+            *_param,
+            _request_timeout=_request_timeout
+        )
+        await response_data.read()
+        return self.api_client.response_deserialize(
+            response_data=response_data,
+            response_types_map=_response_types_map,
+        )
+
+
+    @validate_call
+    async def remove_model_connection_credential_without_preload_content(
+        self,
+        project_id: UUID,
+        model_connection_id: UUID,
+        expected_credential_revision: Annotated[int, Field(le=9007199254740991, strict=True, ge=0)],
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> RESTResponseType:
+        """Remove
+
+
+        :param project_id: (required)
+        :type project_id: UUID
+        :param model_connection_id: (required)
+        :type model_connection_id: UUID
+        :param expected_credential_revision: (required)
+        :type expected_credential_revision: int
+        :param idempotency_key: (required)
+        :type idempotency_key: str
+        :param _request_timeout: timeout setting for this request. If one
+                                 number provided, it will be total request
+                                 timeout. It can also be a pair (tuple) of
+                                 (connection, read) timeouts.
+        :type _request_timeout: int, tuple(int, int), optional
+        :param _request_auth: set to override the auth_settings for an a single
+                              request; this effectively ignores the
+                              authentication in the spec for a single request.
+        :type _request_auth: dict, optional
+        :param _content_type: force content-type for the request.
+        :type _content_type: str, Optional
+        :param _headers: set to override the headers for a single
+                         request; this effectively ignores the headers
+                         in the spec for a single request.
+        :type _headers: dict, optional
+        :param _host_index: set to override the host_index for a single
+                            request; this effectively ignores the host_index
+                            in the spec for a single request.
+        :type _host_index: int, optional
+        :return: Returns the result object.
+        """ # noqa: E501
+
+        _param = self._remove_model_connection_credential_serialize(
+            project_id=project_id,
+            model_connection_id=model_connection_id,
+            expected_credential_revision=expected_credential_revision,
+            idempotency_key=idempotency_key,
+            _request_auth=_request_auth,
+            _content_type=_content_type,
+            _headers=_headers,
+            _host_index=_host_index
+        )
+
+        _response_types_map: Dict[str, Dict[str, Optional[str]]] = {
+            '200': {
+                
+                'application/json': "ModelConnectionCredentialResultResponse",
+                
+            },
+            '400': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '401': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '403': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '404': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '409': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '422': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+            '503': {
+                
+                'application/problem+json': "ProblemDetails",
+                
+            },
+        }
+        response_data = await self.api_client.call_api(
+            *_param,
+            _request_timeout=_request_timeout
+        )
+        return response_data.response
+
+
+    @validate_call
+    def remove_model_connection_credential_sync(
+        self,
+        project_id: UUID,
+        model_connection_id: UUID,
+        expected_credential_revision: Annotated[int, Field(le=9007199254740991, strict=True, ge=0)],
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> Union[response_models.ModelConnectionCredentialResultResponse, ]:
+        """Remove (synchronous)
+
+        Synchronous variant of :meth:`remove_model_connection_credential`. It calls the asynchronous
+        method and blocks until it completes.
+        """ # noqa: E501
+        return run_sync(
+            self.remove_model_connection_credential(
+                project_id=project_id,
+                model_connection_id=model_connection_id,
+                expected_credential_revision=expected_credential_revision,
+                idempotency_key=idempotency_key,
+                _request_timeout=_request_timeout,
+                _request_auth=_request_auth,
+                _content_type=_content_type,
+                _headers=_headers,
+                _host_index=_host_index,
+            )
+        )
+
+
+    @validate_call
+    def remove_model_connection_credential_sync_with_http_info(
+        self,
+        project_id: UUID,
+        model_connection_id: UUID,
+        expected_credential_revision: Annotated[int, Field(le=9007199254740991, strict=True, ge=0)],
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> ApiResponse[Union[response_models.ModelConnectionCredentialResultResponse, ]]:
+        """Remove (synchronous)
+
+        Synchronous variant of :meth:`remove_model_connection_credential_with_http_info`. It calls the
+        asynchronous method and blocks until it completes.
+        """ # noqa: E501
+        return run_sync(
+            self.remove_model_connection_credential_with_http_info(
+                project_id=project_id,
+                model_connection_id=model_connection_id,
+                expected_credential_revision=expected_credential_revision,
+                idempotency_key=idempotency_key,
+                _request_timeout=_request_timeout,
+                _request_auth=_request_auth,
+                _content_type=_content_type,
+                _headers=_headers,
+                _host_index=_host_index,
+            )
+        )
+
+
+    @validate_call
+    def remove_model_connection_credential_sync_without_preload_content(
+        self,
+        project_id: UUID,
+        model_connection_id: UUID,
+        expected_credential_revision: Annotated[int, Field(le=9007199254740991, strict=True, ge=0)],
+        idempotency_key: Annotated[str, Field(min_length=1, strict=True, max_length=128)],
+        _request_timeout: Union[
+            None,
+            Annotated[StrictFloat, Field(gt=0)],
+            Tuple[
+                Annotated[StrictFloat, Field(gt=0)],
+                Annotated[StrictFloat, Field(gt=0)]
+            ]
+        ] = None,
+        _request_auth: Optional[Dict[StrictStr, Any]] = None,
+        _content_type: Optional[StrictStr] = None,
+        _headers: Optional[Dict[StrictStr, Any]] = None,
+        _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
+    ) -> RESTResponseType:
+        """Remove (synchronous)
+
+        Synchronous variant of :meth:`remove_model_connection_credential_without_preload_content`. It calls
+        the asynchronous method and blocks until it completes.
+        """ # noqa: E501
+        return run_sync(
+            self.remove_model_connection_credential_without_preload_content(
+                project_id=project_id,
+                model_connection_id=model_connection_id,
+                expected_credential_revision=expected_credential_revision,
+                idempotency_key=idempotency_key,
+                _request_timeout=_request_timeout,
+                _request_auth=_request_auth,
+                _content_type=_content_type,
+                _headers=_headers,
+                _host_index=_host_index,
+            )
+        )
+
+
+    def _remove_model_connection_credential_serialize(
+        self,
+        project_id,
+        model_connection_id,
+        expected_credential_revision,
+        idempotency_key,
+        _request_auth,
+        _content_type,
+        _headers,
+        _host_index,
+    ) -> RequestSerialized:
+
+        _host = None
+
+        _collection_formats: Dict[str, str] = {
+        }
+
+        _path_params: Dict[str, str] = {}
+        _query_params: List[Tuple[str, str]] = []
+        _header_params: Dict[str, Optional[str]] = _headers or {}
+        _form_params: List[Tuple[str, str]] = []
+        _files: Dict[
+            str, Union[str, bytes, List[str], List[bytes], List[Tuple[str, bytes]]]
+        ] = {}
+        _body_params: Optional[bytes] = None
+
+        # process the path parameters
+        if project_id is not None:
+            _path_params['project_id'] = project_id
+        if model_connection_id is not None:
+            _path_params['model_connection_id'] = model_connection_id
+        # process the query parameters
+        if expected_credential_revision is not None:
+            
+            _query_params.append(('expectedCredentialRevision', expected_credential_revision))
+            
+        # process the header parameters
+        if idempotency_key is not None:
+            _header_params['Idempotency-Key'] = idempotency_key
+        # process the form parameters
+        # process the body parameter
+
+
+        # set the HTTP header `Accept`
+        if not any(name.lower() == 'accept' for name in _header_params):
+            _header_params['Accept'] = self.api_client.select_header_accept(
+                [
+                    'application/json', 
+                    'application/problem+json'
+                ]
+            )
+
+
+        # authentication setting
+        _auth_settings: List[str] = [
+            'KratosSession', 
+            'ProductBearer'
+        ]
+
+        return self.api_client.param_serialize(
+            method='DELETE',
+            resource_path='/v1/projects/{project_id}/model-connections/{model_connection_id}/credential',
             path_params=_path_params,
             query_params=_query_params,
             header_params=_header_params,
@@ -26810,7 +28427,7 @@ class AccessApi:
 
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def restore_human(
         self,
         organization_id: UUID,
@@ -26937,7 +28554,7 @@ class AccessApi:
         ).data
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def restore_human_with_http_info(
         self,
         organization_id: UUID,
@@ -27064,7 +28681,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def restore_human_without_preload_content(
         self,
         organization_id: UUID,
@@ -27187,7 +28804,7 @@ class AccessApi:
         return response_data.response
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def restore_human_sync(
         self,
         organization_id: UUID,
@@ -27227,7 +28844,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def restore_human_sync_with_http_info(
         self,
         organization_id: UUID,
@@ -27267,7 +28884,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def restore_human_sync_without_preload_content(
         self,
         organization_id: UUID,
@@ -27395,7 +29012,7 @@ class AccessApi:
 
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def revoke_application_key(
         self,
         project_id: UUID,
@@ -27526,7 +29143,7 @@ class AccessApi:
         ).data
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def revoke_application_key_with_http_info(
         self,
         project_id: UUID,
@@ -27657,7 +29274,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def revoke_application_key_without_preload_content(
         self,
         project_id: UUID,
@@ -27784,7 +29401,7 @@ class AccessApi:
         return response_data.response
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def revoke_application_key_sync(
         self,
         project_id: UUID,
@@ -27826,7 +29443,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def revoke_application_key_sync_with_http_info(
         self,
         project_id: UUID,
@@ -27868,7 +29485,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def revoke_application_key_sync_without_preload_content(
         self,
         project_id: UUID,
@@ -28001,7 +29618,7 @@ class AccessApi:
 
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def revoke_invitation(
         self,
         invitation_id: UUID,
@@ -28124,7 +29741,7 @@ class AccessApi:
         ).data
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def revoke_invitation_with_http_info(
         self,
         invitation_id: UUID,
@@ -28247,7 +29864,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def revoke_invitation_without_preload_content(
         self,
         invitation_id: UUID,
@@ -28366,7 +29983,7 @@ class AccessApi:
         return response_data.response
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def revoke_invitation_sync(
         self,
         invitation_id: UUID,
@@ -28404,7 +30021,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def revoke_invitation_sync_with_http_info(
         self,
         invitation_id: UUID,
@@ -28442,7 +30059,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def revoke_invitation_sync_without_preload_content(
         self,
         invitation_id: UUID,
@@ -28565,7 +30182,7 @@ class AccessApi:
 
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def set_access_group_action_grant(
         self,
         project_id: UUID,
@@ -28705,7 +30322,7 @@ class AccessApi:
         ).data
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def set_access_group_action_grant_with_http_info(
         self,
         project_id: UUID,
@@ -28845,7 +30462,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def set_access_group_action_grant_without_preload_content(
         self,
         project_id: UUID,
@@ -28981,7 +30598,7 @@ class AccessApi:
         return response_data.response
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def set_access_group_action_grant_sync(
         self,
         project_id: UUID,
@@ -29025,7 +30642,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def set_access_group_action_grant_sync_with_http_info(
         self,
         project_id: UUID,
@@ -29069,7 +30686,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def set_access_group_action_grant_sync_without_preload_content(
         self,
         project_id: UUID,
@@ -29207,7 +30824,7 @@ class AccessApi:
 
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def set_application_account_action_grant(
         self,
         project_id: UUID,
@@ -29347,7 +30964,7 @@ class AccessApi:
         ).data
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def set_application_account_action_grant_with_http_info(
         self,
         project_id: UUID,
@@ -29487,7 +31104,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def set_application_account_action_grant_without_preload_content(
         self,
         project_id: UUID,
@@ -29623,7 +31240,7 @@ class AccessApi:
         return response_data.response
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def set_application_account_action_grant_sync(
         self,
         project_id: UUID,
@@ -29667,7 +31284,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def set_application_account_action_grant_sync_with_http_info(
         self,
         project_id: UUID,
@@ -29711,7 +31328,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def set_application_account_action_grant_sync_without_preload_content(
         self,
         project_id: UUID,
@@ -29849,7 +31466,7 @@ class AccessApi:
 
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def set_model_connection_action_grant(
         self,
         model_connection_id: UUID,
@@ -29985,7 +31602,7 @@ class AccessApi:
         ).data
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def set_model_connection_action_grant_with_http_info(
         self,
         model_connection_id: UUID,
@@ -30121,7 +31738,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def set_model_connection_action_grant_without_preload_content(
         self,
         model_connection_id: UUID,
@@ -30253,7 +31870,7 @@ class AccessApi:
         return response_data.response
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def set_model_connection_action_grant_sync(
         self,
         model_connection_id: UUID,
@@ -30295,7 +31912,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def set_model_connection_action_grant_sync_with_http_info(
         self,
         model_connection_id: UUID,
@@ -30337,7 +31954,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def set_model_connection_action_grant_sync_without_preload_content(
         self,
         model_connection_id: UUID,
@@ -30470,7 +32087,7 @@ class AccessApi:
 
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def set_organization_action_grant(
         self,
         organization_id: UUID,
@@ -30606,7 +32223,7 @@ class AccessApi:
         ).data
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def set_organization_action_grant_with_http_info(
         self,
         organization_id: UUID,
@@ -30742,7 +32359,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def set_organization_action_grant_without_preload_content(
         self,
         organization_id: UUID,
@@ -30874,7 +32491,7 @@ class AccessApi:
         return response_data.response
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def set_organization_action_grant_sync(
         self,
         organization_id: UUID,
@@ -30916,7 +32533,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def set_organization_action_grant_sync_with_http_info(
         self,
         organization_id: UUID,
@@ -30958,7 +32575,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def set_organization_action_grant_sync_without_preload_content(
         self,
         organization_id: UUID,
@@ -31091,7 +32708,7 @@ class AccessApi:
 
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def set_project_action_grant(
         self,
         project_id: UUID,
@@ -31227,7 +32844,7 @@ class AccessApi:
         ).data
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def set_project_action_grant_with_http_info(
         self,
         project_id: UUID,
@@ -31363,7 +32980,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def set_project_action_grant_without_preload_content(
         self,
         project_id: UUID,
@@ -31495,7 +33112,7 @@ class AccessApi:
         return response_data.response
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def set_project_action_grant_sync(
         self,
         project_id: UUID,
@@ -31537,7 +33154,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def set_project_action_grant_sync_with_http_info(
         self,
         project_id: UUID,
@@ -31579,7 +33196,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def set_project_action_grant_sync_without_preload_content(
         self,
         project_id: UUID,
@@ -31712,7 +33329,7 @@ class AccessApi:
 
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def set_project_upload_defaults(
         self,
         project_id: UUID,
@@ -31835,7 +33452,7 @@ class AccessApi:
         ).data
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def set_project_upload_defaults_with_http_info(
         self,
         project_id: UUID,
@@ -31958,7 +33575,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def set_project_upload_defaults_without_preload_content(
         self,
         project_id: UUID,
@@ -32077,7 +33694,7 @@ class AccessApi:
         return response_data.response
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def set_project_upload_defaults_sync(
         self,
         project_id: UUID,
@@ -32115,7 +33732,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def set_project_upload_defaults_sync_with_http_info(
         self,
         project_id: UUID,
@@ -32153,7 +33770,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def set_project_upload_defaults_sync_without_preload_content(
         self,
         project_id: UUID,
@@ -32276,7 +33893,7 @@ class AccessApi:
 
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def suspend_human(
         self,
         organization_id: UUID,
@@ -32403,7 +34020,7 @@ class AccessApi:
         ).data
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def suspend_human_with_http_info(
         self,
         organization_id: UUID,
@@ -32530,7 +34147,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def suspend_human_without_preload_content(
         self,
         organization_id: UUID,
@@ -32653,7 +34270,7 @@ class AccessApi:
         return response_data.response
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def suspend_human_sync(
         self,
         organization_id: UUID,
@@ -32693,7 +34310,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def suspend_human_sync_with_http_info(
         self,
         organization_id: UUID,
@@ -32733,7 +34350,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def suspend_human_sync_without_preload_content(
         self,
         organization_id: UUID,
@@ -32861,7 +34478,7 @@ class AccessApi:
 
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def update_project_metadata(
         self,
         project_id: UUID,
@@ -32984,7 +34601,7 @@ class AccessApi:
         ).data
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def update_project_metadata_with_http_info(
         self,
         project_id: UUID,
@@ -33107,7 +34724,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def update_project_metadata_without_preload_content(
         self,
         project_id: UUID,
@@ -33226,7 +34843,7 @@ class AccessApi:
         return response_data.response
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def update_project_metadata_sync(
         self,
         project_id: UUID,
@@ -33264,7 +34881,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def update_project_metadata_sync_with_http_info(
         self,
         project_id: UUID,
@@ -33302,7 +34919,7 @@ class AccessApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def update_project_metadata_sync_without_preload_content(
         self,
         project_id: UUID,

@@ -12,6 +12,7 @@ dependencies = [
     "ory-hydra-client",
     "ory-kratos-client",
     "psycopg[binary]>=3.3.5",
+    "pynacl==1.6.2",
     "pydantic-settings>=2.15.0",
     "pytest-asyncio>=1.4.0",
     "python-multipart>=0.0.32",

@@ -322,6 +322,48 @@ pub async fn observe(
                 )
                 .await
         ),
+        "getModelConnectionCredential" => observed!(
+            client
+                .get_model_connection_credential(
+                    request.path.as_ref().unwrap()["project_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.path.as_ref().unwrap()["model_connection_id"]
+                        .as_str()
+                        .unwrap(),
+                )
+                .await
+        ),
+        "putModelConnectionCredential" => observed!(
+            client
+                .put_model_connection_credential(
+                    request.path.as_ref().unwrap()["project_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.path.as_ref().unwrap()["model_connection_id"]
+                        .as_str()
+                        .unwrap(),
+                    &request.headers["Idempotency-Key"],
+                    serde_json::from_value(body).unwrap(),
+                )
+                .await
+        ),
+        "removeModelConnectionCredential" => observed!(
+            client
+                .remove_model_connection_credential(
+                    request.path.as_ref().unwrap()["project_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.path.as_ref().unwrap()["model_connection_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.query.as_ref().unwrap()["expectedCredentialRevision"]
+                        .as_i64()
+                        .unwrap(),
+                    &request.headers["Idempotency-Key"],
+                )
+                .await
+        ),
         "listModelConnections" => observed!(
             client
                 .list_model_connections(

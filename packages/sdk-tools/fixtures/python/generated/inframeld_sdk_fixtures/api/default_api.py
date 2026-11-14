@@ -1900,7 +1900,7 @@ class DefaultApi:
 
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def contract_fixture_payload(
         self,
         contract_fixture_payload: ContractFixturePayload,
@@ -1976,7 +1976,7 @@ class DefaultApi:
         ).data
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def contract_fixture_payload_with_http_info(
         self,
         contract_fixture_payload: ContractFixturePayload,
@@ -2052,7 +2052,7 @@ class DefaultApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def contract_fixture_payload_without_preload_content(
         self,
         contract_fixture_payload: ContractFixturePayload,
@@ -2124,7 +2124,7 @@ class DefaultApi:
         return response_data.response
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def contract_fixture_payload_sync(
         self,
         contract_fixture_payload: ContractFixturePayload,
@@ -2158,7 +2158,7 @@ class DefaultApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def contract_fixture_payload_sync_with_http_info(
         self,
         contract_fixture_payload: ContractFixturePayload,
@@ -2192,7 +2192,7 @@ class DefaultApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def contract_fixture_payload_sync_without_preload_content(
         self,
         contract_fixture_payload: ContractFixturePayload,

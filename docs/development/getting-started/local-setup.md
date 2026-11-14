@@ -218,6 +218,35 @@ Omitting an audience permits startup, but a supported application credential at 
 
 The [authentication error contract](../error-handling.md#authentication-contract) separates credential rejection from local ineligibility. The adapters, profile configuration and PostgreSQL local-admission/current-key reads are implemented. [Ordinary Project action facts](../../../apps/backend/src/inframeld_backend/access/infrastructure/readers/postgres_project_action_facts_reader.py) use the explicitly supplied profile and current persisted key/account state within the calling operation's transaction. HTTP metadata composition forwards the configured HTTP profile. An MCP consumer must likewise inject its trusted MCP profile into its authorizer. Initial authentication cannot supply a missing current-authorization profile. Configuration alone does not establish complete client, platform or production qualification. These settings alone issue no key. Eligible human callers use the registered issuance operation, while a mounted MCP transport remains separate delivery work.
 
+### Provider credential encryption key
+
+Enable model connection credential writes in the host-run API by provisioning a separate 32-byte key. Configure the file path and the expected SHA-256 of its original bytes. Generate the key once. Capture the identifier during trusted setup and retain it with the installation configuration. A 32-byte file with a different identifier is refused even before the first write.
+
+From the repository root, run this once as the development account that runs the host API:
+
+```bash
+mise exec -- python - <<'PY'
+import os
+from hashlib import sha256
+from pathlib import Path
+from secrets import token_bytes
+
+os.umask(0o077)
+key_file = Path.home() / ".config/inframeld/secrets/provider_credential.key"
+key_file.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+descriptor = os.open(key_file, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+material = token_bytes(32)
+with os.fdopen(descriptor, "wb") as output:
+    output.write(material)
+print(f"INFRAMELD_PROVIDER_CREDENTIAL__KEY_FILE={key_file}")
+print(f"INFRAMELD_PROVIDER_CREDENTIAL__EXPECTED_KEY_ID={sha256(material).hexdigest()}")
+PY
+```
+
+Copy those two settings to `apps/backend/.env`. The command prints the path and its identifier. The raw key stays in the private file. If the file already exists, use its original trusted identifier. Restore the same file and identifier from the protected installation set after loss. Keep the credential encryption key separate from the required idempotency fingerprint key.
+
+The API reads the key for a new credential change. Dedicated metadata reads and completed same-key recovery can return safe metadata while the file is unavailable. For a separately configured containerized API, supply a private read-only mount readable by the API user and configure the file's path inside the container. Development Compose leaves this optional mount to the operator. The current application worker has no credential-resolution consumer. See [provider credential storage](../../../.agents/skills/inframeld-access-models/references/provider-credential-storage.md).
+
 ### Application-key revocation
 
 The implementation registers `revokeApplicationKey` through the human-authenticated POST route described in [the user guide](../../../apps/docs/src/app/guides/application-accounts/page.mdx#revoke-one-application-key). It requires current exact Revoke authority and a reviewed Project Access revision, without issuance delegation or a selected application-key verification profile. It returns safe metadata only. Exact original-request replay preserves the historical result, and revocation affects new incoming key checks rather than automatically cancelling admitted work.

@@ -133,7 +133,10 @@ __all__ = [
     "ModelConnectionAuthentication",
     "ModelConnectionCreationRequest",
     "ModelConnectionCreationResponse",
+    "ModelConnectionCredentialDetailsResponse",
+    "ModelConnectionCredentialRequest",
     "ModelConnectionCredentialResponse",
+    "ModelConnectionCredentialResultResponse",
     "ModelConnectionGrantTargetResponse",
     "ModelConnectionProvider",
     "ModelConnectionResponse",
@@ -321,7 +324,10 @@ from inframeld_sdk.models.model_connection_action_grant_response import ModelCon
 from inframeld_sdk.models.model_connection_authentication import ModelConnectionAuthentication as ModelConnectionAuthentication
 from inframeld_sdk.models.model_connection_creation_request import ModelConnectionCreationRequest as ModelConnectionCreationRequest
 from inframeld_sdk.models.model_connection_creation_response import ModelConnectionCreationResponse as ModelConnectionCreationResponse
+from inframeld_sdk.models.model_connection_credential_details_response import ModelConnectionCredentialDetailsResponse as ModelConnectionCredentialDetailsResponse
+from inframeld_sdk.models.model_connection_credential_request import ModelConnectionCredentialRequest as ModelConnectionCredentialRequest
 from inframeld_sdk.models.model_connection_credential_response import ModelConnectionCredentialResponse as ModelConnectionCredentialResponse
+from inframeld_sdk.models.model_connection_credential_result_response import ModelConnectionCredentialResultResponse as ModelConnectionCredentialResultResponse
 from inframeld_sdk.models.model_connection_grant_target_response import ModelConnectionGrantTargetResponse as ModelConnectionGrantTargetResponse
 from inframeld_sdk.models.model_connection_provider import ModelConnectionProvider as ModelConnectionProvider
 from inframeld_sdk.models.model_connection_response import ModelConnectionResponse as ModelConnectionResponse

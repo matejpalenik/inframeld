@@ -721,6 +721,40 @@ problems!(
 );
 
 problems!(
+    GetModelConnectionCredentialApiError,
+    GetModelConnectionCredentialApiError::Status400,
+    GetModelConnectionCredentialApiError::Status401,
+    GetModelConnectionCredentialApiError::Status403,
+    GetModelConnectionCredentialApiError::Status404,
+    GetModelConnectionCredentialApiError::Status422,
+    GetModelConnectionCredentialApiError::Status503
+);
+
+problems!(
+    PutModelConnectionCredentialApiError,
+    PutModelConnectionCredentialApiError::Status400,
+    PutModelConnectionCredentialApiError::Status401,
+    PutModelConnectionCredentialApiError::Status403,
+    PutModelConnectionCredentialApiError::Status404,
+    PutModelConnectionCredentialApiError::Status409,
+    PutModelConnectionCredentialApiError::Status413,
+    PutModelConnectionCredentialApiError::Status415,
+    PutModelConnectionCredentialApiError::Status422,
+    PutModelConnectionCredentialApiError::Status503
+);
+
+problems!(
+    RemoveModelConnectionCredentialApiError,
+    RemoveModelConnectionCredentialApiError::Status400,
+    RemoveModelConnectionCredentialApiError::Status401,
+    RemoveModelConnectionCredentialApiError::Status403,
+    RemoveModelConnectionCredentialApiError::Status404,
+    RemoveModelConnectionCredentialApiError::Status409,
+    RemoveModelConnectionCredentialApiError::Status422,
+    RemoveModelConnectionCredentialApiError::Status503
+);
+
+problems!(
     ListModelConnectionsApiError,
     ListModelConnectionsApiError::Status400,
     ListModelConnectionsApiError::Status401,

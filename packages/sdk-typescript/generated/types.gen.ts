@@ -2058,6 +2058,50 @@ export type ModelConnectionCreationResponse = {
 };
 
 /**
+ * ModelConnectionCredentialDetailsResponse
+ *
+ * Safe details of the exact credential slot at the observed revision.
+ */
+export type ModelConnectionCredentialDetailsResponse = {
+    /**
+     * Changedat
+     */
+    changedAt: string | null;
+    /**
+     * Credentialid
+     */
+    credentialId: string | null;
+    /**
+     * Modelconnectionid
+     */
+    modelConnectionId: string;
+    /**
+     * Present
+     */
+    present: boolean;
+    /**
+     * Projectid
+     */
+    projectId: string;
+    /**
+     * Revision
+     */
+    revision: number;
+};
+
+/**
+ * ModelConnectionCredentialRequest
+ *
+ * Submit one provider key over the protected credential-management route.
+ */
+export type ModelConnectionCredentialRequest = {
+    /**
+     * Expectedcredentialrevision
+     */
+    expectedCredentialRevision: number;
+};
+
+/**
  * ModelConnectionCredentialResponse
  */
 export type ModelConnectionCredentialResponse = {
@@ -2069,6 +2113,31 @@ export type ModelConnectionCredentialResponse = {
      * Revision
      */
     revision: number;
+};
+
+/**
+ * ModelConnectionCredentialResultResponse
+ *
+ * Original safe receipt and whether this response recovered a completed request.
+ */
+export type ModelConnectionCredentialResultResponse = {
+    /**
+     * Changed
+     */
+    changed: boolean;
+    credential: ModelConnectionCredentialDetailsResponse;
+    /**
+     * Idempotencyexpiresat
+     */
+    idempotencyExpiresAt: string;
+    /**
+     * Operationid
+     */
+    operationId: string;
+    /**
+     * Replayed
+     */
+    replayed: boolean;
 };
 
 /**
@@ -3472,6 +3541,22 @@ export type HumanOAuthConsentRequestWritable = {
      * Remember
      */
     remember?: boolean;
+};
+
+/**
+ * ModelConnectionCredentialRequest
+ *
+ * Submit one provider key over the protected credential-management route.
+ */
+export type ModelConnectionCredentialRequestWritable = {
+    /**
+     * Expectedcredentialrevision
+     */
+    expectedCredentialRevision: number;
+    /**
+     * Value
+     */
+    value: string;
 };
 
 export type GetProtectedResourceMetadataData = {
@@ -7413,6 +7498,201 @@ export type GetModelConnectionResponses = {
 };
 
 export type GetModelConnectionResponse = GetModelConnectionResponses[keyof GetModelConnectionResponses];
+
+export type RemoveModelConnectionCredentialData = {
+    body?: never;
+    headers: {
+        /**
+         * Idempotency-Key
+         */
+        'Idempotency-Key': string;
+    };
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Model Connection Id
+         */
+        model_connection_id: string;
+    };
+    query: {
+        /**
+         * Expectedcredentialrevision
+         */
+        expectedCredentialRevision: number;
+    };
+    url: '/v1/projects/{project_id}/model-connections/{model_connection_id}/credential';
+};
+
+export type RemoveModelConnectionCredentialErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Operation conflicts with current state
+     */
+    409: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type RemoveModelConnectionCredentialError = RemoveModelConnectionCredentialErrors[keyof RemoveModelConnectionCredentialErrors];
+
+export type RemoveModelConnectionCredentialResponses = {
+    /**
+     * Successful Response
+     */
+    200: ModelConnectionCredentialResultResponse;
+};
+
+export type RemoveModelConnectionCredentialResponse = RemoveModelConnectionCredentialResponses[keyof RemoveModelConnectionCredentialResponses];
+
+export type GetModelConnectionCredentialData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Model Connection Id
+         */
+        model_connection_id: string;
+    };
+    query?: never;
+    url: '/v1/projects/{project_id}/model-connections/{model_connection_id}/credential';
+};
+
+export type GetModelConnectionCredentialErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type GetModelConnectionCredentialError = GetModelConnectionCredentialErrors[keyof GetModelConnectionCredentialErrors];
+
+export type GetModelConnectionCredentialResponses = {
+    /**
+     * Successful Response
+     */
+    200: ModelConnectionCredentialDetailsResponse;
+};
+
+export type GetModelConnectionCredentialResponse = GetModelConnectionCredentialResponses[keyof GetModelConnectionCredentialResponses];
+
+export type PutModelConnectionCredentialData = {
+    body: ModelConnectionCredentialRequestWritable;
+    headers: {
+        /**
+         * Idempotency-Key
+         */
+        'Idempotency-Key': string;
+    };
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Model Connection Id
+         */
+        model_connection_id: string;
+    };
+    query?: never;
+    url: '/v1/projects/{project_id}/model-connections/{model_connection_id}/credential';
+};
+
+export type PutModelConnectionCredentialErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Operation conflicts with current state
+     */
+    409: ProblemDetails;
+    /**
+     * Content Too Large
+     */
+    413: ProblemDetails;
+    /**
+     * Unsupported Media Type
+     */
+    415: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type PutModelConnectionCredentialError = PutModelConnectionCredentialErrors[keyof PutModelConnectionCredentialErrors];
+
+export type PutModelConnectionCredentialResponses = {
+    /**
+     * Successful Response
+     */
+    200: ModelConnectionCredentialResultResponse;
+};
+
+export type PutModelConnectionCredentialResponse = PutModelConnectionCredentialResponses[keyof PutModelConnectionCredentialResponses];
 
 export type ListModelConnectionUsageData = {
     body?: never;

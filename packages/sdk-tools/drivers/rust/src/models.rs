@@ -1,6 +1,51 @@
 #[cfg(test)]
 mod tests {
     #[test]
+    fn password_requests_hide_debug_and_keep_wire_values() {
+        use inframeld_sdk::types::{
+            HumanOAuthConsentRequest, ModelConnectionCredentialRequest, OAuthConsentDecision,
+        };
+        const SECRET: &str = "synthetic-secret-marker-75";
+        let credential_source = serde_json::json!({
+            "expectedCredentialRevision": 0,
+            "value": SECRET,
+        });
+        let credential: ModelConnectionCredentialRequest =
+            serde_json::from_value(credential_source.clone()).unwrap();
+        assert!(
+            credential.value == SECRET,
+            "Public credential field changed"
+        );
+        for rendered in [format!("{credential:?}"), format!("{credential:#?}")] {
+            assert!(
+                !rendered.contains(SECRET),
+                "Credential Debug exposed a password field"
+            );
+        }
+        assert!(
+            serde_json::to_value(credential).unwrap() == credential_source,
+            "Explicit wire serialization changed the credential field",
+        );
+
+        let builder =
+            HumanOAuthConsentRequest::builder(SECRET.to_owned(), OAuthConsentDecision::Allow);
+        assert!(
+            !format!("{builder:?}").contains(SECRET),
+            "Consent builder Debug exposed its password field"
+        );
+        let consent = builder.build();
+        assert!(
+            !format!("{consent:#?}").contains(SECRET),
+            "Consent Debug exposed its password field"
+        );
+        assert!(
+            serde_json::to_value(consent).unwrap()
+                == serde_json::json!({"consentChallenge": SECRET, "decision": "allow"}),
+            "Explicit wire serialization changed consent",
+        );
+    }
+
+    #[test]
     fn application_key_issue_preserves_adapter_order_and_lifetime_omission() {
         use inframeld_sdk::types::ApplicationKeyIssueRequest;
         let source = serde_json::json!({

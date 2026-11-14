@@ -27,6 +27,8 @@ class ActionGrantRoute(APIRoute):
     """Bound exact-grant inputs and prevent caching private assignment results."""
 
     _json_methods: ClassVar[frozenset[str]] = frozenset({"PUT"})
+    _json_body_limit: ClassVar[int] = 32_768
+    _delete_revision_query: ClassVar[str] = "expectedAccessRevision"
 
     def _allowed_read_query(self) -> frozenset[str]:
         return frozenset({"actionId", "limit", "cursor"})
@@ -68,10 +70,10 @@ class ActionGrantRoute(APIRoute):
             return
         if method == "DELETE":
             invalid = any(
-                key != "expectedAccessRevision" or len(request.query_params.getlist(key)) != 1
+                key != self._delete_revision_query or len(request.query_params.getlist(key)) != 1
                 for key in request.query_params
             )
-            revision = request.query_params.get("expectedAccessRevision")
+            revision = request.query_params.get(self._delete_revision_query)
             if revision is not None and (
                 not revision.isascii()
                 or not revision.isdecimal()
@@ -109,7 +111,7 @@ class ActionGrantRoute(APIRoute):
             return
         body = bytearray()
         async for chunk in request.stream():
-            if len(body) + len(chunk) > 32768:
+            if len(body) + len(chunk) > self._json_body_limit:
                 await build_problem_response(request, for_http_status(413))(
                     scope, receive, private_response
                 )

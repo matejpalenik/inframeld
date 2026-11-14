@@ -301,6 +301,31 @@ const calls = {
       ...options(client, call),
       path: call.path as sdk.GetModelConnectionData["path"],
     }),
+  getModelConnectionCredential: (client: Client, call: SdkCall) =>
+    sdk.getModelConnectionCredential({
+      ...options(client, call),
+      path: call.path as sdk.GetModelConnectionCredentialData["path"],
+    }),
+  putModelConnectionCredential: (client: Client, call: SdkCall) =>
+    sdk.putModelConnectionCredential({
+      ...options(client, call),
+      path: call.path as sdk.PutModelConnectionCredentialData["path"],
+      headers: {
+        ...call.headers,
+        "Idempotency-Key": call.headers["Idempotency-Key"]!,
+      },
+      body: call.body as sdk.PutModelConnectionCredentialData["body"],
+    }),
+  removeModelConnectionCredential: (client: Client, call: SdkCall) =>
+    sdk.removeModelConnectionCredential({
+      ...options(client, call),
+      path: call.path as sdk.RemoveModelConnectionCredentialData["path"],
+      headers: {
+        ...call.headers,
+        "Idempotency-Key": call.headers["Idempotency-Key"]!,
+      },
+      query: call.query as sdk.RemoveModelConnectionCredentialData["query"],
+    }),
   listModelConnectionUsage: (client: Client, call: SdkCall) =>
     sdk.listModelConnectionUsage({
       ...options(client, call),

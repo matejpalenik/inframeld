@@ -32,7 +32,7 @@ Manual release mode and Pipeline rollback do not freeze or restore shared connec
 
 ## Protect credentials and model access
 
-PostgreSQL/PyNaCl authenticated encryption with a separate persistent root key is accepted. Authenticated encryption protects saved secret contents and detects tampering. Bind ciphertext to the documented resource context, and keep plaintext resolution narrow.
+The credential management API stores provider values with PostgreSQL/PyNaCl authenticated encryption and a separate persistent root key. The current exact human Manage action controls inspection, saving and removal. Ordinary View reads expose presence and revision. A saved result contains safe slot metadata and can be recovered under current authority by repeating the original protected request. [Provider credential storage](provider-credential-storage.md) describes management and remaining dispatch qualification.
 
 Missing or wrong key material must fail closed. Root encryption keys and keyed request-fingerprint keys serve different purposes. Secrets do not enter exports, access-history, receipts, logs or replay payloads.
 

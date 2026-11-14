@@ -1,6 +1,7 @@
 export const pageMetadata = {
   title: "Configure models and processing",
-  description: "Save a model connection and inspect its allowed configuration.",
+  description:
+    "Save a model connection, inspect its settings and manage its provider credential.",
 }
 
 # Configure models and processing
@@ -186,7 +187,7 @@ EOF_HEADERS
 
 </CodeGroup>
 
-The response reports the saved base URL, selected authentication method and connection settings revision. `credential.present: false` with revision `0` is expected for a new connection. The [API reference](/api-reference/projects-and-access#list-model-connections) shows how to continue a connection list.
+The response reports the saved base URL, selected authentication method and connection settings revision. The `credential` summary shows the current presence and revision. A new connection starts with `credential.present: false` and revision `0`. The [API reference](/api-reference/projects-and-access#list-model-connections) shows how to continue a connection list.
 
 Use the [usage read](/api-reference/projects-and-access#list-model-connection-usage) to inspect permitted saved observations. Append `/usage` to the connection URL and send the same authenticated GET. In this version the page has empty `items` and `nextCursor: null`. An empty page means there are no recorded observations to show. It gives no provider reachability or validation result. [Models, processing and search](/product/models-and-search) explains where consumer model and role settings belong.
 
@@ -195,3 +196,82 @@ Use the [usage read](/api-reference/projects-and-access#list-model-connection-us
 Keep the original installation, Project, method, route, request body and key. A timeout, disconnect or unusable response can occur after creation. Within the retained period, explicitly repeat the original POST with those inputs and a current credential for the same human. Current `create-model-connections` authority still applies. The receipt describes the original connection and creator assignments. Later changes stay in force. Use GET for current configuration.
 
 If a fresh request rejects the destination, ask the operator to confirm the exact URL and provider selection. Keep the original request separate if you have already sent it and its result is uncertain. Use a new key only for a deliberately changed, reviewed request.
+
+## Save a provider credential
+
+Save the API key for an existing `api-key` connection. The server stores the key without contacting the provider. Use a disposable Project and synthetic token when practicing this procedure.
+
+You need the permanent `PROJECT_ID` and `MODEL_CONNECTION_ID`, a current human bearer credential and `manage-model-connection` on the exact connection. Use your installation's HTTPS URL and the [HTTP setup](/clients/http#call-protected-operations) for `INFRAMELD_URL` and `INFRAMELD_TOKEN`. The ordinary configuration read shows a credential summary under `view-model-connection-configuration`. The dedicated credential read and changes use `manage-model-connection`.
+
+<CodeGroup>
+
+```shell
+CREDENTIAL_URL="$INFRAMELD_URL/v1/projects/$PROJECT_ID/model-connections/$MODEL_CONNECTION_ID/credential"
+
+curl --disable --fail-with-body --silent --show-error --max-time 5 \
+  --proto '=https' --header @- "$CREDENTIAL_URL" <<EOF_HEADERS
+Authorization: Bearer $INFRAMELD_TOKEN
+EOF_HEADERS
+```
+
+</CodeGroup>
+
+Read `present` and `revision` in the response. Before the first save, the revision is `0` and `credentialId` and `changedAt` are `null`. Use the revision you read when preparing a save or replacement. [Credential metadata schema](/api-reference/models#ModelConnectionCredentialDetailsResponse).
+
+Create a private request file outside your checkout and choose an idempotency key to identify this save request.
+
+<CodeGroup>
+
+```shell
+CREDENTIAL_REQUEST_DIR=$(mktemp -d "${TMPDIR:-/tmp}/inframeld-credential.XXXXXXXX") &&
+  CREDENTIAL_REQUEST_FILE="$CREDENTIAL_REQUEST_DIR/credential-save.json" &&
+  (umask 077; : > "$CREDENTIAL_REQUEST_FILE") &&
+  CREDENTIAL_SAVE_KEY=$(uuidgen)
+```
+
+</CodeGroup>
+
+Use a protected local editor or secret-handling tool to prepare `credential-save.json`. Set `expectedCredentialRevision` to the revision you just read as a JSON integer. Set `value` to the raw provider token as a JSON string and omit the `Bearer` prefix. Keep the provider token out of shell arguments, environment variables and logs. Keep shell and HTTP tracing disabled. [Save request schema](/api-reference/models#ModelConnectionCredentialRequest).
+
+<CodeGroup>
+
+```shell
+curl --disable --fail-with-body --silent --show-error --max-time 5 \
+  --proto '=https' --request PUT --header @- \
+  --header "Idempotency-Key: $CREDENTIAL_SAVE_KEY" \
+  --header 'Content-Type: application/json' \
+  --data-binary "@$CREDENTIAL_REQUEST_FILE" "$CREDENTIAL_URL" <<EOF_HEADERS
+Authorization: Bearer $INFRAMELD_TOKEN
+EOF_HEADERS
+```
+
+</CodeGroup>
+
+HTTP `200` returns the resulting `credential.revision` and `credential.present`. The receipt's `changed` field records whether the original request changed the slot. To replace a saved key, read the current revision and prepare a separate protected file and idempotency key.
+
+## Recover a save or removal after a lost reply
+
+A timeout or disconnect can happen after the change commits. Keep the original installation, IDs, method, revision and idempotency key. For a save, keep the original JSON file protected as well. Within the retained result period, repeat the original call with a current credential for the same human. Keep the request inputs and key unchanged. Current management permission still applies.
+
+An authorized replay returns the original `credential`, `changed`, `operationId` and `idempotencyExpiresAt` with `replayed: true`. Use GET to find today's state. A different secret under the same idempotency key conflicts. If retention may have expired, inspect current state before deciding whether to send a new request. Once the result is resolved, remove the protected local request file and its directory.
+
+## Remove the saved provider credential
+
+Check the current credential revision again and review any work you know depends on this connection. The current usage page only reports saved observations. An empty page cannot establish that removal has no impact. Future calls that require the key will need a saved credential. Already sent requests may finish. Revoke the provider's own key separately at the provider if needed.
+
+Set `CURRENT_CREDENTIAL_REVISION` to the revision you just read. Run `CREDENTIAL_REMOVE_KEY=$(uuidgen)` once for this removal and keep both values in case the reply is lost.
+
+<CodeGroup>
+
+```shell
+curl --disable --fail-with-body --silent --show-error --max-time 5 \
+  --proto '=https' --request DELETE --header @- \
+  --header "Idempotency-Key: $CREDENTIAL_REMOVE_KEY" \
+  "$CREDENTIAL_URL?expectedCredentialRevision=$CURRENT_CREDENTIAL_REVISION" <<EOF_HEADERS
+Authorization: Bearer $INFRAMELD_TOKEN
+EOF_HEADERS
+```
+
+</CodeGroup>
+
+HTTP `200` returns the original removal outcome. Removing a present credential advances its revision and returns `credential.present: false`. A removal of an already empty slot at its current revision records `changed: false`. For a lost reply, reuse the original DELETE key and revision. [Recover a save or removal after a lost reply](#recover-a-save-or-removal-after-a-lost-reply).

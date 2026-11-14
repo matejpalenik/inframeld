@@ -105,6 +105,9 @@ from inframeld_backend.access.http.requests.invitation_revocation_request import
 from inframeld_backend.access.http.requests.model_connection_action_grant_request import (
     ModelConnectionActionGrantRequest,
 )
+from inframeld_backend.access.http.requests.model_connection_credential_request import (
+    ModelConnectionCredentialRequest,
+)
 from inframeld_backend.access.http.requests.organization_action_grant_request import (
     OrganizationActionGrantRequest,
 )
@@ -214,6 +217,9 @@ from inframeld_backend.access.http.responses.model_connection_action_grant_respo
 from inframeld_backend.access.http.responses.model_connection_creation_response import (
     ModelConnectionCreationResponse,
 )
+from inframeld_backend.access.http.responses.model_connection_credential_details_response import (
+    ModelConnectionCredentialDetailsResponse,
+)
 from inframeld_backend.access.http.responses.model_connection_response import (
     ModelConnectionCredentialResponse,
     ModelConnectionResponse,
@@ -276,6 +282,9 @@ from inframeld_backend.access.http.routes.human_oauth_consent_routes import (
     create_human_oauth_consent_router,
 )
 from inframeld_backend.access.http.routes.invitation_routes import create_invitation_router
+from inframeld_backend.access.http.routes.model_connection_credential_routes import (
+    create_model_connection_credential_router,
+)
 from inframeld_backend.access.http.routes.model_connection_grant_routes import (
     create_model_connection_grant_router,
 )
@@ -368,6 +377,7 @@ from inframeld_backend.bootstrap.invitation_composition import (
 )
 from inframeld_backend.bootstrap.model_connection_composition import (
     open_model_connection_creation,
+    open_model_connection_credentials,
     open_model_connection_grant_change,
     open_model_connection_grant_read,
     open_model_connection_read,
@@ -449,9 +459,10 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
             if client is not None:
                 provider_cleanup.callback(client.rest_client.pool_manager.clear)
 
-        request_fingerprints = RequestFingerprintService(
-            FileRequestFingerprintKeyReader(resolved_settings.request_fingerprint.key_file).read()
-        )
+        fingerprint_key = FileRequestFingerprintKeyReader(
+            resolved_settings.request_fingerprint.key_file
+        ).read()
+        request_fingerprints = RequestFingerprintService(fingerprint_key)
         fingerprints = ProjectGrantChangeFingerprintService(request_fingerprints)
         upload_default_fingerprints = ProjectUploadDefaultFingerprintService(request_fingerprints)
         metadata_fingerprints = ProjectMetadataFingerprintService(request_fingerprints)
@@ -549,6 +560,7 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
                 AccessGroupActionGrantRequest,
                 ApplicationAccountActionGrantRequest,
                 ModelConnectionActionGrantRequest,
+                ModelConnectionCredentialRequest,
             ),
             serialization_models=(
                 InvitationIssueResponse,
@@ -592,6 +604,7 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
                 ModelConnectionCreationResponse,
                 ModelConnectionResponse,
                 ModelConnectionCredentialResponse,
+                ModelConnectionCredentialDetailsResponse,
             ),
         )
         application.include_router(health_router)
@@ -730,6 +743,18 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
                     resolved_settings.model_connection_destinations,
                 ),
                 partial(open_model_connection_read, database, http_application_key_profile),
+            )
+        )
+        application.include_router(
+            create_model_connection_credential_router(
+                product_access,
+                partial(
+                    open_model_connection_credentials,
+                    database,
+                    fingerprint_key,
+                    resolved_settings.model_connection_destinations,
+                    resolved_settings.provider_credential,
+                ),
             )
         )
         application.include_router(

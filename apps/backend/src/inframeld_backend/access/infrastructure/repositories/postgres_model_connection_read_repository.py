@@ -1,6 +1,6 @@
 from typing import override
 
-from sqlalchemy import String, exists, func, select
+from sqlalchemy import Nullable, String, and_, exists, func, select
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.exc import TimeoutError as SqlAlchemyTimeoutError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -35,6 +35,9 @@ from inframeld_backend.access.infrastructure.readers.postgres_project_action_fac
 )
 from inframeld_backend.access.infrastructure.rows.model_connection_action_grant_row import (
     ModelConnectionActionGrantRow,
+)
+from inframeld_backend.access.infrastructure.rows.model_connection_credential_row import (
+    ModelConnectionCredentialRow,
 )
 from inframeld_backend.access.infrastructure.rows.model_connection_row import ModelConnectionRow
 from inframeld_backend.access.infrastructure.rows.organization_row import OrganizationRow
@@ -133,12 +136,13 @@ class PostgresModelConnectionReadRepository(ModelConnectionReadRepository):
         self, facts: ProjectActionFactsDTO, project_id: ProjectId, connection_id: ModelConnectionId
     ) -> ModelConnectionDTO | None:
         try:
-            row = await self._session.scalar(
+            result = await self._session.execute(
                 self._visible(facts, project_id).where(ModelConnectionRow.id == connection_id.value)
             )
+            row = result.tuples().one_or_none()
         except (OperationalError, SqlAlchemyTimeoutError):
             raise DependencyUnavailableError() from None
-        return self._metadata(row) if row is not None else None
+        return self._metadata(*row) if row is not None else None
 
     @override
     async def list_visible(
@@ -152,31 +156,47 @@ class PostgresModelConnectionReadRepository(ModelConnectionReadRepository):
         if after is not None:
             query = query.where(ModelConnectionRow.id > after.value)
         try:
-            rows = await self._session.scalars(query.order_by(ModelConnectionRow.id).limit(limit))
+            result = await self._session.execute(query.order_by(ModelConnectionRow.id).limit(limit))
+            rows = result.tuples().all()
         except (OperationalError, SqlAlchemyTimeoutError):
             raise DependencyUnavailableError() from None
-        return tuple(self._metadata(row) for row in rows)
+        return tuple(self._metadata(*row) for row in rows)
 
     @staticmethod
     def _visible(
         facts: ProjectActionFactsDTO, project_id: ProjectId
-    ) -> Select[tuple[ModelConnectionRow]]:
-        return select(ModelConnectionRow).where(
-            ModelConnectionRow.project_id == project_id.value,
-            ModelConnectionRow.organization_id == facts.principal.organization_id.value,
-            ModelConnectionRow.retired_at.is_(None),
-            exists().where(
-                ModelConnectionActionGrantRow.project_id == ModelConnectionRow.project_id,
-                ModelConnectionActionGrantRow.model_connection_id == ModelConnectionRow.id,
-                ModelConnectionActionGrantRow.recipient_principal_id == facts.principal.id.value,
-                ModelConnectionActionGrantRow.recipient_kind == facts.principal.kind,
-                ModelConnectionActionGrantRow.action
-                == ModelConnectionAction.VIEW_CONFIGURATION.value,
-            ),
+    ) -> Select[tuple[ModelConnectionRow, int | None, bool]]:
+        slot = ModelConnectionCredentialRow
+        return (
+            select(ModelConnectionRow, Nullable(slot.revision), slot.key_id.is_not(None))
+            .outerjoin(
+                slot,
+                and_(
+                    slot.model_connection_id == ModelConnectionRow.id,
+                    slot.project_id == ModelConnectionRow.project_id,
+                    slot.organization_id == ModelConnectionRow.organization_id,
+                ),
+            )
+            .where(
+                ModelConnectionRow.project_id == project_id.value,
+                ModelConnectionRow.organization_id == facts.principal.organization_id.value,
+                ModelConnectionRow.retired_at.is_(None),
+                exists().where(
+                    ModelConnectionActionGrantRow.project_id == ModelConnectionRow.project_id,
+                    ModelConnectionActionGrantRow.model_connection_id == ModelConnectionRow.id,
+                    ModelConnectionActionGrantRow.recipient_principal_id
+                    == facts.principal.id.value,
+                    ModelConnectionActionGrantRow.recipient_kind == facts.principal.kind,
+                    ModelConnectionActionGrantRow.action
+                    == ModelConnectionAction.VIEW_CONFIGURATION.value,
+                ),
+            )
         )
 
     @staticmethod
-    def _metadata(row: ModelConnectionRow) -> ModelConnectionDTO:
+    def _metadata(
+        row: ModelConnectionRow, revision: int | None, present: bool
+    ) -> ModelConnectionDTO:
         return ModelConnectionDTO(
             ProjectId(row.project_id),
             ModelConnectionId(row.id),
@@ -189,6 +209,6 @@ class PostgresModelConnectionReadRepository(ModelConnectionReadRepository):
                 ModelConnectionAuthentication(row.authentication),
             ),
             row.access_revision,
-            credential_present=False,
-            credential_revision=0,
+            credential_present=present,
+            credential_revision=revision or 0,
         )

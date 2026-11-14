@@ -37,6 +37,9 @@ from inframeld_sdk.models.model_connection_action_grant_request import (
     ModelConnectionActionGrantRequest,
 )
 from inframeld_sdk.models.model_connection_creation_request import ModelConnectionCreationRequest
+from inframeld_sdk.models.model_connection_credential_request import (
+    ModelConnectionCredentialRequest,
+)
 from inframeld_sdk.models.organization_action_grant_request import OrganizationActionGrantRequest
 from inframeld_sdk.models.original_operation_lookup_request import OriginalOperationLookupRequest
 from inframeld_sdk.models.project_action_grant_request import ProjectActionGrantRequest
@@ -353,6 +356,72 @@ async def get_model_connection_async(clients: Clients, call: Call) -> NativeResp
     return await AccessApi(clients.production).get_model_connection_with_http_info(
         project_id=UUID(call.path["project_id"]),
         model_connection_id=UUID(call.path["model_connection_id"]),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+def get_model_connection_credential_sync(clients: Clients, call: Call) -> NativeResponse:
+    return AccessApi(clients.production).get_model_connection_credential_sync_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        model_connection_id=UUID(call.path["model_connection_id"]),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def get_model_connection_credential_async(clients: Clients, call: Call) -> NativeResponse:
+    return await AccessApi(clients.production).get_model_connection_credential_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        model_connection_id=UUID(call.path["model_connection_id"]),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+def put_model_connection_credential_sync(clients: Clients, call: Call) -> NativeResponse:
+    return AccessApi(clients.production).put_model_connection_credential_sync_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        model_connection_id=UUID(call.path["model_connection_id"]),
+        idempotency_key=call.headers["Idempotency-Key"],
+        model_connection_credential_request=ModelConnectionCredentialRequest.model_validate(
+            call.body
+        ),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def put_model_connection_credential_async(clients: Clients, call: Call) -> NativeResponse:
+    return await AccessApi(clients.production).put_model_connection_credential_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        model_connection_id=UUID(call.path["model_connection_id"]),
+        idempotency_key=call.headers["Idempotency-Key"],
+        model_connection_credential_request=ModelConnectionCredentialRequest.model_validate(
+            call.body
+        ),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+def remove_model_connection_credential_sync(clients: Clients, call: Call) -> NativeResponse:
+    return AccessApi(clients.production).remove_model_connection_credential_sync_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        model_connection_id=UUID(call.path["model_connection_id"]),
+        idempotency_key=call.headers["Idempotency-Key"],
+        expected_credential_revision=integer(call.query["expectedCredentialRevision"]),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def remove_model_connection_credential_async(clients: Clients, call: Call) -> NativeResponse:
+    return await AccessApi(clients.production).remove_model_connection_credential_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        model_connection_id=UUID(call.path["model_connection_id"]),
+        idempotency_key=call.headers["Idempotency-Key"],
+        expected_credential_revision=integer(call.query["expectedCredentialRevision"]),
         _headers=call.headers,
         _request_timeout=call.timeout / 1000,
     )
@@ -1678,6 +1747,15 @@ BINDINGS: dict[Operation, Binding] = {
         list_model_connections_sync, list_model_connections_async
     ),
     Operation.GET_MODEL_CONNECTION: Binding(get_model_connection_sync, get_model_connection_async),
+    Operation.GET_MODEL_CONNECTION_CREDENTIAL: Binding(
+        get_model_connection_credential_sync, get_model_connection_credential_async
+    ),
+    Operation.PUT_MODEL_CONNECTION_CREDENTIAL: Binding(
+        put_model_connection_credential_sync, put_model_connection_credential_async
+    ),
+    Operation.REMOVE_MODEL_CONNECTION_CREDENTIAL: Binding(
+        remove_model_connection_credential_sync, remove_model_connection_credential_async
+    ),
     Operation.LIST_MODEL_CONNECTION_USAGE: Binding(
         list_model_connection_usage_sync, list_model_connection_usage_async
     ),

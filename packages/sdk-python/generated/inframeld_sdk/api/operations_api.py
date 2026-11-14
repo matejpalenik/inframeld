@@ -508,7 +508,7 @@ class OperationsApi:
 
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def lookup_original_operation(
         self,
         original_operation_lookup_request: OriginalOperationLookupRequest,
@@ -618,7 +618,7 @@ class OperationsApi:
         ).data
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def lookup_original_operation_with_http_info(
         self,
         original_operation_lookup_request: OriginalOperationLookupRequest,
@@ -728,7 +728,7 @@ class OperationsApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     async def lookup_original_operation_without_preload_content(
         self,
         original_operation_lookup_request: OriginalOperationLookupRequest,
@@ -834,7 +834,7 @@ class OperationsApi:
         return response_data.response
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def lookup_original_operation_sync(
         self,
         original_operation_lookup_request: OriginalOperationLookupRequest,
@@ -868,7 +868,7 @@ class OperationsApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def lookup_original_operation_sync_with_http_info(
         self,
         original_operation_lookup_request: OriginalOperationLookupRequest,
@@ -902,7 +902,7 @@ class OperationsApi:
         )
 
 
-    @validate_call
+    @validate_call(config={"hide_input_in_errors": bool([])})
     def lookup_original_operation_sync_without_preload_content(
         self,
         original_operation_lookup_request: OriginalOperationLookupRequest,
