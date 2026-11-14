@@ -55,7 +55,7 @@ Provide capabilities to inspect current access/history and permitted usage, revi
 
 Logical update inputs identify the connection, expected current revisions, complete proposed supported settings and acknowledgment of the reviewed live impact. Destination-changing credentials use protected write-only input. Outputs distinguish unchanged, committed, rejected, stale review and uncertain response/recovered outcome, with safe current/result revision metadata. Incompatible or unproven embedding dependencies reject before mutation. Do not invent new endpoint paths, problem codes, permission IDs, physical tables or vendor-typed request bags in this documentation.
 
-Pipeline/profile/evaluator definitions select stable connection IDs, not executable historical access revisions. Execution results expose actual safe revision observations and interrupted-work attribution through their owning contracts. Snapshot/history inspection must not become a way to dispatch against retired access settings or recover secrets. Specify exact wire mappings and tests when implementing the capabilities. This change generates no contract and adds no MCP tools.
+Pipeline/profile/evaluator definitions select stable connection IDs, not executable historical access revisions. Execution results expose actual safe revision observations and interrupted-work attribution through their owning contracts. Snapshot/history inspection must not become a way to dispatch against retired access settings or recover secrets. The [native contract examples](model-contract-examples.md#create-and-inspect-a-connection) give the receiving issues their request and result mappings. Route implementation, OpenAPI and generated-client qualification belong to those issues.
 
 <a id="connection-changes"></a>
 
@@ -128,3 +128,5 @@ Project configuration export captures one current non-secret definition per incl
 ## Apply accepted ADR-0123
 
 Accepted [ADR-0123](model-metadata-and-validation.md#accepted-metadata-and-reference-contract) selects this workflow's detailed contract. A model catalogue can suggest settings without proving that a private server supports them. Separately, deleting a shared connection is safe only when no retained executable configuration still needs it. Apply its exact bounds, current-state checks and failure outcomes. Native implementation and qualification remain separate.
+
+The [connection request and result examples](model-contract-examples.md#create-and-inspect-a-connection) specify the native handoff for creation, current reads, impact, reviewed updates and safe retirement.

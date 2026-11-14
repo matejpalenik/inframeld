@@ -35,6 +35,8 @@ Recording where a setting came from explains it. It does not transfer validation
 
 Offline validation checks definitions without fetching catalogues, tokenizers or provider metadata. If the destination cannot honor a setting, report the incompatibility. Do not substitute a default or run a hidden probe.
 
+See the [portable model settings example](model-contract-examples.md#preserve-portable-meaning) for the effective model fragment that the complete TOML schema preserves.
+
 <a id="one-coherent-capture"></a>
 
 ## One Coherent Capture
