@@ -350,16 +350,20 @@ async def test_fresh_allocation_measures_capacity_only_after_its_ledger_turn(
             holder_pid = await holder.scalar(select(func.pg_backend_pid(type_=Integer)))
             assert holder_pid is not None
             allocation = tasks.create_task(allocate_with_observation())
-            async with database.session() as observer, asyncio.timeout(3):
+            async with asyncio.timeout(3):
                 while not allocation.done():
-                    blocked = await observer.scalar(
-                        select(pid)
-                        .select_from(activity)
-                        .where(
-                            name == func.current_database(type_=String()),
-                            func.pg_blocking_pids(pid, type_=ARRAY(Integer)).contains([holder_pid]),
+                    # PostgreSQL caches pg_stat_activity for the current transaction.
+                    async with database.session() as observer:
+                        blocked = await observer.scalar(
+                            select(pid)
+                            .select_from(activity)
+                            .where(
+                                name == func.current_database(type_=String()),
+                                func.pg_blocking_pids(pid, type_=ARRAY(Integer)).contains(
+                                    [holder_pid]
+                                ),
+                            )
                         )
-                    )
                     if blocked is not None:
                         break
                     await asyncio.sleep(0.01)
