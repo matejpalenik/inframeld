@@ -26,6 +26,9 @@ from inframeld_backend.access.application.dtos.invitation_model_connection_targe
 from inframeld_backend.access.application.dtos.invitation_preview_result_dto import (
     InvitationPreviewResultDTO,
 )
+from inframeld_backend.access.application.dtos.invitation_processing_profile_target_dto import (
+    InvitationProcessingProfileTargetDTO,
+)
 from inframeld_backend.access.application.dtos.invitation_project_membership_intent_dto import (
     InvitationProjectMembershipIntentDTO,
 )
@@ -57,6 +60,9 @@ from inframeld_backend.access.domain.policies.organization_grant_policy import (
 )
 from inframeld_backend.access.domain.policies.project_action_eligibility_policy import (
     ProjectActionEligibilityPolicy,
+)
+from inframeld_backend.indexing.domain.enums.processing_profile_action import (
+    ProcessingProfileAction,
 )
 from inframeld_backend.shared.application.errors.application_errors import (
     ConflictError,
@@ -117,14 +123,17 @@ class InvitationPreviewService(InvitationPreviewer):
                 required = self._required_targets(invitation)
                 observed = {scope.target for scope in facts.scopes}
                 for scope in facts.scopes:
-                    if isinstance(scope.target, InvitationModelConnectionTargetDTO):
-                        if scope.model_project_id is None:
-                            raise RuntimeError(
-                                "Preview lost the model connection's owning Project."
-                            )
-                        required.add(ProjectGrantTargetDTO(scope.model_project_id))
-                    elif scope.model_project_id is not None:
-                        raise RuntimeError("Preview attached a model binding to another target.")
+                    if isinstance(
+                        scope.target,
+                        (InvitationModelConnectionTargetDTO, InvitationProcessingProfileTargetDTO),
+                    ):
+                        if scope.resolved_project_id is None:
+                            raise RuntimeError("Preview lost the intended target Project.")
+                        required.add(ProjectGrantTargetDTO(scope.resolved_project_id))
+                    elif scope.resolved_project_id is not None:
+                        raise RuntimeError(
+                            "Preview attached an extra Project binding to this target."
+                        )
                 if (
                     len(facts.scopes) > 201
                     or len(observed) != len(facts.scopes)
@@ -182,6 +191,8 @@ class InvitationPreviewService(InvitationPreviewer):
                 )
             elif isinstance(target, InvitationModelConnectionTargetDTO):
                 supported = intent.action_id.value in ModelConnectionAction
+            elif isinstance(target, InvitationProcessingProfileTargetDTO):
+                supported = intent.action_id.value in ProcessingProfileAction
             else:
                 # Real future owners add their authoritative integration, never a placeholder target.
                 supported = False

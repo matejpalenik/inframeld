@@ -5,7 +5,7 @@ The staged test OAuth exchange does not claim production CLI login/provisioning 
 
 import os
 from dataclasses import replace
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 from pydantic import HttpUrl
@@ -13,6 +13,11 @@ from sqlalchemy import delete, func, select, update
 from tests.support.hydra_provider import API_AUDIENCE, HYDRA_ISSUER, hydra_test_provider
 from tests.support.integration_services import HYDRA_ADMIN_URL, KRATOS_ADMIN_URL, KRATOS_PUBLIC_URL
 from tests.support.kratos_browser import create_browser, register_human
+from tests.support.processing_profile_scenarios import (
+    grant_profile_creation,
+    profile_command,
+    profile_context,
+)
 from tests.support.project_metadata_maintenance_command import run_project_metadata_maintenance
 from tests.support.project_metadata_scenarios import (
     seed_metadata_repair_recipient,
@@ -25,6 +30,9 @@ from inframeld_backend.access.application.commands.create_model_connection_comma
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
 from inframeld_backend.access.application.dtos.access_group_grant_target_dto import (
     AccessGroupGrantTargetDTO,
+)
+from inframeld_backend.access.application.dtos.action_grantor_repair_responsibility_dto import (
+    ActionGrantorRepairResponsibilityDTO,
 )
 from inframeld_backend.access.application.dtos.application_account_grant_target_dto import (
     ApplicationAccountGrantTargetDTO,
@@ -59,6 +67,7 @@ from inframeld_backend.access.domain.value_objects.human_credential_version impo
     HumanCredentialVersion,
 )
 from inframeld_backend.access.domain.value_objects.identity_authority import IdentityAuthority
+from inframeld_backend.access.domain.value_objects.identity_subject import IdentitySubject
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.infrastructure.resources.postgres_identity_coordinator import (
     PostgresIdentityCoordinator,
@@ -104,8 +113,19 @@ from inframeld_backend.access.infrastructure.settings.model_connection_destinati
 )
 from inframeld_backend.bootstrap.access_composition import create_access_components
 from inframeld_backend.bootstrap.model_connection_composition import open_model_connection_creation
+from inframeld_backend.bootstrap.processing_profile_composition import (
+    open_processing_profile_creation,
+    open_processing_profile_read,
+)
+from inframeld_backend.indexing.domain.enums.processing_profile_action import (
+    ProcessingProfileAction,
+)
+from inframeld_backend.indexing.infrastructure.rows.processing_profile_action_grant_row import (
+    ProcessingProfileActionGrantRow,
+)
 from inframeld_backend.shared.application.dtos.idempotency_context_dto import IdempotencyContextDTO
 from inframeld_backend.shared.application.enums.http_method import HttpMethod
+from inframeld_backend.shared.application.errors.application_errors import ResourceNotFoundError
 from inframeld_backend.shared.application.services.request_fingerprint_service import (
     RequestFingerprintService,
 )
@@ -235,6 +255,7 @@ async def test_real_recipient_proof_current_generation_and_proof_independent_rec
                     "accessGroupId": str(group_id.value),
                 }
             else:
+                assert isinstance(observed, ActionGrantorRepairResponsibilityDTO)
                 action = observed.action_id.value
                 target = observed.target
                 if isinstance(target, OrganizationGrantTargetDTO):
@@ -836,3 +857,195 @@ async def test_real_recipient_proof_current_generation_and_proof_independent_rec
                     )
                     == 0
                 )
+
+
+@pytest.mark.asyncio
+async def test_real_recipient_proof_repairs_only_the_exact_processing_profile_action(
+    database: Database, temporary_postgres_settings: DatabaseSettings
+) -> None:
+    async with hydra_test_provider() as provider, create_browser() as browser:
+        human = await register_human(browser)
+        identity = VerifiedHumanIdentityDTO(IdentityAuthority("kratos:test"), human.subject)
+        seed, binding = await seed_metadata_repair_recipient(database, identity)
+        access = AccessContextDTO(seed.principal_id, binding)
+        project = seed.project_id
+        other_seed, other_binding = await seed_metadata_repair_recipient(
+            database, replace(identity, subject=IdentitySubject(str(uuid4())))
+        )
+        other_access = AccessContextDTO(other_seed.principal_id, other_binding)
+        await grant_profile_creation(database, access, project)
+        await grant_profile_creation(database, other_access, other_seed.project_id)
+        fingerprints = RequestFingerprintService(RequestFingerprintKey(b"P" * 32))
+        async with open_processing_profile_creation(database, fingerprints) as creator:
+            created = await creator.create(
+                access=access,
+                command=profile_command(project),
+                context=profile_context(project, "native-profile-repair"),
+            )
+            neighbor = await creator.create(
+                access=access,
+                command=replace(profile_command(project), name=ResourceName("other-profile")),
+                context=profile_context(project, "native-neighbor-profile"),
+            )
+            foreign = await creator.create(
+                access=other_access,
+                command=profile_command(other_seed.project_id),
+                context=profile_context(other_seed.project_id, "native-foreign-profile"),
+            )
+        profile = created.profile.id
+        action = ProcessingProfileAction.VIEW.value
+        use_action = ProcessingProfileAction.USE.value
+        grant_key = (project.value, profile.value, seed.principal_id.value)
+        target = {
+            "kind": "processing-profile",
+            "processingProfileId": str(profile.value),
+        }
+        responsibility = {"kind": "action-grantor", "target": target, "actionId": action}
+        tokens = await provider.issue_tokens(human, browser=browser, credential_binding=binding)
+        operation = "native-processing-profile-repair"
+        request: dict[str, object] = {
+            "schemaVersion": 1,
+            "mode": "repair-stranded-authority",
+            "expectedInstallationId": str(binding.installation_id.value),
+            "operationId": operation,
+            "operatorLabel": "Native host operator",
+            "reason": "Restore the exact Processing Profile View grantor",
+            "expectedAccessRevision": neighbor.project_access_revision,
+            "expectedIdentityId": str(UUID(identity.subject.value)),
+            "identityProof": {
+                "kind": "hydra-access-token",
+                "accessToken": tokens.access_token.value,
+            },
+            "responsibility": responsibility,
+        }
+        for candidate, exit_code, expected in (
+            (
+                request
+                | {
+                    "responsibility": responsibility
+                    | {"target": target | {"projectId": str(project.value)}}
+                },
+                2,
+                "invalid_input",
+            ),
+            (
+                request
+                | {
+                    "responsibility": responsibility
+                    | {"target": target | {"processingProfileId": str(foreign.profile.id.value)}}
+                },
+                1,
+                "identity_ineligible",
+            ),
+            (request, 1, "responsibility_not_stranded"),
+        ):
+            status, result, _ = await run_project_metadata_maintenance(
+                candidate, temporary_postgres_settings
+            )
+            assert status == exit_code and result["code"] == expected
+
+        async with database.session() as session, session.begin():
+            assert (
+                await session.scalar(select(func.count()).select_from(HostMaintenanceReceiptRow))
+                == 0
+            )
+            current = await session.get(ProcessingProfileActionGrantRow, (*grant_key, action))
+            assert current is not None and current.can_grant
+            await session.delete(current)
+            await session.execute(
+                update(ProjectRow)
+                .where(ProjectRow.id == project.value)
+                .values(access_revision=ProjectRow.access_revision + 1)
+            )
+        async with open_processing_profile_read(database, None) as reader:
+            with pytest.raises(ResourceNotFoundError):
+                await reader.get(access, project, profile)
+        status, stale, _ = await run_project_metadata_maintenance(
+            request, temporary_postgres_settings
+        )
+        assert status == 1 and stale["code"] == "stale_revision"
+        before = neighbor.project_access_revision + 1
+        request["expectedAccessRevision"] = before
+        status, original, diagnostics = await run_project_metadata_maintenance(
+            request, temporary_postgres_settings
+        )
+        if tokens.access_token.value.encode() in diagnostics:
+            pytest.fail("Recipient proof appeared in private command diagnostics.", pytrace=False)
+        assert status == 0 and original["outcome"] == "repaired"
+        assert original["responsibility"] == responsibility
+        assert original["principalId"] == str(seed.principal_id.value)
+        assert original["accessRevision"] == before + 1
+        async with open_processing_profile_read(database, None) as reader:
+            assert await reader.get(access, project, profile) == created.profile
+
+        original_key = (binding.installation_id.value, operation)
+        async with database.session() as session, session.begin():
+            retained = await session.get(StrandedAuthorityRepairReceiptRow, original_key)
+            assert retained is not None
+            assert (retained.project_id, retained.processing_profile_id, retained.action_id) == (
+                project.value,
+                profile.value,
+                action,
+            )
+            assert (retained.before_revision, retained.after_revision) == (before, before + 1)
+            grant = await session.get(ProcessingProfileActionGrantRow, (*grant_key, action))
+            assert grant is not None and grant.can_grant and grant.assigned_by_principal_id is None
+            untouched = await session.get(ProcessingProfileActionGrantRow, (*grant_key, use_action))
+            assert (
+                untouched is not None
+                and untouched.assigned_by_principal_id == seed.principal_id.value
+            )
+            audit = await session.scalar(
+                select(AccessAuditEventRow).where(AccessAuditEventRow.correlation_id == operation)
+            )
+            assert audit is not None
+            assert (audit.project_id, audit.target_kind, audit.target_id, audit.action) == (
+                project.value,
+                "processing_profile",
+                profile.value,
+                action,
+            )
+            assert (audit.actor_kind, audit.actor_reference, audit.reason) == (
+                "operator",
+                request["operatorLabel"],
+                request["reason"],
+            )
+            assert audit.before_values == {"access_revision": before}
+            assert audit.after_values == {"access_revision": before + 1, "can_grant": True}
+            await session.delete(grant)
+            await session.execute(
+                update(ProjectRow)
+                .where(ProjectRow.id == project.value)
+                .values(access_revision=ProjectRow.access_revision + 1)
+            )
+        refreshed = await provider.refresh_tokens(tokens)
+        assert refreshed is not None
+        request["identityProof"] = {
+            "kind": "hydra-access-token",
+            "accessToken": refreshed.access_token.value,
+        }
+        for changed in (
+            responsibility | {"actionId": use_action},
+            responsibility
+            | {"target": target | {"processingProfileId": str(neighbor.profile.id.value)}},
+        ):
+            status, conflict, _ = await run_project_metadata_maintenance(
+                request | {"responsibility": changed}, temporary_postgres_settings
+            )
+            assert status == 1 and conflict["code"] == "idempotency_key_reused"
+        status, replay, _ = await run_project_metadata_maintenance(
+            request, temporary_postgres_settings
+        )
+        assert status == 0 and replay == original
+        async with database.session() as session:
+            assert await session.get(ProcessingProfileActionGrantRow, (*grant_key, action)) is None
+            assert (
+                await session.scalar(select(func.count()).select_from(HostMaintenanceReceiptRow))
+                == 1
+            )
+            audit_count = (
+                select(func.count())
+                .select_from(AccessAuditEventRow)
+                .where(AccessAuditEventRow.correlation_id == operation)
+            )
+            assert await session.scalar(audit_count) == 1

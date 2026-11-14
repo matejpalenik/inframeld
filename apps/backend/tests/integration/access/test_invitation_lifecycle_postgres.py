@@ -20,6 +20,7 @@ from sqlalchemy.orm import ORMExecuteState, Session, SessionTransaction
 from tests.support.access_group_scenarios import create_group, delete_group
 from tests.support.application_account_scenarios import create_account
 from tests.support.application_key_scenarios import store_application_key
+from tests.support.processing_profile_scenarios import profile_command, profile_context
 from tests.support.project_action_grant_postgres_scenarios import change_project_grant
 from tests.support.project_creation_scenarios import (
     ProjectCreationSeedDTO,
@@ -40,6 +41,9 @@ from inframeld_backend.access.application.commands.change_access_group_relations
 )
 from inframeld_backend.access.application.commands.change_model_connection_grant_command import (
     ChangeModelConnectionGrantCommand,
+)
+from inframeld_backend.access.application.commands.change_processing_profile_grant_command import (
+    ChangeProcessingProfileGrantCommand,
 )
 from inframeld_backend.access.application.commands.create_model_connection_command import (
     CreateModelConnectionCommand,
@@ -110,6 +114,9 @@ from inframeld_backend.access.application.dtos.invitation_group_membership_inten
 from inframeld_backend.access.application.dtos.invitation_model_connection_target_dto import (
     InvitationModelConnectionTargetDTO,
 )
+from inframeld_backend.access.application.dtos.invitation_processing_profile_target_dto import (
+    InvitationProcessingProfileTargetDTO,
+)
 from inframeld_backend.access.application.dtos.invitation_project_access_revision_dto import (
     InvitationProjectAccessRevisionDTO,
 )
@@ -128,6 +135,9 @@ from inframeld_backend.access.application.dtos.organization_grant_management_fac
 )
 from inframeld_backend.access.application.dtos.organization_grant_target_dto import (
     OrganizationGrantTargetDTO,
+)
+from inframeld_backend.access.application.dtos.processing_profile_grant_facts_dto import (
+    ProcessingProfileGrantFactsDTO,
 )
 from inframeld_backend.access.application.dtos.project_grant_target_dto import ProjectGrantTargetDTO
 from inframeld_backend.access.application.dtos.project_membership_change_facts_dto import (
@@ -269,6 +279,7 @@ from inframeld_backend.access.infrastructure.rows.invitation_row import Invitati
 from inframeld_backend.access.infrastructure.rows.model_connection_action_grant_row import (
     ModelConnectionActionGrantRow,
 )
+from inframeld_backend.access.infrastructure.rows.model_connection_row import ModelConnectionRow
 from inframeld_backend.access.infrastructure.rows.organization_action_grant_row import (
     OrganizationActionGrantRow,
 )
@@ -311,6 +322,9 @@ from inframeld_backend.access.infrastructure.writers.postgres_human_admission_wr
 from inframeld_backend.access.infrastructure.writers.postgres_identity_recovery_admission_writer import (
     PostgresIdentityRecoveryAdmissionWriter,
 )
+from inframeld_backend.access.infrastructure.writers.postgres_invitation_processing_profile_grant_writer import (
+    PostgresInvitationProcessingProfileGrantWriter,
+)
 from inframeld_backend.access.infrastructure.writers.postgres_invitation_writer import (
     PostgresInvitationWriter,
 )
@@ -332,6 +346,16 @@ from inframeld_backend.bootstrap.model_connection_composition import (
 )
 from inframeld_backend.bootstrap.organization_grant_composition import (
     open_organization_grant_change,
+)
+from inframeld_backend.bootstrap.processing_profile_composition import (
+    open_processing_profile_creation,
+    open_processing_profile_grant_change,
+)
+from inframeld_backend.indexing.domain.enums.processing_profile_action import (
+    ProcessingProfileAction,
+)
+from inframeld_backend.indexing.infrastructure.rows.processing_profile_action_grant_row import (
+    ProcessingProfileActionGrantRow,
 )
 from inframeld_backend.shared.application.dtos.completed_synchronous_operation_dto import (
     CompletedSynchronousOperationDTO,
@@ -6096,3 +6120,321 @@ async def test_model_connection_invitation_preserves_exact_preview_activation_an
             )
             is None
         )
+
+
+@pytest.mark.parametrize("blocked", ["membership", "issuer", "rollback", None])
+async def test_processing_profile_invitation_preserves_exact_preview_activation_and_replay(
+    database: Database,
+    blocked: str | None,
+) -> None:
+    membership = await seed_membership_project(database)
+    seed, project = membership.actor, membership.project
+    fingerprints = RequestFingerprintService(RequestFingerprintKey(b"F" * 32))
+    async with open_processing_profile_creation(database, fingerprints) as creator:
+        profile = await creator.create(
+            access=seed.access,
+            command=profile_command(project.project_id),
+            context=profile_context(project.project_id, "create-invited-profile"),
+        )
+    profile_id = profile.profile.id
+    profile_uuid = profile_id.value
+    target = InvitationProcessingProfileTargetDTO(profile_uuid)
+    action = ProcessingProfileAction.USE.value
+    intent = InvitationActionGrantIntentDTO(target, ActionId(action), False)
+    assignments = (
+        (intent,)
+        if blocked == "membership"
+        else (
+            InvitationProjectMembershipIntentDTO(project.project_id),
+            intent,
+        )
+    )
+    issuer = seed.access
+    if blocked is None:
+        joined = await change_membership(
+            database, membership, revision=profile.project_access_revision, key="join-issuer"
+        )
+        delegated = await change_project_grant(
+            database,
+            membership,
+            revision=joined.access_revision,
+            key="issuer-manage-members",
+            action_id=ActionId("manage-project-members"),
+            can_grant=True,
+        )
+        async with open_processing_profile_grant_change(database, fingerprints) as changer:
+            await changer.change(
+                seed.access,
+                ChangeProcessingProfileGrantCommand(
+                    profile_id,
+                    membership.bob_id,
+                    ProcessingProfileAction.USE,
+                    delegated.access_revision,
+                    True,
+                ),
+                IdempotencyContextDTO(
+                    HttpMethod.PUT,
+                    f"/v1/processing-profiles/{profile_uuid}/grants/{membership.bob_id.value}/{action}",
+                    IdempotencyKey("issuer-profile-delegation"),
+                ),
+            )
+        async with open_organization_grant_change(database, fingerprints) as changer:
+            await changer.set_grant(
+                access=seed.access,
+                command=SetOrganizationActionGrantCommand(
+                    seed.organization_id,
+                    membership.bob_id,
+                    ActionId("admit-users"),
+                    False,
+                    await _current_org_revision(database, seed),
+                ),
+                context=IdempotencyContextDTO(
+                    HttpMethod.PUT,
+                    f"/v1/organizations/{seed.organization_id.value}/grants/{membership.bob_id.value}/admit-users",
+                    IdempotencyKey("issuer-admit-users"),
+                ),
+            )
+        issuer = membership.bob_access
+    reviewed = await _review(database, seed, assignments, (project.project_id,))
+    async with database.session() as session:
+        issued = await _administration(session).issue(
+            access=issuer,
+            command=reviewed,
+            context=_context("invite-for-profile"),
+        )
+    assert issued.token is not None
+    grant = ProcessingProfileActionGrantRow
+    if blocked == "issuer":
+        async with database.session() as session, session.begin():
+            await session.execute(
+                delete(grant).where(
+                    grant.processing_profile_id == profile_uuid,
+                    grant.recipient_principal_id == seed.access.actor_principal_id.value,
+                    grant.action == action,
+                )
+            )
+    proof = _unadmitted_invitation_proof(seed)
+    async with database.session() as session:
+        preview = await _preview_service(session).preview(
+            proof=proof,
+            query=PreviewInvitationQuery(token=issued.token),
+        )
+        assert (
+            await session.scalar(
+                select(HumanIdentityLinkRow.principal_id).where(
+                    HumanIdentityLinkRow.subject == proof.identity.subject.value,
+                )
+            )
+            is None
+        )
+        assert (
+            await session.scalar(select(func.count()).select_from(InvitationActivationOperationRow))
+            == 0
+        )
+    assert preview.assignments == assignments
+    assert {
+        scope.target: scope.display_name for scope in preview.scopes if scope.target == target
+    } == {
+        target: profile.profile.display_name.value,
+    }
+    assert any(
+        scope.target == ProjectGrantTargetDTO(project.project_id) for scope in preview.scopes
+    )
+
+    context = IdempotencyContextDTO(
+        HttpMethod.POST, "/v1/invitations/activate", IdempotencyKey("activate-profile")
+    )
+    proof = replace(proof, password_completed=True)
+    command = ActivateInvitationCommand(token=issued.token)
+    if blocked is not None:
+        before = await _mixed_activation_counts(database, membership)
+        grant_count = (
+            select(func.count())
+            .select_from(grant)
+            .where(grant.processing_profile_id == profile_uuid)
+        )
+        async with database.session() as session:
+            expected_grants = await session.scalar(grant_count)
+        original = PostgresInvitationProcessingProfileGrantWriter.apply_invitation_grant
+        injected = RuntimeError("Controlled failure after the Profile grant write")
+
+        async def fail_after_grant(
+            writer: PostgresInvitationProcessingProfileGrantWriter,
+            binding: InvitationActivationBindingDTO,
+            facts: ProcessingProfileGrantFactsDTO,
+            recipient: PrincipalId,
+            after: ActionGrantState,
+        ) -> int:
+            await original(writer, binding, facts, recipient, after)
+            raise injected
+
+        with ExitStack() as controls:
+            if blocked == "rollback":
+                controls.enter_context(
+                    patch.object(
+                        PostgresInvitationProcessingProfileGrantWriter,
+                        "apply_invitation_grant",
+                        fail_after_grant,
+                    )
+                )
+            async with open_invitation_activation(
+                database, InvitationFingerprintService(fingerprints)
+            ) as activation:
+                with pytest.raises(
+                    RuntimeError if blocked == "rollback" else ConflictError
+                ) as caught:
+                    await activation.activate(proof=proof, command=command, context=context)
+            if blocked == "rollback":
+                assert caught.value is injected
+        assert await _mixed_activation_counts(database, membership) == before
+        async with database.session() as session:
+            assert await session.scalar(grant_count) == expected_grants
+            assert (
+                await session.scalar(
+                    select(HumanIdentityLinkRow.principal_id).where(
+                        HumanIdentityLinkRow.subject == proof.identity.subject.value,
+                    )
+                )
+                is None
+            )
+            invite = await session.get(InvitationRow, issued.invitation_id.value)
+            assert invite is not None and invite.consumed_at is None
+            assert (
+                await session.scalar(
+                    select(func.count()).select_from(InvitationActivationOperationRow)
+                )
+                == 0
+            )
+        return
+
+    async with open_invitation_activation(
+        database, InvitationFingerprintService(fingerprints)
+    ) as activation:
+        result = await activation.activate(proof=proof, command=command, context=context)
+    assert result.operation.created
+    assert result.project_access_revisions == (
+        InvitationProjectAccessRevisionDTO(
+            project.project_id, reviewed.expected_project_access_revisions[0].access_revision + 2
+        ),
+    )
+    key = (project.project_id.value, profile_uuid, result.principal_id.value, action)
+    async with database.session() as session:
+        assignment = await session.get(grant, key)
+        assert assignment is not None and assignment.can_grant is False
+        assert assignment.assigned_by_principal_id == issuer.actor_principal_id.value
+        audit = await session.scalar(
+            select(AccessAuditEventRow).where(
+                AccessAuditEventRow.correlation_id == result.operation.operation_id.value,
+                AccessAuditEventRow.target_kind == "processing_profile",
+                AccessAuditEventRow.target_id == profile_uuid,
+                AccessAuditEventRow.action == action,
+            )
+        )
+        assert audit is not None
+        assert audit.actor_principal_id == issuer.actor_principal_id.value
+        assert audit.affected_principal_id == result.principal_id.value
+
+    departed = await change_membership(
+        database,
+        membership,
+        revision=result.project_access_revisions[0].access_revision,
+        key="issuer-departure",
+        remove=True,
+    )
+    assert departed.changed
+    async with open_processing_profile_grant_change(database, fingerprints) as changer:
+        removed = await changer.change(
+            seed.access,
+            ChangeProcessingProfileGrantCommand(
+                profile_id,
+                result.principal_id,
+                ProcessingProfileAction.USE,
+                departed.access_revision,
+                None,
+            ),
+            IdempotencyContextDTO(
+                HttpMethod.DELETE,
+                f"/v1/processing-profiles/{profile_uuid}/grants/{result.principal_id.value}/{action}",
+                IdempotencyKey("remove-invited-profile-grant"),
+            ),
+        )
+    assert removed.changed
+    async with database.session() as session, session.begin():
+        now = await session.scalar(select(func.clock_timestamp(type_=DateTime(timezone=True))))
+        assert now is not None
+        await session.execute(
+            update(InvitationRow)
+            .where(InvitationRow.id == issued.invitation_id.value)
+            .values(
+                issued_at=now - timedelta(hours=2),
+                expires_at=now - timedelta(hours=1),
+            )
+        )
+        assert await session.scalar(
+            select(InvitationRow.expires_at < func.clock_timestamp()).where(
+                InvitationRow.id == issued.invitation_id.value
+            )
+        )
+    async with open_invitation_activation(
+        database, InvitationFingerprintService(fingerprints)
+    ) as activation:
+        replay = await activation.activate(
+            proof=replace(proof, password_completed=None), command=command, context=context
+        )
+    assert replay == replace(result, operation=replace(result.operation, created=False))
+    async with database.session() as session:
+        assert await session.get(grant, key) is None
+        assert (
+            await session.get(
+                ProjectMembershipRow, (project.project_id.value, membership.bob_id.value)
+            )
+            is None
+        )
+
+
+async def test_invitation_resolves_equal_cross_kind_ids_to_their_exact_projects(
+    database: Database,
+) -> None:
+    seed = await seed_project_creator(database)
+    profile_project = (await create_project(database, seed)).project
+    connection_project = await _new_project(database, seed, "connection-project")
+    fingerprints = RequestFingerprintService(RequestFingerprintKey(b"F" * 32))
+    async with open_processing_profile_creation(database, fingerprints) as creator:
+        profile = await creator.create(
+            access=seed.access,
+            command=profile_command(profile_project.project_id),
+            context=profile_context(profile_project.project_id, "typed-invitation-targets"),
+        )
+    shared_uuid = profile.profile.id.value
+    profile_target = InvitationProcessingProfileTargetDTO(shared_uuid)
+    connection_target = InvitationModelConnectionTargetDTO(shared_uuid)
+    async with database.session() as session, session.begin():
+        session.add(
+            ModelConnectionRow(
+                id=shared_uuid,
+                project_id=connection_project.project_id.value,
+                organization_id=seed.organization_id.value,
+                name="shared-uuid",
+                display_name="Different connection",
+                provider=ModelConnectionProvider.OPENAI_COMPATIBLE.value,
+                base_url="https://models.example.test/v1",
+                api_version=None,
+                authentication=ModelConnectionAuthentication.API_KEY.value,
+            )
+        )
+        await session.flush()
+        result = await PostgresInvitationFactsReader(session).target_projects(
+            seed.organization_id,
+            (
+                InvitationActionGrantIntentDTO(
+                    profile_target, ActionId(ProcessingProfileAction.USE.value), False
+                ),
+                InvitationActionGrantIntentDTO(
+                    connection_target, ActionId(ModelConnectionAction.USE.value), False
+                ),
+            ),
+        )
+    assert result == {
+        profile_target: profile_project.project_id,
+        connection_target: connection_project.project_id,
+    }

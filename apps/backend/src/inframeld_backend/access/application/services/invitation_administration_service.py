@@ -35,6 +35,9 @@ from inframeld_backend.access.application.dtos.invitation_issue_result_dto impor
 from inframeld_backend.access.application.dtos.invitation_model_connection_target_dto import (
     InvitationModelConnectionTargetDTO,
 )
+from inframeld_backend.access.application.dtos.invitation_processing_profile_target_dto import (
+    InvitationProcessingProfileTargetDTO,
+)
 from inframeld_backend.access.application.dtos.invitation_project_membership_intent_dto import (
     InvitationProjectMembershipIntentDTO,
 )
@@ -94,6 +97,9 @@ from inframeld_backend.access.domain.policy_inputs.action_authorization_policy_i
 from inframeld_backend.access.domain.value_objects.invitation_id import InvitationId
 from inframeld_backend.access.domain.value_objects.invitation_token import InvitationToken
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
+from inframeld_backend.indexing.domain.enums.processing_profile_action import (
+    ProcessingProfileAction,
+)
 from inframeld_backend.shared.application.dtos.completed_synchronous_operation_dto import (
     CompletedSynchronousOperationDTO,
 )
@@ -468,7 +474,8 @@ class InvitationAdministrationService(InvitationIssuer, InvitationRevoker):
                     raise AccessDeniedError()
                 continue
             if isinstance(intent, InvitationActionGrantIntentDTO) and isinstance(
-                intent.target, InvitationModelConnectionTargetDTO
+                intent.target,
+                (InvitationModelConnectionTargetDTO, InvitationProcessingProfileTargetDTO),
             ):
                 if observed.project is None:
                     raise ResourceNotFoundError()
@@ -547,6 +554,8 @@ class InvitationAdministrationService(InvitationIssuer, InvitationRevoker):
             else:
                 if isinstance(intent.target, InvitationModelConnectionTargetDTO):
                     supported = intent.action_id.value in ModelConnectionAction
+                elif isinstance(intent.target, InvitationProcessingProfileTargetDTO):
+                    supported = intent.action_id.value in ProcessingProfileAction
                 elif isinstance(intent.target, ProjectGrantTargetDTO):
                     supported = ProjectActionEligibilityPolicy.may_use(
                         action_id=intent.action_id, principal_kind=PrincipalKind.HUMAN

@@ -17,6 +17,12 @@ from inframeld_backend.access.application.dtos.human_oauth_credential_binding_dt
 from inframeld_backend.access.application.dtos.organization_grant_target_dto import (
     OrganizationGrantTargetDTO,
 )
+from inframeld_backend.access.application.dtos.processing_profile_grant_target_dto import (
+    ProcessingProfileGrantTargetDTO,
+)
+from inframeld_backend.access.application.dtos.processing_profile_repair_request_dto import (
+    ProcessingProfileRepairRequestDTO,
+)
 from inframeld_backend.access.application.dtos.stranded_authority_repair_facts_dto import (
     StrandedAuthorityRepairFactsDTO,
 )
@@ -118,22 +124,25 @@ class StrandedAuthorityRepairService(StrandedAuthorityRepairer):
             raise StrandedAuthorityMaintenanceError(code.IDENTITY_INELIGIBLE)
         if facts.installation_id != command.expected_installation_id:
             raise StrandedAuthorityMaintenanceError(code.INSTALLATION_MISMATCH)
-        if (
-            facts.responsibility != command.responsibility
-            or facts.recipient.id != access.actor_principal_id
-        ):
+        requested, resolved = command.responsibility, facts.responsibility
+        if isinstance(requested, ProcessingProfileRepairRequestDTO):
+            exact = (
+                isinstance(resolved, ActionGrantorRepairResponsibilityDTO)
+                and isinstance(resolved.target, ProcessingProfileGrantTargetDTO)
+                and resolved.target.processing_profile_id == requested.processing_profile_id
+                and resolved.action_id.value == requested.action.value
+            )
+        else:
+            exact = resolved == requested
+        if not exact or facts.recipient.id != access.actor_principal_id:
             raise RuntimeError("Repair facts changed the verified recipient or responsibility.")
-        requires_project = not (
-            isinstance(command.responsibility, ActionGrantorRepairResponsibilityDTO)
-            and isinstance(command.responsibility.target, OrganizationGrantTargetDTO)
-        )
-        if (
-            not requires_project
-            and isinstance(command.responsibility, ActionGrantorRepairResponsibilityDTO)
-            and isinstance(command.responsibility.target, OrganizationGrantTargetDTO)
-            and command.responsibility.target.organization_id != facts.recipient.organization_id
+        requires_project = True
+        if isinstance(resolved, ActionGrantorRepairResponsibilityDTO) and isinstance(
+            resolved.target, OrganizationGrantTargetDTO
         ):
-            raise RuntimeError("Repair facts changed the target Organization.")
+            if resolved.target.organization_id != facts.recipient.organization_id:
+                raise RuntimeError("Repair facts changed the target Organization.")
+            requires_project = False
         eligibility = PrincipalAccessEvaluationService.evaluate(
             access=access,
             principal=facts.recipient,
@@ -236,7 +245,7 @@ class StrandedAuthorityRepairService(StrandedAuthorityRepairer):
             != (
                 facts.installation_id,
                 facts.recipient.organization_id,
-                command.responsibility,
+                facts.responsibility,
                 facts.recipient.id,
                 command.operation_id,
             )

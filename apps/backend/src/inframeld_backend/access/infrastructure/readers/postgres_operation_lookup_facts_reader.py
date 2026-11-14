@@ -62,6 +62,12 @@ from inframeld_backend.access.infrastructure.rows.project_action_grant_row impor
 )
 from inframeld_backend.access.infrastructure.rows.project_membership_row import ProjectMembershipRow
 from inframeld_backend.access.infrastructure.rows.project_row import ProjectRow
+from inframeld_backend.indexing.infrastructure.rows.processing_profile_action_grant_row import (
+    ProcessingProfileActionGrantRow,
+)
+from inframeld_backend.indexing.infrastructure.rows.processing_profile_row import (
+    ProcessingProfileRow,
+)
 from inframeld_backend.shared.application.enums.operation_lookup_authority_family import (
     OperationLookupAuthorityFamily,
 )
@@ -144,6 +150,29 @@ class PostgresOperationLookupFactsReader(OperationLookupFactsReader):
                 granted = exists().where(*grant_scope)
                 can_grant = exists().where(
                     *grant_scope, ModelConnectionActionGrantRow.can_grant.is_(True)
+                )
+            elif family is OperationLookupAuthorityFamily.PROCESSING_PROFILE_GRANT_READ:
+                profile = UUID(query.requested_route.split("/")[3])
+                target_exists = (
+                    exists()
+                    .where(
+                        ProcessingProfileRow.id == profile,
+                        ProcessingProfileRow.project_id == ProjectRow.id,
+                        ProcessingProfileRow.organization_id == ProjectRow.organization_id,
+                    )
+                    .correlate(ProjectRow)
+                )
+                grant_scope = (
+                    ProcessingProfileActionGrantRow.project_id == ProjectRow.id,
+                    ProcessingProfileActionGrantRow.processing_profile_id == profile,
+                    ProcessingProfileActionGrantRow.recipient_principal_id == PrincipalRow.id,
+                    ProcessingProfileActionGrantRow.recipient_kind == PrincipalRow.kind,
+                    ProcessingProfileActionGrantRow.action
+                    == query.expected_authority.action_id.value,
+                )
+                granted = exists().where(*grant_scope)
+                can_grant = exists().where(
+                    *grant_scope, ProcessingProfileActionGrantRow.can_grant.is_(True)
                 )
             elif family is OperationLookupAuthorityFamily.APPLICATION_ACCOUNT_GRANT_READ:
                 application = UUID(query.requested_route.split("/")[5])

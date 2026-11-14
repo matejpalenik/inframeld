@@ -18,6 +18,9 @@ from inframeld_backend.access.application.dtos.grant_recipients_page_dto import 
 from inframeld_backend.access.application.dtos.model_connection_grant_target_dto import (
     ModelConnectionGrantTargetDTO,
 )
+from inframeld_backend.access.application.dtos.processing_profile_grant_target_dto import (
+    ProcessingProfileGrantTargetDTO,
+)
 from inframeld_backend.access.application.dtos.project_grant_target_dto import ProjectGrantTargetDTO
 from inframeld_backend.access.application.protocols.grant_recipients_facts_reader import (
     GrantRecipientsFactsReader,
@@ -59,6 +62,9 @@ from inframeld_backend.access.domain.policy_inputs.principal_access_policy_input
     PrincipalAccessPolicyInput,
 )
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
+from inframeld_backend.indexing.domain.enums.processing_profile_action import (
+    ProcessingProfileAction,
+)
 from inframeld_backend.shared.application.errors.application_errors import (
     AccessDeniedError,
     DependencyUnavailableError,
@@ -225,7 +231,8 @@ class ProjectGrantRecipientsService(ProjectGrantRecipientsReader):
         target: ProjectGrantTargetDTO
         | AccessGroupGrantTargetDTO
         | ApplicationAccountGrantTargetDTO
-        | ModelConnectionGrantTargetDTO,
+        | ModelConnectionGrantTargetDTO
+        | ProcessingProfileGrantTargetDTO,
         action_id: ActionId,
         kind: PrincipalKind,
     ) -> bool:
@@ -242,6 +249,8 @@ class ProjectGrantRecipientsService(ProjectGrantRecipientsReader):
                     ModelConnectionAction(action_id.value), kind
                 )
             )
+        if isinstance(target, ProcessingProfileGrantTargetDTO):
+            return action_id.value in ProcessingProfileAction
         return ApplicationAccountGrantPolicy.supports_recipient(action_id=action_id, kind=kind)
 
     @staticmethod
@@ -250,7 +259,8 @@ class ProjectGrantRecipientsService(ProjectGrantRecipientsReader):
         target: ProjectGrantTargetDTO
         | AccessGroupGrantTargetDTO
         | ApplicationAccountGrantTargetDTO
-        | ModelConnectionGrantTargetDTO,
+        | ModelConnectionGrantTargetDTO
+        | ProcessingProfileGrantTargetDTO,
         action_id: ActionId,
         candidate: GrantRecipientCandidateDTO,
     ) -> bool:
@@ -277,6 +287,14 @@ class ProjectGrantRecipientsService(ProjectGrantRecipientsReader):
             )
         if isinstance(target, ModelConnectionGrantTargetDTO):
             return ModelConnectionGrantPolicy.may_assign(
+                recipient_access=access,
+                is_project_member=candidate.is_project_member,
+                has_coherent_identity=candidate.has_coherent_identity,
+                application_is_project_bound=candidate.application_is_project_bound,
+                can_grant=False,
+            )
+        if isinstance(target, ProcessingProfileGrantTargetDTO):
+            return ProjectGrantDelegationPolicy.may_assign_to_project_member(
                 recipient_access=access,
                 is_project_member=candidate.is_project_member,
                 has_coherent_identity=candidate.has_coherent_identity,

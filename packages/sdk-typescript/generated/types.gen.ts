@@ -995,6 +995,74 @@ export type DeletionStatusResponse = ({
 } & UnresolvedDeletionStatusResponse);
 
 /**
+ * DoclingProcessingDefinitionRequest
+ */
+export type DoclingProcessingDefinitionRequest = {
+    /**
+     * Assetmanifestsha256
+     */
+    assetManifestSha256: string;
+    /**
+     * Doclingcoreversion
+     */
+    doclingCoreVersion: string;
+    /**
+     * Doclingslimversion
+     */
+    doclingSlimVersion: string;
+    /**
+     * Maxcontenttokens
+     */
+    maxContentTokens: number;
+    /**
+     * Mergepeers
+     */
+    mergePeers: boolean;
+    /**
+     * Ocrenabled
+     */
+    ocrEnabled: false;
+    /**
+     * Repeattableheader
+     */
+    repeatTableHeader: boolean;
+};
+
+/**
+ * DoclingProcessingDefinitionResponse
+ */
+export type DoclingProcessingDefinitionResponse = {
+    /**
+     * Assetmanifestsha256
+     */
+    assetManifestSha256: string;
+    /**
+     * Doclingcoreversion
+     */
+    doclingCoreVersion: string;
+    /**
+     * Doclingslimversion
+     */
+    doclingSlimVersion: string;
+    /**
+     * Maxcontenttokens
+     */
+    maxContentTokens: number;
+    /**
+     * Mergepeers
+     */
+    mergePeers: boolean;
+    /**
+     * Ocrenabled
+     */
+    ocrEnabled: false;
+    /**
+     * Repeattableheader
+     */
+    repeatTableHeader: boolean;
+};
+
+/**
  * GrantRecipientResponse
  */
 export type GrantRecipientResponse = {
@@ -1014,7 +1082,7 @@ export type GrantRecipientResponse = {
  *
  * Discriminate published grant targets without changing their wire tags.
  */
-export type GrantTargetKind = 'project' | 'access-group' | 'application-account' | 'model-connection';
+export type GrantTargetKind = 'project' | 'access-group' | 'application-account' | 'model-connection' | 'processing-profile';
 
 /**
  * HttpMethod
@@ -1285,6 +1353,18 @@ export type InitialModelConnectionGrantResponse = {
      */
     canGrant: true;
     target: ModelConnectionGrantTargetResponse;
+};
+
+/**
+ * InitialProcessingProfileGrantResponse
+ */
+export type InitialProcessingProfileGrantResponse = {
+    actionId: ProcessingProfileAction;
+    /**
+     * Cangrant
+     */
+    canGrant: true;
+    target: ProcessingProfileGrantTargetResponse;
 };
 
 /**
@@ -2317,7 +2397,7 @@ export type OAuthConsentDecision = 'allow' | 'deny';
  *
  * Select a fixed current-authority check without granting permission.
  */
-export type OperationLookupAuthorityFamily = 'project_action_use' | 'project_grant_read' | 'organization_action_use' | 'organization_grant_read' | 'access_group_grant_read' | 'application_account_grant_read' | 'model_connection_grant_read' | 'access_group_deletion' | 'project_deletion';
+export type OperationLookupAuthorityFamily = 'project_action_use' | 'project_grant_read' | 'organization_action_use' | 'organization_grant_read' | 'access_group_grant_read' | 'application_account_grant_read' | 'model_connection_grant_read' | 'processing_profile_grant_read' | 'access_group_deletion' | 'project_deletion';
 
 /**
  * OperationLookupAuthorityRequest
@@ -2615,6 +2695,34 @@ export type PageResponseOrganizationActionGrantItemResponse = {
 };
 
 /**
+ * PageResponse[ProcessingProfileActionGrantItemResponse]
+ */
+export type PageResponseProcessingProfileActionGrantItemResponse = {
+    /**
+     * Items
+     */
+    items: Array<ProcessingProfileActionGrantItemResponse>;
+    /**
+     * Nextcursor
+     */
+    nextCursor: string | null;
+};
+
+/**
+ * PageResponse[ProcessingProfileResponse]
+ */
+export type PageResponseProcessingProfileResponse = {
+    /**
+     * Items
+     */
+    items: Array<ProcessingProfileResponse>;
+    /**
+     * Nextcursor
+     */
+    nextCursor: string | null;
+};
+
+/**
  * PageResponse[ProjectActionGrantItemResponse]
  */
 export type PageResponseProjectActionGrantItemResponse = {
@@ -2711,6 +2819,192 @@ export type ProblemDetails = {
      * Primary RFC 9457 problem-type URI.
      */
     type: string;
+};
+
+/**
+ * ProcessingProfileAction
+ */
+export type ProcessingProfileAction = 'view-processing-profile' | 'use-processing-profile';
+
+/**
+ * ProcessingProfileActionGrantItemResponse
+ */
+export type ProcessingProfileActionGrantItemResponse = {
+    actionId: ProcessingProfileAction;
+    /**
+     * Cangrant
+     */
+    canGrant: boolean;
+    /**
+     * Processingprofileid
+     */
+    processingProfileId: string;
+    /**
+     * Recipientprincipalid
+     */
+    recipientPrincipalId: string;
+};
+
+/**
+ * ProcessingProfileActionGrantRemovalResponse
+ */
+export type ProcessingProfileActionGrantRemovalResponse = {
+    /**
+     * Accessrevision
+     */
+    accessRevision: number;
+    actionId: ProcessingProfileAction;
+    /**
+     * Changed
+     */
+    changed: boolean;
+    /**
+     * Idempotencyexpiresat
+     */
+    idempotencyExpiresAt: string;
+    /**
+     * Operationid
+     */
+    operationId: string;
+    /**
+     * Processingprofileid
+     */
+    processingProfileId: string;
+    /**
+     * Recipientprincipalid
+     */
+    recipientPrincipalId: string;
+    /**
+     * Removed
+     */
+    removed: true;
+};
+
+/**
+ * ProcessingProfileActionGrantRequest
+ */
+export type ProcessingProfileActionGrantRequest = {
+    /**
+     * Cangrant
+     */
+    canGrant: boolean;
+    /**
+     * Expectedaccessrevision
+     */
+    expectedAccessRevision: number;
+};
+
+/**
+ * ProcessingProfileActionGrantResponse
+ */
+export type ProcessingProfileActionGrantResponse = {
+    /**
+     * Accessrevision
+     */
+    accessRevision: number;
+    actionId: ProcessingProfileAction;
+    /**
+     * Cangrant
+     */
+    canGrant: boolean;
+    /**
+     * Changed
+     */
+    changed: boolean;
+    /**
+     * Idempotencyexpiresat
+     */
+    idempotencyExpiresAt: string;
+    /**
+     * Operationid
+     */
+    operationId: string;
+    /**
+     * Processingprofileid
+     */
+    processingProfileId: string;
+    /**
+     * Recipientprincipalid
+     */
+    recipientPrincipalId: string;
+};
+
+/**
+ * ProcessingProfileCreationRequest
+ */
+export type ProcessingProfileCreationRequest = {
+    definition: DoclingProcessingDefinitionRequest;
+    /**
+     * Displayname
+     */
+    displayName: string;
+    /**
+     * Name
+     */
+    name: string;
+};
+
+/**
+ * ProcessingProfileCreationResponse
+ */
+export type ProcessingProfileCreationResponse = {
+    /**
+     * Idempotencyexpiresat
+     */
+    idempotencyExpiresAt: string;
+    /**
+     * Initialgrants
+     */
+    initialGrants: [
+        InitialProcessingProfileGrantResponse,
+        InitialProcessingProfileGrantResponse
+    ];
+    /**
+     * Operationid
+     */
+    operationId: string;
+    profile: ProcessingProfileResponse;
+    /**
+     * Projectaccessrevision
+     */
+    projectAccessRevision: number;
+};
+
+/**
+ * ProcessingProfileGrantTargetResponse
+ */
+export type ProcessingProfileGrantTargetResponse = {
+    /**
+     * Kind
+     */
+    kind: 'processing-profile';
+    /**
+     * Processingprofileid
+     */
+    processingProfileId: string;
+};
+
+/**
+ * ProcessingProfileResponse
+ */
+export type ProcessingProfileResponse = {
+    definition: DoclingProcessingDefinitionResponse;
+    /**
+     * Displayname
+     */
+    displayName: string;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Processingprofileid
+     */
+    processingProfileId: string;
+    /**
+     * Projectid
+     */
+    projectId: string;
 };
 
 /**
@@ -4834,6 +5128,217 @@ export type SuspendHumanResponses = {
 };
 
 export type SuspendHumanResponse = SuspendHumanResponses[keyof SuspendHumanResponses];
+
+export type ListProcessingProfileActionGrantsData = {
+    body?: never;
+    path: {
+        /**
+         * Processing Profile Id
+         */
+        processing_profile_id: string;
+    };
+    query: {
+        actionId: ProcessingProfileAction;
+        /**
+         * Limit
+         */
+        limit?: number;
+        /**
+         * Cursor
+         */
+        cursor?: string | null;
+    };
+    url: '/v1/processing-profiles/{processing_profile_id}/grants';
+};
+
+export type ListProcessingProfileActionGrantsErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Revision is no longer current
+     */
+    409: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type ListProcessingProfileActionGrantsError = ListProcessingProfileActionGrantsErrors[keyof ListProcessingProfileActionGrantsErrors];
+
+export type ListProcessingProfileActionGrantsResponses = {
+    /**
+     * Successful Response
+     */
+    200: PageResponseProcessingProfileActionGrantItemResponse;
+};
+
+export type ListProcessingProfileActionGrantsResponse = ListProcessingProfileActionGrantsResponses[keyof ListProcessingProfileActionGrantsResponses];
+
+export type RemoveProcessingProfileActionGrantData = {
+    body?: never;
+    headers: {
+        /**
+         * Idempotency-Key
+         */
+        'Idempotency-Key': string;
+    };
+    path: {
+        /**
+         * Processing Profile Id
+         */
+        processing_profile_id: string;
+        /**
+         * Recipient Principal Id
+         */
+        recipient_principal_id: string;
+        action_id: ProcessingProfileAction;
+    };
+    query: {
+        /**
+         * Expectedaccessrevision
+         */
+        expectedAccessRevision: number;
+    };
+    url: '/v1/processing-profiles/{processing_profile_id}/grants/{recipient_principal_id}/{action_id}';
+};
+
+export type RemoveProcessingProfileActionGrantErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Revision is no longer current
+     */
+    409: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type RemoveProcessingProfileActionGrantError = RemoveProcessingProfileActionGrantErrors[keyof RemoveProcessingProfileActionGrantErrors];
+
+export type RemoveProcessingProfileActionGrantResponses = {
+    /**
+     * Successful Response
+     */
+    200: ProcessingProfileActionGrantRemovalResponse;
+};
+
+export type RemoveProcessingProfileActionGrantResponse = RemoveProcessingProfileActionGrantResponses[keyof RemoveProcessingProfileActionGrantResponses];
+
+export type SetProcessingProfileActionGrantData = {
+    body: ProcessingProfileActionGrantRequest;
+    headers: {
+        /**
+         * Idempotency-Key
+         */
+        'Idempotency-Key': string;
+    };
+    path: {
+        /**
+         * Processing Profile Id
+         */
+        processing_profile_id: string;
+        /**
+         * Recipient Principal Id
+         */
+        recipient_principal_id: string;
+        action_id: ProcessingProfileAction;
+    };
+    query?: never;
+    url: '/v1/processing-profiles/{processing_profile_id}/grants/{recipient_principal_id}/{action_id}';
+};
+
+export type SetProcessingProfileActionGrantErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Revision is no longer current
+     */
+    409: ProblemDetails;
+    /**
+     * Content Too Large
+     */
+    413: ProblemDetails;
+    /**
+     * Unsupported Media Type
+     */
+    415: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type SetProcessingProfileActionGrantError = SetProcessingProfileActionGrantErrors[keyof SetProcessingProfileActionGrantErrors];
+
+export type SetProcessingProfileActionGrantResponses = {
+    /**
+     * Changed or unchanged assignment.
+     */
+    200: ProcessingProfileActionGrantResponse;
+    /**
+     * Successful Response
+     */
+    201: ProcessingProfileActionGrantResponse;
+};
+
+export type SetProcessingProfileActionGrantResponse = SetProcessingProfileActionGrantResponses[keyof SetProcessingProfileActionGrantResponses];
 
 export type CreateProjectData = {
     body: ProjectCreationRequest;
@@ -7815,6 +8320,187 @@ export type GetMyProjectAccessResponses = {
 };
 
 export type GetMyProjectAccessResponse = GetMyProjectAccessResponses[keyof GetMyProjectAccessResponses];
+
+export type ListProcessingProfilesData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: {
+        /**
+         * Limit
+         */
+        limit?: number;
+        /**
+         * Cursor
+         */
+        cursor?: string | null;
+    };
+    url: '/v1/projects/{project_id}/processing-profiles';
+};
+
+export type ListProcessingProfilesErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type ListProcessingProfilesError = ListProcessingProfilesErrors[keyof ListProcessingProfilesErrors];
+
+export type ListProcessingProfilesResponses = {
+    /**
+     * Successful Response
+     */
+    200: PageResponseProcessingProfileResponse;
+};
+
+export type ListProcessingProfilesResponse = ListProcessingProfilesResponses[keyof ListProcessingProfilesResponses];
+
+export type CreateProcessingProfileData = {
+    body: ProcessingProfileCreationRequest;
+    headers: {
+        /**
+         * Idempotency-Key
+         */
+        'Idempotency-Key': string;
+    };
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/v1/projects/{project_id}/processing-profiles';
+};
+
+export type CreateProcessingProfileErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Operation conflicts with current state
+     */
+    409: ProblemDetails;
+    /**
+     * Content Too Large
+     */
+    413: ProblemDetails;
+    /**
+     * Unsupported Media Type
+     */
+    415: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type CreateProcessingProfileError = CreateProcessingProfileErrors[keyof CreateProcessingProfileErrors];
+
+export type CreateProcessingProfileResponses = {
+    /**
+     * Successful Response
+     */
+    201: ProcessingProfileCreationResponse;
+};
+
+export type CreateProcessingProfileResponse = CreateProcessingProfileResponses[keyof CreateProcessingProfileResponses];
+
+export type GetProcessingProfileData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Processing Profile Id
+         */
+        processing_profile_id: string;
+    };
+    query?: never;
+    url: '/v1/projects/{project_id}/processing-profiles/{processing_profile_id}';
+};
+
+export type GetProcessingProfileErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type GetProcessingProfileError = GetProcessingProfileErrors[keyof GetProcessingProfileErrors];
+
+export type GetProcessingProfileResponses = {
+    /**
+     * Successful Response
+     */
+    200: ProcessingProfileResponse;
+};
+
+export type GetProcessingProfileResponse = GetProcessingProfileResponses[keyof GetProcessingProfileResponses];
 
 export type GetProjectUploadDefaultsData = {
     body?: never;

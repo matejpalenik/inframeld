@@ -1,6 +1,5 @@
 import asyncio
 from typing import override
-from uuid import UUID
 
 from sqlalchemy import ColumnElement, DateTime, String, exists, func, literal, or_, select
 from sqlalchemy.exc import OperationalError
@@ -52,6 +51,9 @@ from inframeld_backend.access.application.dtos.invitation_issuer_facts_dto impor
 from inframeld_backend.access.application.dtos.invitation_model_connection_target_dto import (
     InvitationModelConnectionTargetDTO,
 )
+from inframeld_backend.access.application.dtos.invitation_processing_profile_target_dto import (
+    InvitationProcessingProfileTargetDTO,
+)
 from inframeld_backend.access.application.dtos.invitation_project_membership_intent_dto import (
     InvitationProjectMembershipIntentDTO,
 )
@@ -70,6 +72,9 @@ from inframeld_backend.access.application.dtos.organization_grant_management_fac
 )
 from inframeld_backend.access.application.dtos.organization_grant_target_dto import (
     OrganizationGrantTargetDTO,
+)
+from inframeld_backend.access.application.dtos.processing_profile_grant_facts_dto import (
+    ProcessingProfileGrantFactsDTO,
 )
 from inframeld_backend.access.application.dtos.project_action_facts_dto import ProjectActionFactsDTO
 from inframeld_backend.access.application.dtos.project_action_grant_management_facts_dto import (
@@ -127,6 +132,9 @@ from inframeld_backend.access.infrastructure.readers.model_connection_grant_quer
 from inframeld_backend.access.infrastructure.readers.postgres_invitation_facts_reader import (
     PostgresInvitationFactsReader,
 )
+from inframeld_backend.access.infrastructure.readers.processing_profile_grant_queries import (
+    ProcessingProfileGrantQueries,
+)
 from inframeld_backend.access.infrastructure.readers.project_principal_queries import (
     ProjectPrincipalQueries,
 )
@@ -160,6 +168,15 @@ from inframeld_backend.access.infrastructure.rows.project_action_grant_row impor
 )
 from inframeld_backend.access.infrastructure.rows.project_membership_row import ProjectMembershipRow
 from inframeld_backend.access.infrastructure.rows.project_row import ProjectRow
+from inframeld_backend.indexing.domain.enums.processing_profile_action import (
+    ProcessingProfileAction,
+)
+from inframeld_backend.indexing.domain.value_objects.processing_profile_id import (
+    ProcessingProfileId,
+)
+from inframeld_backend.indexing.infrastructure.rows.processing_profile_action_grant_row import (
+    ProcessingProfileActionGrantRow,
+)
 from inframeld_backend.shared.application.errors.application_errors import (
     DependencyUnavailableError,
 )
@@ -235,7 +252,7 @@ class PostgresInvitationAssignmentFactsReader(InvitationAssignmentFactsReader):
                     }
                     projects.update(
                         (
-                            await reader.model_projects(
+                            await reader.target_projects(
                                 invitation.organization_id, invitation.assignments
                             )
                         ).values()
@@ -417,13 +434,13 @@ class PostgresInvitationAssignmentFactsReader(InvitationAssignmentFactsReader):
             .tuples()
             .all()
         )
-        model_projects = await PostgresInvitationFactsReader(self._session).model_projects(
+        target_projects = await PostgresInvitationFactsReader(self._session).target_projects(
             invitation.organization_id, intents
         )
         assignments = tuple(
             [
                 await self._assignment(
-                    invitation, principal, installation, recovering, intent, model_projects
+                    invitation, principal, installation, recovering, intent, target_projects
                 )
                 for intent in intents
             ]
@@ -450,13 +467,18 @@ class PostgresInvitationAssignmentFactsReader(InvitationAssignmentFactsReader):
         installation: InstallationId,
         recovering: bool,
         intent: InvitationAssignmentDTO,
-        model_projects: dict[UUID, ProjectId],
+        target_projects: dict[
+            InvitationModelConnectionTargetDTO | InvitationProcessingProfileTargetDTO, ProjectId
+        ],
     ) -> InvitationAssignmentFactsDTO:
         organization = invitation.organization_id
         project_id = (
-            model_projects.get(intent.target.model_connection_id)
+            target_projects.get(intent.target)
             if isinstance(intent, InvitationActionGrantIntentDTO)
-            and isinstance(intent.target, InvitationModelConnectionTargetDTO)
+            and isinstance(
+                intent.target,
+                (InvitationModelConnectionTargetDTO, InvitationProcessingProfileTargetDTO),
+            )
             else self._project_id(intent)
         )
         project = None
@@ -617,6 +639,21 @@ class PostgresInvitationAssignmentFactsReader(InvitationAssignmentFactsReader):
                         target_exists,
                         delegated,
                     ) = await ModelConnectionGrantQueries.invitation_authority(
+                        self._session,
+                        organization,
+                        project_id,
+                        intent.target,
+                        principal.id,
+                        principal.kind,
+                        intent.action_id,
+                    )
+                elif isinstance(intent, InvitationActionGrantIntentDTO) and isinstance(
+                    intent.target, InvitationProcessingProfileTargetDTO
+                ):
+                    (
+                        target_exists,
+                        delegated,
+                    ) = await ProcessingProfileGrantQueries.invitation_authority(
                         self._session,
                         organization,
                         project_id,
@@ -1040,6 +1077,41 @@ class PostgresInvitationAssignmentFactsReader(InvitationAssignmentFactsReader):
                     grantors,
                 ),
             )
+        if isinstance(target, InvitationProcessingProfileTargetDTO):
+            grant = ProcessingProfileActionGrantRow
+            before = (
+                await self._session.scalar(
+                    select(grant.can_grant).where(
+                        grant.project_id == project.project_id.value,
+                        grant.processing_profile_id == target.processing_profile_id,
+                        grant.recipient_principal_id == recipient.id.value,
+                        grant.recipient_kind == recipient.kind,
+                        grant.action == intent.action_id.value,
+                    )
+                )
+                if recipient is not None
+                else None
+            )
+            return InvitationAssignmentStateDTO(
+                intent,
+                ProcessingProfileGrantFactsDTO(
+                    installation,
+                    organization,
+                    project.project_id,
+                    ProcessingProfileId(target.processing_profile_id),
+                    ProcessingProfileAction(intent.action_id.value),
+                    project.access_revision,
+                    project.action,
+                    observed.actor_can_grant,
+                    recipient,
+                    member,
+                    pending,
+                    coherent,
+                    False,
+                    ActionGrantState(before),
+                    grantors,
+                ),
+            )
         return None
 
     @staticmethod
@@ -1111,6 +1183,19 @@ class PostgresInvitationAssignmentFactsReader(InvitationAssignmentFactsReader):
                 exists()
                 .where(
                     grant.model_connection_id == target.model_connection_id,
+                    grant.recipient_principal_id == PrincipalRow.id,
+                    grant.recipient_kind == PrincipalRow.kind,
+                    grant.action == intent.action_id.value,
+                    grant.can_grant.is_(True),
+                )
+                .correlate(PrincipalRow)
+            )
+        if isinstance(target, InvitationProcessingProfileTargetDTO):
+            grant = ProcessingProfileActionGrantRow
+            return (
+                exists()
+                .where(
+                    grant.processing_profile_id == target.processing_profile_id,
                     grant.recipient_principal_id == PrincipalRow.id,
                     grant.recipient_kind == PrincipalRow.kind,
                     grant.action == intent.action_id.value,

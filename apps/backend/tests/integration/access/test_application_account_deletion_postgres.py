@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 from tests.support.access_group_scenarios import change_group, create_group
 from tests.support.application_account_scenarios import create_account
 from tests.support.application_key_scenarios import issue_application_key, store_application_key
+from tests.support.processing_profile_scenarios import profile_command, profile_context
 from tests.support.project_creation_scenarios import ProjectCreationSeedDTO, create_project
 from tests.support.project_grant_changes import create_project_grant_change_service
 from tests.support.project_upload_default_scenarios import (
@@ -163,6 +164,15 @@ from inframeld_backend.access.infrastructure.writers.postgres_human_credential_s
     PostgresHumanCredentialStateInitializer,
 )
 from inframeld_backend.bootstrap.application_key_composition import open_application_key_issuance
+from inframeld_backend.bootstrap.processing_profile_composition import (
+    open_processing_profile_creation,
+)
+from inframeld_backend.indexing.domain.enums.processing_profile_action import (
+    ProcessingProfileAction,
+)
+from inframeld_backend.indexing.infrastructure.rows.processing_profile_action_grant_row import (
+    ProcessingProfileActionGrantRow,
+)
 from inframeld_backend.shared.application.dtos.accepted_async_operation_dto import (
     AcceptedAsyncOperationDTO,
 )
@@ -858,6 +868,15 @@ async def test_retirement_removes_only_exact_received_access_and_preserves_proje
             context=upload_default_context(project, "keep-retirement-default"),
         )
 
+    async with open_processing_profile_creation(
+        database, RequestFingerprintService(RequestFingerprintKey(b"P" * 32))
+    ) as creator:
+        created_profile = await creator.create(
+            access=access,
+            command=profile_command(project),
+            context=profile_context(project, "retirement-profile"),
+        )
+
     live_keys = [
         (
             await store_application_key(
@@ -940,6 +959,18 @@ async def test_retirement_removes_only_exact_received_access_and_preserves_proje
                 )
             )
 
+            session.add(
+                ProcessingProfileActionGrantRow(
+                    project_id=project.value,
+                    processing_profile_id=created_profile.profile.id.value,
+                    recipient_principal_id=recipient.value,
+                    recipient_kind=PrincipalKind.APPLICATION,
+                    action=ProcessingProfileAction.USE.value,
+                    can_grant=False,
+                    assigned_by_principal_id=access.actor_principal_id.value,
+                )
+            )
+
     verifier = PostgresApplicationKeyVerifier(database)
     for credential, profile in live_keys:
         verified = await verifier.verify(credential, profile=profile)
@@ -979,7 +1010,7 @@ async def test_retirement_removes_only_exact_received_access_and_preserves_proje
             project_row.metadata_revision,
         )
 
-    command, context = retirement_request(issued, revision=default.default.access_revision)
+    command, context = retirement_request(issued, revision=created_profile.project_access_revision)
     async with database.session() as session:
         result = await deletion_service(session).delete(
             access=access, command=command, context=context
@@ -990,6 +1021,21 @@ async def test_retirement_removes_only_exact_received_access_and_preserves_proje
         assert await session.get(GroupMembershipRow, target_member) is None
         assert await session.get(ProjectActionGrantRow, target_project_grant) is None
         assert await session.get(GroupActionGrantRow, target_group_grant) is None
+        profile_binding = (project.value, created_profile.profile.id.value)
+        assert (
+            await session.get(
+                ProcessingProfileActionGrantRow,
+                (*profile_binding, account.value, ProcessingProfileAction.USE.value),
+            )
+            is None
+        )
+        assert (
+            await session.get(
+                ProcessingProfileActionGrantRow,
+                (*profile_binding, other.principal_id.value, ProcessingProfileAction.USE.value),
+            )
+            is not None
+        )
         assert await session.get(ProjectMembershipRow, (project.value, account.value)) is None
         other_member = (project.value, group_id, other.principal_id.value)
         assert await session.get(GroupMembershipRow, other_member) is not None

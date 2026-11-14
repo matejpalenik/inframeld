@@ -460,6 +460,103 @@ pub async fn observe(
                 )
                 .await
         ),
+        "createProcessingProfile" => observed!(
+            client
+                .create_processing_profile(
+                    request.path.as_ref().unwrap()["project_id"]
+                        .as_str()
+                        .unwrap(),
+                    &request.headers["Idempotency-Key"],
+                    serde_json::from_value(body).unwrap(),
+                )
+                .await
+        ),
+        "getProcessingProfile" => observed!(
+            client
+                .get_processing_profile(
+                    request.path.as_ref().unwrap()["project_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.path.as_ref().unwrap()["processing_profile_id"]
+                        .as_str()
+                        .unwrap(),
+                )
+                .await
+        ),
+        "listProcessingProfiles" => observed!(
+            client
+                .list_processing_profiles(
+                    request.path.as_ref().unwrap()["project_id"]
+                        .as_str()
+                        .unwrap(),
+                    request
+                        .query
+                        .as_ref()
+                        .and_then(|query| query.get("limit"))
+                        .and_then(Value::as_i64),
+                    request
+                        .query
+                        .as_ref()
+                        .and_then(|query| query.get("cursor"))
+                        .and_then(Value::as_str),
+                )
+                .await
+        ),
+        "listProcessingProfileActionGrants" => observed!(
+            client
+                .list_processing_profile_action_grants(
+                    request.path.as_ref().unwrap()["processing_profile_id"]
+                        .as_str()
+                        .unwrap(),
+                    serde_json::from_value(request.query.as_ref().unwrap()["actionId"].clone())
+                        .unwrap(),
+                    request
+                        .query
+                        .as_ref()
+                        .and_then(|query| query.get("limit"))
+                        .and_then(Value::as_i64),
+                    request
+                        .query
+                        .as_ref()
+                        .and_then(|query| query.get("cursor"))
+                        .and_then(Value::as_str),
+                )
+                .await
+        ),
+        "setProcessingProfileActionGrant" => observed!(
+            client
+                .set_processing_profile_action_grant(
+                    request.path.as_ref().unwrap()["processing_profile_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.path.as_ref().unwrap()["recipient_principal_id"]
+                        .as_str()
+                        .unwrap(),
+                    serde_json::from_value(request.path.as_ref().unwrap()["action_id"].clone())
+                        .unwrap(),
+                    &request.headers["Idempotency-Key"],
+                    serde_json::from_value(body).unwrap(),
+                )
+                .await
+        ),
+        "removeProcessingProfileActionGrant" => observed!(
+            client
+                .remove_processing_profile_action_grant(
+                    request.path.as_ref().unwrap()["processing_profile_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.path.as_ref().unwrap()["recipient_principal_id"]
+                        .as_str()
+                        .unwrap(),
+                    serde_json::from_value(request.path.as_ref().unwrap()["action_id"].clone())
+                        .unwrap(),
+                    request.query.as_ref().unwrap()["expectedAccessRevision"]
+                        .as_i64()
+                        .unwrap(),
+                    &request.headers["Idempotency-Key"],
+                )
+                .await
+        ),
         "listProjectGrantRecipients" => observed!(
             client
                 .list_project_grant_recipients(

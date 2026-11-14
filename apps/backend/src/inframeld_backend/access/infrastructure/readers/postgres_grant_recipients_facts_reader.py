@@ -22,6 +22,9 @@ from inframeld_backend.access.application.dtos.grant_recipients_page_facts_dto i
 from inframeld_backend.access.application.dtos.model_connection_grant_target_dto import (
     ModelConnectionGrantTargetDTO,
 )
+from inframeld_backend.access.application.dtos.processing_profile_grant_target_dto import (
+    ProcessingProfileGrantTargetDTO,
+)
 from inframeld_backend.access.application.dtos.project_grant_target_dto import ProjectGrantTargetDTO
 from inframeld_backend.access.application.protocols.grant_recipients_facts_reader import (
     GrantRecipientsFactsReader,
@@ -65,6 +68,12 @@ from inframeld_backend.access.infrastructure.rows.project_action_grant_row impor
 )
 from inframeld_backend.access.infrastructure.rows.project_membership_row import ProjectMembershipRow
 from inframeld_backend.access.infrastructure.rows.project_row import ProjectRow
+from inframeld_backend.indexing.infrastructure.rows.processing_profile_action_grant_row import (
+    ProcessingProfileActionGrantRow,
+)
+from inframeld_backend.indexing.infrastructure.rows.processing_profile_row import (
+    ProcessingProfileRow,
+)
 from inframeld_backend.shared.application.errors.application_errors import (
     DependencyUnavailableError,
 )
@@ -94,7 +103,8 @@ class PostgresGrantRecipientsFactsReader(GrantRecipientsFactsReader):
         target: ProjectGrantTargetDTO
         | AccessGroupGrantTargetDTO
         | ApplicationAccountGrantTargetDTO
-        | ModelConnectionGrantTargetDTO,
+        | ModelConnectionGrantTargetDTO
+        | ProcessingProfileGrantTargetDTO,
         action_id: ActionId,
         eligible_kinds: tuple[PrincipalKind, ...],
         after: PrincipalId | None,
@@ -176,6 +186,29 @@ class PostgresGrantRecipientsFactsReader(GrantRecipientsFactsReader):
                 .correlate(PrincipalRow, ProjectRow, ModelConnectionRow)
             )
             delegated = granted.where(model_grants.can_grant.is_(True))
+        elif isinstance(target, ProcessingProfileGrantTargetDTO):
+            header = header.join(
+                ProcessingProfileRow,
+                and_(
+                    ProcessingProfileRow.project_id == ProjectRow.id,
+                    ProcessingProfileRow.organization_id == ProjectRow.organization_id,
+                ),
+            ).where(
+                ProcessingProfileRow.id == target.processing_profile_id.value,
+            )
+            profile_grants = ProcessingProfileActionGrantRow
+            granted = (
+                exists()
+                .where(
+                    profile_grants.project_id == ProjectRow.id,
+                    profile_grants.processing_profile_id == ProcessingProfileRow.id,
+                    profile_grants.recipient_principal_id == PrincipalRow.id,
+                    profile_grants.recipient_kind == PrincipalRow.kind,
+                    profile_grants.action == action_id.value,
+                )
+                .correlate(PrincipalRow, ProjectRow, ProcessingProfileRow)
+            )
+            delegated = granted.where(profile_grants.can_grant.is_(True))
         else:
             application = aliased(PrincipalRow, name="application_principal")
             bound_membership = (

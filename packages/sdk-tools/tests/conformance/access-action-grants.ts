@@ -15,6 +15,7 @@ const unchangedRecipient = "00000000-0000-4000-8000-000000000005";
 const groupId = "00000000-0000-4000-8000-000000000007";
 const applicationPrincipalId = "00000000-0000-4000-8000-000000000008";
 const modelConnectionId = "00000000-0000-4000-8000-000000000030";
+const processingProfileId = "00000000-0000-4000-8000-000000000032";
 const bearer = { Authorization: "Bearer sdk-human" };
 const expires = "2030-01-01T00:00:00Z";
 
@@ -68,6 +69,18 @@ const families = [
     set: "setModelConnectionActionGrant",
     remove: "removeModelConnectionActionGrant",
     lookup: "model_connection_grant_read",
+    lookupProject: projectId,
+  },
+  {
+    slug: "processing-profile",
+    path: { processing_profile_id: processingProfileId },
+    scope: { processingProfileId },
+    route: `/v1/processing-profiles/${processingProfileId}/grants`,
+    actionId: "use-processing-profile",
+    list: "listProcessingProfileActionGrants",
+    set: "setProcessingProfileActionGrant",
+    remove: "removeProcessingProfileActionGrant",
+    lookup: "processing_profile_grant_read",
     lookupProject: projectId,
   },
 ] as const;
@@ -244,6 +257,7 @@ for (const [targetKind, targetId, actionId] of [
   ["access-group", groupId, "add-documents"],
   ["application-account", applicationPrincipalId, "issue-application-keys"],
   ["model-connection", modelConnectionId, "use-model-connection"],
+  ["processing-profile", processingProfileId, "use-processing-profile"],
 ] as const)
   sdkTest(
     {

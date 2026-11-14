@@ -18,6 +18,12 @@ from inframeld_backend.access.application.dtos.model_connection_grant_target_dto
 from inframeld_backend.access.application.dtos.organization_grant_target_dto import (
     OrganizationGrantTargetDTO,
 )
+from inframeld_backend.access.application.dtos.processing_profile_grant_target_dto import (
+    ProcessingProfileGrantTargetDTO,
+)
+from inframeld_backend.access.application.dtos.processing_profile_repair_request_dto import (
+    ProcessingProfileRepairRequestDTO,
+)
 from inframeld_backend.access.application.dtos.project_grant_target_dto import ProjectGrantTargetDTO
 from inframeld_backend.access.application.dtos.verified_human_identity_dto import (
     VerifiedHumanIdentityDTO,
@@ -74,8 +80,17 @@ class StrandedAuthorityFingerprintService:
 
     @staticmethod
     def _meaning(
-        responsibility: GroupManagerRepairResponsibilityDTO | ActionGrantorRepairResponsibilityDTO,
+        responsibility: GroupManagerRepairResponsibilityDTO
+        | ActionGrantorRepairResponsibilityDTO
+        | ProcessingProfileRepairRequestDTO,
     ) -> list[str]:
+        if isinstance(responsibility, ProcessingProfileRepairRequestDTO):
+            return [
+                responsibility.kind.value,
+                "processing-profile",
+                str(responsibility.processing_profile_id.value),
+                responsibility.action.value,
+            ]
         if isinstance(responsibility, GroupManagerRepairResponsibilityDTO):
             return [
                 responsibility.kind.value,
@@ -99,6 +114,8 @@ class StrandedAuthorityFingerprintService:
                 str(target.project_id.value),
                 str(target.model_connection_id.value),
             ]
+        elif isinstance(target, ProcessingProfileGrantTargetDTO):
+            raise ValueError("A Processing Profile repair command requires a stable ID request.")
         else:
             scope = [
                 "application-account",

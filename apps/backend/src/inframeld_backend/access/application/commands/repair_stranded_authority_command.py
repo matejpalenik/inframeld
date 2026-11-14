@@ -7,6 +7,9 @@ from inframeld_backend.access.application.dtos.action_grantor_repair_responsibil
 from inframeld_backend.access.application.dtos.group_manager_repair_responsibility_dto import (
     GroupManagerRepairResponsibilityDTO,
 )
+from inframeld_backend.access.application.dtos.processing_profile_repair_request_dto import (
+    ProcessingProfileRepairRequestDTO,
+)
 from inframeld_backend.access.application.value_objects.human_access_token_credential import (
     HumanAccessTokenCredential,
 )
@@ -21,7 +24,11 @@ from inframeld_backend.shared.domain.value_objects.installation_id import Instal
 class RepairStrandedAuthorityCommand(Command):
     expected_installation_id: InstallationId
     operation_id: OperationId
-    responsibility: GroupManagerRepairResponsibilityDTO | ActionGrantorRepairResponsibilityDTO
+    responsibility: (
+        GroupManagerRepairResponsibilityDTO
+        | ActionGrantorRepairResponsibilityDTO
+        | ProcessingProfileRepairRequestDTO
+    )
     expected_access_revision: int
     expected_identity_id: UUID
     operator_label: str

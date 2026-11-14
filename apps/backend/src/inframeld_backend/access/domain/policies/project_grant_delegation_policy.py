@@ -28,15 +28,32 @@ class ProjectGrantDelegationPolicy:
     ) -> bool:
         """Check fresh assignment eligibility without restricting cleanup or replay."""
         recipient = recipient_access.principal
+        return ProjectActionEligibilityPolicy.may_use(
+            action_id=action_id, principal_kind=recipient.kind
+        ) and ProjectGrantDelegationPolicy.may_assign_to_project_member(
+            recipient_access=recipient_access,
+            is_project_member=is_project_member,
+            has_coherent_identity=has_coherent_identity,
+            application_is_project_bound=application_is_project_bound,
+            can_grant=can_grant,
+        )
+
+    @staticmethod
+    def may_assign_to_project_member(
+        *,
+        recipient_access: PrincipalAccessPolicyInput,
+        is_project_member: bool,
+        has_coherent_identity: bool,
+        application_is_project_bound: bool,
+        can_grant: bool,
+    ) -> bool:
+        """Check recipient eligibility after the target has selected a supported exact action."""
         return (
             PrincipalAccessPolicy.may_use_product(recipient_access)
             and is_project_member
-            and ProjectActionEligibilityPolicy.may_use(
-                action_id=action_id, principal_kind=recipient.kind
-            )
             and (
                 has_coherent_identity
-                if recipient.kind is PrincipalKind.HUMAN
+                if recipient_access.principal.kind is PrincipalKind.HUMAN
                 else application_is_project_bound and not can_grant
             )
         )

@@ -12,7 +12,7 @@ from sqlalchemy import Boolean, Connection, func, select
 from inframeld_backend.shared.infrastructure.errors.migration_errors import MigrationLockError
 from inframeld_backend.shared.infrastructure.settings.database_settings import DatabaseSettings
 
-SUPPORTED_SCHEMA_REVISION = "0036_provider_credentials"
+SUPPORTED_SCHEMA_REVISION = "0037_processing_profiles"
 MIGRATION_LOCK_KEY = 4_321_017
 MIGRATION_LOCK_POLL_INTERVAL_SECONDS = 0.05
 

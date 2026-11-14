@@ -149,6 +149,9 @@ from inframeld_backend.access.application.dtos.organization_action_grant_dto imp
 from inframeld_backend.access.application.dtos.organization_action_grants_page_dto import (
     OrganizationActionGrantsPageDTO,
 )
+from inframeld_backend.access.application.dtos.processing_profile_grant_target_dto import (
+    ProcessingProfileGrantTargetDTO,
+)
 from inframeld_backend.access.application.dtos.project_action_facts_dto import ProjectActionFactsDTO
 from inframeld_backend.access.application.dtos.project_action_grant_change_result_dto import (
     ProjectActionGrantChangeResultDTO,
@@ -409,6 +412,9 @@ from inframeld_backend.access.http.routes.organization_access_routes import (
 from inframeld_backend.access.http.routes.organization_action_grant_routes import (
     create_organization_action_grant_router,
 )
+from inframeld_backend.access.http.routes.processing_profile_grant_routes import (
+    create_processing_profile_grant_router,
+)
 from inframeld_backend.access.http.routes.project_action_grant_change_routes import (
     create_project_action_grant_change_router,
 )
@@ -435,6 +441,9 @@ from inframeld_backend.access.http.routes.project_metadata_routes import (
 )
 from inframeld_backend.access.http.routes.project_upload_default_routes import (
     create_project_upload_default_router,
+)
+from inframeld_backend.indexing.http.routes.processing_profile_routes import (
+    create_processing_profile_router,
 )
 from inframeld_backend.shared.application.dtos.accepted_async_operation_dto import (
     AcceptedAsyncOperationDTO,
@@ -512,6 +521,10 @@ from tests.support.mock_sdk_model_connections import (
     SDK_MODEL_CONNECTION_ID,
     open_model_connection_credentials,
     open_model_connections,
+)
+from tests.support.mock_sdk_processing_profiles import (
+    SDK_PROCESSING_PROFILE_ID,
+    MockSDKProcessingProfiles,
 )
 from tests.support.mock_sdk_project_upload_defaults import MockSDKProjectUploadDefaults
 from tests.support.openapi_schema_fixture import create_schema_fixture_app
@@ -1047,6 +1060,11 @@ class MockSDKGrantRecipients(ProjectGrantRecipientsReader):
             query.target.model_connection_id != SDK_MODEL_CONNECTION_ID
         ):
             raise ResourceNotFoundError()
+        if isinstance(query.target, ProcessingProfileGrantTargetDTO):
+            if access.actor_principal_id != PRINCIPAL:
+                raise AccessDeniedError()
+            if query.target.processing_profile_id != SDK_PROCESSING_PROFILE_ID:
+                raise ResourceNotFoundError()
         return GrantRecipientsPageDTO(
             items=(
                 GrantRecipientDTO(
@@ -1778,6 +1796,7 @@ class MockSDKOriginalOperationLookup(OriginalOperationLookup):
             OperationLookupAuthorityFamily.ACCESS_GROUP_GRANT_READ,
             OperationLookupAuthorityFamily.APPLICATION_ACCOUNT_GRANT_READ,
             OperationLookupAuthorityFamily.MODEL_CONNECTION_GRANT_READ,
+            OperationLookupAuthorityFamily.PROCESSING_PROFILE_GRANT_READ,
         }:
             organization = "00000000-0000-4000-8000-000000000002"
             project = "00000000-0000-4000-8000-000000000003"
@@ -1808,6 +1827,16 @@ class MockSDKOriginalOperationLookup(OriginalOperationLookup):
                     f"/v1/model-connections/{SDK_MODEL_CONNECTION_ID.value}",
                 )
                 if query.project_id != ProjectId(UUID(project)):
+                    return UnresolvedOperationDTO()
+            elif family is OperationLookupAuthorityFamily.PROCESSING_PROFILE_GRANT_READ:
+                slug, action, base = (
+                    "processing-profile",
+                    "use-processing-profile",
+                    f"/v1/processing-profiles/{SDK_PROCESSING_PROFILE_ID.value}",
+                )
+                if access.actor_principal_id != PRINCIPAL or query.project_id != ProjectId(
+                    UUID(project)
+                ):
                     return UnresolvedOperationDTO()
             else:
                 slug, action, base = (
@@ -2038,6 +2067,12 @@ def create_sdk_conformance_app(browser_origin: str | None = None) -> FastAPI:
         origins += (HttpUrl(browser_origin),)
 
     csrf = CSRFProtectionDependency(origins)
+    profiles = MockSDKProcessingProfiles()
+
+    @asynccontextmanager
+    async def open_profiles() -> AsyncGenerator[MockSDKProcessingProfiles]:
+        yield profiles
+
     browser_authenticator = MockSDKBrowserAuthenticator()
     token_authenticator = MockSDKTokenAuthenticator()
     human_session = HumanSessionDependency(
@@ -2120,6 +2155,12 @@ def create_sdk_conformance_app(browser_origin: str | None = None) -> FastAPI:
     )
     application.include_router(
         create_model_connection_credential_router(authenticate, open_model_connection_credentials)
+    )
+    application.include_router(
+        create_processing_profile_router(authenticate, open_profiles, open_profiles)
+    )
+    application.include_router(
+        create_processing_profile_grant_router(authenticate, open_profiles, open_profiles)
     )
     application.include_router(
         create_project_grant_recipients_router(authenticate, _open_grant_recipients)

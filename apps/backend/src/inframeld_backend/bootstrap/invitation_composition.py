@@ -49,6 +49,9 @@ from inframeld_backend.access.infrastructure.writers.postgres_human_admission_wr
 from inframeld_backend.access.infrastructure.writers.postgres_invitation_model_connection_grant_writer import (
     PostgresInvitationModelConnectionGrantWriter,
 )
+from inframeld_backend.access.infrastructure.writers.postgres_invitation_processing_profile_grant_writer import (
+    PostgresInvitationProcessingProfileGrantWriter,
+)
 from inframeld_backend.access.infrastructure.writers.postgres_invitation_writer import (
     PostgresInvitationWriter,
 )
@@ -118,6 +121,9 @@ async def open_invitation_activation(
             ),
             project_membership_repository=PostgresProjectMembershipRepository(session, audit),
             invitation_model_connection_grant_writer=PostgresInvitationModelConnectionGrantWriter(
+                session
+            ),
+            invitation_processing_profile_grant_writer=PostgresInvitationProcessingProfileGrantWriter(
                 session
             ),
         )

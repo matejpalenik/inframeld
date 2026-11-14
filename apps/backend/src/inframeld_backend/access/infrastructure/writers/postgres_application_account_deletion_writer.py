@@ -45,6 +45,9 @@ from inframeld_backend.access.infrastructure.rows.project_action_grant_row impor
 )
 from inframeld_backend.access.infrastructure.rows.project_membership_row import ProjectMembershipRow
 from inframeld_backend.access.infrastructure.rows.project_row import ProjectRow
+from inframeld_backend.indexing.infrastructure.rows.processing_profile_action_grant_row import (
+    ProcessingProfileActionGrantRow,
+)
 from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.enums.operation_reservation_state import (
     OperationReservationState,
@@ -293,6 +296,12 @@ class PostgresApplicationAccountDeletionWriter(ApplicationAccountDeletionWriter)
             delete(ModelConnectionActionGrantRow).where(
                 ModelConnectionActionGrantRow.project_id == project,
                 ModelConnectionActionGrantRow.recipient_principal_id == application,
+            )
+        )
+        await self._session.execute(
+            delete(ProcessingProfileActionGrantRow).where(
+                ProcessingProfileActionGrantRow.project_id == project,
+                ProcessingProfileActionGrantRow.recipient_principal_id == application,
             )
         )
         await self._session.execute(

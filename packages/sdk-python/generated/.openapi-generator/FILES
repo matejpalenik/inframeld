@@ -3,6 +3,7 @@ inframeld_sdk/api/__init__.py
 inframeld_sdk/api/access_api.py
 inframeld_sdk/api/discovery_api.py
 inframeld_sdk/api/health_api.py
+inframeld_sdk/api/indexing_api.py
 inframeld_sdk/api/operations_api.py
 inframeld_sdk/api_client.py
 inframeld_sdk/api_response.py
@@ -49,6 +50,8 @@ inframeld_sdk/models/completed_operation_lookup_response.py
 inframeld_sdk/models/current_application_session_response.py
 inframeld_sdk/models/current_session_response.py
 inframeld_sdk/models/deletion_status_response.py
+inframeld_sdk/models/docling_processing_definition_request.py
+inframeld_sdk/models/docling_processing_definition_response.py
 inframeld_sdk/models/grant_recipient_response.py
 inframeld_sdk/models/grant_target_kind.py
 inframeld_sdk/models/http_method.py
@@ -66,6 +69,7 @@ inframeld_sdk/models/in_progress_operation_lookup_response.py
 inframeld_sdk/models/inframeld_discovery_response.py
 inframeld_sdk/models/initial_application_account_grant_response.py
 inframeld_sdk/models/initial_model_connection_grant_response.py
+inframeld_sdk/models/initial_processing_profile_grant_response.py
 inframeld_sdk/models/initial_project_grant_response.py
 inframeld_sdk/models/invitation_access_group_target_request.py
 inframeld_sdk/models/invitation_action_grant_request.py
@@ -143,11 +147,22 @@ inframeld_sdk/models/page_response_model_connection_action_grant_item_response.p
 inframeld_sdk/models/page_response_model_connection_response.py
 inframeld_sdk/models/page_response_model_connection_usage_response.py
 inframeld_sdk/models/page_response_organization_action_grant_item_response.py
+inframeld_sdk/models/page_response_processing_profile_action_grant_item_response.py
+inframeld_sdk/models/page_response_processing_profile_response.py
 inframeld_sdk/models/page_response_project_action_grant_item_response.py
 inframeld_sdk/models/path_inner.py
 inframeld_sdk/models/principal_kind.py
 inframeld_sdk/models/principal_status.py
 inframeld_sdk/models/problem_details.py
+inframeld_sdk/models/processing_profile_action.py
+inframeld_sdk/models/processing_profile_action_grant_item_response.py
+inframeld_sdk/models/processing_profile_action_grant_removal_response.py
+inframeld_sdk/models/processing_profile_action_grant_request.py
+inframeld_sdk/models/processing_profile_action_grant_response.py
+inframeld_sdk/models/processing_profile_creation_request.py
+inframeld_sdk/models/processing_profile_creation_response.py
+inframeld_sdk/models/processing_profile_grant_target_response.py
+inframeld_sdk/models/processing_profile_response.py
 inframeld_sdk/models/project_action.py
 inframeld_sdk/models/project_action_grant_item_response.py
 inframeld_sdk/models/project_action_grant_removal_response.py

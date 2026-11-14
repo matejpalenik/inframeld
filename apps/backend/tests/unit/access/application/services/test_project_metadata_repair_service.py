@@ -309,13 +309,18 @@ RESPONSIBILITIES = [
 class BroaderFacts(StrandedAuthorityRepairFactsReader):
     def __init__(self, events: list[str], command: RepairStrandedAuthorityCommand) -> None:
         self.events = events
+        responsibility = command.responsibility
+        assert isinstance(
+            responsibility,
+            (ActionGrantorRepairResponsibilityDTO, GroupManagerRepairResponsibilityDTO),
+        )
         organization_only = isinstance(
-            command.responsibility, ActionGrantorRepairResponsibilityDTO
-        ) and isinstance(command.responsibility.target, OrganizationGrantTargetDTO)
+            responsibility, ActionGrantorRepairResponsibilityDTO
+        ) and isinstance(responsibility.target, OrganizationGrantTargetDTO)
         self.facts = StrandedAuthorityRepairFactsDTO(
             INSTALLATION,
             ACTOR,
-            command.responsibility,
+            responsibility,
             None if organization_only else ProjectStatus.ACTIVE,
             0,
             not organization_only,

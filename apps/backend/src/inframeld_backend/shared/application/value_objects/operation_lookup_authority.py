@@ -11,6 +11,9 @@ from inframeld_backend.access.domain.enums.project_action import ProjectAction
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
+from inframeld_backend.indexing.domain.enums.processing_profile_action import (
+    ProcessingProfileAction,
+)
 from inframeld_backend.shared.application.enums.operation_lookup_authority_family import (
     OperationLookupAuthorityFamily,
 )
@@ -109,6 +112,30 @@ class OperationLookupAuthority:
                 and self.family is family.MODEL_CONNECTION_GRANT_READ
                 and method in {"PUT", "DELETE"}
                 and self.action_id.value in ModelConnectionAction
+                and parts[6] == self.action_id.value
+            ):
+                try:
+                    valid = str(UUID(parts[3])) == parts[3] and str(UUID(parts[5])) == parts[5]
+                except ValueError:
+                    valid = False
+            if not valid:
+                raise InvalidInputError()
+            return
+
+        profile_grant_path = (
+            len(parts) >= 5
+            and parts[:3] == ["", "v1", "processing-profiles"]
+            and parts[4] == "grants"
+        )
+        if profile_grant_path or self.family is family.PROCESSING_PROFILE_GRANT_READ:
+            valid = False
+            if (
+                profile_grant_path
+                and len(parts) == 7
+                and project_id is not None
+                and self.family is family.PROCESSING_PROFILE_GRANT_READ
+                and method in {"PUT", "DELETE"}
+                and self.action_id.value in ProcessingProfileAction
                 and parts[6] == self.action_id.value
             ):
                 try:

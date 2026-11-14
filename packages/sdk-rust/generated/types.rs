@@ -159,6 +159,89 @@ pub struct ProjectCreationResponse {
     #[serde(rename = "projectId")]
     pub project_id: uuid::Uuid,
 }
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ProcessingProfileCreationResponse {
+    #[serde(rename = "idempotencyExpiresAt")]
+    pub idempotency_expires_at: chrono::DateTime<chrono::Utc>,
+    ///Constraint: minItems=2, maxItems=2
+    #[serde(rename = "initialGrants")]
+    pub initial_grants: Vec<InitialProcessingProfileGrantResponse>,
+    #[serde(rename = "operationId")]
+    pub operation_id: String,
+    pub profile: ProcessingProfileResponse,
+    ///Constraint: minimum=1, maximum=9007199254740991
+    #[serde(rename = "projectAccessRevision")]
+    pub project_access_revision: i64,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ProcessingProfileCreationRequest {
+    pub definition: DoclingProcessingDefinitionRequest,
+    ///Constraint: minLength=1, maxLength=128
+    #[serde(rename = "displayName")]
+    pub display_name: String,
+    ///Constraint: minLength=1, maxLength=63, pattern=`^[a-z](?:[a-z0-9-]*[a-z0-9])?$`
+    pub name: String,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct DoclingProcessingDefinitionRequest {
+    ///Constraint: pattern=`^[a-f0-9]{64}$`
+    #[serde(rename = "assetManifestSha256")]
+    pub asset_manifest_sha256: String,
+    ///Constraint: minLength=1, maxLength=32
+    #[serde(rename = "doclingCoreVersion")]
+    pub docling_core_version: String,
+    ///Constraint: minLength=1, maxLength=32
+    #[serde(rename = "doclingSlimVersion")]
+    pub docling_slim_version: String,
+    ///Constraint: minimum=1, maximum=1024
+    #[serde(rename = "maxContentTokens")]
+    pub max_content_tokens: i64,
+    #[serde(rename = "mergePeers")]
+    pub merge_peers: bool,
+    #[serde(rename = "ocrEnabled")]
+    pub ocr_enabled: BooleanConstant<false>,
+    #[serde(rename = "repeatTableHeader")]
+    pub repeat_table_header: bool,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ProcessingProfileActionGrantResponse {
+    ///Constraint: minimum=0, maximum=9007199254740991
+    #[serde(rename = "accessRevision")]
+    pub access_revision: i64,
+    #[serde(rename = "actionId")]
+    pub action_id: ProcessingProfileAction,
+    #[serde(rename = "canGrant")]
+    pub can_grant: bool,
+    pub changed: bool,
+    #[serde(rename = "idempotencyExpiresAt")]
+    pub idempotency_expires_at: chrono::DateTime<chrono::Utc>,
+    ///Constraint: minLength=1, maxLength=128
+    #[serde(rename = "operationId")]
+    pub operation_id: String,
+    #[serde(rename = "processingProfileId")]
+    pub processing_profile_id: uuid::Uuid,
+    #[serde(rename = "recipientPrincipalId")]
+    pub recipient_principal_id: uuid::Uuid,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ProcessingProfileActionGrantRemovalResponse {
+    ///Constraint: minimum=0, maximum=9007199254740991
+    #[serde(rename = "accessRevision")]
+    pub access_revision: i64,
+    #[serde(rename = "actionId")]
+    pub action_id: ProcessingProfileAction,
+    pub changed: bool,
+    #[serde(rename = "idempotencyExpiresAt")]
+    pub idempotency_expires_at: chrono::DateTime<chrono::Utc>,
+    ///Constraint: minLength=1, maxLength=128
+    #[serde(rename = "operationId")]
+    pub operation_id: String,
+    #[serde(rename = "processingProfileId")]
+    pub processing_profile_id: uuid::Uuid,
+    #[serde(rename = "recipientPrincipalId")]
+    pub recipient_principal_id: uuid::Uuid,
+    pub removed: BooleanConstant<true>,
+}
 /**Represent an Inframeld HTTP error using RFC 9457 Problem Details.
 
 Attributes:
@@ -297,6 +380,64 @@ pub struct ProjectActionGrantItemResponse {
     pub can_grant: bool,
     #[serde(rename = "projectId")]
     pub project_id: uuid::Uuid,
+    #[serde(rename = "recipientPrincipalId")]
+    pub recipient_principal_id: uuid::Uuid,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct PageResponseProcessingProfileResponse {
+    pub items: Vec<ProcessingProfileResponse>,
+    #[serde(
+        rename = "nextCursor",
+        deserialize_with = "presence_serde::required_nullable"
+    )]
+    pub next_cursor: Option<String>,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ProcessingProfileResponse {
+    pub definition: DoclingProcessingDefinitionResponse,
+    #[serde(rename = "displayName")]
+    pub display_name: String,
+    pub name: String,
+    #[serde(rename = "processingProfileId")]
+    pub processing_profile_id: uuid::Uuid,
+    #[serde(rename = "projectId")]
+    pub project_id: uuid::Uuid,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct DoclingProcessingDefinitionResponse {
+    #[serde(rename = "assetManifestSha256")]
+    pub asset_manifest_sha256: String,
+    #[serde(rename = "doclingCoreVersion")]
+    pub docling_core_version: String,
+    #[serde(rename = "doclingSlimVersion")]
+    pub docling_slim_version: String,
+    ///Constraint: minimum=1, maximum=1024
+    #[serde(rename = "maxContentTokens")]
+    pub max_content_tokens: i64,
+    #[serde(rename = "mergePeers")]
+    pub merge_peers: bool,
+    #[serde(rename = "ocrEnabled")]
+    pub ocr_enabled: BooleanConstant<false>,
+    #[serde(rename = "repeatTableHeader")]
+    pub repeat_table_header: bool,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct PageResponseProcessingProfileActionGrantItemResponse {
+    pub items: Vec<ProcessingProfileActionGrantItemResponse>,
+    #[serde(
+        rename = "nextCursor",
+        deserialize_with = "presence_serde::required_nullable"
+    )]
+    pub next_cursor: Option<String>,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ProcessingProfileActionGrantItemResponse {
+    #[serde(rename = "actionId")]
+    pub action_id: ProcessingProfileAction,
+    #[serde(rename = "canGrant")]
+    pub can_grant: bool,
+    #[serde(rename = "processingProfileId")]
+    pub processing_profile_id: uuid::Uuid,
     #[serde(rename = "recipientPrincipalId")]
     pub recipient_principal_id: uuid::Uuid,
 }
@@ -1583,6 +1724,8 @@ pub enum OperationLookupAuthorityFamily {
     ApplicationAccountGrantRead,
     #[serde(rename = "model_connection_grant_read")]
     ModelConnectionGrantRead,
+    #[serde(rename = "processing_profile_grant_read")]
+    ProcessingProfileGrantRead,
     #[serde(rename = "access_group_deletion")]
     AccessGroupDeletion,
     #[serde(rename = "project_deletion")]
@@ -1598,6 +1741,7 @@ impl OperationLookupAuthorityFamily {
             Self::AccessGroupGrantRead => "access_group_grant_read",
             Self::ApplicationAccountGrantRead => "application_account_grant_read",
             Self::ModelConnectionGrantRead => "model_connection_grant_read",
+            Self::ProcessingProfileGrantRead => "processing_profile_grant_read",
             Self::AccessGroupDeletion => "access_group_deletion",
             Self::ProjectDeletion => "project_deletion",
         }
@@ -7090,6 +7234,69 @@ impl AsRef<str> for ProjectAction {
     }
 }
 #[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct InitialProcessingProfileGrantResponse {
+    #[serde(rename = "actionId")]
+    pub action_id: ProcessingProfileAction,
+    #[serde(rename = "canGrant")]
+    pub can_grant: BooleanConstant<true>,
+    pub target: ProcessingProfileGrantTargetResponse,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ProcessingProfileGrantTargetResponse {
+    pub kind: ProcessingProfileGrantTargetResponseKind,
+    #[serde(rename = "processingProfileId")]
+    pub processing_profile_id: uuid::Uuid,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum ProcessingProfileGrantTargetResponseKind {
+    #[default]
+    #[serde(rename = "processing-profile")]
+    ProcessingProfile,
+}
+impl ProcessingProfileGrantTargetResponseKind {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::ProcessingProfile => "processing-profile",
+        }
+    }
+}
+impl ::std::fmt::Display for ProcessingProfileGrantTargetResponseKind {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for ProcessingProfileGrantTargetResponseKind {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum ProcessingProfileAction {
+    #[default]
+    #[serde(rename = "view-processing-profile")]
+    ViewProcessingProfile,
+    #[serde(rename = "use-processing-profile")]
+    UseProcessingProfile,
+}
+impl ProcessingProfileAction {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::ViewProcessingProfile => "view-processing-profile",
+            Self::UseProcessingProfile => "use-processing-profile",
+        }
+    }
+}
+impl ::std::fmt::Display for ProcessingProfileAction {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for ProcessingProfileAction {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct InitialModelConnectionGrantResponse {
     #[serde(rename = "actionId")]
     pub action_id: ModelConnectionAction,
@@ -8839,6 +9046,8 @@ pub enum GrantTargetKind {
     ApplicationAccount,
     #[serde(rename = "model-connection")]
     ModelConnection,
+    #[serde(rename = "processing-profile")]
+    ProcessingProfile,
 }
 impl GrantTargetKind {
     pub fn as_str(&self) -> &'static str {
@@ -8847,6 +9056,7 @@ impl GrantTargetKind {
             Self::AccessGroup => "access-group",
             Self::ApplicationAccount => "application-account",
             Self::ModelConnection => "model-connection",
+            Self::ProcessingProfile => "processing-profile",
         }
     }
 }
@@ -9053,6 +9263,14 @@ pub struct OrganizationActionGrantResponse {
     pub organization_id: uuid::Uuid,
     #[serde(rename = "recipientPrincipalId")]
     pub recipient_principal_id: uuid::Uuid,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ProcessingProfileActionGrantRequest {
+    #[serde(rename = "canGrant")]
+    pub can_grant: bool,
+    ///Constraint: minimum=0, maximum=9007199254740991
+    #[serde(rename = "expectedAccessRevision")]
+    pub expected_access_revision: i64,
 }
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ProjectActionGrantRemovalResponse {

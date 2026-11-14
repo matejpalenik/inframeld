@@ -1,7 +1,7 @@
 export const pageMetadata = {
   title: "Configure models and processing",
   description:
-    "Save a model connection, inspect its settings and manage its provider credential.",
+    "Configure model connections, manage provider credentials and save processing profiles.",
 }
 
 # Configure models and processing
@@ -275,3 +275,152 @@ EOF_HEADERS
 </CodeGroup>
 
 HTTP `200` returns the original removal outcome. Removing a present credential advances its revision and returns `credential.present: false`. A removal of an already empty slot at its current revision records `changed: false`. For a lost reply, reuse the original DELETE key and revision. [Recover a save or removal after a lost reply](#recover-a-save-or-removal-after-a-lost-reply).
+
+## Create a processing profile
+
+Save how a Project splits documents into chunks. For example, `support-chunks` uses Docling's hybrid chunking with a limit of 512 content tokens per chunk. Creating the profile saves the definition. The profile keeps that definition for its lifetime. Create a distinct Name to change the settings.
+
+You need the permanent `PROJECT_ID`, a current human credential and `create-processing-profiles` in that Project. Follow [HTTP setup](/clients/http#call-protected-operations) for `INFRAMELD_URL` and `INFRAMELD_TOKEN`. Choose `PROFILE_CREATE_KEY` once for this request, for example by running `PROFILE_CREATE_KEY=$(uuidgen)`.
+
+Save this complete request as `processing-profile.json` in the directory where you will run cURL.
+
+<CodeGroup>
+
+```json
+{
+  "name": "support-chunks",
+  "displayName": "Support chunks",
+  "definition": {
+    "doclingSlimVersion": "2.148.0",
+    "doclingCoreVersion": "2.106.0",
+    "assetManifestSha256": "7ea9f3c967a7bc66d2501e466334e7aef46a639e01a11376888321e0f0a51d0e",
+    "maxContentTokens": 512,
+    "mergePeers": true,
+    "repeatTableHeader": true,
+    "ocrEnabled": false
+  }
+}
+```
+
+</CodeGroup>
+
+Choose a profile Name of 1 to 63 characters that is unique within the Project. Start with an ASCII lowercase letter, use lowercase letters, digits and hyphens, and end with a letter or digit. Use a display name of 1 to 128 characters.
+
+The Docling versions and asset manifest digest select the supported source. The chunk limit is a whole number from 1 to 1,024 and counts content without tokenizer special tokens. Set `mergePeers` to allow compatible peer chunks to combine within that limit and `repeatTableHeader` to carry the header into chunks from a table. Set both explicitly. Optical character recognition (OCR) is disabled, so set `ocrEnabled` to `false`.
+
+<CodeGroup>
+
+```shell
+PROFILE_URL="$INFRAMELD_URL/v1/projects/$PROJECT_ID/processing-profiles"
+
+curl --disable --fail-with-body --silent --show-error --max-time 5 \
+  --request POST --header @- \
+  --header "Idempotency-Key: $PROFILE_CREATE_KEY" \
+  --header 'Content-Type: application/json' \
+  --data-binary @processing-profile.json "$PROFILE_URL" <<EOF_HEADERS
+Authorization: Bearer $INFRAMELD_TOKEN
+EOF_HEADERS
+```
+
+</CodeGroup>
+
+HTTP `201` returns `profile.processingProfileId`, the original operation ID and expiry, and the resulting Project Access revision. `initialGrants` records the creator's `view-processing-profile` and `use-processing-profile` assignments with `canGrant: true`. Saving defines the settings. Processing documents and checking runtime readiness are separate operations.
+
+## Read or share a processing profile
+
+To read a definition, use the exact `view-processing-profile` permission. Set `PROCESSING_PROFILE_ID` to `profile.processingProfileId` from creation.
+
+<CodeGroup>
+
+```shell
+curl --disable --fail-with-body --silent --show-error --max-time 5 \
+  --header @- "$PROFILE_URL/$PROCESSING_PROFILE_ID" <<EOF_HEADERS
+Authorization: Bearer $INFRAMELD_TOKEN
+EOF_HEADERS
+```
+
+</CodeGroup>
+
+To list the profiles you can view, send GET to `$PROFILE_URL?limit=25` with the same Authorization header. For another page, pass the unchanged `nextCursor` as `cursor` on the same installation and Project. `nextCursor: null` ends the list. Access is checked on every page. [List processing profiles](/api-reference/processing#list-processing-profiles).
+
+To let Bob inspect this profile, choose `view-processing-profile` and `canGrant: false` on this exact profile. `use-processing-profile` is a separate action for selecting the profile in an authorized operation. Discover Bob under [eligible Project recipients](/api-reference/projects-and-access#find-eligible-project-grant-recipients) with `targetKind=processing-profile`, the permanent profile ID as `targetId` and the exact action. Review the owning Project's Access revision before [setting the assignment](/api-reference/projects-and-access#set-a-processing-profile-action-grant).
+
+## Recover an uncertain profile creation
+
+A lost reply can happen after the profile is saved. Within the retained result period, repeat the POST with the same installation, Project, request and idempotency key. Use a current credential for the same human. The server checks current creation authority and recovers the original `201` receipt. That receipt preserves the original profile, assignments and expiry. Use GET for current access. A changed definition under the same key conflicts. If retention may have expired, inspect current state before sending a new request.
+
+## Copy a processing profile to another Project
+
+Use this manual recipe to copy a saved definition from an authorized GET. Keep the file with your configuration. In `processing-profile.toml`, copy `name` and `displayName` into `metadata.name` and `metadata.display_name`. Copy the seven `definition` values to the corresponding `spec` fields below. Keep the pinned versions, digest, numbers and booleans exactly as returned. This example uses `support-chunks`.
+
+<CodeGroup>
+
+```toml
+schema_version = 1
+kind = "processing-profile"
+
+[metadata]
+name = "support-chunks"
+display_name = "Support chunks"
+
+[spec]
+docling_slim_version = "2.148.0"
+docling_core_version = "2.106.0"
+asset_manifest_sha256 = "7ea9f3c967a7bc66d2501e466334e7aef46a639e01a11376888321e0f0a51d0e"
+max_content_tokens = 512
+merge_peers = true
+repeat_table_header = true
+ocr_enabled = false
+```
+
+</CodeGroup>
+
+Save the following complete script as `convert_profile.py` beside `processing-profile.toml`. Use Python 3.11 or newer. The script checks the file's version and fields, then writes the native creation request to stdout. The creation endpoint validates the setting values.
+
+<CodeGroup>
+
+```python
+import json
+import tomllib
+from pathlib import Path
+
+
+with Path("processing-profile.toml").open("rb") as source:
+    profile = tomllib.load(source)
+
+if set(profile) != {"schema_version", "kind", "metadata", "spec"}:
+    raise SystemExit("Use exactly schema_version, kind, metadata and spec.")
+
+version = profile["schema_version"]
+if type(version) is not int or version != 1 or profile["kind"] != "processing-profile":
+    raise SystemExit("Use a version 1 processing-profile file.")
+
+metadata_fields = {"name": "name", "display_name": "displayName"}
+definition_fields = {
+    "docling_slim_version": "doclingSlimVersion",
+    "docling_core_version": "doclingCoreVersion",
+    "asset_manifest_sha256": "assetManifestSha256",
+    "max_content_tokens": "maxContentTokens",
+    "merge_peers": "mergePeers",
+    "repeat_table_header": "repeatTableHeader",
+    "ocr_enabled": "ocrEnabled",
+}
+metadata = profile["metadata"]
+spec = profile["spec"]
+if not isinstance(metadata, dict) or metadata.keys() != metadata_fields.keys():
+    raise SystemExit("Use exactly name and display_name in metadata.")
+if not isinstance(spec, dict) or spec.keys() != definition_fields.keys():
+    raise SystemExit("Use exactly the seven spec fields shown above.")
+
+request = {field: metadata[key] for key, field in metadata_fields.items()}
+request["definition"] = {
+    field: spec[key] for key, field in definition_fields.items()
+}
+print(json.dumps(request, indent=2))
+```
+
+</CodeGroup>
+
+Run `python3 convert_profile.py > processing-profile.json`. After it succeeds, set `PROJECT_ID` to the ID of a destination Project where that profile Name is available, then choose a fresh `PROFILE_CREATE_KEY`. Run the [creation POST](#create-a-processing-profile) from the same directory with current create authority in the destination.
+
+Read the newly created profile in the destination. Compare its `name`, `displayName` and every field in `definition` with the source. The destination has its own new `processingProfileId` and its ordinary creator assignments. The file carries only settings and labels. It transfers no existing grants or processing results.

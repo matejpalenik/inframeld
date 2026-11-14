@@ -77,6 +77,7 @@ For other supported operations, preserve the original authority meaning:
 | Organization grant PUT/DELETE        | `organization_grant_read`        | Original Organization action           | Explicit `null`       |
 | Access-group grant PUT/DELETE        | `access_group_grant_read`        | Original group document action         | Original Project UUID |
 | Application-account grant PUT/DELETE | `application_account_grant_read` | Original account-administration action | Original Project UUID |
+| Processing-profile grant PUT/DELETE  | `processing_profile_grant_read`  | Original profile View or Use action    | Original Project UUID |
 | Generic Project operation            | `project_action_use`             | Original Project action                | Original Project UUID |
 | Other Organization operation         | `organization_action_use`        | Original Organization action           | Explicit `null`       |
 | Project deletion status              | `project_deletion`               | `delete-project`                       | Original Project UUID |
@@ -89,7 +90,7 @@ A grant lookup requires the exact grant-read family above. A weaker action-use g
 
 ## Inspect another exact grant operation
 
-For an Organization, group, application-account or model-connection grant, retain the original concrete route containing the actual scope, target and recipient UUIDs and action. Use the original `PUT` or `DELETE` method. DELETE's revision query remains part of the original business request but is excluded from its lookup route. Organization grants require explicit `projectId: null`.
+For an Organization, group, application-account, model-connection or processing-profile grant, retain the original concrete route containing the actual scope, target and recipient UUIDs and action. Use the original `PUT` or `DELETE` method. DELETE's revision query remains part of the original business request but is excluded from its lookup route. Organization grants require explicit `projectId: null`.
 
 Choose the matching complete lookup input below and save it as `original-request.json` in its own example directory. Replace the illustrative IDs and key with the original values. The common cURL and three generated programs below use the same lookup operation for each input, without resending a grant change:
 
@@ -142,7 +143,11 @@ Choose the matching complete lookup input below and save it as `original-request
 
 </CodeGroup>
 
-For a model-connection grant, use the original concrete `/v1/model-connections/{model_connection_id}/grants/{recipient_principal_id}/{action_id}` route and `model_connection_grant_read` with that exact action. Include the connection's authoritative `projectId` in the lookup body even though the grant route has no Project segment. The same current exact use-and-grant requirement applies to each target. A saved key, original creator receipt or current group-management relationship grants no generic-history disclosure. [Manage exact action grants](/guides/manage-action-grants#recover-an-uncertain-result) explains the ordinary business-replay alternative and current-authority checks.
+For a model-connection grant, use the original concrete `/v1/model-connections/{model_connection_id}/grants/{recipient_principal_id}/{action_id}` route and `model_connection_grant_read` with that exact action. Include the connection's authoritative `projectId` in the lookup body even though the grant route has no Project segment.
+
+For a processing-profile grant, use the original concrete `/v1/processing-profiles/{processing_profile_id}/grants/{recipient_principal_id}/{action_id}` route and `processing_profile_grant_read`. Set `actionId` to the original exact View or Use action and `projectId` to the profile's owning Project.
+
+The same current exact use-and-grant requirement applies to each target. A saved key, original creator receipt or current group-management relationship grants no generic-history disclosure. [Manage exact action grants](/guides/manage-action-grants#recover-an-uncertain-result) explains the ordinary business-replay alternative and current-authority checks.
 
 ## Inspect historical use-only POST metadata
 

@@ -111,6 +111,9 @@ from inframeld_backend.access.http.requests.model_connection_credential_request 
 from inframeld_backend.access.http.requests.organization_action_grant_request import (
     OrganizationActionGrantRequest,
 )
+from inframeld_backend.access.http.requests.processing_profile_action_grant_request import (
+    ProcessingProfileActionGrantRequest,
+)
 from inframeld_backend.access.http.requests.project_action_grant_request import (
     ProjectActionGrantRequest,
 )
@@ -236,6 +239,12 @@ from inframeld_backend.access.http.responses.organization_action_grant_removal_r
 from inframeld_backend.access.http.responses.organization_action_grant_response import (
     OrganizationActionGrantResponse,
 )
+from inframeld_backend.access.http.responses.processing_profile_action_grant_removal_response import (
+    ProcessingProfileActionGrantRemovalResponse,
+)
+from inframeld_backend.access.http.responses.processing_profile_action_grant_response import (
+    ProcessingProfileActionGrantResponse,
+)
 from inframeld_backend.access.http.responses.project_action_grant_removal_response import (
     ProjectActionGrantRemovalResponse,
 )
@@ -299,6 +308,9 @@ from inframeld_backend.access.http.routes.organization_access_routes import (
 )
 from inframeld_backend.access.http.routes.organization_action_grant_routes import (
     create_organization_action_grant_router,
+)
+from inframeld_backend.access.http.routes.processing_profile_grant_routes import (
+    create_processing_profile_grant_router,
 )
 from inframeld_backend.access.http.routes.project_action_grant_change_routes import (
     create_project_action_grant_change_router,
@@ -394,6 +406,12 @@ from inframeld_backend.bootstrap.original_operation_lookup_composition import (
 from inframeld_backend.bootstrap.postgres_project_membership_change_service_factory import (
     PostgresProjectMembershipChangeServiceFactory,
 )
+from inframeld_backend.bootstrap.processing_profile_composition import (
+    open_processing_profile_creation,
+    open_processing_profile_grant_change,
+    open_processing_profile_grant_read,
+    open_processing_profile_read,
+)
 from inframeld_backend.bootstrap.project_action_grants_composition import open_project_action_grants
 from inframeld_backend.bootstrap.project_creation_composition import open_project_creation
 from inframeld_backend.bootstrap.project_deletion_composition import open_project_deletion
@@ -405,6 +423,12 @@ from inframeld_backend.bootstrap.project_metadata_composition import (
 )
 from inframeld_backend.bootstrap.project_upload_default_composition import (
     open_project_upload_default,
+)
+from inframeld_backend.indexing.http.responses.processing_profile_creation_response import (
+    ProcessingProfileCreationResponse,
+)
+from inframeld_backend.indexing.http.routes.processing_profile_routes import (
+    create_processing_profile_router,
 )
 from inframeld_backend.shared.application.services.request_fingerprint_service import (
     RequestFingerprintService,
@@ -561,6 +585,7 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
                 ApplicationAccountActionGrantRequest,
                 ModelConnectionActionGrantRequest,
                 ModelConnectionCredentialRequest,
+                ProcessingProfileActionGrantRequest,
             ),
             serialization_models=(
                 InvitationIssueResponse,
@@ -605,6 +630,9 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
                 ModelConnectionResponse,
                 ModelConnectionCredentialResponse,
                 ModelConnectionCredentialDetailsResponse,
+                ProcessingProfileCreationResponse,
+                ProcessingProfileActionGrantResponse,
+                ProcessingProfileActionGrantRemovalResponse,
             ),
         )
         application.include_router(health_router)
@@ -755,6 +783,20 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
                     resolved_settings.model_connection_destinations,
                     resolved_settings.provider_credential,
                 ),
+            )
+        )
+        application.include_router(
+            create_processing_profile_grant_router(
+                product_access,
+                partial(open_processing_profile_grant_change, database, request_fingerprints),
+                partial(open_processing_profile_grant_read, database),
+            )
+        )
+        application.include_router(
+            create_processing_profile_router(
+                product_access,
+                partial(open_processing_profile_creation, database, request_fingerprints),
+                partial(open_processing_profile_read, database, http_application_key_profile),
             )
         )
         application.include_router(

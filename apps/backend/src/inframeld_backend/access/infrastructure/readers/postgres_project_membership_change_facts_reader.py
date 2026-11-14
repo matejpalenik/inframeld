@@ -75,6 +75,9 @@ from inframeld_backend.access.infrastructure.rows.project_action_grant_row impor
     ProjectActionGrantRow,
 )
 from inframeld_backend.access.infrastructure.rows.project_row import ProjectRow
+from inframeld_backend.indexing.infrastructure.rows.processing_profile_action_grant_row import (
+    ProcessingProfileActionGrantRow,
+)
 from inframeld_backend.shared.application.errors.application_errors import (
     DependencyUnavailableError,
 )
@@ -438,6 +441,42 @@ class PostgresProjectMembershipChangeFactsReader(ProjectMembershipChangeFactsRea
                 ProjectDepartureResponsibilityDTO(
                     ProjectDepartureTargetKind.MODEL_CONNECTION,
                     connection,
+                    ActionId(action),
+                    await self._candidates(facts, departing, grant),
+                )
+            )
+
+        profile_grants = ProcessingProfileActionGrantRow
+        profiles = (
+            (
+                await self._session.execute(
+                    select(profile_grants.processing_profile_id, profile_grants.action).where(
+                        profile_grants.project_id == project,
+                        profile_grants.recipient_principal_id == departing.value,
+                        profile_grants.can_grant.is_(True),
+                    )
+                )
+            )
+            .tuples()
+            .all()
+        )
+        for profile, action in profiles:
+            grant = (
+                exists()
+                .where(
+                    profile_grants.project_id == project,
+                    profile_grants.processing_profile_id == profile,
+                    profile_grants.recipient_principal_id == PrincipalRow.id,
+                    profile_grants.recipient_kind == PrincipalRow.kind,
+                    profile_grants.action == action,
+                    profile_grants.can_grant.is_(True),
+                )
+                .correlate(PrincipalRow)
+            )
+            result.append(
+                ProjectDepartureResponsibilityDTO(
+                    ProjectDepartureTargetKind.PROCESSING_PROFILE,
+                    profile,
                     ActionId(action),
                     await self._candidates(facts, departing, grant),
                 )

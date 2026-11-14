@@ -15,6 +15,9 @@ from inframeld_backend.access.domain.policy_inputs.project_departure_responsibil
     ProjectDepartureResponsibilityPolicyInput,
 )
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
+from inframeld_backend.indexing.domain.enums.processing_profile_action import (
+    ProcessingProfileAction,
+)
 
 _GROUP_DOCUMENT_ACTIONS = frozenset(AccessGroupAction)
 
@@ -35,6 +38,8 @@ class ProjectDeparturePolicy:
             return action_id.value in _GROUP_DOCUMENT_ACTIONS
         if target_kind == ProjectDepartureTargetKind.MODEL_CONNECTION:
             return action_id.value in ModelConnectionAction
+        if target_kind == ProjectDepartureTargetKind.PROCESSING_PROFILE:
+            return action_id.value in ProcessingProfileAction
         if target_kind == ProjectDepartureTargetKind.APPLICATION_ACCOUNT:
             return action_id.value in {
                 "issue-application-keys",

@@ -39,6 +39,9 @@ from inframeld_backend.access.application.dtos.invitation_group_membership_inten
 from inframeld_backend.access.application.dtos.invitation_model_connection_target_dto import (
     InvitationModelConnectionTargetDTO,
 )
+from inframeld_backend.access.application.dtos.invitation_processing_profile_target_dto import (
+    InvitationProcessingProfileTargetDTO,
+)
 from inframeld_backend.access.application.dtos.invitation_project_membership_intent_dto import (
     InvitationProjectMembershipIntentDTO,
 )
@@ -80,6 +83,9 @@ from inframeld_backend.access.infrastructure.readers.model_connection_grant_quer
 )
 from inframeld_backend.access.infrastructure.readers.postgres_organization_access_facts_reader import (
     PostgresOrganizationAccessFactsReader,
+)
+from inframeld_backend.access.infrastructure.readers.processing_profile_grant_queries import (
+    ProcessingProfileGrantQueries,
 )
 from inframeld_backend.access.infrastructure.readers.project_actor_queries import (
     ProjectActorQueries,
@@ -192,19 +198,39 @@ class PostgresInvitationFactsReader(InvitationFactsReader):
             return intent.target.project_id
         return None
 
-    async def model_projects(
+    async def target_projects(
         self, organization: OrganizationId, intents: tuple[InvitationAssignmentDTO, ...]
-    ) -> dict[UUID, ProjectId]:
-        return await ModelConnectionGrantQueries.invitation_projects(
-            self._session,
-            organization,
-            tuple(
-                intent.target
-                for intent in intents
-                if isinstance(intent, InvitationActionGrantIntentDTO)
-                and isinstance(intent.target, InvitationModelConnectionTargetDTO)
-            ),
+    ) -> dict[InvitationModelConnectionTargetDTO | InvitationProcessingProfileTargetDTO, ProjectId]:
+        models = tuple(
+            intent.target
+            for intent in intents
+            if isinstance(intent, InvitationActionGrantIntentDTO)
+            and isinstance(intent.target, InvitationModelConnectionTargetDTO)
         )
+        profiles = tuple(
+            intent.target
+            for intent in intents
+            if isinstance(intent, InvitationActionGrantIntentDTO)
+            and isinstance(intent.target, InvitationProcessingProfileTargetDTO)
+        )
+        model_projects = await ModelConnectionGrantQueries.invitation_projects(
+            self._session, organization, models
+        )
+        profile_projects = await ProcessingProfileGrantQueries.invitation_projects(
+            self._session, organization, profiles
+        )
+        parents: dict[
+            InvitationModelConnectionTargetDTO | InvitationProcessingProfileTargetDTO, ProjectId
+        ] = {}
+        parents.update(
+            (InvitationModelConnectionTargetDTO(key), project)
+            for key, project in model_projects.items()
+        )
+        parents.update(
+            (InvitationProcessingProfileTargetDTO(key), project)
+            for key, project in profile_projects.items()
+        )
+        return parents
 
     @override
     async def lock_for_issue(
@@ -238,10 +264,10 @@ class PostgresInvitationFactsReader(InvitationFactsReader):
                         for intent in command.assignments
                         if (project := self._project_id(intent)) is not None
                     }
-                    model_projects = await self.model_projects(
+                    target_projects = await self.target_projects(
                         command.organization_id, command.assignments
                     )
-                    projects.update(model_projects.values())
+                    projects.update(target_projects.values())
                     for project in sorted(projects, key=lambda value: value.value.int):
                         await self._session.scalar(
                             select(ProjectRow.id)
@@ -275,7 +301,7 @@ class PostgresInvitationFactsReader(InvitationFactsReader):
                     assignments = tuple(
                         [
                             await self._assignment(
-                                access, intent, command.organization_id, headers, model_projects
+                                access, intent, command.organization_id, headers, target_projects
                             )
                             for intent in command.assignments
                         ]
@@ -294,12 +320,17 @@ class PostgresInvitationFactsReader(InvitationFactsReader):
         intent: InvitationAssignmentDTO,
         organization: OrganizationId,
         headers: dict[ProjectId, _ProjectHeader],
-        model_projects: dict[UUID, ProjectId],
+        target_projects: dict[
+            InvitationModelConnectionTargetDTO | InvitationProcessingProfileTargetDTO, ProjectId
+        ],
     ) -> InvitationAssignmentFactsDTO:
         project_id = (
-            model_projects.get(intent.target.model_connection_id)
+            target_projects.get(intent.target)
             if isinstance(intent, InvitationActionGrantIntentDTO)
-            and isinstance(intent.target, InvitationModelConnectionTargetDTO)
+            and isinstance(
+                intent.target,
+                (InvitationModelConnectionTargetDTO, InvitationProcessingProfileTargetDTO),
+            )
             else self._project_id(intent)
         )
         project: ProjectMembershipObservationDTO | None = None
@@ -439,6 +470,18 @@ class PostgresInvitationFactsReader(InvitationFactsReader):
                 intent.target, InvitationModelConnectionTargetDTO
             ):
                 target_exists, delegated = await ModelConnectionGrantQueries.invitation_authority(
+                    self._session,
+                    organization,
+                    project_id,
+                    intent.target,
+                    access.actor_principal_id,
+                    principal_row.kind,
+                    intent.action_id,
+                )
+            elif isinstance(intent, InvitationActionGrantIntentDTO) and isinstance(
+                intent.target, InvitationProcessingProfileTargetDTO
+            ):
+                target_exists, delegated = await ProcessingProfileGrantQueries.invitation_authority(
                     self._session,
                     organization,
                     project_id,

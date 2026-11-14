@@ -464,6 +464,19 @@ pub enum CreateModelConnectionApiError {
     Status422(ProblemDetails),
     Status503(ProblemDetails),
 }
+///Typed error responses for `createProcessingProfile`. One variant per declared non-2xx response.
+#[derive(Debug, Clone)]
+pub enum CreateProcessingProfileApiError {
+    Status400(ProblemDetails),
+    Status401(ProblemDetails),
+    Status403(ProblemDetails),
+    Status404(ProblemDetails),
+    Status409(ProblemDetails),
+    Status413(ProblemDetails),
+    Status415(ProblemDetails),
+    Status422(ProblemDetails),
+    Status503(ProblemDetails),
+}
 ///Typed error responses for `createProject`. One variant per declared non-2xx response.
 #[derive(Debug, Clone)]
 pub enum CreateProjectApiError {
@@ -616,6 +629,16 @@ pub enum GetMyOrganizationAccessApiError {
 ///Typed error responses for `getMyProjectAccess`. One variant per declared non-2xx response.
 #[derive(Debug, Clone)]
 pub enum GetMyProjectAccessApiError {
+    Status400(ProblemDetails),
+    Status401(ProblemDetails),
+    Status403(ProblemDetails),
+    Status404(ProblemDetails),
+    Status422(ProblemDetails),
+    Status503(ProblemDetails),
+}
+///Typed error responses for `getProcessingProfile`. One variant per declared non-2xx response.
+#[derive(Debug, Clone)]
+pub enum GetProcessingProfileApiError {
     Status400(ProblemDetails),
     Status401(ProblemDetails),
     Status403(ProblemDetails),
@@ -792,6 +815,27 @@ pub enum ListOrganizationActionGrantsApiError {
     Status422(ProblemDetails),
     Status503(ProblemDetails),
 }
+///Typed error responses for `listProcessingProfileActionGrants`. One variant per declared non-2xx response.
+#[derive(Debug, Clone)]
+pub enum ListProcessingProfileActionGrantsApiError {
+    Status400(ProblemDetails),
+    Status401(ProblemDetails),
+    Status403(ProblemDetails),
+    Status404(ProblemDetails),
+    Status409(ProblemDetails),
+    Status422(ProblemDetails),
+    Status503(ProblemDetails),
+}
+///Typed error responses for `listProcessingProfiles`. One variant per declared non-2xx response.
+#[derive(Debug, Clone)]
+pub enum ListProcessingProfilesApiError {
+    Status400(ProblemDetails),
+    Status401(ProblemDetails),
+    Status403(ProblemDetails),
+    Status404(ProblemDetails),
+    Status422(ProblemDetails),
+    Status503(ProblemDetails),
+}
 ///Typed error responses for `listProjectActionGrants`. One variant per declared non-2xx response.
 #[derive(Debug, Clone)]
 pub enum ListProjectActionGrantsApiError {
@@ -929,6 +973,17 @@ pub enum RemoveModelConnectionCredentialApiError {
 ///Typed error responses for `removeOrganizationActionGrant`. One variant per declared non-2xx response.
 #[derive(Debug, Clone)]
 pub enum RemoveOrganizationActionGrantApiError {
+    Status400(ProblemDetails),
+    Status401(ProblemDetails),
+    Status403(ProblemDetails),
+    Status404(ProblemDetails),
+    Status409(ProblemDetails),
+    Status422(ProblemDetails),
+    Status503(ProblemDetails),
+}
+///Typed error responses for `removeProcessingProfileActionGrant`. One variant per declared non-2xx response.
+#[derive(Debug, Clone)]
+pub enum RemoveProcessingProfileActionGrantApiError {
     Status400(ProblemDetails),
     Status401(ProblemDetails),
     Status403(ProblemDetails),
@@ -1083,6 +1138,19 @@ pub enum SetOrganizationActionGrantApiError {
     Status422(ProblemDetails),
     Status503(ProblemDetails),
 }
+///Typed error responses for `setProcessingProfileActionGrant`. One variant per declared non-2xx response.
+#[derive(Debug, Clone)]
+pub enum SetProcessingProfileActionGrantApiError {
+    Status400(ProblemDetails),
+    Status401(ProblemDetails),
+    Status403(ProblemDetails),
+    Status404(ProblemDetails),
+    Status409(ProblemDetails),
+    Status413(ProblemDetails),
+    Status415(ProblemDetails),
+    Status422(ProblemDetails),
+    Status503(ProblemDetails),
+}
 ///Typed error responses for `setProjectActionGrant`. One variant per declared non-2xx response.
 #[derive(Debug, Clone)]
 pub enum SetProjectActionGrantApiError {
@@ -1182,6 +1250,12 @@ pub enum SetModelConnectionActionGrantHttpResponseBody {
 pub enum SetOrganizationActionGrantHttpResponseBody {
     Status200Representation0(super::types::OrganizationActionGrantResponse),
     Status201Representation1(super::types::OrganizationActionGrantResponse),
+}
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(untagged)]
+pub enum SetProcessingProfileActionGrantHttpResponseBody {
+    Status200Representation0(super::types::ProcessingProfileActionGrantResponse),
+    Status201Representation1(super::types::ProcessingProfileActionGrantResponse),
 }
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(untagged)]
@@ -3727,6 +3801,303 @@ impl HttpClient {
                         {
                             Ok(v) => {
                                 typed = Some(CreateModelConnectionApiError::Status503(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    _ => {
+                        typed = None;
+                        parse_error = None;
+                    }
+                }
+            }
+            Err(
+                ApiOpError::Api(ApiError {
+                    status: status_code,
+                    headers,
+                    body: body_text,
+                    raw_body,
+                    typed,
+                    parse_error,
+                }),
+            )
+        }
+    }
+    /// Create
+    ///
+    /// `POST /v1/projects/{project_id}/processing-profiles`
+    pub async fn create_processing_profile(
+        &self,
+        project_id: impl AsRef<str>,
+        idempotency_key: impl AsRef<str>,
+        request: ProcessingProfileCreationRequest,
+    ) -> Result<
+        self::response::ApiResponse<ProcessingProfileCreationResponse>,
+        ApiOpError<CreateProcessingProfileApiError>,
+    > {
+        let request_url = format!(
+            "{}{}", self.base_url, format!("/v1/projects/{}/processing-profiles",
+            __pct_encode_path_segment(project_id.as_ref()))
+        );
+        let mut req = self.http_client.post(request_url);
+        req = req
+            .body(serde_json::to_vec(&request).map_err(HttpError::serialization_error)?)
+            .header("content-type", "application/json");
+        req = req.header("Idempotency-Key", idempotency_key.as_ref());
+        if let Some(api_key) = &self.api_key {
+            req = req.bearer_auth(api_key);
+        }
+        for (name, value) in &self.custom_headers {
+            if !name.eq_ignore_ascii_case("accept") {
+                req = req.header(name, value);
+            }
+        }
+        req = req.header(reqwest::header::ACCEPT, "application/json");
+        let response = req.send().await?;
+        let status = response.status();
+        let status_code = status.as_u16();
+        let headers = response.headers().clone();
+        let body_bytes = __read_bounded_response_body(
+                response,
+                self.max_response_body_bytes,
+            )
+            .await?;
+        let raw_body = body_bytes;
+        let body_text = String::from_utf8_lossy(&raw_body).into_owned();
+        if false || status_code == 201u16 {
+            match __json_response_representation(&headers, &["application/json"])
+                .and_then(|_| {
+                    serde_json::from_slice(&raw_body).map_err(|error| error.to_string())
+                })
+            {
+                Ok(body) => {
+                    Ok(self::response::ApiResponse {
+                        status: status_code,
+                        headers,
+                        body: body,
+                    })
+                }
+                Err(error) => {
+                    Err(
+                        ApiOpError::Api(ApiError {
+                            status: status_code,
+                            headers,
+                            body: body_text,
+                            raw_body,
+                            typed: None,
+                            parse_error: Some(
+                                format!(
+                                    "failed to deserialize 2xx response body: {}", error
+                                ),
+                            ),
+                        }),
+                    )
+                }
+            }
+        } else if status.is_success() {
+            Err(
+                ApiOpError::Api(ApiError {
+                    status: status_code,
+                    headers,
+                    body: body_text,
+                    raw_body,
+                    typed: None,
+                    parse_error: Some(
+                        format!(
+                            "unexpected successful status {}; generated return type selects `{}`",
+                            status_code, "201",
+                        ),
+                    ),
+                }),
+            )
+        } else {
+            let typed: Option<CreateProcessingProfileApiError>;
+            let parse_error: Option<String>;
+            if false {
+                typed = None;
+                parse_error = if raw_body.is_empty() {
+                    None
+                } else {
+                    Some("Unexpected body for a bodyless response".into())
+                };
+            } else {
+                match status_code {
+                    400u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(CreateProcessingProfileApiError::Status400(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    401u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(CreateProcessingProfileApiError::Status401(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    403u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(CreateProcessingProfileApiError::Status403(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    404u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(CreateProcessingProfileApiError::Status404(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    409u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(CreateProcessingProfileApiError::Status409(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    413u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(CreateProcessingProfileApiError::Status413(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    415u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(CreateProcessingProfileApiError::Status415(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    422u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(CreateProcessingProfileApiError::Status422(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    503u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(CreateProcessingProfileApiError::Status503(v));
                                 parse_error = None;
                             }
                             Err(e) => {
@@ -7502,6 +7873,239 @@ impl HttpClient {
                         {
                             Ok(v) => {
                                 typed = Some(GetMyProjectAccessApiError::Status503(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    _ => {
+                        typed = None;
+                        parse_error = None;
+                    }
+                }
+            }
+            Err(
+                ApiOpError::Api(ApiError {
+                    status: status_code,
+                    headers,
+                    body: body_text,
+                    raw_body,
+                    typed,
+                    parse_error,
+                }),
+            )
+        }
+    }
+    /// Get
+    ///
+    /// `GET /v1/projects/{project_id}/processing-profiles/{processing_profile_id}`
+    pub async fn get_processing_profile(
+        &self,
+        project_id: impl AsRef<str>,
+        processing_profile_id: impl AsRef<str>,
+    ) -> Result<
+        self::response::ApiResponse<ProcessingProfileResponse>,
+        ApiOpError<GetProcessingProfileApiError>,
+    > {
+        let request_url = format!(
+            "{}{}", self.base_url, format!("/v1/projects/{}/processing-profiles/{}",
+            __pct_encode_path_segment(project_id.as_ref()),
+            __pct_encode_path_segment(processing_profile_id.as_ref()))
+        );
+        let mut req = self.http_client.get(request_url);
+        if let Some(api_key) = &self.api_key {
+            req = req.bearer_auth(api_key);
+        }
+        for (name, value) in &self.custom_headers {
+            if !name.eq_ignore_ascii_case("accept") {
+                req = req.header(name, value);
+            }
+        }
+        req = req.header(reqwest::header::ACCEPT, "application/json");
+        let response = req.send().await?;
+        let status = response.status();
+        let status_code = status.as_u16();
+        let headers = response.headers().clone();
+        let body_bytes = __read_bounded_response_body(
+                response,
+                self.max_response_body_bytes,
+            )
+            .await?;
+        let raw_body = body_bytes;
+        let body_text = String::from_utf8_lossy(&raw_body).into_owned();
+        if false || status_code == 200u16 {
+            match __json_response_representation(&headers, &["application/json"])
+                .and_then(|_| {
+                    serde_json::from_slice(&raw_body).map_err(|error| error.to_string())
+                })
+            {
+                Ok(body) => {
+                    Ok(self::response::ApiResponse {
+                        status: status_code,
+                        headers,
+                        body: body,
+                    })
+                }
+                Err(error) => {
+                    Err(
+                        ApiOpError::Api(ApiError {
+                            status: status_code,
+                            headers,
+                            body: body_text,
+                            raw_body,
+                            typed: None,
+                            parse_error: Some(
+                                format!(
+                                    "failed to deserialize 2xx response body: {}", error
+                                ),
+                            ),
+                        }),
+                    )
+                }
+            }
+        } else if status.is_success() {
+            Err(
+                ApiOpError::Api(ApiError {
+                    status: status_code,
+                    headers,
+                    body: body_text,
+                    raw_body,
+                    typed: None,
+                    parse_error: Some(
+                        format!(
+                            "unexpected successful status {}; generated return type selects `{}`",
+                            status_code, "200",
+                        ),
+                    ),
+                }),
+            )
+        } else {
+            let typed: Option<GetProcessingProfileApiError>;
+            let parse_error: Option<String>;
+            if false {
+                typed = None;
+                parse_error = if raw_body.is_empty() {
+                    None
+                } else {
+                    Some("Unexpected body for a bodyless response".into())
+                };
+            } else {
+                match status_code {
+                    400u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(GetProcessingProfileApiError::Status400(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    401u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(GetProcessingProfileApiError::Status401(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    403u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(GetProcessingProfileApiError::Status403(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    404u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(GetProcessingProfileApiError::Status404(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    422u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(GetProcessingProfileApiError::Status422(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    503u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(GetProcessingProfileApiError::Status503(v));
                                 parse_error = None;
                             }
                             Err(e) => {
@@ -11683,6 +12287,534 @@ impl HttpClient {
     }
     /// Grants
     ///
+    /// `GET /v1/processing-profiles/{processing_profile_id}/grants`
+    pub async fn list_processing_profile_action_grants(
+        &self,
+        processing_profile_id: impl AsRef<str>,
+        action_id: ProcessingProfileAction,
+        limit: Option<i64>,
+        cursor: Option<impl AsRef<str>>,
+    ) -> Result<
+        self::response::ApiResponse<
+            PageResponseProcessingProfileActionGrantItemResponse,
+        >,
+        ApiOpError<ListProcessingProfileActionGrantsApiError>,
+    > {
+        let request_url = format!(
+            "{}{}", self.base_url, format!("/v1/processing-profiles/{}/grants",
+            __pct_encode_path_segment(processing_profile_id.as_ref()))
+        );
+        let mut req = self.http_client.get(request_url);
+        {
+            let mut query_params: Vec<(String, String)> = Vec::new();
+            query_params.push(("actionId".to_string(), action_id.to_string()));
+            if let Some(v) = limit {
+                query_params.push(("limit".to_string(), v.to_string()));
+            }
+            if let Some(v) = cursor {
+                query_params.push(("cursor".to_string(), v.as_ref().to_string()));
+            }
+            if !query_params.is_empty() {
+                req = req.query(&query_params);
+            }
+        }
+        if let Some(api_key) = &self.api_key {
+            req = req.bearer_auth(api_key);
+        }
+        for (name, value) in &self.custom_headers {
+            if !name.eq_ignore_ascii_case("accept") {
+                req = req.header(name, value);
+            }
+        }
+        req = req.header(reqwest::header::ACCEPT, "application/json");
+        let response = req.send().await?;
+        let status = response.status();
+        let status_code = status.as_u16();
+        let headers = response.headers().clone();
+        let body_bytes = __read_bounded_response_body(
+                response,
+                self.max_response_body_bytes,
+            )
+            .await?;
+        let raw_body = body_bytes;
+        let body_text = String::from_utf8_lossy(&raw_body).into_owned();
+        if false || status_code == 200u16 {
+            match __json_response_representation(&headers, &["application/json"])
+                .and_then(|_| {
+                    serde_json::from_slice(&raw_body).map_err(|error| error.to_string())
+                })
+            {
+                Ok(body) => {
+                    Ok(self::response::ApiResponse {
+                        status: status_code,
+                        headers,
+                        body: body,
+                    })
+                }
+                Err(error) => {
+                    Err(
+                        ApiOpError::Api(ApiError {
+                            status: status_code,
+                            headers,
+                            body: body_text,
+                            raw_body,
+                            typed: None,
+                            parse_error: Some(
+                                format!(
+                                    "failed to deserialize 2xx response body: {}", error
+                                ),
+                            ),
+                        }),
+                    )
+                }
+            }
+        } else if status.is_success() {
+            Err(
+                ApiOpError::Api(ApiError {
+                    status: status_code,
+                    headers,
+                    body: body_text,
+                    raw_body,
+                    typed: None,
+                    parse_error: Some(
+                        format!(
+                            "unexpected successful status {}; generated return type selects `{}`",
+                            status_code, "200",
+                        ),
+                    ),
+                }),
+            )
+        } else {
+            let typed: Option<ListProcessingProfileActionGrantsApiError>;
+            let parse_error: Option<String>;
+            if false {
+                typed = None;
+                parse_error = if raw_body.is_empty() {
+                    None
+                } else {
+                    Some("Unexpected body for a bodyless response".into())
+                };
+            } else {
+                match status_code {
+                    400u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(
+                                    ListProcessingProfileActionGrantsApiError::Status400(v),
+                                );
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    401u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(
+                                    ListProcessingProfileActionGrantsApiError::Status401(v),
+                                );
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    403u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(
+                                    ListProcessingProfileActionGrantsApiError::Status403(v),
+                                );
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    404u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(
+                                    ListProcessingProfileActionGrantsApiError::Status404(v),
+                                );
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    409u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(
+                                    ListProcessingProfileActionGrantsApiError::Status409(v),
+                                );
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    422u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(
+                                    ListProcessingProfileActionGrantsApiError::Status422(v),
+                                );
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    503u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(
+                                    ListProcessingProfileActionGrantsApiError::Status503(v),
+                                );
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    _ => {
+                        typed = None;
+                        parse_error = None;
+                    }
+                }
+            }
+            Err(
+                ApiOpError::Api(ApiError {
+                    status: status_code,
+                    headers,
+                    body: body_text,
+                    raw_body,
+                    typed,
+                    parse_error,
+                }),
+            )
+        }
+    }
+    /// List Profiles
+    ///
+    /// `GET /v1/projects/{project_id}/processing-profiles`
+    pub async fn list_processing_profiles(
+        &self,
+        project_id: impl AsRef<str>,
+        limit: Option<i64>,
+        cursor: Option<impl AsRef<str>>,
+    ) -> Result<
+        self::response::ApiResponse<PageResponseProcessingProfileResponse>,
+        ApiOpError<ListProcessingProfilesApiError>,
+    > {
+        let request_url = format!(
+            "{}{}", self.base_url, format!("/v1/projects/{}/processing-profiles",
+            __pct_encode_path_segment(project_id.as_ref()))
+        );
+        let mut req = self.http_client.get(request_url);
+        {
+            let mut query_params: Vec<(String, String)> = Vec::new();
+            if let Some(v) = limit {
+                query_params.push(("limit".to_string(), v.to_string()));
+            }
+            if let Some(v) = cursor {
+                query_params.push(("cursor".to_string(), v.as_ref().to_string()));
+            }
+            if !query_params.is_empty() {
+                req = req.query(&query_params);
+            }
+        }
+        if let Some(api_key) = &self.api_key {
+            req = req.bearer_auth(api_key);
+        }
+        for (name, value) in &self.custom_headers {
+            if !name.eq_ignore_ascii_case("accept") {
+                req = req.header(name, value);
+            }
+        }
+        req = req.header(reqwest::header::ACCEPT, "application/json");
+        let response = req.send().await?;
+        let status = response.status();
+        let status_code = status.as_u16();
+        let headers = response.headers().clone();
+        let body_bytes = __read_bounded_response_body(
+                response,
+                self.max_response_body_bytes,
+            )
+            .await?;
+        let raw_body = body_bytes;
+        let body_text = String::from_utf8_lossy(&raw_body).into_owned();
+        if false || status_code == 200u16 {
+            match __json_response_representation(&headers, &["application/json"])
+                .and_then(|_| {
+                    serde_json::from_slice(&raw_body).map_err(|error| error.to_string())
+                })
+            {
+                Ok(body) => {
+                    Ok(self::response::ApiResponse {
+                        status: status_code,
+                        headers,
+                        body: body,
+                    })
+                }
+                Err(error) => {
+                    Err(
+                        ApiOpError::Api(ApiError {
+                            status: status_code,
+                            headers,
+                            body: body_text,
+                            raw_body,
+                            typed: None,
+                            parse_error: Some(
+                                format!(
+                                    "failed to deserialize 2xx response body: {}", error
+                                ),
+                            ),
+                        }),
+                    )
+                }
+            }
+        } else if status.is_success() {
+            Err(
+                ApiOpError::Api(ApiError {
+                    status: status_code,
+                    headers,
+                    body: body_text,
+                    raw_body,
+                    typed: None,
+                    parse_error: Some(
+                        format!(
+                            "unexpected successful status {}; generated return type selects `{}`",
+                            status_code, "200",
+                        ),
+                    ),
+                }),
+            )
+        } else {
+            let typed: Option<ListProcessingProfilesApiError>;
+            let parse_error: Option<String>;
+            if false {
+                typed = None;
+                parse_error = if raw_body.is_empty() {
+                    None
+                } else {
+                    Some("Unexpected body for a bodyless response".into())
+                };
+            } else {
+                match status_code {
+                    400u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(ListProcessingProfilesApiError::Status400(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    401u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(ListProcessingProfilesApiError::Status401(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    403u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(ListProcessingProfilesApiError::Status403(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    404u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(ListProcessingProfilesApiError::Status404(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    422u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(ListProcessingProfilesApiError::Status422(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    503u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(ListProcessingProfilesApiError::Status503(v));
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    _ => {
+                        typed = None;
+                        parse_error = None;
+                    }
+                }
+            }
+            Err(
+                ApiOpError::Api(ApiError {
+                    status: status_code,
+                    headers,
+                    body: body_text,
+                    raw_body,
+                    typed,
+                    parse_error,
+                }),
+            )
+        }
+    }
+    /// Grants
+    ///
     /// `GET /v1/projects/{project_id}/grants`
     pub async fn list_project_action_grants(
         &self,
@@ -15262,6 +16394,289 @@ impl HttpClient {
                             Ok(v) => {
                                 typed = Some(
                                     RemoveOrganizationActionGrantApiError::Status503(v),
+                                );
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    _ => {
+                        typed = None;
+                        parse_error = None;
+                    }
+                }
+            }
+            Err(
+                ApiOpError::Api(ApiError {
+                    status: status_code,
+                    headers,
+                    body: body_text,
+                    raw_body,
+                    typed,
+                    parse_error,
+                }),
+            )
+        }
+    }
+    /// Remove
+    ///
+    /// `DELETE /v1/processing-profiles/{processing_profile_id}/grants/{recipient_principal_id}/{action_id}`
+    pub async fn remove_processing_profile_action_grant(
+        &self,
+        processing_profile_id: impl AsRef<str>,
+        recipient_principal_id: impl AsRef<str>,
+        action_id: ProcessingProfileAction,
+        expected_access_revision: i64,
+        idempotency_key: impl AsRef<str>,
+    ) -> Result<
+        self::response::ApiResponse<ProcessingProfileActionGrantRemovalResponse>,
+        ApiOpError<RemoveProcessingProfileActionGrantApiError>,
+    > {
+        let request_url = format!(
+            "{}{}", self.base_url, format!("/v1/processing-profiles/{}/grants/{}/{}",
+            __pct_encode_path_segment(processing_profile_id.as_ref()),
+            __pct_encode_path_segment(recipient_principal_id.as_ref()),
+            __pct_encode_path_segment(& action_id.to_string()))
+        );
+        let mut req = self.http_client.delete(request_url);
+        {
+            let mut query_params: Vec<(String, String)> = Vec::new();
+            query_params
+                .push((
+                    "expectedAccessRevision".to_string(),
+                    expected_access_revision.to_string(),
+                ));
+            if !query_params.is_empty() {
+                req = req.query(&query_params);
+            }
+        }
+        req = req.header("Idempotency-Key", idempotency_key.as_ref());
+        if let Some(api_key) = &self.api_key {
+            req = req.bearer_auth(api_key);
+        }
+        for (name, value) in &self.custom_headers {
+            if !name.eq_ignore_ascii_case("accept") {
+                req = req.header(name, value);
+            }
+        }
+        req = req.header(reqwest::header::ACCEPT, "application/json");
+        let response = req.send().await?;
+        let status = response.status();
+        let status_code = status.as_u16();
+        let headers = response.headers().clone();
+        let body_bytes = __read_bounded_response_body(
+                response,
+                self.max_response_body_bytes,
+            )
+            .await?;
+        let raw_body = body_bytes;
+        let body_text = String::from_utf8_lossy(&raw_body).into_owned();
+        if false || status_code == 200u16 {
+            match __json_response_representation(&headers, &["application/json"])
+                .and_then(|_| {
+                    serde_json::from_slice(&raw_body).map_err(|error| error.to_string())
+                })
+            {
+                Ok(body) => {
+                    Ok(self::response::ApiResponse {
+                        status: status_code,
+                        headers,
+                        body: body,
+                    })
+                }
+                Err(error) => {
+                    Err(
+                        ApiOpError::Api(ApiError {
+                            status: status_code,
+                            headers,
+                            body: body_text,
+                            raw_body,
+                            typed: None,
+                            parse_error: Some(
+                                format!(
+                                    "failed to deserialize 2xx response body: {}", error
+                                ),
+                            ),
+                        }),
+                    )
+                }
+            }
+        } else if status.is_success() {
+            Err(
+                ApiOpError::Api(ApiError {
+                    status: status_code,
+                    headers,
+                    body: body_text,
+                    raw_body,
+                    typed: None,
+                    parse_error: Some(
+                        format!(
+                            "unexpected successful status {}; generated return type selects `{}`",
+                            status_code, "200",
+                        ),
+                    ),
+                }),
+            )
+        } else {
+            let typed: Option<RemoveProcessingProfileActionGrantApiError>;
+            let parse_error: Option<String>;
+            if false {
+                typed = None;
+                parse_error = if raw_body.is_empty() {
+                    None
+                } else {
+                    Some("Unexpected body for a bodyless response".into())
+                };
+            } else {
+                match status_code {
+                    400u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(
+                                    RemoveProcessingProfileActionGrantApiError::Status400(v),
+                                );
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    401u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(
+                                    RemoveProcessingProfileActionGrantApiError::Status401(v),
+                                );
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    403u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(
+                                    RemoveProcessingProfileActionGrantApiError::Status403(v),
+                                );
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    404u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(
+                                    RemoveProcessingProfileActionGrantApiError::Status404(v),
+                                );
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    409u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(
+                                    RemoveProcessingProfileActionGrantApiError::Status409(v),
+                                );
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    422u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(
+                                    RemoveProcessingProfileActionGrantApiError::Status422(v),
+                                );
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    503u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(
+                                    RemoveProcessingProfileActionGrantApiError::Status503(v),
                                 );
                                 parse_error = None;
                             }
@@ -18897,6 +20312,356 @@ impl HttpClient {
                             Ok(v) => {
                                 typed = Some(
                                     SetOrganizationActionGrantApiError::Status503(v),
+                                );
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    _ => {
+                        typed = None;
+                        parse_error = None;
+                    }
+                }
+            }
+            Err(
+                ApiOpError::Api(ApiError {
+                    status: status_code,
+                    headers,
+                    body: body_text,
+                    raw_body,
+                    typed,
+                    parse_error,
+                }),
+            )
+        }
+    }
+    /// Put
+    ///
+    /// `PUT /v1/processing-profiles/{processing_profile_id}/grants/{recipient_principal_id}/{action_id}`
+    pub async fn set_processing_profile_action_grant(
+        &self,
+        processing_profile_id: impl AsRef<str>,
+        recipient_principal_id: impl AsRef<str>,
+        action_id: ProcessingProfileAction,
+        idempotency_key: impl AsRef<str>,
+        request: ProcessingProfileActionGrantRequest,
+    ) -> Result<
+        self::response::ApiResponse<
+            self::SetProcessingProfileActionGrantHttpResponseBody,
+        >,
+        ApiOpError<SetProcessingProfileActionGrantApiError>,
+    > {
+        let request_url = format!(
+            "{}{}", self.base_url, format!("/v1/processing-profiles/{}/grants/{}/{}",
+            __pct_encode_path_segment(processing_profile_id.as_ref()),
+            __pct_encode_path_segment(recipient_principal_id.as_ref()),
+            __pct_encode_path_segment(& action_id.to_string()))
+        );
+        let mut req = self.http_client.put(request_url);
+        req = req
+            .body(serde_json::to_vec(&request).map_err(HttpError::serialization_error)?)
+            .header("content-type", "application/json");
+        req = req.header("Idempotency-Key", idempotency_key.as_ref());
+        if let Some(api_key) = &self.api_key {
+            req = req.bearer_auth(api_key);
+        }
+        for (name, value) in &self.custom_headers {
+            req = req.header(name, value);
+        }
+        let response = req.send().await?;
+        let status = response.status();
+        let status_code = status.as_u16();
+        let headers = response.headers().clone();
+        let body_bytes = __read_bounded_response_body(
+                response,
+                self.max_response_body_bytes,
+            )
+            .await?;
+        let raw_body = body_bytes;
+        let body_text = String::from_utf8_lossy(&raw_body).into_owned();
+        if false || status_code == 200u16 || status_code == 201u16 {
+            match (|| -> Result<SetProcessingProfileActionGrantHttpResponseBody, String> {
+                if status_code == 200u16 {
+                    return match __json_response_representation(
+                        &headers,
+                        &["application/json"],
+                    )? {
+                        0usize => {
+                            serde_json::from_slice::<
+                                super::types::ProcessingProfileActionGrantResponse,
+                            >(&raw_body)
+                                .map(
+                                    SetProcessingProfileActionGrantHttpResponseBody::Status200Representation0,
+                                )
+                                .map_err(|error| error.to_string())
+                        }
+                        _ => unreachable!(),
+                    };
+                }
+                if status_code == 201u16 {
+                    return match __json_response_representation(
+                        &headers,
+                        &["application/json"],
+                    )? {
+                        0usize => {
+                            serde_json::from_slice::<
+                                super::types::ProcessingProfileActionGrantResponse,
+                            >(&raw_body)
+                                .map(
+                                    SetProcessingProfileActionGrantHttpResponseBody::Status201Representation1,
+                                )
+                                .map_err(|error| error.to_string())
+                        }
+                        _ => unreachable!(),
+                    };
+                }
+                Err("No declared JSON response matched the status".into())
+            })() {
+                Ok(body) => {
+                    Ok(self::response::ApiResponse {
+                        status: status_code,
+                        headers,
+                        body: body,
+                    })
+                }
+                Err(error) => {
+                    Err(
+                        ApiOpError::Api(ApiError {
+                            status: status_code,
+                            headers,
+                            body: body_text,
+                            raw_body,
+                            typed: None,
+                            parse_error: Some(
+                                format!(
+                                    "failed to deserialize 2xx response body: {}", error
+                                ),
+                            ),
+                        }),
+                    )
+                }
+            }
+        } else if status.is_success() {
+            Err(
+                ApiOpError::Api(ApiError {
+                    status: status_code,
+                    headers,
+                    body: body_text,
+                    raw_body,
+                    typed: None,
+                    parse_error: Some(
+                        format!(
+                            "unexpected successful status {}; generated return type selects `{}`",
+                            status_code, "200, 201",
+                        ),
+                    ),
+                }),
+            )
+        } else {
+            let typed: Option<SetProcessingProfileActionGrantApiError>;
+            let parse_error: Option<String>;
+            if false {
+                typed = None;
+                parse_error = if raw_body.is_empty() {
+                    None
+                } else {
+                    Some("Unexpected body for a bodyless response".into())
+                };
+            } else {
+                match status_code {
+                    400u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(
+                                    SetProcessingProfileActionGrantApiError::Status400(v),
+                                );
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    401u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(
+                                    SetProcessingProfileActionGrantApiError::Status401(v),
+                                );
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    403u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(
+                                    SetProcessingProfileActionGrantApiError::Status403(v),
+                                );
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    404u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(
+                                    SetProcessingProfileActionGrantApiError::Status404(v),
+                                );
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    409u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(
+                                    SetProcessingProfileActionGrantApiError::Status409(v),
+                                );
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    413u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(
+                                    SetProcessingProfileActionGrantApiError::Status413(v),
+                                );
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    415u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(
+                                    SetProcessingProfileActionGrantApiError::Status415(v),
+                                );
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    422u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(
+                                    SetProcessingProfileActionGrantApiError::Status422(v),
+                                );
+                                parse_error = None;
+                            }
+                            Err(e) => {
+                                typed = None;
+                                parse_error = Some(e.to_string());
+                            }
+                        }
+                    }
+                    503u16 => {
+                        match __json_response_representation(
+                                &headers,
+                                &["application/problem+json"],
+                            )
+                            .and_then(|_| {
+                                serde_json::from_slice::<ProblemDetails>(&raw_body)
+                                    .map_err(|error| error.to_string())
+                            })
+                        {
+                            Ok(v) => {
+                                typed = Some(
+                                    SetProcessingProfileActionGrantApiError::Status503(v),
                                 );
                                 parse_error = None;
                             }
