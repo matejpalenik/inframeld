@@ -40,6 +40,7 @@ from inframeld_backend.shared.infrastructure.rows.alembic_version_row import Ale
 from inframeld_backend.shared.infrastructure.settings.database_settings import DatabaseSettings
 
 _PREVIOUS = "0036_provider_credentials"
+_PROFILE_REVISION = "0037_processing_profiles"
 _TABLES = {
     "processing_profiles",
     "processing_profile_action_grants",
@@ -68,11 +69,11 @@ def test_empty_schema_upgrade_and_downgrade_preserve_prior_tables(
         previous_tables = set(inspect(session.connection()).get_table_names())
         assert _TABLES.isdisjoint(previous_tables)
 
-    command.upgrade(config, "head")
+    command.upgrade(config, _PROFILE_REVISION)
     with database_session(temporary_postgres_settings) as session:
         schema = inspect(session.connection())
         assert set(schema.get_table_names()) == previous_tables | _TABLES
-        assert session.scalar(select(AlembicVersionRow.version_num)) == SUPPORTED_SCHEMA_REVISION
+        assert session.scalar(select(AlembicVersionRow.version_num)) == _PROFILE_REVISION
         assert {"uq_processing_profiles_project_name", "uq_processing_profiles_scope_id"}.issubset(
             {key["name"] for key in schema.get_unique_constraints("processing_profiles")}
         )

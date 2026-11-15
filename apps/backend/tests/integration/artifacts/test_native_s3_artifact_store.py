@@ -1,7 +1,7 @@
 """Exercise real live-instance S3 behavior, without claiming durable or physical cleanup."""
 
 import os
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator
 from contextlib import closing
 from dataclasses import replace
 from io import BytesIO
@@ -61,27 +61,6 @@ pytestmark = pytest.mark.skipif(
     os.environ.get("INFRAMELD_RUN_ARTIFACT_INTEGRATION") != "1",
     reason="Requires the private maintained SeaweedFS test service.",
 )
-
-
-@pytest.fixture(scope="module")
-def seaweed() -> Iterator[SeaweedFixture]:
-    with closing(create_client(bootstrap=True)) as bootstrap:
-        try:
-            bootstrap.create_bucket(Bucket=BUCKET)
-        except ClientError as error:
-            response_error = error.response.get("Error")
-            if (
-                not isinstance(response_error, dict)
-                or response_error.get("Code") != "BucketAlreadyOwnedByYou"
-            ):
-                raise
-    yield SeaweedFixture()
-
-
-@pytest.fixture(scope="module")
-def alice_pdf() -> bytes:
-    fixture_dir = Path(__file__).resolve().parents[2] / "fixtures" / "documents"
-    return (fixture_dir / "alice-in-wonderland.pdf").read_bytes()
 
 
 @pytest.mark.asyncio
