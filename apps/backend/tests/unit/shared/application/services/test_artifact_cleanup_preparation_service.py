@@ -16,6 +16,7 @@ from inframeld_backend.shared.application.dtos.artifact_cleanup_job_binding_dto 
 from inframeld_backend.shared.application.dtos.artifact_cleanup_target_dto import (
     ArtifactCleanupTargetDTO,
 )
+from inframeld_backend.shared.application.dtos.job_attempt_context_dto import JobAttemptContextDTO
 from inframeld_backend.shared.application.dtos.job_effect_binding_dto import JobEffectBindingDTO
 from inframeld_backend.shared.application.enums.artifact_cleanup_kind import ArtifactCleanupKind
 from inframeld_backend.shared.application.errors.application_errors import (
@@ -30,11 +31,15 @@ from inframeld_backend.shared.application.errors.job_errors import (
 from inframeld_backend.shared.application.protocols.artifact_cleanup_target_reader import (
     ArtifactCleanupTargetReader,
 )
+from inframeld_backend.shared.application.services.artifact_cleanup_checkpoint_service import (
+    ArtifactCleanupCheckpointService,
+)
 from inframeld_backend.shared.application.services.artifact_cleanup_preparation_service import (
     ArtifactCleanupPreparationService,
 )
 from inframeld_backend.shared.application.value_objects.artifact_attempt_id import ArtifactAttemptId
 from inframeld_backend.shared.application.value_objects.job_payload import JobPayload
+from inframeld_backend.shared.domain.enums.job_status import JobStatus
 
 
 class MockPreparationStore(MockEffectStore):
@@ -42,6 +47,12 @@ class MockPreparationStore(MockEffectStore):
     async def register_effect(self, binding: JobEffectBindingDTO) -> None:
         await super().register_effect(binding)
         self.job = replace(self.job, pending_effect=binding.unit)
+
+    @override
+    async def finish(
+        self, context: JobAttemptContextDTO, *, status: JobStatus, reason: str | None
+    ) -> None:
+        self.job = replace(self.job, status=status, reason=reason)
 
 
 class MockCleanupTargetReader(ArtifactCleanupTargetReader):
@@ -220,3 +231,52 @@ async def test_lost_preparation_commit_ack_cannot_grant_dispatch_or_another_invo
     with pytest.raises(ConflictError):
         await operation.prepare(store.binding.context)
     assert store.events.count("register") == 1
+
+
+@pytest.mark.asyncio
+async def test_verified_published_local_completion_needs_no_remote_invocation() -> None:
+    operation, store, authority, _, _ = prepared_operation()
+    authority.facts = replace(
+        authority.facts, published=True, published_staging_removed=True, pending_write=True
+    )
+
+    assert await operation.prepare(store.binding.context) is None
+    assert "register" not in store.events
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("has_pending_effect", [False, True])
+async def test_published_local_completion_cannot_skip_existing_remote_job_evidence(
+    has_pending_effect: bool,
+) -> None:
+    operation, store, authority, _, _ = prepared_operation()
+    authority.facts = replace(authority.facts, published=True, published_staging_removed=True)
+    if has_pending_effect:
+        store.job = replace(store.job, pending_effect="existing-delete")
+    else:
+        store.job = replace(store.job, checkpoint=ack_for(store))
+
+    with pytest.raises((ConflictError, AccessDeniedError)):
+        await operation.prepare(store.binding.context)
+    assert "register" not in store.events
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("unexpected_checkpoint", [False, True])
+async def test_published_cleanup_success_only_completes_the_local_execution(
+    unexpected_checkpoint: bool,
+) -> None:
+    _, store, authority, _, transactions = prepared_operation()
+    authority.facts = replace(
+        authority.facts, published=True, published_staging_removed=True, pending_write=True
+    )
+    checkpoints = ArtifactCleanupCheckpointService(transactions, store, authority)
+    if unexpected_checkpoint:
+        store.job = replace(store.job, checkpoint=b"unexpected remote effect")
+        with pytest.raises(JobStoppedError):
+            await checkpoints.succeed(store.binding.context)
+        assert store.job.status is JobStatus.RECOVERY_REQUIRED
+    else:
+        await checkpoints.succeed(store.binding.context)
+        assert store.job.status is JobStatus.SUCCEEDED
+    assert authority.facts.pending_write and not authority.facts.physically_complete

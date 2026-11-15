@@ -16,7 +16,6 @@ from inframeld_backend.shared.application.dtos.artifact_cleanup_target_dto impor
     ArtifactCleanupTargetDTO,
 )
 from inframeld_backend.shared.application.errors.application_errors import (
-    AccessDeniedError,
     ConflictError,
 )
 from inframeld_backend.shared.application.errors.job_errors import JobFenceLostError
@@ -44,11 +43,12 @@ class MockLocalAttempts(PostgresArtifactAttemptRepository):
         self.needs_removal = True
 
     @override
-    async def retire_local(
+    async def prepare_local_removal(
         self, binding: ArtifactCleanupJobBindingDTO, target: ArtifactCleanupTargetDTO
     ) -> bool:
         self.events.append("retired")
-        assert target.length is None and target.digest is None
+        if not target.published:
+            assert target.length is None and target.digest is None
         return self.needs_removal
 
     @override
@@ -59,9 +59,12 @@ class MockLocalAttempts(PostgresArtifactAttemptRepository):
 
 
 class MockTargets(ArtifactCleanupTargetReader):
-    def __init__(self, jobs: MockEffectStore, malformed: bool = False) -> None:
+    def __init__(
+        self, jobs: MockEffectStore, *, malformed: bool = False, published: bool = False
+    ) -> None:
         self.jobs = jobs
         self.malformed = malformed
+        self.published = published
 
     @override
     async def read(
@@ -73,13 +76,16 @@ class MockTargets(ArtifactCleanupTargetReader):
             source.artifact_id,
             source.artifact_attempt_id,
             source.scope,
-            -1 if self.malformed else None,
-            ArtifactContentDigest.from_content(b"") if self.malformed else None,
+            -1 if self.malformed else 3 if self.published else None,
+            ArtifactContentDigest.from_content(b"abc")
+            if self.malformed or self.published
+            else None,
+            published=self.published,
         )
 
 
 def _operation(
-    *, malformed: bool = False
+    *, malformed: bool = False, published: bool = False
 ) -> tuple[
     ArtifactLocalCleanupService, MockEffectStore, MockEffectCleanupAuthority, MockLocalAttempts
 ]:
@@ -94,15 +100,21 @@ def _operation(
         ),
     )
     jobs = MockEffectStore(effect)
+    jobs.job = replace(jobs.job, checkpoint=b"", pending_effect=None)
     authority = MockEffectCleanupAuthority(jobs)
-    authority.facts = replace(authority.facts, retention_allows_cleanup=True, pending_write=True)
+    authority.facts = replace(
+        authority.facts,
+        retention_allows_cleanup=not published,
+        pending_write=True,
+        published=published,
+    )
     attempts = MockLocalAttempts(jobs.events)
     return (
         ArtifactLocalCleanupService(
             MockEffectTransactions(jobs.events),
             jobs,
             authority,
-            MockTargets(jobs, malformed),
+            MockTargets(jobs, malformed=malformed, published=published),
             attempts,
         ),
         jobs,
@@ -124,13 +136,13 @@ async def test_local_retirement_and_confirmation_do_not_clear_remote_pending_wri
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("reason", ["fence", "published"])
-async def test_lost_fence_or_published_target_prevents_local_retirement(reason: str) -> None:
+async def test_lost_fence_or_mismatched_publication_prevents_local_retirement(reason: str) -> None:
     service, jobs, authority, _ = _operation()
     if reason == "fence":
         jobs.fence_error = True
     else:
         authority.facts = replace(authority.facts, published=True)
-    with pytest.raises((JobFenceLostError, AccessDeniedError)):
+    with pytest.raises((JobFenceLostError, ConflictError)):
         await service.prepare_local(jobs.binding.context)
     assert "retired" not in jobs.events
 
@@ -141,3 +153,14 @@ async def test_invalid_saved_length_is_rejected_before_local_retirement() -> Non
     with pytest.raises(ConflictError):
         await service.prepare_local(jobs.binding.context)
     assert "retired" not in jobs.events
+
+
+@pytest.mark.asyncio
+async def test_published_target_allows_local_cleanup_despite_remote_retention() -> None:
+    service, jobs, authority, _ = _operation(published=True)
+
+    target = await service.prepare_local(jobs.binding.context)
+    assert target is not None and target.published and target.length == 3
+    await service.confirm_local(jobs.binding.context, target)
+    assert jobs.events[-2:] == ["local_settled", "commit"]
+    assert authority.facts.pending_write and not authority.facts.physically_complete

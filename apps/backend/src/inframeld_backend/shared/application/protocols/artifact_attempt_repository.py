@@ -81,15 +81,17 @@ class ArtifactAttemptRepository(Protocol):
     ) -> None:
         """Conditionally publish in the owning admission's currently authorized transaction.
 
-        This supporting operation checks original storage meaning, not audience
-        authority. It grants no DocumentVersion or remote byte settlement.
+        Make the original dormant cleanup job due for local staging removal.
+        The owning caller must establish current admission authority.
         """
         ...
 
     @abstractmethod
-    async def retire_local(
+    async def prepare_local_removal(
         self, binding: ArtifactCleanupJobBindingDTO, target: ArtifactCleanupTargetDTO
-    ) -> bool: ...
+    ) -> bool:
+        """Close local growth and report whether the original staging still needs removal."""
+        ...
 
     @abstractmethod
     async def confirm_local_removed(

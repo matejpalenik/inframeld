@@ -86,7 +86,9 @@ class JobContinuationEligibilityService(JobContinuationEligibility):
                     )
                     if facts.binding != job.binding or facts.job_id != job.job_id:
                         raise ConflictError("Cleanup observations changed the original binding.")
-                    complete = facts.physically_complete
+                    complete = facts.execution_complete(
+                        checkpoint=job.checkpoint, pending_effect=job.pending_effect
+                    )
                 case _:
                     raise ConflictError("The original job binding is unsupported.")
         except AccessDeniedError:

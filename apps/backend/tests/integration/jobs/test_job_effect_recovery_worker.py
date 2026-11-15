@@ -4,7 +4,7 @@ import asyncio
 import os
 import signal
 import threading
-from collections.abc import Callable, Iterator
+from collections.abc import AsyncIterator, Callable, Iterator
 from contextlib import AsyncExitStack, closing
 from datetime import timedelta
 from io import BytesIO
@@ -41,11 +41,15 @@ from inframeld_backend.bootstrap.application_worker_application_settings import 
     ApplicationWorkerApplicationSettings,
 )
 from inframeld_backend.bootstrap.application_worker_operations import ApplicationWorkerOperations
+from inframeld_backend.bootstrap.artifact_preparation_composition import create_artifact_preparation
 from inframeld_backend.shared.application.dtos.artifact_allocation_dto import ArtifactAllocationDTO
 from inframeld_backend.shared.application.dtos.artifact_attempt_dto import ArtifactAttemptDTO
 from inframeld_backend.shared.application.dtos.artifact_scope_dto import ArtifactScopeDTO
 from inframeld_backend.shared.application.dtos.job_attempt_context_dto import JobAttemptContextDTO
-from inframeld_backend.shared.application.errors.job_errors import SafeJobRetryError
+from inframeld_backend.shared.application.errors.job_errors import (
+    JobFenceLostError,
+    SafeJobRetryError,
+)
 from inframeld_backend.shared.application.services.artifact_cleanup_authorization_service import (
     ArtifactCleanupAuthorizationService,
 )
@@ -70,6 +74,9 @@ from inframeld_backend.shared.infrastructure.readers.postgres_artifact_cleanup_f
 )
 from inframeld_backend.shared.infrastructure.readers.postgres_artifact_staging_reservation_reader import (
     PostgresArtifactStagingReservationReader,
+)
+from inframeld_backend.shared.infrastructure.repositories.postgres_artifact_attempt_repository import (
+    PostgresArtifactAttemptRepository,
 )
 from inframeld_backend.shared.infrastructure.repositories.postgres_job_store import PostgresJobStore
 from inframeld_backend.shared.infrastructure.resources.database import Database
@@ -603,3 +610,85 @@ async def test_sql_pool_is_free_during_native_delete_and_committed_ack_prevents_
         )
     async with seaweed.open_store() as observed:
         assert await observed.head(original.scope, original.attempt_id) is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("local_debit_saved", [False, True], ids=["after-unlink", "after-debit"])
+async def test_replacement_worker_finishes_published_local_only_cleanup(
+    database: Database,
+    temporary_postgres_settings: DatabaseSettings,
+    seaweed: SeaweedFixture,
+    tmp_path: Path,
+    local_debit_saved: bool,
+) -> None:
+    scope = await seed_artifact_scope(database)
+    allocation = await allocate_artifact(database, artifact_scenario(scope))
+    settings = _settings(temporary_postgres_settings)
+    preparation = await create_artifact_preparation(
+        database, settings.artifact_staging, settings.artifact_storage
+    )
+    content = seaweed.body(b"published bytes survive cleanup")
+
+    async def chunks() -> AsyncIterator[bytes]:
+        yield content
+
+    published = await preparation.prepare(allocation, chunks())
+    async with database.session() as session, session.begin():
+        await PostgresArtifactAttemptRepository(session).publish_verified(allocation, published)
+
+    context = await _context(database, settings)
+    assert context.job_id == allocation.cleanup_job_id
+    cleanup = ApplicationWorkerOperations(database, settings.jobs, asyncio.Event())
+    staging = PrivateArtifactStaging(
+        settings.artifact_staging.root, PostgresArtifactStagingReservationReader(database)
+    )
+    target = await cleanup.prepare_local(context)
+    assert target is not None and target.published
+    await staging.remove(target)
+    if local_debit_saved:
+        await cleanup.confirm_local(context, target)
+
+    original = allocation.reservation
+    async with database.session() as session, session.begin():
+        job = await session.get(DurableJobRow, context.job_id.value)
+        assert job is not None and job.status == JobStatus.RUNNING.value
+        reservation = await session.get(
+            ArtifactStagingReservationRow, original.reservation_id.value
+        )
+        assert reservation is not None and reservation.released is local_debit_saved
+        assert reservation.local_reserved_bytes == (
+            0 if local_debit_saved else original.limit_bytes
+        )
+        await session.execute(
+            update(DurableJobRow)
+            .where(DurableJobRow.id == context.job_id.value)
+            .values(lease_expires_at=func.clock_timestamp() - timedelta(seconds=1))
+        )
+    with pytest.raises(JobFenceLostError):
+        await cleanup.confirm_local(context, target)
+
+    journal = tmp_path / "delete-attempts"
+    journal.touch(mode=0o600)
+    async with application_worker_process(
+        temporary_postgres_settings, artifact_cleanup=True, delete_journal=journal
+    ):
+        await _wait_status(database, allocation.cleanup_job_id, JobStatus.SUCCEEDED)
+
+    assert not journal.read_bytes()
+    async with database.session() as session:
+        job = await session.get(DurableJobRow, context.job_id.value)
+        reservation = await session.get(
+            ArtifactStagingReservationRow, original.reservation_id.value
+        )
+        assert job is not None and job.pending_effect is None and job.checkpoint == b""
+        assert job.attempt_count == (1 if local_debit_saved else 2)
+        assert reservation is not None and reservation.staging_removed and reservation.released
+        assert reservation.local_reserved_bytes == 0
+        assert reservation.remote_reserved_bytes == original.limit_bytes
+        assert await _capacity_ledger(session, scope.installation_id) == (
+            0,
+            original.limit_bytes,
+            0,
+        )
+    async with seaweed.open_store() as store:
+        assert b"".join([chunk async for chunk in store.read(published.attempt)]) == content

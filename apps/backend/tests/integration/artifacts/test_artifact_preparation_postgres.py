@@ -46,6 +46,7 @@ from inframeld_backend.shared.infrastructure.rows.artifact_staging_reservation_r
 from inframeld_backend.shared.infrastructure.rows.artifact_storage_capacity_row import (
     ArtifactStorageCapacityRow,
 )
+from inframeld_backend.shared.infrastructure.rows.durable_job_row import DurableJobRow
 
 pytestmark = pytest.mark.skipif(
     os.getenv("INFRAMELD_RUN_DB_INTEGRATION") != "1",
@@ -82,6 +83,12 @@ async def test_original_intent_is_single_use_and_verification_publication_keep_r
             # Supplied readback evidence tests SQL transitions only, not S3 verification.
             await repository.confirm_verified(allocation, VerifiedArtifactDTO(attempt))
             await repository.publish_verified(allocation, VerifiedArtifactDTO(attempt))
+        async with session.begin():
+            job = await session.get(DurableJobRow, allocation.cleanup_job_id.value)
+            assert job is not None and job.due_at < original.expires_at
+            due_at = job.due_at
+            await repository.publish_verified(allocation, VerifiedArtifactDTO(attempt))
+            assert job.due_at == due_at and job.attempt_count == 0
     facts = await PostgresArtifactStagingReservationReader(database).read(original.reservation_id)
     assert facts is not None and facts.published and facts.put_confirmed and facts.put_pending
     assert not facts.released and not facts.retired
@@ -108,7 +115,7 @@ async def test_retirement_and_target_changes_prevent_seal_without_partial_mutati
     async with database.session() as session:
         repository = PostgresArtifactAttemptRepository(session)
         async with session.begin():
-            assert await repository.retire_local(allocation.cleanup_binding, target)
+            assert await repository.prepare_local_removal(allocation.cleanup_binding, target)
         attempt = ArtifactAttemptDTO(
             original.artifact_id,
             original.attempt_id,
@@ -225,7 +232,7 @@ async def _remove_allocated_local_target(
     )
     await _wait_for_original_deadline(database, allocation)
     async with database.session() as session, session.begin():
-        assert await PostgresArtifactAttemptRepository(session).retire_local(
+        assert await PostgresArtifactAttemptRepository(session).prepare_local_removal(
             allocation.cleanup_binding, target
         )
     # This exact allocation has no local file. Exercise real locking and durable

@@ -36,7 +36,7 @@ from inframeld_backend.shared.application.protocols.transaction_manager import T
 
 
 class ArtifactLocalCleanupService(ArtifactLocalCleanup):
-    """Retire local growth before joining holders, retaining all remote uncertainty."""
+    """Guard exact local removal with the original cleanup fence."""
 
     def __init__(
         self,
@@ -58,7 +58,7 @@ class ArtifactLocalCleanupService(ArtifactLocalCleanup):
             binding, target = await self._require_current_target(context)
             return (
                 target
-                if await self._artifact_attempt_repository.retire_local(binding, target)
+                if await self._artifact_attempt_repository.prepare_local_removal(binding, target)
                 else None
             )
 
@@ -96,19 +96,24 @@ class ArtifactLocalCleanupService(ArtifactLocalCleanup):
             or facts.job_id != context.job_id
             or not facts.owns_targets
             or len(facts.targets) != 1
-            or facts.published
-            or not facts.retention_allows_cleanup
+            or (
+                (current.pending_effect is not None or current.checkpoint != b"")
+                if facts.published
+                else not facts.retention_allows_cleanup
+            )
             or (
                 isinstance(binding.origin, UnadmittedStagingArtifactOriginDTO)
                 and facts.targets != (binding.origin.attempt_id,)
             )
         ):
-            raise AccessDeniedError("The original single local target cannot be retired.")
+            raise AccessDeniedError("The original single local target cannot be removed.")
         target = await self._cleanup_target_reader.read(binding, facts.targets[0])
         if (
             target is None
             or target.attempt_id != facts.targets[0]
             or target.scope != binding.scope
+            or target.published != facts.published
+            or (target.published and target.length is None)
             or ((target.length is None) != (target.digest is None))
             or (target.length is not None and (type(target.length) is not int or target.length < 0))
         ):
