@@ -40,15 +40,27 @@ Look for `application_worker_ready` after the worker validates its private stagi
 
 ## Start with development Compose
 
-As an alternative to the host process, use the opt-in `jobs` profile. Prepare the required artifact-storage variables in the environment running Compose. The host command's `--env-file` option does not prepare that separate environment. Compose forwards the endpoint, bucket, explicit credentials, region and optional CA path to the worker. It adds no storage service or CA mount. A private CA needs an operator-supplied container-readable path and mount. With the development dependencies running and the database already migrated, build the current image and start only the worker:
+The opt-in `jobs` profile mounts an existing staging volume at `/var/lib/inframeld/staging`. Its default name is `inframeld_artifact_staging`. Set `INFRAMELD_ARTIFACT_STAGING_VOLUME` to use a different operator-owned volume. The volume's root must belong to UID and GID `10001` with mode `0700`. Compose refuses to start the worker when that external volume is missing.
+
+For a new disposable Podman stack, provision and prepare its empty volume once:
+
+```sh
+podman compose -f compose.dev.yaml --profile jobs build application-worker
+podman volume create --uid 10001 --gid 10001 --opt nocopy inframeld_artifact_staging
+podman run --rm --pull=never --network=none --read-only --cap-drop=all \
+  --user=10001:10001 --volume=inframeld_artifact_staging:/staging:nocopy \
+  localhost/inframeld-backend:dev chmod 0700 /staging
+```
+
+On Docker, prepare an external volume with the same ownership and mode before using `docker compose`. If an existing stack loses its staging volume, restore the original volume and its lock and retirement files before restarting. An empty replacement cannot account for staging retained in the original volume.
+
+Set the required artifact-storage variables in the environment running Compose. The host command's `--env-file` loads settings for that command only. Compose forwards the endpoint, bucket, explicit credentials, region and optional CA path. Supply a container-readable path and mount if a private CA is required. With the development dependencies running and migrated, start the worker:
 
 ```sh
 podman compose -f compose.dev.yaml --profile jobs up -d --build --no-deps application-worker
 ```
 
 Use `docker compose` in place of `podman compose` on Docker. The service has no published port. It uses the development database on the Compose network, with a pool of two connections and no overflow. Host settings otherwise default to a pool of ten with up to twenty overflow connections. Keep the API and worker on compatible revisions when rebuilding.
-
-The jobs profile binds `INFRAMELD_ARTIFACT_STAGING_HOST_ROOT`, defaulting to `/var/lib/inframeld/staging`, at the worker's `/var/lib/inframeld/staging`. Prepare that existing private host directory with the correct worker ownership before startup. Compose refuses to create a missing source path automatically. This mount does not measure or configure the S3 server's data filesystem.
 
 Read recent worker events with:
 

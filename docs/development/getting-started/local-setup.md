@@ -87,13 +87,13 @@ Application, Kratos and Hydra databases use three separate named volumes, preser
 
 ## Run the ordinary application worker
 
-After explicitly applying the [current required schema revision](../../../apps/backend/src/inframeld_backend/shared/infrastructure/migrations/migration_runner.py) through [migrations](#migrations), start the worker from the same checkout as the API, with the development database still running:
+Keep the development database running with the [current required schema revision](../../../apps/backend/src/inframeld_backend/shared/infrastructure/migrations/migration_runner.py). Configure the private S3 endpoint, credentials and worker-owned staging directory in your local `apps/backend/.env` using the [worker prerequisites](../operations/application-jobs.md#prepare-the-database-and-configuration). From the same checkout as the API, run:
 
 ```bash
 mise exec -- uv run --project apps/backend --locked --env-file apps/backend/.env python -m inframeld_backend.application_worker
 ```
 
-This explicitly loads the ignored API environment file for database settings. Worker startup checks the schema and existing installation identity without migrating. Look for `application_worker_ready`, then use Ctrl-C to stop the foreground process when finished. The worker has no HTTP listener and does not require the API's fingerprint key or provider credentials.
+This loads the ignored local environment file. Startup validates the staging directory, database schema and existing installation identity. Look for `application_worker_ready`, then use Ctrl-C to stop the foreground process when finished. The worker uses database and private artifact-storage credentials and has no HTTP listener.
 
 The production registry contains only the artifact cleanup and Project deletion handlers. [The operator guide](../operations/application-jobs.md) covers the opt-in `jobs` Compose service, effective settings, queue events and restart or shutdown uncertainty. There is no generic job submission or inspection interface.
 
