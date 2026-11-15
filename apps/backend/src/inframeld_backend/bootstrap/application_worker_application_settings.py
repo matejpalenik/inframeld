@@ -1,6 +1,9 @@
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from inframeld_backend.shared.infrastructure.settings.artifact_staging_settings import (
+    ArtifactStagingSettings,
+)
 from inframeld_backend.shared.infrastructure.settings.artifact_storage_settings import (
     ArtifactStorageSettings,
 )
@@ -13,6 +16,7 @@ from inframeld_backend.shared.infrastructure.types.log_level import LogLevel
 class ApplicationWorkerApplicationSettings(BaseSettings):
     database: DatabaseSettings
     artifact_storage: ArtifactStorageSettings
+    artifact_staging: ArtifactStagingSettings
     jobs: JobSettings = Field(default_factory=JobSettings)
     log_level: LogLevel = LogLevel.INFO
     log_format: LogFormat = LogFormat.CONSOLE

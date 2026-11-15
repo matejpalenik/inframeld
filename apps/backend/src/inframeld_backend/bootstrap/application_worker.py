@@ -57,6 +57,9 @@ from inframeld_backend.shared.infrastructure.logging.logging_configuration impor
 from inframeld_backend.shared.infrastructure.readers.postgres_artifact_cleanup_facts_reader import (
     PostgresArtifactCleanupFactsReader,
 )
+from inframeld_backend.shared.infrastructure.readers.postgres_artifact_staging_reservation_reader import (
+    PostgresArtifactStagingReservationReader,
+)
 from inframeld_backend.shared.infrastructure.readers.postgres_installation_identity_reader import (
     PostgresInstallationIdentityReader,
 )
@@ -68,6 +71,9 @@ from inframeld_backend.shared.infrastructure.readers.postgres_project_deletion_j
 )
 from inframeld_backend.shared.infrastructure.repositories.postgres_job_store import PostgresJobStore
 from inframeld_backend.shared.infrastructure.resources.database import Database
+from inframeld_backend.shared.infrastructure.resources.private_artifact_staging import (
+    PrivateArtifactStaging,
+)
 from inframeld_backend.shared.infrastructure.resources.s3_artifact_store import S3ArtifactStore
 from inframeld_backend.shared.infrastructure.resources.sqlalchemy_transaction_manager import (
     SqlAlchemyTransactionManager,
@@ -304,10 +310,14 @@ async def _serve(settings: ApplicationWorkerApplicationSettings) -> None:
     try:
         database = Database(settings.database)
         operations = ApplicationWorkerOperations(database, settings.jobs, stopped)
+        staging = PrivateArtifactStaging(
+            settings.artifact_staging.root, PostgresArtifactStagingReservationReader(database)
+        )
+        await staging.startup()
         artifacts = S3ArtifactStore(
             settings.artifact_storage, effect_observation_recorder=operations
         )
-        handler = ArtifactCleanupJobHandler(operations, artifacts)
+        handler = ArtifactCleanupJobHandler(operations, artifacts, operations, staging)
         shutdown = ProjectDeletionJobHandler(operations)
         # Transfer the one pool to the runtime before validation or startup.
         delegated = True

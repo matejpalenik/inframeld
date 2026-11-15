@@ -51,7 +51,7 @@ The initial real starting case is the creator's membership from ordinary Project
 
 ## Ordinary application worker
 
-`python -m inframeld_backend.application_worker` starts the shared PostgreSQL-backed worker without an HTTP listener. Development Compose exposes it through the opt-in `jobs` profile. Its default production handler registry is empty, and there is no generic job API or CLI. [Run the ordinary application worker](../../docs/development/operations/application-jobs.md) covers explicit schema migration, environment loading, settings, events and safe shutdown.
+`python -m inframeld_backend.application_worker` starts the shared PostgreSQL-backed worker without an HTTP listener. It runs `artifact.cleanup` and `project.application-shutdown`. Configure private S3 and staging before starting the worker on the host or through the opt-in Compose `jobs` profile. [Run the ordinary application worker](../../docs/development/operations/application-jobs.md) covers prerequisites, events and safe shutdown.
 
 ## Private recovery notifications
 

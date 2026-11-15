@@ -9,7 +9,7 @@ from contextlib import AsyncExitStack, closing
 from datetime import timedelta
 from io import BytesIO
 from pathlib import Path
-from typing import Unpack
+from typing import Unpack, override
 from uuid import uuid4
 
 import pytest
@@ -43,6 +43,7 @@ from inframeld_backend.bootstrap.application_worker_application_settings import 
 from inframeld_backend.bootstrap.application_worker_operations import ApplicationWorkerOperations
 from inframeld_backend.shared.application.dtos.artifact_allocation_dto import ArtifactAllocationDTO
 from inframeld_backend.shared.application.dtos.artifact_attempt_dto import ArtifactAttemptDTO
+from inframeld_backend.shared.application.dtos.artifact_scope_dto import ArtifactScopeDTO
 from inframeld_backend.shared.application.dtos.job_attempt_context_dto import JobAttemptContextDTO
 from inframeld_backend.shared.application.errors.job_errors import SafeJobRetryError
 from inframeld_backend.shared.application.services.artifact_cleanup_authorization_service import (
@@ -56,17 +57,25 @@ from inframeld_backend.shared.application.services.job_continuation_eligibility_
 )
 from inframeld_backend.shared.application.services.job_execution_service import JobExecutionService
 from inframeld_backend.shared.application.services.job_recovery_service import JobRecoveryService
+from inframeld_backend.shared.application.value_objects.artifact_attempt_id import ArtifactAttemptId
 from inframeld_backend.shared.application.value_objects.artifact_content_digest import (
     ArtifactContentDigest,
 )
+from inframeld_backend.shared.application.value_objects.job_effect_id import JobEffectId
 from inframeld_backend.shared.application.value_objects.job_id import JobId
 from inframeld_backend.shared.domain.enums.job_status import JobStatus
 from inframeld_backend.shared.domain.value_objects.installation_id import InstallationId
 from inframeld_backend.shared.infrastructure.readers.postgres_artifact_cleanup_facts_reader import (
     PostgresArtifactCleanupFactsReader,
 )
+from inframeld_backend.shared.infrastructure.readers.postgres_artifact_staging_reservation_reader import (
+    PostgresArtifactStagingReservationReader,
+)
 from inframeld_backend.shared.infrastructure.repositories.postgres_job_store import PostgresJobStore
 from inframeld_backend.shared.infrastructure.resources.database import Database
+from inframeld_backend.shared.infrastructure.resources.private_artifact_staging import (
+    PrivateArtifactStaging,
+)
 from inframeld_backend.shared.infrastructure.resources.s3_artifact_store import S3ArtifactStore
 from inframeld_backend.shared.infrastructure.resources.sqlalchemy_transaction_manager import (
     SqlAlchemyTransactionManager,
@@ -83,6 +92,9 @@ from inframeld_backend.shared.infrastructure.rows.artifact_storage_capacity_row 
 )
 from inframeld_backend.shared.infrastructure.rows.durable_job_effect_row import DurableJobEffectRow
 from inframeld_backend.shared.infrastructure.rows.durable_job_row import DurableJobRow
+from inframeld_backend.shared.infrastructure.settings.artifact_staging_settings import (
+    ArtifactStagingSettings,
+)
 from inframeld_backend.shared.infrastructure.settings.database_settings import DatabaseSettings
 from inframeld_backend.shared.infrastructure.settings.job_settings import JobSettings
 
@@ -91,6 +103,13 @@ pytestmark = pytest.mark.skipif(
     or os.getenv("INFRAMELD_RUN_ARTIFACT_INTEGRATION") != "1",
     reason="Requires the maintained private PostgreSQL and SeaweedFS services.",
 )
+
+
+@pytest.fixture(autouse=True)
+def private_staging_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    root = tmp_path / "staging"
+    root.mkdir(mode=0o700)
+    monkeypatch.setenv("INFRAMELD_ARTIFACT_STAGING__ROOT", str(root))
 
 
 @pytest.fixture(scope="module")
@@ -178,17 +197,17 @@ async def _retained(
             and not obligation.physically_complete
         )
         assert not target.remote_removed and not target.published
-        assert not reservation.released and not reservation.staging_removed
-        assert (
-            reservation.local_reserved_bytes
-            == reservation.remote_reserved_bytes
-            == reservation.limit_bytes
-        )
+        assert reservation.released and reservation.staging_removed
+        assert reservation.local_reserved_bytes == 0
+        assert reservation.remote_reserved_bytes == reservation.limit_bytes
         return job.checkpoint
 
 
 def _settings(database: DatabaseSettings) -> ApplicationWorkerApplicationSettings:
     return ApplicationWorkerApplicationSettings(
+        artifact_staging=ArtifactStagingSettings(
+            root=Path(os.environ["INFRAMELD_ARTIFACT_STAGING__ROOT"])
+        ),
         database=database,
         artifact_storage=storage_settings(),
         jobs=JobSettings(lease_seconds=30, database_timeout_seconds=1, work_seconds=60),
@@ -286,7 +305,9 @@ async def test_worker_loss_after_native_delete_preserves_unknown_effect_without_
             DurableJobEffectRow.job_id == allocation.cleanup_job_id.value
         )
         async with database.session() as session:
-            capacity_before = await _capacity_ledger(session, original.scope.installation_id)
+            spool_before, protected_before, occupied_before = await _capacity_ledger(
+                session, original.scope.installation_id
+            )
         async with application_worker_process(
             temporary_postgres_settings,
             allow_killed=True,
@@ -299,6 +320,7 @@ async def test_worker_loss_after_native_delete_preserves_unknown_effect_without_
         assert await store.head(original.scope, original.attempt_id) is None
         assert await store.head(next_object.scope, next_object.attempt_id) is not None
         assert journal.read_text(encoding="ascii").splitlines() == [original.attempt_id.value.hex]
+        original_local = allocation.reservation.limit_bytes
         async with database.session() as session:
             before = await session.get(DurableJobRow, allocation.cleanup_job_id.value)
             effect = (await session.scalars(effect_query)).one()
@@ -313,6 +335,16 @@ async def test_worker_loss_after_native_delete_preserves_unknown_effect_without_
                 and effect.aborted_at is None
                 and effect.consumed_at is None
             )
+            assert await _capacity_ledger(session, original.scope.installation_id) == (
+                spool_before - original_local,
+                protected_before - original_local,
+                occupied_before,
+            )
+            next_reservation = await session.get(
+                ArtifactStagingReservationRow, following.reservation.reservation_id.value
+            )
+            assert next_reservation is not None
+            assert next_reservation.local_reserved_bytes == following.reservation.limit_bytes
 
         # Let the real lease expire while the replacement polls both jobs.
         async with application_worker_process(
@@ -331,13 +363,14 @@ async def test_worker_loss_after_native_delete_preserves_unknown_effect_without_
             )
             == b""
         )
+        local_removed = original_local + following.reservation.limit_bytes
         async with database.session() as session:
             after = await session.get(DurableJobRow, allocation.cleanup_job_id.value)
             retained = (await session.scalars(effect_query)).one()
-            # A remote DELETE does not release storage. A future local removal proof may
-            # independently release its spool reservation.
-            assert (
-                await _capacity_ledger(session, original.scope.installation_id) == capacity_before
+            assert await _capacity_ledger(session, original.scope.installation_id) == (
+                spool_before - local_removed,
+                protected_before - local_removed,
+                occupied_before,
             )
             assert after is not None and after.fence is None
             assert (after.payload, after.queued_deadline, after.work_deadline) == (
@@ -379,22 +412,48 @@ async def test_actual_handler_abort_is_consumed_before_registered_worker_retries
     operations = ApplicationWorkerOperations(
         database, _settings(temporary_postgres_settings).jobs, asyncio.Event()
     )
-    store = S3ArtifactStore(storage_settings(), effect_observation_recorder=operations)
+    staging = PrivateArtifactStaging(
+        Path(os.environ["INFRAMELD_ARTIFACT_STAGING__ROOT"]),
+        PostgresArtifactStagingReservationReader(database),
+    )
+    await staging.startup()
     scheduled, release = asyncio.Event(), asyncio.Event()
     to_thread = asyncio.to_thread
+    inside_delete = False
 
-    async def delayed(function: Callable[[], None]) -> None:
-        scheduled.set()
-        await release.wait()
-        await to_thread(function)
+    class MockScheduledDeleteStore(S3ArtifactStore):
+        @override
+        async def delete(
+            self,
+            scope: ArtifactScopeDTO,
+            attempt_id: ArtifactAttemptId,
+            *,
+            observation: JobEffectId | None = None,
+        ) -> None:
+            nonlocal inside_delete
+            inside_delete = True
+            try:
+                await super().delete(scope, attempt_id, observation=observation)
+            finally:
+                inside_delete = False
+
+    store = MockScheduledDeleteStore(storage_settings(), effect_observation_recorder=operations)
+
+    async def delayed[T](function: Callable[[], T]) -> T:
+        if inside_delete:
+            scheduled.set()
+            await release.wait()
+        return await to_thread(function)
 
     monkeypatch.setattr(asyncio, "to_thread", delayed)
     work = asyncio.create_task(
-        ArtifactCleanupJobHandler(operations, store).run(context, operations)
+        ArtifactCleanupJobHandler(operations, store, operations, staging).run(context, operations)
     )
     try:
         await asyncio.wait_for(scheduled.wait(), 2)
         work.cancel()
+        done, _ = await asyncio.wait((work,), timeout=2)
+        assert work in done, "The excluded native DELETE did not finish within its caller bound."
         with pytest.raises(SafeJobRetryError):
             await work
     finally:
@@ -476,6 +535,10 @@ async def test_sql_pool_is_free_during_native_delete_and_committed_ack_prevents_
         return native_delete(**arguments)
 
     monkeypatch.setattr(client, "delete_object", delayed_delete)
+    staging = PrivateArtifactStaging(
+        settings.artifact_staging.root, PostgresArtifactStagingReservationReader(owner)
+    )
+    await staging.startup()
     store = S3ArtifactStore(
         storage_settings(), client=client, effect_observation_recorder=operations
     )
@@ -487,7 +550,9 @@ async def test_sql_pool_is_free_during_native_delete_and_committed_ack_prevents_
         )
         context = await _context(owner, claim_settings)
         work = asyncio.create_task(
-            ArtifactCleanupJobHandler(operations, store).run(context, operations)
+            ArtifactCleanupJobHandler(operations, store, operations, staging).run(
+                context, operations
+            )
         )
         assert await asyncio.to_thread(entered.wait, 1)
         async with asyncio.timeout(1), owner.session() as session:

@@ -247,6 +247,13 @@ services:
       INFRAMELD_ARTIFACT_STORAGE__SECRET_ACCESS_KEY: ${INFRAMELD_ARTIFACT_STORAGE__SECRET_ACCESS_KEY-}
       INFRAMELD_ARTIFACT_STORAGE__REGION: ${INFRAMELD_ARTIFACT_STORAGE__REGION-us-east-1}
       INFRAMELD_ARTIFACT_STORAGE__CA_BUNDLE:
+      INFRAMELD_ARTIFACT_STAGING__ROOT: /var/lib/inframeld/staging
+    volumes:
+      - type: volume
+        source: inframeld_artifact_staging
+        target: /var/lib/inframeld/staging
+        volume:
+          nocopy: true
     depends_on:
       postgres:
         condition: service_healthy
@@ -283,6 +290,9 @@ volumes:
   inframeld_postgres_data:
   inframeld_kratos_postgres_data:
   inframeld_hydra_postgres_data:
+  inframeld_artifact_staging:
+    name: ${INFRAMELD_ARTIFACT_STAGING_VOLUME:-inframeld_artifact_staging}
+    external: true
 
 secrets:
   recovery_hook_key:

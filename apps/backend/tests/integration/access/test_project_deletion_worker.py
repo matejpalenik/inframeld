@@ -4,6 +4,7 @@ import asyncio
 import os
 from dataclasses import replace
 from datetime import timedelta
+from pathlib import Path
 from uuid import uuid4
 
 import pytest
@@ -19,7 +20,6 @@ from tests.integration.access.test_project_deletion_postgres import (
 from tests.support.application_worker_process import application_worker_process
 from tests.support.processing_profile_scenarios import profile_command, profile_context
 from tests.support.project_creation_scenarios import create_project, seed_project_creator
-from tests.support.seaweedfs_fixture import storage_settings
 
 from inframeld_backend.access.application.commands.delete_project_command import (
     DeleteProjectCommand,
@@ -72,9 +72,6 @@ from inframeld_backend.access.infrastructure.writers.postgres_project_applicatio
 )
 from inframeld_backend.access.infrastructure.writers.postgres_project_deletion_shutdown_writer import (
     PostgresProjectDeletionShutdownWriter,
-)
-from inframeld_backend.bootstrap.application_worker_application_settings import (
-    ApplicationWorkerApplicationSettings,
 )
 from inframeld_backend.bootstrap.application_worker_operations import ApplicationWorkerOperations
 from inframeld_backend.bootstrap.processing_profile_composition import (
@@ -162,12 +159,6 @@ SUPPORTED = (("project.application-shutdown", 1),)
 @pytest_asyncio.fixture
 async def deletion_scope(database: Database) -> DeletionScenario:
     return await seed_deletion_scenario(database)
-
-
-def worker_settings(settings: DatabaseSettings) -> ApplicationWorkerApplicationSettings:
-    return ApplicationWorkerApplicationSettings(
-        database=settings, artifact_storage=storage_settings(), jobs=JobSettings(work_seconds=60)
-    )
 
 
 async def claim_next(database: Database) -> JobAttemptContextDTO | None:
@@ -576,8 +567,14 @@ async def test_registered_production_worker_releases_local_execution_without_par
     database: Database,
     temporary_postgres_settings: DatabaseSettings,
     deletion_scope: DeletionScenario,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    staging_root = tmp_path / "staging"
+    staging_root.mkdir(mode=0o700)
+    monkeypatch.setenv("INFRAMELD_ARTIFACT_STAGING__ROOT", str(staging_root))
     accepted = await admit_deletion(database, deletion_scope)
+
     async with application_worker_process(temporary_postgres_settings, artifact_cleanup=True):
         async with asyncio.timeout(10):
             while True:
