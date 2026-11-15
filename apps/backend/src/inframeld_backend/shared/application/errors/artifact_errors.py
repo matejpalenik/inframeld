@@ -10,6 +10,10 @@ class ArtifactReservationError(RuntimeError):
     pass
 
 
+class ArtifactStagingBusyError(ArtifactReservationError):
+    pass
+
+
 class ArtifactStoreUnavailableError(RuntimeError):
     pass
 
