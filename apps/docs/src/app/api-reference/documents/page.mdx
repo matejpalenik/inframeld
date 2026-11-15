@@ -1,10 +1,22 @@
 export const pageMetadata = {
   title: "Documents, collections and sources",
-  description: "Find API availability for this product area.",
+  description: "Upload a PDF and interpret the original Document receipt.",
 }
 
 # Documents, collections and sources
 
-No public operations for this area are delivered in the current OpenAPI contract.
+## Upload a PDF
 
-[Read the product model](/product/documents-and-collections) for the accepted concepts. This reference entry will display the native contracts and supported client examples when the public operations are delivered. Use [the API overview](/api-reference) for available operations today.
+<ApiOperation operationId="uploadDocument" />
+
+Send `POST /v1/projects/{project_id}/documents` with a raw `application/pdf` body. Send exactly one UTF-8 `filename` query value and repeat `groupIds` once for each distinct group UUID. Send one `Idempotency-Key` and keep it with the original request. Each request carries one PDF up to 25 MiB (26,214,400 bytes). The limit applies to the bytes the server receives.
+
+Use an eligible human's bearer token or a current browser session cookie with the installation's trusted Origin and `X-Inframeld-CSRF: 1`. The server checks current Project membership and Add documents on every explicit group in that Project, including on replay. Group IDs must be present even when the Project has saved upload defaults.
+
+A `201` response returns `operationId`, `projectId`, `documentId`, `documentVersionId` and `idempotencyExpiresAt`. It records durable acceptance of the original bytes and audience. Parsing, collection selection and read availability are separate.
+
+An authorized exact replay returns the original `201` and receipt. The expiry for a new admission is fixed at 24 hours after the database's admission time. A retained legacy result can return `null` when its original expiry is unknown. The server preserves the original value if it still returns the receipt after the guaranteed window.
+
+A `409` with `idempotency_in_progress` includes `Retry-After`. A `409` with `idempotency_key_reused` reports different inputs under the same key. Oversize bodies return `413`. Unsupported request media type or encoding returns `415`. The default server leaves the storage binding disabled. When the required managed backing capacity or shared private staging is unavailable, the route returns `503`.
+
+See [Upload one PDF](/guides/knowledge#upload-one-pdf) for the request inputs and lost-response recovery. Collection editing, source synchronization, replacement and Document sharing and reading remain separate work. [Documents and collections](/product/documents-and-collections) explains the resource model.

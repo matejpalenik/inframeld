@@ -2,6 +2,9 @@ from collections.abc import AsyncIterator
 
 import pytest
 
+from inframeld_backend.knowledge.application.errors.document_upload_errors import (
+    PdfUploadTooLargeError,
+)
 from inframeld_backend.knowledge.application.services.pdf_upload_stream import PdfUploadStream
 from inframeld_backend.shared.application.value_objects.artifact_content_digest import (
     ArtifactContentDigest,
@@ -62,7 +65,7 @@ async def test_checks_the_actual_byte_limit(excess: int) -> None:
     stream = PdfUploadStream("handbook.pdf", _chunks(*parts))
 
     if excess:
-        with pytest.raises(ValueError):
+        with pytest.raises(PdfUploadTooLargeError):
             assert sum([len(part) async for part in stream.read()]) == 0
     else:
         assert sum([len(part) async for part in stream.read()]) == 25 * 1024 * 1024

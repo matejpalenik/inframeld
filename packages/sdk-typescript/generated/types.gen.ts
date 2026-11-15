@@ -1063,6 +1063,32 @@ export type DoclingProcessingDefinitionResponse = {
 };
 
 /**
+ * DocumentUploadResponse
+ */
+export type DocumentUploadResponse = {
+    /**
+     * Documentid
+     */
+    documentId: string;
+    /**
+     * Documentversionid
+     */
+    documentVersionId: string;
+    /**
+     * Idempotencyexpiresat
+     */
+    idempotencyExpiresAt: string | null;
+    /**
+     * Operationid
+     */
+    operationId: string;
+    /**
+     * Projectid
+     */
+    projectId: string;
+};
+
+/**
  * GrantRecipientResponse
  */
 export type GrantRecipientResponse = {
@@ -7212,6 +7238,83 @@ export type RevokeApplicationKeyResponses = {
 };
 
 export type RevokeApplicationKeyResponse = RevokeApplicationKeyResponses[keyof RevokeApplicationKeyResponses];
+
+export type UploadDocumentData = {
+    body: Blob | File;
+    headers: {
+        /**
+         * Idempotency-Key
+         */
+        'Idempotency-Key': string;
+    };
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query: {
+        /**
+         * Groupids
+         */
+        groupIds: Array<string>;
+        /**
+         * Filename
+         */
+        filename: string;
+    };
+    url: '/v1/projects/{project_id}/documents';
+};
+
+export type UploadDocumentErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Operation conflicts with current state
+     */
+    409: ProblemDetails;
+    /**
+     * Content Too Large
+     */
+    413: ProblemDetails;
+    /**
+     * Unsupported Media Type
+     */
+    415: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type UploadDocumentError = UploadDocumentErrors[keyof UploadDocumentErrors];
+
+export type UploadDocumentResponses = {
+    /**
+     * Successful Response
+     */
+    201: DocumentUploadResponse;
+};
+
+export type UploadDocumentResponse = UploadDocumentResponses[keyof UploadDocumentResponses];
 
 export type ListProjectGrantRecipientsData = {
     body?: never;

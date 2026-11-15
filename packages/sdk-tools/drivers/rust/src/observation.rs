@@ -25,6 +25,18 @@ macro_rules! problems {
     };
 }
 problems!(
+    UploadDocumentApiError,
+    UploadDocumentApiError::Status400,
+    UploadDocumentApiError::Status401,
+    UploadDocumentApiError::Status403,
+    UploadDocumentApiError::Status404,
+    UploadDocumentApiError::Status409,
+    UploadDocumentApiError::Status413,
+    UploadDocumentApiError::Status415,
+    UploadDocumentApiError::Status422,
+    UploadDocumentApiError::Status503
+);
+problems!(
     SuspendHumanApiError,
     SuspendHumanApiError::Status400,
     SuspendHumanApiError::Status401,

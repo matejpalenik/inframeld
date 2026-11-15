@@ -1,5 +1,6 @@
 import asyncio
 from collections.abc import AsyncIterable
+from typing import override
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
 from inframeld_backend.knowledge.application.commands.upload_document_command import (
@@ -21,6 +22,7 @@ from inframeld_backend.knowledge.application.protocols.document_upload_authorize
 from inframeld_backend.knowledge.application.protocols.document_upload_repository import (
     DocumentUploadRepository,
 )
+from inframeld_backend.knowledge.application.protocols.document_uploader import DocumentUploader
 from inframeld_backend.knowledge.application.services.pdf_upload_stream import PdfUploadStream
 from inframeld_backend.shared.application.dtos.artifact_scope_dto import ArtifactScopeDTO
 from inframeld_backend.shared.application.dtos.verified_artifact_dto import VerifiedArtifactDTO
@@ -34,7 +36,7 @@ from inframeld_backend.shared.application.protocols.artifact_preparer import Art
 from inframeld_backend.shared.application.protocols.transaction_manager import TransactionManager
 
 
-class DocumentUploadService:
+class DocumentUploadService(DocumentUploader):
     """Admit one verified PDF using its durable original storage reservation."""
 
     def __init__(
@@ -49,6 +51,7 @@ class DocumentUploadService:
         self._document_upload_repository = document_upload_repository
         self._artifact_preparer = artifact_preparer
 
+    @override
     async def upload(
         self,
         *,
@@ -72,7 +75,7 @@ class DocumentUploadService:
             current = await self._document_upload_repository.read_original(
                 scope=current_scope, actor=access.actor_principal_id, command=command
             )
-            if current_scope != scope or current.result != record.result:
+            if current_scope != scope or not current.result.matches_original(record.result):
                 raise ArtifactIntegrityError("The original upload changed during verification.")
 
             self._require_original_content(current, stream)
@@ -81,8 +84,7 @@ class DocumentUploadService:
             if current.state is not DocumentUploadState.PENDING or verified is None:
                 raise ConflictError("The original upload can no longer be admitted.")
 
-            await self._document_upload_repository.admit(record=current, verified=verified)
-            return current.result
+            return await self._document_upload_repository.admit(record=current, verified=verified)
 
     async def _prepare(
         self,

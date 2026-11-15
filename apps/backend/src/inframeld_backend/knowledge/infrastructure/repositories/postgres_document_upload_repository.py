@@ -1,4 +1,5 @@
 from dataclasses import replace
+from datetime import timedelta
 from typing import override
 from uuid import uuid4
 
@@ -171,7 +172,7 @@ class PostgresDocumentUploadRepository(DocumentUploadRepository):
     @override
     async def admit(
         self, *, record: DocumentUploadRecordDTO, verified: VerifiedArtifactDTO
-    ) -> None:
+    ) -> DocumentUploadResultDTO:
         row = await self._require_pending(record)
         sealed = record.allocation.reservation
         if (
@@ -225,9 +226,16 @@ class PostgresDocumentUploadRepository(DocumentUploadRepository):
                 after_values={"document_version_id": str(row.version_id)},
             )
         )
+        admitted_at = await self._session.scalar(
+            select(func.clock_timestamp(type_=DateTime(timezone=True)))
+        )
+        if admitted_at is None:
+            raise DependencyUnavailableError("The original admission clock is unavailable.")
         row.state = DocumentUploadState.ADMITTED.value
+        row.replay_expires_at = admitted_at + timedelta(hours=24)
         await self._remove_pending_groups(row)
         await self._session.flush()
+        return self._result(row)
 
     @override
     async def decline(self, *, record: DocumentUploadRecordDTO) -> None:
@@ -415,4 +423,5 @@ class PostgresDocumentUploadRepository(DocumentUploadRepository):
             ProjectId(row.project_id),
             DocumentId(row.document_id),
             DocumentVersionId(row.version_id),
+            row.replay_expires_at,
         )

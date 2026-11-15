@@ -14,6 +14,9 @@ from inframeld_backend.knowledge.infrastructure.repositories.postgres_document_u
 from inframeld_backend.knowledge.infrastructure.resources.postgres_document_upload_authorizer import (
     PostgresDocumentUploadAuthorizer,
 )
+from inframeld_backend.shared.application.errors.application_errors import (
+    DependencyUnavailableError,
+)
 from inframeld_backend.shared.application.protocols.artifact_capacity_reader import (
     ArtifactCapacityReader,
 )
@@ -52,7 +55,12 @@ async def open_document_upload(
     capacity_reader: ArtifactCapacityReader,
 ) -> AsyncGenerator[DocumentUploadService]:
     """Bind a private upload to real storage and the caller's trusted capacity reader."""
-    preparation = await create_artifact_preparation(database, staging_settings, storage_settings)
+    try:
+        preparation = await create_artifact_preparation(
+            database, staging_settings, storage_settings
+        )
+    except OSError as error:
+        raise DependencyUnavailableError() from error
     async with database.session() as session:
         transactions = SqlAlchemyTransactionManager(session)
         attempts = PostgresArtifactAttemptRepository(session)

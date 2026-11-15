@@ -3,6 +3,7 @@ from hashlib import sha256
 
 from inframeld_backend.knowledge.application.errors.document_upload_errors import (
     InvalidPdfUploadError,
+    PdfUploadTooLargeError,
 )
 from inframeld_backend.shared.application.value_objects.artifact_content_digest import (
     ArtifactContentDigest,
@@ -43,8 +44,10 @@ class PdfUploadStream:
         hasher = sha256()
         total = 0
         async for chunk in self._chunks:
-            if type(chunk) is not bytes or len(chunk) > _MAX_BYTES - total:
-                raise InvalidPdfUploadError("The PDF exceeds its byte limit or has invalid bytes.")
+            if type(chunk) is not bytes:
+                raise InvalidPdfUploadError("The PDF stream contains invalid bytes.")
+            if len(chunk) > _MAX_BYTES - total:
+                raise PdfUploadTooLargeError("The PDF exceeds its byte limit.")
             total += len(chunk)
             hasher.update(chunk)
 

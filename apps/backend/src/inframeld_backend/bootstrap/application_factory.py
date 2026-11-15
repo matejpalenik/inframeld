@@ -1,6 +1,7 @@
 """Construct the HTTP application and connect its concrete resources and services."""
 
-from contextlib import ExitStack
+from collections.abc import Callable
+from contextlib import AbstractAsyncContextManager, ExitStack
 from functools import partial
 
 from fastapi import FastAPI
@@ -430,6 +431,13 @@ from inframeld_backend.indexing.http.responses.processing_profile_creation_respo
 from inframeld_backend.indexing.http.routes.processing_profile_routes import (
     create_processing_profile_router,
 )
+from inframeld_backend.knowledge.application.protocols.document_uploader import DocumentUploader
+from inframeld_backend.knowledge.http.responses.document_upload_response import (
+    DocumentUploadResponse,
+)
+from inframeld_backend.knowledge.http.routes.document_upload_routes import (
+    create_document_upload_router,
+)
 from inframeld_backend.shared.application.services.request_fingerprint_service import (
     RequestFingerprintService,
 )
@@ -455,7 +463,12 @@ API_TITLE = "Inframeld API"
 API_VERSION = "0.1.0"
 
 
-def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
+def create_app(
+    settings: ApplicationSettings | None = None,
+    *,
+    open_document_uploader: Callable[[Database], AbstractAsyncContextManager[DocumentUploader]]
+    | None = None,
+) -> FastAPI:
     """Construct resources, wire application services, and register HTTP behavior.
 
     Construction performs no network I/O. Release provider clients if assembly
@@ -595,6 +608,7 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
                 InvitationPreviewResponse,
                 InvitationActivationResponse,
                 CurrentApplicationSessionResponse,
+                DocumentUploadResponse,
                 ProjectUploadDefaultResponse,
                 ProjectUploadDefaultChangeResponse,
                 AccessGroupCreationResponse,
@@ -929,6 +943,14 @@ def create_app(settings: ApplicationSettings | None = None) -> FastAPI:
                 product_access,
                 partial(open_project_upload_default, database, upload_default_fingerprints),
                 partial(open_project_upload_default, database, upload_default_fingerprints),
+            )
+        )
+        application.include_router(
+            create_document_upload_router(
+                product_access,
+                partial(open_document_uploader, database)
+                if open_document_uploader is not None
+                else None,
             )
         )
 
