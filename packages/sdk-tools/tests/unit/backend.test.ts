@@ -19,7 +19,12 @@ import { Duplex, PassThrough, Writable } from "node:stream";
 /** A ready backend produces its only output in response to the first STOP. */
 async function shutdownOutput(
   context: TestContext,
-  scenario: { overflow: boolean; cleanupError: boolean; logError: boolean },
+  scenario: {
+    overflow: boolean;
+    cleanupError: boolean;
+    logError: boolean;
+    executionTimeMs?: number;
+  },
   run: (backend: Backend, work: string) => Promise<void>,
 ): Promise<void> {
   const work = await mkdtemp(join(tmpdir(), "sdk-pure-backend-close-"));
@@ -33,6 +38,8 @@ async function shutdownOutput(
   const helper = new EventEmitter();
   let pending = "";
   let stops = 0;
+  let ownedExecutionDeadline: number | undefined;
+  const ownerClock = 10_000;
   const frame = (value: object) =>
     control.push(JSON.stringify({ version: 1, ...value }) + "\n");
   const control = new Duplex({
@@ -43,11 +50,13 @@ async function shutdownOutput(
       while ((boundary = pending.indexOf("\n")) >= 0) {
         const value = JSON.parse(pending.slice(0, boundary)) as {
           type: string;
+          executionDeadline?: number;
         };
         pending = pending.slice(boundary + 1);
-        if (value.type === "start")
+        if (value.type === "start") {
+          ownedExecutionDeadline = value.executionDeadline;
           process.nextTick(() => frame({ type: "started", pid: 123 }));
-        else if (value.type === "stop") {
+        } else if (value.type === "stop") {
           stops++;
           stdout.emit(
             "data",
@@ -81,7 +90,7 @@ async function shutdownOutput(
   });
   context.mock.method(childProcess, "spawn", () => {
     queueMicrotask(() =>
-      frame({ type: "ready", clock: 10000, python: "3.13.12" }),
+      frame({ type: "ready", clock: ownerClock, python: "3.13.12" }),
     );
     return fake as unknown as ReturnType<typeof childProcess.spawn>;
   });
@@ -98,11 +107,25 @@ async function shutdownOutput(
   try {
     await writeFile(join(work, "address"), "http://controlled.invalid");
     if (scenario.logError) await mkdir(join(work, "backend.log"));
-    backend = await startBackend(work, undefined, undefined, 500);
+    const executionTimeMs = scenario.executionTimeMs;
+    const executionDeadline =
+      executionTimeMs === undefined
+        ? undefined
+        : performance.now() + executionTimeMs;
+    backend = await startBackend(
+      work,
+      undefined,
+      undefined,
+      500,
+      undefined,
+      executionDeadline,
+    );
     assert.equal(stops, 0);
     await run(backend, work);
     assert.equal(stops, 1);
     assert.deepEqual(signals, []);
+    if (executionTimeMs !== undefined)
+      assert.equal(ownedExecutionDeadline, ownerClock + executionTimeMs);
   } finally {
     try {
       await backend?.close().catch(() => {});
@@ -114,6 +137,23 @@ async function shutdownOutput(
     }
   }
 }
+
+test("backend ownership retains the fixture execution deadline", async (context) => {
+  for (const executionTimeMs of [660_000, 960_000])
+    await context.test(`${executionTimeMs} ms allowance`, async (nested) => {
+      nested.mock.method(performance, "now", () => 1_000);
+      await shutdownOutput(
+        nested,
+        {
+          overflow: false,
+          cleanupError: false,
+          logError: false,
+          executionTimeMs,
+        },
+        (backend) => backend.close(),
+      );
+    });
+});
 
 test("pure stub backend close retains STOP-time overflow and independent failures", async (context) => {
   for (const scenario of [
