@@ -17,3 +17,4 @@ class ArtifactCleanupTargetDTO:
     scope: ArtifactScopeDTO
     length: int | None
     digest: ArtifactContentDigest | None
+    published: bool = False

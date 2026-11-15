@@ -74,14 +74,19 @@ class ArtifactCleanupPreparationService(ArtifactCleanupPreparer):
                 or facts.job_id != context.job_id
                 or not facts.owns_targets
                 or len(facts.targets) != 1
-                or facts.published
-                or facts.pending_write
-                or not facts.retention_allows_cleanup
                 or (
                     isinstance(binding.origin, UnadmittedStagingArtifactOriginDTO)
                     and facts.targets != (binding.origin.attempt_id,)
                 )
             ):
+                raise AccessDeniedError("The original single cleanup target is not available.")
+            if facts.published:
+                if facts.execution_complete(
+                    checkpoint=current.checkpoint, pending_effect=current.pending_effect
+                ):
+                    return None
+                raise AccessDeniedError("Published cleanup requires confirmed local removal.")
+            if facts.pending_write or not facts.retention_allows_cleanup:
                 raise AccessDeniedError("The original single cleanup target is not available.")
             if current.pending_effect is not None:
                 raise ConflictError("An original physical invocation remains unresolved.")

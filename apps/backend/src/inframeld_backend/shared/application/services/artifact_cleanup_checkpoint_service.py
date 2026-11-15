@@ -73,21 +73,22 @@ class ArtifactCleanupCheckpointService(JobCheckpoints):
 
     @override
     async def succeed(self, context: JobAttemptContextDTO) -> None:
+        completed = False
         async with self._transaction_manager.begin():
             current = await self._guard(context)
             if current is not None:
+                job, facts = current
+                completed = facts.execution_complete(
+                    checkpoint=job.checkpoint, pending_effect=job.pending_effect
+                )
                 await self._job_store.finish(
                     context,
-                    status=JobStatus.SUCCEEDED
-                    if current[1].physically_complete
-                    else JobStatus.RECOVERY_REQUIRED,
-                    reason=None if current[1].physically_complete else "physical_cleanup_pending",
+                    status=JobStatus.SUCCEEDED if completed else JobStatus.RECOVERY_REQUIRED,
+                    reason=None if completed else "physical_cleanup_pending",
                 )
         self._require_continuation(current)
-        if current is not None and (
-            not current[1].physically_complete or current[0].pending_effect is not None
-        ):
-            raise JobStoppedError("The original physical cleanup remains pending.")
+        if current is not None and (not completed or current[0].pending_effect is not None):
+            raise JobStoppedError("The original cleanup remains pending.")
 
     @override
     async def fail(self, context: JobAttemptContextDTO) -> None:

@@ -79,4 +79,5 @@ class PostgresArtifactCleanupTargetReader(ArtifactCleanupTargetReader):
             ),
             target.length,
             ArtifactContentDigest(target.digest) if target.digest is not None else None,
+            published=target.published,
         )

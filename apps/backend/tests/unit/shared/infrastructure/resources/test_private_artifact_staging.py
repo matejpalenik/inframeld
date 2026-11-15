@@ -270,3 +270,74 @@ async def test_stream_and_handle_close_failures_are_both_preserved(tmp_path: Pat
         )
     assert any(isinstance(error, ValueError) for error in caught.value.exceptions)
     assert any(isinstance(error, OSError) for error in caught.value.exceptions)
+
+
+@pytest.mark.asyncio
+async def test_published_staging_can_be_removed_without_reopening_its_name(
+    tmp_path: Path,
+) -> None:
+    await asyncio.to_thread(tmp_path.chmod, 0o700)
+    reader = MockReservations()
+    staging = PrivateArtifactStaging(tmp_path, reader)
+    await staging.startup()
+    attempt = await staging.stage(
+        RESERVATION.reservation_id,
+        artifact_id=RESERVATION.artifact_id,
+        attempt_id=RESERVATION.attempt_id,
+        scope=SCOPE,
+        chunks=chunks(b"abc"),
+    )
+    reader.facts = replace(
+        reader.facts,
+        published=True,
+        put_pending=True,
+        put_confirmed=True,
+        length=attempt.length,
+        digest=attempt.digest,
+    )
+    target = ArtifactCleanupTargetDTO(
+        attempt.artifact_id,
+        attempt.attempt_id,
+        attempt.scope,
+        attempt.length,
+        attempt.digest,
+        published=True,
+    )
+
+    await staging.remove(target)
+    await staging.remove(target)
+    with pytest.raises(ArtifactReservationError):
+        await staging.stage(
+            RESERVATION.reservation_id,
+            artifact_id=RESERVATION.artifact_id,
+            attempt_id=RESERVATION.attempt_id,
+            scope=SCOPE,
+            chunks=chunks(b"replacement"),
+        )
+
+
+@pytest.mark.asyncio
+async def test_published_attempt_cannot_recreate_bytes_while_local_confirmation_is_pending(
+    tmp_path: Path,
+) -> None:
+    await asyncio.to_thread(tmp_path.chmod, 0o700)
+    reader = MockReservations(
+        replace(
+            RESERVATION,
+            length=3,
+            digest=ArtifactContentDigest.from_content(b"abc"),
+            published=True,
+            put_confirmed=True,
+        )
+    )
+    staging = PrivateArtifactStaging(tmp_path, reader)
+    await staging.startup()
+
+    with pytest.raises(ArtifactReservationError):
+        await staging.stage(
+            RESERVATION.reservation_id,
+            artifact_id=RESERVATION.artifact_id,
+            attempt_id=RESERVATION.attempt_id,
+            scope=SCOPE,
+            chunks=chunks(b"replacement"),
+        )

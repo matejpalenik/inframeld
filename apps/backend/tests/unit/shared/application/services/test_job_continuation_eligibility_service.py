@@ -165,3 +165,34 @@ async def test_deletion_unknown_effect_never_consumes_artifact_abort_proof() -> 
     assert result.disposition is JobContinuationDisposition.NOT_ESTABLISHED
     assert result.reason == "unknown_external_effect"
     assert "proof" not in store.events and "consume" not in store.events
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("remote_evidence", ["none", "checkpoint", "pending"])
+async def test_expired_published_cleanup_requires_only_proven_local_completion(
+    remote_evidence: str,
+) -> None:
+    store = prepared_store()
+    store.job = replace(
+        store.job,
+        pending_effect=store.job.pending_effect if remote_evidence == "pending" else None,
+        checkpoint=b"unexpected remote effect" if remote_evidence == "checkpoint" else b"",
+    )
+    authority = MockEffectCleanupAuthority(store)
+    authority.facts = replace(
+        authority.facts, published=True, pending_write=True, published_staging_removed=True
+    )
+    operation = JobContinuationEligibilityService(
+        store,
+        MockEffectProductAuthority(store.events),
+        authority,
+        supported_payloads=(("artifact.cleanup", 1),),
+    )
+
+    result = await operation.assess_in_transaction(store.job)
+
+    if remote_evidence == "none":
+        assert result.disposition is JobContinuationDisposition.INELIGIBLE
+        assert result.reason == "cleanup_already_complete"
+    else:
+        assert result.reason != "cleanup_already_complete"

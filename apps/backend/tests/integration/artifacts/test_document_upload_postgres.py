@@ -12,7 +12,12 @@ from uuid import uuid4
 import pytest
 from sqlalchemy import Connection, delete, event, func, select
 from sqlalchemy.orm import Mapper
-from tests.support.artifact_scenarios import MockArtifactCapacityReader
+from tests.support.application_worker_process import application_worker_process
+from tests.support.artifact_scenarios import (
+    MockArtifactCapacityReader,
+    allocate_artifact,
+    artifact_scenario,
+)
 from tests.support.project_creation_scenarios import (
     ProjectCreationSeedDTO,
     create_project,
@@ -60,6 +65,7 @@ from inframeld_backend.shared.application.errors.application_errors import (
     IdempotencyKeyReusedError,
     ResourceNotFoundError,
 )
+from inframeld_backend.shared.application.errors.job_errors import JobQueueFullError
 from inframeld_backend.shared.application.value_objects.artifact_attempt_id import ArtifactAttemptId
 from inframeld_backend.shared.application.value_objects.artifact_content_digest import (
     ArtifactContentDigest,
@@ -68,6 +74,7 @@ from inframeld_backend.shared.application.value_objects.artifact_id import Artif
 from inframeld_backend.shared.application.value_objects.idempotency_key import IdempotencyKey
 from inframeld_backend.shared.application.value_objects.job_effect_id import JobEffectId
 from inframeld_backend.shared.application.value_objects.request_id import RequestId
+from inframeld_backend.shared.domain.enums.job_status import JobStatus
 from inframeld_backend.shared.infrastructure.mappers.postgres_job_binding_mapper import (
     PostgresJobBindingMapper,
 )
@@ -90,6 +97,7 @@ from inframeld_backend.shared.infrastructure.rows.durable_job_row import Durable
 from inframeld_backend.shared.infrastructure.settings.artifact_staging_settings import (
     ArtifactStagingSettings,
 )
+from inframeld_backend.shared.infrastructure.settings.database_settings import DatabaseSettings
 
 pytestmark = [
     pytest.mark.asyncio,
@@ -366,7 +374,7 @@ async def test_confirmed_retirement_reconciles_interrupted_pending_occupancy(
             scenario.seed.organization_id,
             scenario.command.project_id,
         )
-        await PostgresArtifactAttemptRepository(session).retire_local(
+        await PostgresArtifactAttemptRepository(session).prepare_local_removal(
             binding,
             ArtifactCleanupTargetDTO(
                 ArtifactId(original.artifact_id),
@@ -429,6 +437,10 @@ async def test_audit_failure_rolls_back_publication_and_exact_retry_recovers(
         pending = (await session.scalars(select(DocumentUploadRow))).one()
         assert attempt.put_confirmed and not attempt.published
         assert pending.state == DocumentUploadState.PENDING.value
+        job = await session.get(DurableJobRow, pending.cleanup_job_id)
+        reservation = await session.get(ArtifactStagingReservationRow, pending.reservation_id)
+        assert job is not None and reservation is not None
+        assert job.due_at == reservation.expires_at and job.attempt_count == 0
         expected_document = pending.document_id
         assert await session.scalar(select(func.count()).select_from(DocumentRow)) == 0
 
@@ -491,3 +503,93 @@ async def test_competing_projects_cannot_take_the_last_document_slot(
     async with database.session() as session:
         assert await session.scalar(select(func.count()).select_from(DocumentRow)) == 200
         assert await session.scalar(select(func.count()).select_from(DocumentVersionRow)) == 1
+
+
+async def test_published_pdf_releases_exactly_one_slot_and_replays_after_local_removal(
+    database: Database,
+    temporary_postgres_settings: DatabaseSettings,
+    tmp_path: Path,
+    seaweed: SeaweedFixture,
+    alice_pdf: bytes,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    scenario = await _scenario(database, tmp_path)
+    scope = ArtifactScopeDTO(
+        scenario.seed.binding.installation_id,
+        scenario.seed.organization_id,
+        scenario.command.project_id,
+    )
+    for _ in range(7):
+        await allocate_artifact(database, artifact_scenario(scope))
+    content = seaweed.body(alice_pdf)
+    result = await scenario.upload(_stream(content))
+    next_command = replace(scenario.command, key=IdempotencyKey("next-upload"))
+    with pytest.raises(JobQueueFullError):
+        await scenario.upload(_must_not_read(), command=next_command)
+
+    async with database.session() as session:
+        original = await session.get(DocumentUploadRow, result.operation_id.value)
+        assert original is not None
+        job_id = original.cleanup_job_id
+        before = await session.get(DurableJobRow, job_id)
+        assert before is not None and before.status == JobStatus.QUEUED.value
+        assert before.attempt_count == 0 and before.due_at < before.queued_deadline
+
+    monkeypatch.setenv("INFRAMELD_ARTIFACT_STAGING__ROOT", str(scenario.staging.root))
+    journal = tmp_path / "delete-attempts"
+    journal.touch(mode=0o600)
+    async with application_worker_process(
+        temporary_postgres_settings, artifact_cleanup=True, delete_journal=journal
+    ):
+        async with asyncio.timeout(10):
+            while True:
+                async with database.session() as session:
+                    job = await session.get(DurableJobRow, job_id)
+                    if job is not None and job.status == JobStatus.SUCCEEDED.value:
+                        break
+                await asyncio.sleep(0.02)
+    assert not journal.read_bytes()
+
+    async with database.session() as session:
+        reservation = await session.get(ArtifactStagingReservationRow, original.reservation_id)
+        attempt = await session.get(ArtifactAttemptRow, original.attempt_id)
+        obligation = await session.get(ArtifactCleanupObligationRow, original.obligation_id)
+        ledger = await session.get(ArtifactStorageCapacityRow, scope.installation_id.value)
+        assert reservation is not None and reservation.released and reservation.staging_removed
+        assert reservation.local_reserved_bytes == 0
+        assert reservation.remote_reserved_bytes == 25 * 1024**2
+        assert attempt is not None and attempt.published and not attempt.retired
+        assert attempt.put_pending and attempt.put_confirmed and not attempt.remote_removed
+        assert obligation is not None and not obligation.physically_complete
+        assert obligation.transfer_deadline == reservation.expires_at
+        assert ledger is not None and ledger.spool_reserved_bytes == 7 * 25 * 1024**2
+        assert job.attempt_count == 1 and job.pending_effect is None and job.checkpoint == b""
+        assert job.queued_deadline == before.queued_deadline and job.due_at < reservation.expires_at
+    exact = ArtifactAttemptDTO(
+        ArtifactId(original.artifact_id),
+        ArtifactAttemptId(original.attempt_id),
+        scope,
+        len(content),
+        ArtifactContentDigest.from_content(content),
+    )
+    file = scenario.staging.root.joinpath(
+        scope.installation_id.value.hex,
+        scope.organization_id.value.hex,
+        scope.project_id.value.hex,
+        exact.attempt_id.value.hex,
+    )
+    assert not file.exists()
+    async with seaweed.open_store() as store:
+        assert b"".join([chunk async for chunk in store.read(exact)]) == content
+
+    scenario.capacity_reader.unavailable = True
+    replay_command = replace(scenario.command, request_id=RequestId(uuid4()))
+    assert await scenario.upload(_stream(content), command=replay_command) == result
+    with pytest.raises(IdempotencyKeyReusedError):
+        await scenario.upload(_stream(content + b"changed"), command=replay_command)
+    scenario.capacity_reader.unavailable = False
+    assert (await scenario.upload(_stream(content), command=next_command)) != result
+    with pytest.raises(JobQueueFullError):
+        await scenario.upload(
+            _must_not_read(), command=replace(scenario.command, key=IdempotencyKey("still-full"))
+        )

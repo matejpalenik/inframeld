@@ -20,6 +20,7 @@ from inframeld_backend.shared.application.dtos.artifact_staging_reservation_dto 
     ArtifactStagingReservationDTO,
 )
 from inframeld_backend.shared.application.dtos.verified_artifact_dto import VerifiedArtifactDTO
+from inframeld_backend.shared.application.enums.artifact_cleanup_kind import ArtifactCleanupKind
 from inframeld_backend.shared.application.errors.artifact_errors import (
     ArtifactCapacityError,
     ArtifactReservationError,
@@ -35,6 +36,7 @@ from inframeld_backend.shared.application.value_objects.artifact_id import Artif
 from inframeld_backend.shared.application.value_objects.artifact_staging_reservation_id import (
     ArtifactStagingReservationId,
 )
+from inframeld_backend.shared.domain.enums.job_status import JobStatus
 from inframeld_backend.shared.infrastructure.mappers.postgres_artifact_attempt_mapper import (
     PostgresArtifactAttemptMapper,
 )
@@ -125,42 +127,112 @@ class PostgresArtifactAttemptRepository(ArtifactAttemptRepository):
     async def publish_verified(
         self, allocation: ArtifactAllocationDTO, verified: VerifiedArtifactDTO
     ) -> None:
+        job = await self._lock_publication_job(allocation)
         row, reservation = await self._original(allocation)
-        await self._writable(row, reservation)
         self._require_seal(row, verified.attempt)
-        if not row.put_confirmed or row.state not in ("verified", "published"):
+        if (
+            row.retired
+            or row.remote_removed
+            or not row.put_confirmed
+            or row.state != ("published" if row.published else "verified")
+        ):
             raise ArtifactReservationError(
                 "The original artifact has no complete persisted verification."
             )
+        if row.published:
+            return
+
+        targets = await self._session.scalar(
+            select(func.count())
+            .select_from(ArtifactCleanupTargetRow)
+            .where(
+                ArtifactCleanupTargetRow.obligation_id
+                == allocation.cleanup_binding.obligation_id.value
+            )
+        )
+        now = await self._now()
+        if (
+            targets != 1
+            or reservation.released
+            or reservation.staging_removed
+            or reservation.local_reserved_bytes != reservation.limit_bytes
+            or reservation.expires_at <= now
+            or job.status != JobStatus.QUEUED.value
+            or job.due_at != reservation.expires_at
+            or job.queued_deadline <= now
+            or job.attempt_count != 0
+            or job.work_deadline is not None
+            or job.lease_expires_at is not None
+            or job.fence is not None
+            or job.worker_id is not None
+            or job.terminal_at is not None
+            or job.cancel_requested
+            or job.pending_effect is not None
+            or job.checkpoint != b""
+        ):
+            raise ArtifactReservationError("The original dormant cleanup slot is unavailable.")
         row.published, row.state = True, "published"
+        job.due_at = now
         await self._session.flush()
 
+    async def _lock_publication_job(self, allocation: ArtifactAllocationDTO) -> DurableJobRow:
+        if not self._session.in_transaction():
+            raise RuntimeError("Artifact publication requires the caller transaction.")
+        # The worker claims queue then job before locking storage rows.
+        await self._lock_queue()
+        binding = allocation.cleanup_binding
+        job = await self._session.scalar(
+            select(DurableJobRow)
+            .where(
+                DurableJobRow.id == allocation.cleanup_job_id.value,
+                DurableJobRow.binding_kind == "artifact_cleanup",
+                DurableJobRow.cleanup_obligation_id == binding.obligation_id.value,
+                DurableJobRow.request_id == binding.origin.request_id.value,
+                DurableJobRow.installation_id == binding.scope.installation_id.value,
+                DurableJobRow.organization_id == binding.scope.organization_id.value,
+                DurableJobRow.project_id == binding.scope.project_id.value,
+                DurableJobRow.payload_kind == "artifact.cleanup",
+                DurableJobRow.payload_version == 1,
+                DurableJobRow.payload == binding.obligation_id.value.bytes,
+            )
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+        if job is None or binding.kind is not ArtifactCleanupKind.ABANDONED_STAGING:
+            raise ArtifactReservationError("The original publication cleanup job is unavailable.")
+        return job
+
+    async def _lock_queue(self) -> None:
+        queue = await self._session.scalar(
+            select(ApplicationJobQueueRow)
+            .where(ApplicationJobQueueRow.singleton_key == 1)
+            .with_for_update()
+        )
+        if queue is None:
+            raise ArtifactReservationError("The shared allocation queue is unavailable.")
+
     @override
-    async def retire_local(
+    async def prepare_local_removal(
         self, binding: ArtifactCleanupJobBindingDTO, target: ArtifactCleanupTargetDTO
     ) -> bool:
         attempt, reservation, member, obligation = await self._cleanup_target(binding, target)
-        if await self._now() < obligation.transfer_deadline:
-            raise ArtifactReservationError("The original local transfer allowance is still live.")
-        attempt.retired = True
-        await self._session.flush()
-        if reservation.staging_removed:
-            if (
-                not member.staging_confirmed_removed
-                or reservation.local_reserved_bytes != 0
-                or not reservation.released
-            ):
-                raise ArtifactReservationError("The saved local removal is inconsistent.")
-            return False
-        return True
+        if not target.published:
+            if await self._now() < obligation.transfer_deadline:
+                raise ArtifactReservationError(
+                    "The original local transfer allowance is still live."
+                )
+            attempt.retired = True
+            await self._session.flush()
+        return not self._local_removal_saved(reservation, member)
 
     @override
     async def confirm_local_removed(
         self, binding: ArtifactCleanupJobBindingDTO, target: ArtifactCleanupTargetDTO
     ) -> None:
         attempt, reservation, member, _ = await self._cleanup_target(binding, target)
-        if not attempt.retired:
-            raise ArtifactReservationError("Local removal requires permanent retirement first.")
+        if not (attempt.retired or target.published):
+            raise ArtifactReservationError("Local removal requires a closed staging producer.")
+        self._local_removal_saved(reservation, member)
         ledger = await self._session.scalar(
             select(ArtifactStorageCapacityRow)
             .where(
@@ -184,6 +256,21 @@ class PostgresArtifactAttemptRepository(ArtifactAttemptRepository):
         reservation.staging_removed = reservation.released = member.staging_confirmed_removed = True
         # Remote charges, unknown PUTs and physical-retirement flags remain untouched.
         await self._session.flush()
+
+    @staticmethod
+    def _local_removal_saved(
+        reservation: ArtifactStagingReservationRow, member: ArtifactCleanupTargetRow
+    ) -> bool:
+        if reservation.staging_removed or reservation.released or member.staging_confirmed_removed:
+            if (
+                not reservation.staging_removed
+                or not reservation.released
+                or not member.staging_confirmed_removed
+                or reservation.local_reserved_bytes != 0
+            ):
+                raise ArtifactReservationError("The saved local removal is inconsistent.")
+            return True
+        return False
 
     async def _now(self) -> datetime:
         now = await self._session.scalar(
@@ -328,7 +415,9 @@ class PostgresArtifactAttemptRepository(ArtifactAttemptRepository):
             or reservation is None
             or PostgresJobBindingMapper.cleanup(obligation) != binding
             or target.scope != binding.scope
+            or binding.kind is not ArtifactCleanupKind.ABANDONED_STAGING
             or obligation.staging_reservation_id != reservation.id
+            or obligation.transfer_deadline != reservation.expires_at
             or (
                 attempt.artifact_id,
                 attempt.installation_id,
@@ -345,8 +434,19 @@ class PostgresArtifactAttemptRepository(ArtifactAttemptRepository):
                 target.length,
                 target.digest.value if target.digest is not None else None,
             )
-            or attempt.published
-            or attempt.retention_protected
+            or attempt.published != target.published
+            or (
+                (
+                    attempt.retired
+                    or attempt.remote_removed
+                    or member.remote_confirmed_removed
+                    or not attempt.put_confirmed
+                    or attempt.state != "published"
+                    or attempt.length is None
+                )
+                if target.published
+                else attempt.retention_protected
+            )
         ):
             raise ArtifactReservationError(
                 "The original local cleanup target changed or is protected."
@@ -387,13 +487,7 @@ class PostgresArtifactAttemptRepository(ArtifactAttemptRepository):
         installation = await self._session.scalar(select(InstallationIdentityRow.installation_id))
         if project is None or installation != scope.installation_id.value:
             raise ArtifactReservationError("The allocation scope cannot be confirmed.")
-        queue = await self._session.scalar(
-            select(ApplicationJobQueueRow)
-            .where(ApplicationJobQueueRow.singleton_key == 1)
-            .with_for_update()
-        )
-        if queue is None:
-            raise ArtifactReservationError("The shared queue is unavailable.")
+        await self._lock_queue()
         now = await self._session.scalar(
             select(func.clock_timestamp(type_=DateTime(timezone=True)))
         )

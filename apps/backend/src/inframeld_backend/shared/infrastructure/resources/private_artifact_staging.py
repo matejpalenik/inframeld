@@ -80,6 +80,7 @@ class PrivateArtifactStaging(ArtifactStaging):
                 or facts.scope != scope
                 or facts.released
                 or facts.retired
+                or facts.published
                 or type(facts.limit_bytes) is not int
                 or not 0 < facts.limit_bytes <= 256 * 1024 * 1024
                 or facts.expires_at.tzinfo is None
@@ -189,13 +190,23 @@ class PrivateArtifactStaging(ArtifactStaging):
             facts = await self._staging_reservation_reader.read_attempt(target.attempt_id)
             if (
                 facts is None
-                or not facts.retired
-                or facts.published
-                or (facts.artifact_id, facts.scope, facts.length, facts.digest)
-                != (target.artifact_id, target.scope, target.length, target.digest)
+                or (facts.artifact_id, facts.attempt_id, facts.scope, facts.length, facts.digest)
+                != (
+                    target.artifact_id,
+                    target.attempt_id,
+                    target.scope,
+                    target.length,
+                    target.digest,
+                )
+                or facts.published != target.published
+                or (
+                    (facts.retired or not facts.put_confirmed or facts.length is None)
+                    if facts.published
+                    else not facts.retired
+                )
             ):
                 raise ArtifactReservationError(
-                    "The exact retired local target cannot be confirmed."
+                    "The exact local cleanup target cannot be confirmed."
                 )
             await self._run_io(lambda: self._remove_file(target))
 
