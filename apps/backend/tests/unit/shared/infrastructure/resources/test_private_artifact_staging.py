@@ -120,6 +120,43 @@ async def test_partial_overflow_is_owned_and_never_sealed(tmp_path: Path) -> Non
 
 
 @pytest.mark.asyncio
+async def test_stage_retries_parent_sync_when_failed_mkdir_sync_left_the_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    await asyncio.to_thread(tmp_path.chmod, 0o700)
+    storage = PrivateArtifactStaging(tmp_path, MockReservations())
+    await storage.startup()
+    inode, original = (await asyncio.to_thread(tmp_path.stat)).st_ino, os.fsync
+    calls = 0
+
+    def fsync(descriptor: int) -> None:
+        nonlocal calls
+        if os.fstat(descriptor).st_ino == inode:
+            calls += 1
+            if calls == 1:
+                raise OSError("controlled parent directory sync failure")
+        original(descriptor)
+
+    async def stage() -> None:
+        await storage.stage(
+            RESERVATION.reservation_id,
+            artifact_id=RESERVATION.artifact_id,
+            attempt_id=RESERVATION.attempt_id,
+            scope=SCOPE,
+            chunks=chunks(b"abc"),
+        )
+
+    monkeypatch.setattr(os, "fsync", fsync)
+    with pytest.raises(ArtifactIntegrityError):
+        await stage()
+    installation = tmp_path / SCOPE.installation_id.value.hex
+    assert await asyncio.to_thread(installation.is_dir)
+
+    await stage()
+    assert calls == 2
+
+
+@pytest.mark.asyncio
 async def test_unlink_fsync_failure_retries_with_durable_parent_even_when_name_is_absent(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

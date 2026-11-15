@@ -4,7 +4,7 @@ import os
 import stat
 import time
 from collections.abc import AsyncGenerator, AsyncIterable, Callable, Generator
-from contextlib import AbstractAsyncContextManager, asynccontextmanager, contextmanager
+from contextlib import AbstractAsyncContextManager, asynccontextmanager, contextmanager, suppress
 from pathlib import Path
 from typing import BinaryIO, override
 
@@ -314,11 +314,10 @@ class PrivateArtifactStaging(ArtifactStaging):
             ):
                 self._require_private_directory(directory)
                 if create:
-                    try:
+                    with suppress(FileExistsError):
                         os.mkdir(component, mode=0o700, dir_fd=directory)
-                        os.fsync(directory)
-                    except FileExistsError:
-                        pass
+                    # Reuse also needs to persist directories left by a failed parent sync.
+                    os.fsync(directory)
                 try:
                     child = os.open(
                         component, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=directory
