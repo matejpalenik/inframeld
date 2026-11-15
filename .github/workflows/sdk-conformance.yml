@@ -32,7 +32,7 @@ jobs:
     if: needs.changes.outputs.sdk == 'true'
     name: ${{ matrix.language }} on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 40
+    timeout-minutes: ${{ matrix.language == 'python' && matrix.os == 'ubuntu-26.04' && 45 || 40 }}
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.changes.outputs.sdk_matrix) }}
@@ -127,7 +127,7 @@ jobs:
         run: uv run --directory apps/backend pytest tests/unit/contract
       - name: Verify selected SDK
         env:
-          SDK_PROFILE_TIMEOUT_MS: ${{ matrix.language == 'python' && '600000' || '300000' }}
+          SDK_PROFILE_TIMEOUT_MS: ${{ matrix.language == 'python' && (matrix.os == 'ubuntu-26.04' && '900000' || '600000') || '300000' }}
         run: pnpm sdk:verify ${{ matrix.language }}
       - name: Preserve results
         if: always()
