@@ -72,6 +72,8 @@ export async function startBackend(
         mode: "backend",
         maxOutputBytes: 4 * 1024 * 1024,
         startupDeadline: deadline,
+        // Use the fixture's remaining lifetime in place of the default command limit.
+        timeout: executionDeadline - performance.now(),
         executionDeadline,
         signal: lifetime.signal,
       },
