@@ -2,7 +2,7 @@
 
 Use this guide to start, observe and stop the PostgreSQL-backed application worker. For example, after a worker process exits, a replacement uses the original job and its saved checkpoints rather than admitting replacement work.
 
-The worker registers two version `1` handlers. `artifact.cleanup` handles one original abandoned-staging target. `project.application-shutdown` completes the local application work for an admitted Project deletion while its physical cleanup remains separately tracked. Starting the worker does not enable document processing, builds or evaluations. There is no generic job submission, inspection, cancellation or continuation command, HTTP endpoint or SDK operation.
+The worker registers two version `1` handlers. `artifact.cleanup` handles the exact original staging cleanup for verified publications and abandoned uploads. `project.application-shutdown` completes the local application work for an admitted Project deletion while its physical cleanup remains separately tracked. Starting the worker does not enable document processing, builds or evaluations. There is no generic job submission, inspection, cancellation or continuation command, HTTP endpoint or SDK operation.
 
 The private preparation tests exercise PostgreSQL, filesystem staging, S3 readback and conditional publication while retaining pending PUT evidence and remote charges. Registered-worker tests exercise recovery after a process exits. The limits below bound execution. Full capacity and physical retirement require separate verification.
 
