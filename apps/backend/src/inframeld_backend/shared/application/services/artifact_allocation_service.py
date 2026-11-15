@@ -63,6 +63,34 @@ class ArtifactAllocationService:
         limit_bytes: int = 25 * 1024 * 1024,
         transfer_seconds: float = 7200,
     ) -> ArtifactAllocationDTO:
+        async with self._transaction_manager.begin():
+            return await self.allocate_in_transaction(
+                scope=scope,
+                artifact_id=artifact_id,
+                attempt_id=attempt_id,
+                reservation_id=reservation_id,
+                obligation_id=obligation_id,
+                origin=origin,
+                limit_bytes=limit_bytes,
+                transfer_seconds=transfer_seconds,
+            )
+
+    async def allocate_in_transaction(
+        self,
+        *,
+        scope: ArtifactScopeDTO,
+        artifact_id: ArtifactId,
+        attempt_id: ArtifactAttemptId,
+        reservation_id: ArtifactStagingReservationId,
+        obligation_id: ArtifactCleanupObligationId,
+        origin: BusinessOperationArtifactOriginDTO | UnadmittedStagingArtifactOriginDTO,
+        limit_bytes: int = 25 * 1024 * 1024,
+        transfer_seconds: float = 7200,
+    ) -> ArtifactAllocationDTO:
+        """Reserve alongside the owning workflow's durable pending record.
+
+        The caller must commit that transaction before starting any private I/O.
+        """
         if isinstance(origin, UnadmittedStagingArtifactOriginDTO) and (
             origin.attempt_id != attempt_id or limit_bytes != 25 * 1024 * 1024
         ):
@@ -72,19 +100,17 @@ class ArtifactAllocationService:
         binding = ArtifactCleanupJobBindingDTO(
             obligation_id, scope, ArtifactCleanupKind.ABANDONED_STAGING, origin
         )
-        async with self._transaction_manager.begin():
-            reservation = await self._artifact_attempt_repository.reserve(
-                scope=scope,
-                artifact_id=artifact_id,
-                attempt_id=attempt_id,
-                reservation_id=reservation_id,
-                limit_bytes=limit_bytes,
-                transfer_seconds=transfer_seconds,
-                capacity_reader=self._artifact_capacity_reader,
-            )
-            await self._artifact_cleanup_obligation_repository.create_staging(
-                binding, targets=(attempt_id,), transfer_deadline=reservation.expires_at
-            )
-            admission = await self._artifact_cleanup_admission_service.admit(binding)
-            result = ArtifactAllocationDTO(reservation, binding, admission.job_id)
-        return result
+        reservation = await self._artifact_attempt_repository.reserve(
+            scope=scope,
+            artifact_id=artifact_id,
+            attempt_id=attempt_id,
+            reservation_id=reservation_id,
+            limit_bytes=limit_bytes,
+            transfer_seconds=transfer_seconds,
+            capacity_reader=self._artifact_capacity_reader,
+        )
+        await self._artifact_cleanup_obligation_repository.create_staging(
+            binding, targets=(attempt_id,), transfer_deadline=reservation.expires_at
+        )
+        admission = await self._artifact_cleanup_admission_service.admit(binding)
+        return ArtifactAllocationDTO(reservation, binding, admission.job_id)

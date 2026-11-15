@@ -1,4 +1,5 @@
 from collections.abc import AsyncIterable
+from typing import override
 
 from inframeld_backend.shared.application.dtos.artifact_allocation_dto import ArtifactAllocationDTO
 from inframeld_backend.shared.application.dtos.artifact_attempt_dto import ArtifactAttemptDTO
@@ -13,9 +14,10 @@ from inframeld_backend.shared.application.protocols.artifact_preparation_io impo
 from inframeld_backend.shared.application.protocols.artifact_preparation_records import (
     ArtifactPreparationRecords,
 )
+from inframeld_backend.shared.application.protocols.artifact_preparer import ArtifactPreparer
 
 
-class ArtifactPreparationService:
+class ArtifactPreparationService(ArtifactPreparer):
     """Prepare one private original artifact, without granting source admission."""
 
     def __init__(
@@ -24,11 +26,13 @@ class ArtifactPreparationService:
         self._preparation_records = preparation_records
         self._preparation_io = preparation_io
 
+    @override
     async def prepare(
         self, allocation: ArtifactAllocationDTO, chunks: AsyncIterable[bytes]
     ) -> VerifiedArtifactDTO:
         return await self._prepare(allocation, chunks)
 
+    @override
     async def resume(self, allocation: ArtifactAllocationDTO) -> VerifiedArtifactDTO:
         return await self._prepare(allocation, None)
 

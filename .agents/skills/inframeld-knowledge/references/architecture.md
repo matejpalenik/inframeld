@@ -88,7 +88,7 @@ Removing B from a future selection differs from erasing B. Erasure first blocks 
 
 ## What exists today
 
-This is accepted design, not a delivered Knowledge module. The inspected backend source has Access, shared and bootstrap foundations. Source admission, synchronisation, durable artifacts and deletion still need their domain-specific implementation and qualification. Existing generic infrastructure does not qualify those complete workflows.
+The [private PDF admission service](../../../../apps/backend/src/inframeld_backend/knowledge/application/services/document_upload_service.py) reserves a Document slot, checks current Add authority on the explicit Project audience and commits an immutable version after complete artifact verification. A matching retry recovers the original result. Public upload and generated clients depend on deployment that supplies trusted capacity, shared private staging and successful-upload staging settlement. Replacement, other formats, protected reads, synchronisation and deletion remain receiving work.
 
 Read [documents and collections](documents-and-collections.md), [uploads and source sync](uploads-and-source-sync.md) and [deletion and retention](deletion-and-retention.md) for applicable rules. Do not infer a service, repository or table for each named concept.
 
