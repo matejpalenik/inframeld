@@ -11,6 +11,7 @@ profile inframeld-parser-probe flags=(mediate_deleted) {
   capability setgid,
   capability net_admin,
   capability setpcap,
+  capability sys_ptrace,
 
   / mr,
   /usr/local/** mr,
