@@ -53,7 +53,10 @@ from inframeld_backend.shared.application.value_objects.artifact_content_digest 
 from inframeld_backend.shared.application.value_objects.artifact_id import ArtifactId
 from inframeld_backend.shared.application.value_objects.job_effect_id import JobEffectId
 from inframeld_backend.shared.domain.enums.job_status import JobStatus
-from inframeld_backend.shared.infrastructure.migrations.migration_runner import ALEMBIC_CONFIG_PATH
+from inframeld_backend.shared.infrastructure.migrations.migration_runner import (
+    ALEMBIC_CONFIG_PATH,
+    run_migrations,
+)
 from inframeld_backend.shared.infrastructure.resources.database import Database
 from inframeld_backend.shared.infrastructure.resources.s3_artifact_store import S3ArtifactStore
 from inframeld_backend.shared.infrastructure.rows.alembic_version_row import AlembicVersionRow
@@ -95,6 +98,7 @@ def _migrate_legacy_receipt(
     config = Config(str(ALEMBIC_CONFIG_PATH))
     config.attributes["database_settings"] = settings
     revision = select(AlembicVersionRow.version_num)
+    command.downgrade(config, _REPLAY_REVISION)
     with pytest.raises(RuntimeError, match="Retained upload receipt deadlines"):
         command.downgrade(config, _LEGACY_REVISION)
     with database_session(settings) as session, session.begin():
@@ -120,7 +124,7 @@ def _migrate_legacy_receipt(
             original.attempt_id,
             "admitted",
         )
-    command.upgrade(config, _REPLAY_REVISION)
+    run_migrations(settings)
 
 
 async def test_registered_human_upload_preserves_original_after_worker_settlement(
