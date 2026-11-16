@@ -60,6 +60,7 @@ from inframeld_backend.access.infrastructure.readers.postgres_project_action_fac
 from inframeld_backend.access.infrastructure.resources.pynacl_provider_credential_cipher import (
     PyNaClProviderCredentialCipher,
 )
+from inframeld_backend.access.infrastructure.rows.model_connection_row import ModelConnectionRow
 from inframeld_backend.access.infrastructure.rows.project_row import ProjectRow
 from inframeld_backend.access.infrastructure.settings.model_connection_destination_settings import (
     ModelConnectionDestinationSettings,
@@ -183,6 +184,7 @@ _HOSTNAME = "embeddings.fixture.test"
 _MODEL = "text-embedding-3-small"
 _ADDRESS = IPv4Address("127.0.0.1")
 _KEY = "controlled-provider-key"
+_ROTATED_KEY = "controlled-replacement-provider-key"
 _FINGERPRINT_KEY = RequestFingerprintKey(b"F" * 32)
 _FINGERPRINTS = RequestFingerprintService(_FINGERPRINT_KEY)
 _VECTOR = (0.125, 0.25, -0.5)
@@ -244,6 +246,8 @@ async def _admit(
     "outcome",
     [
         "accepted",
+        "rotated",
+        "removed",
         "lost",
         "late",
         "confirm-fence",
@@ -339,7 +343,8 @@ async def test_original_model_embedding_uses_committed_issuance_and_exact_wire_e
                 requests += 1
                 assert line == b"POST /v1/embeddings HTTP/1.1"
                 assert headers[b"host"] == f"{_HOSTNAME}:{port}".encode()
-                assert headers.get(b"authorization") == f"Bearer {_KEY}".encode()
+                expected_key = _ROTATED_KEY if outcome == "rotated" else _KEY
+                assert headers.get(b"authorization") == f"Bearer {expected_key}".encode()
                 assert (
                     not {b"openai-organization", b"x-unapproved", b"proxy-authorization"}
                     & headers.keys()
@@ -519,11 +524,14 @@ async def test_original_model_embedding_uses_committed_issuance_and_exact_wire_e
             key_file.write_bytes(root)
             key_file.chmod(0o600)
             key_id = sha256(root).hexdigest()
+            credential_settings = ProviderCredentialSettings(
+                key_file=key_file, expected_key_id=key_id
+            )
             async with open_model_connection_credentials(
                 database,
                 _FINGERPRINT_KEY,
                 destinations,
-                ProviderCredentialSettings(key_file=key_file, expected_key_id=key_id),
+                credential_settings,
             ) as credentials:
                 await credentials.change(
                     owner.access,
@@ -584,6 +592,33 @@ async def test_original_model_embedding_uses_committed_issuance_and_exact_wire_e
                 _FINGERPRINTS,
             )
             attempt = await _admit(database, owner, gateway.admission_payload(call))
+            if outcome in ("rotated", "removed"):
+                rotated = outcome == "rotated"
+                async with open_model_connection_credentials(
+                    database, _FINGERPRINT_KEY, destinations, credential_settings
+                ) as credentials:
+                    changed = await credentials.change(
+                        owner.access,
+                        ChangeModelConnectionCredentialCommand(
+                            owner.project_id,
+                            selected,
+                            1,
+                            ProviderCredentialValue(_ROTATED_KEY) if rotated else None,
+                        ),
+                        IdempotencyContextDTO(
+                            HttpMethod.PUT if rotated else HttpMethod.DELETE,
+                            credential_path,
+                            IdempotencyKey(f"fixture-key-{outcome}"),
+                        ),
+                    )
+                assert changed.changed and changed.credential.revision == 2
+                assert changed.credential.present is rotated and key_file.is_file()
+                async with database.session() as observer:
+                    connection = await observer.get(ModelConnectionRow, selected.value)
+                    assert (
+                        connection is not None
+                        and connection.access_revision == call.access_revision
+                    )
             if outcome == "tls-deadline":
                 async with database.session() as session, session.begin():
                     current = await PostgresJobStore(session).require_current(attempt)
@@ -665,7 +700,14 @@ async def test_original_model_embedding_uses_committed_issuance_and_exact_wire_e
                     )
                     assert job.checkpoint == b"conflicting-job-progress"
                 return
-            if outcome == "confirm-fence":
+            if outcome == "removed":
+                with pytest.raises(
+                    ConflictError,
+                    match=r"^A current provider credential is required for this connection\.$",
+                ):
+                    await gateway.embed(attempt, call)
+                result = None
+            elif outcome == "confirm-fence":
                 monkeypatch.setattr(
                     PostgresModelDispatchIssuanceRepository, "confirm", lose_at_confirmation
                 )
@@ -674,19 +716,30 @@ async def test_original_model_embedding_uses_committed_issuance_and_exact_wire_e
                 result = None
             else:
                 result = await gateway.embed(attempt, call)
-            if outcome not in ("late", "canceled", "confirm-fence", "tls-deadline"):
+            if outcome not in ("removed", "late", "canceled", "confirm-fence", "tls-deadline"):
                 with pytest.raises(ConflictError):
                     await gateway.embed(attempt, call)
     finally:
         await asyncio.gather(*handlers)
 
+    assert attempt is not None
+    if outcome == "removed":
+        assert requests == 0 and not names
+        async with database.session() as observer:
+            assert await observer.scalar(select(ModelDispatchIssuanceRow)) is None
+            assert await observer.scalar(select(ModelCallAccountingRow)) is None
+            assert await observer.scalar(select(ModelCallAccountingEvidenceRow)) is None
+            job = await observer.get(DurableJobRow, attempt.job_id.value)
+            assert job is not None and job.status == JobStatus.RUNNING.value
+            assert job.fence == attempt.fence.value
+            assert job.pending_effect is None and job.checkpoint == b""
+        return
     if outcome in ("missing-key", "refused"):
         assert requests == 0 and not names
     elif outcome == "tls-deadline":
         assert saw_client_hello and requests == 0
     else:
         assert requests == 1 and names == [_HOSTNAME]
-    assert attempt is not None
     async with database.session() as session, session.begin():
         issuance = await session.scalar(select(ModelDispatchIssuanceRow))
         job = await session.get(DurableJobRow, attempt.job_id.value)
@@ -694,9 +747,8 @@ async def test_original_model_embedding_uses_committed_issuance_and_exact_wire_e
         accounting = await session.get(ModelCallAccountingRow, issuance.call_id)
         assert accounting is not None
         assert issuance.connection_id == selected.value
-        assert (
-            issuance.credential_revision == 1 and issuance.access_revision == call.access_revision
-        )
+        assert issuance.credential_revision == (2 if outcome == "rotated" else 1)
+        assert issuance.access_revision == call.access_revision
         if outcome == "confirm-fence":
             evidence = await session.scalar(select(ModelCallAccountingEvidenceRow))
             assert evidence is not None and evidence.was_pending
@@ -707,7 +759,7 @@ async def test_original_model_embedding_uses_committed_issuance_and_exact_wire_e
             assert result is None
             return
         assert result is not None
-        if outcome == "accepted":
+        if outcome in ("accepted", "rotated"):
             assert result.vector == _VECTOR and result.provider_reference == "native-fixture-call"
             assert accounting.settled_amount == Decimal("0.2") and accounting.hold_amount == 0
             assert accounting.state == SpendingCallState.SETTLED and job.pending_effect is None
