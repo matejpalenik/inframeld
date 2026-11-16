@@ -19,6 +19,8 @@ Apply the [complete accepted PD-INDEXING-05 contract](../../.agents/skills/infra
 
 The developer explicitly approved the presented batch-4 contracts and delegated selection of all remaining decisions to the assistant on 2026-10-29, requesting repository/GitHub recording and plain-language justification. This resolution is accepted under that authority. It selects logical policy, not implemented code or passing qualification.
 
+[ADR-0133](ADR-0133-omit-procfs-from-restricted-parser-children.md) supersedes the private child procfs detail in the linked isolation workflow. The trusted supervisor owns the required process observations.
+
 ## Consequences
 
 Some legitimate large or scanned documents are rejected initially, and unqualified hosts cannot parse. This keeps the supported security boundary narrow and testable.
