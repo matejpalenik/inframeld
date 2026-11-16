@@ -49,6 +49,9 @@ from inframeld_backend.access.infrastructure.rows.project_membership_operation_r
 )
 from inframeld_backend.access.infrastructure.rows.project_membership_row import ProjectMembershipRow
 from inframeld_backend.access.infrastructure.rows.project_row import ProjectRow
+from inframeld_backend.indexing.infrastructure.rows.embedding_profile_action_grant_row import (
+    EmbeddingProfileActionGrantRow,
+)
 from inframeld_backend.indexing.infrastructure.rows.processing_profile_action_grant_row import (
     ProcessingProfileActionGrantRow,
 )
@@ -255,6 +258,12 @@ class PostgresProjectMembershipChangeWriter(
                 delete(ProcessingProfileActionGrantRow).where(
                     ProcessingProfileActionGrantRow.project_id == project,
                     ProcessingProfileActionGrantRow.recipient_principal_id == recipient,
+                )
+            )
+            await self._session.execute(
+                delete(EmbeddingProfileActionGrantRow).where(
+                    EmbeddingProfileActionGrantRow.project_id == project,
+                    EmbeddingProfileActionGrantRow.recipient_principal_id == recipient,
                 )
             )
             await self._session.execute(

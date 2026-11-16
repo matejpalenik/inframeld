@@ -9,3 +9,4 @@ class ProjectDepartureTargetKind(StrEnum):
     APPLICATION_ACCOUNT = "application_account"
     MODEL_CONNECTION = "model_connection"
     PROCESSING_PROFILE = "processing_profile"
+    EMBEDDING_PROFILE = "embedding_profile"

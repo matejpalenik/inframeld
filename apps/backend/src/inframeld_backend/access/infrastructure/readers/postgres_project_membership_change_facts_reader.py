@@ -75,6 +75,9 @@ from inframeld_backend.access.infrastructure.rows.project_action_grant_row impor
     ProjectActionGrantRow,
 )
 from inframeld_backend.access.infrastructure.rows.project_row import ProjectRow
+from inframeld_backend.indexing.infrastructure.rows.embedding_profile_action_grant_row import (
+    EmbeddingProfileActionGrantRow,
+)
 from inframeld_backend.indexing.infrastructure.rows.processing_profile_action_grant_row import (
     ProcessingProfileActionGrantRow,
 )
@@ -476,6 +479,42 @@ class PostgresProjectMembershipChangeFactsReader(ProjectMembershipChangeFactsRea
             result.append(
                 ProjectDepartureResponsibilityDTO(
                     ProjectDepartureTargetKind.PROCESSING_PROFILE,
+                    profile,
+                    ActionId(action),
+                    await self._candidates(facts, departing, grant),
+                )
+            )
+
+        embedding_grants = EmbeddingProfileActionGrantRow
+        embedding_profiles = (
+            (
+                await self._session.execute(
+                    select(embedding_grants.embedding_profile_id, embedding_grants.action).where(
+                        embedding_grants.project_id == project,
+                        embedding_grants.recipient_principal_id == departing.value,
+                        embedding_grants.can_grant.is_(True),
+                    )
+                )
+            )
+            .tuples()
+            .all()
+        )
+        for profile, action in embedding_profiles:
+            grant = (
+                exists()
+                .where(
+                    embedding_grants.project_id == project,
+                    embedding_grants.embedding_profile_id == profile,
+                    embedding_grants.recipient_principal_id == PrincipalRow.id,
+                    embedding_grants.recipient_kind == PrincipalRow.kind,
+                    embedding_grants.action == action,
+                    embedding_grants.can_grant.is_(True),
+                )
+                .correlate(PrincipalRow)
+            )
+            result.append(
+                ProjectDepartureResponsibilityDTO(
+                    ProjectDepartureTargetKind.EMBEDDING_PROFILE,
                     profile,
                     ActionId(action),
                     await self._candidates(facts, departing, grant),
