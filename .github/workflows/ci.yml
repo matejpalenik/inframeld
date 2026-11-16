@@ -423,8 +423,37 @@ jobs:
 
           timeout 10s sudo -n apparmor_parser --skip-cache --add "$policy"
           test "$(profile_entries)" = "$profile (enforce)"
-          timeout --kill-after=5s 620s docker run --rm --pull=never --name "$probe" \
+          audit_since="$(date --utc '+%Y-%m-%d %H:%M:%S.%6N UTC')"
+          if timeout --kill-after=5s 620s docker run --rm --pull=never --name "$probe" \
             --network none --read-only --cap-drop ALL --security-opt no-new-privileges \
             --security-opt "apparmor=$profile" --security-opt "seccomp=$scratch/oci-seccomp.json" \
             --cpus 2 --memory 8g --memory-swap=8g --pids-limit 128 --log-driver none \
-            --tmpfs /tmp:rw,noexec,nosuid,nodev,size=1g,mode=1777 "$image_id"
+            --tmpfs /tmp:rw,noexec,nosuid,nodev,size=1g,mode=1777 "$image_id"; then
+            exit 0
+          else
+            result=$?
+          fi
+
+          # The journal can omit audit events. Report only fixed matching categories.
+          audit="$(timeout --kill-after=1s 9s bash -o pipefail -s "$audit_since" <<'AUDIT'
+          sudo -n journalctl --boot --since "$1" -n 128 --no-pager --quiet --output=cat \
+            --grep 'apparmor="DENIED"' _TRANSPORT=kernel _TRANSPORT=audit 2>/dev/null |
+            LC_ALL=C awk '
+              !/(^|[[:space:]])apparmor="DENIED"([[:space:]]|$)/ ||
+              !/(^|[[:space:]])profile="inframeld-parser-probe"([[:space:]]|$)/ ||
+              !/(^|[[:space:]])comm="bwrap"([[:space:]]|$)/ { next }
+              / name="\/proc\/([[:digit:]]+|self|thread-self)\/uid_map"([[:space:]]|$)/ { uid = 1 }
+              / name="\/proc\/([[:digit:]]+|self|thread-self)\/gid_map"([[:space:]]|$)/ { gid = 1 }
+              / name="\/proc\/([[:digit:]]+|self|thread-self)\/setgroups"([[:space:]]|$)/ { groups = 1 }
+              / operation="capable"([[:space:]]|$)/ { capability = 1 }
+              END {
+                if (uid) print "Parser probe kernel audit: uid-map-denied"
+                if (gid) print "Parser probe kernel audit: gid-map-denied"
+                if (groups) print "Parser probe kernel audit: setgroups-denied"
+                if (capability) print "Parser probe kernel audit: capability-denied"
+              }
+            '
+          AUDIT
+          )" || audit=""
+          printf '%s\n' "${audit:-Parser probe kernel audit: unknown}"
+          exit "$result"

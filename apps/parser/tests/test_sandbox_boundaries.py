@@ -174,6 +174,24 @@ class NamespaceReportTest(unittest.TestCase):
                 _read_namespace_report(report)
 
 
+class FixtureFailureTest(unittest.TestCase):
+    def test_reports_fixed_mapping_operation_and_permission_classes(self) -> None:
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            for message, category in (
+                (b"setting up uid map: Permission denied", "uid-map-eacces"),
+                (b"setting up gid map: Operation not permitted", "gid-map-eperm"),
+                (b"error writing to setgroups: Read-only file system", "setgroups-erofs"),
+                (b"setting up uid map: unexpected: protected detail", "uid-map-other"),
+            ):
+                with self.subTest(category=category):
+                    (root / "stderr").write_bytes(b"bwrap: " + message + b"\n")
+                    self.assertEqual(
+                        _fixture_failure(root, "before-child-ready"),
+                        f"Parser sandbox stage=before-child-ready category={category}.",
+                    )
+
+
 @unittest.skipUnless(
     os.getenv("INFRAMELD_PARSER_SANDBOX_TEST") == "1", "Requires the Ubuntu parser probe"
 )
@@ -303,6 +321,7 @@ def _start_owner(root: Path, mode: str) -> subprocess.Popen[bytes]:
                 stdin=subprocess.PIPE if mode == "once" else subprocess.DEVNULL,
                 stdout=subprocess.DEVNULL,
                 stderr=diagnostics,
+                env={**os.environ, "LC_ALL": "C"},
                 bufsize=0,
                 start_new_session=True,
             )
@@ -389,12 +408,28 @@ def _fixture_failure(root: Path, stage: str) -> str:
         return f"Parser sandbox stage={stage} category=capture-unavailable."
     if len(captured) > _CAPTURE_BYTES:
         return f"Parser sandbox stage={stage} category=capture-overflow."
+    lines = captured.splitlines()
+    map_operations = {
+        b"setting up uid map": "uid-map",
+        b"setting up gid map": "gid-map",
+        b"error writing to setgroups": "setgroups",
+    }
+    permission_classes = {
+        b"Permission denied": "eacces",
+        b"Operation not permitted": "eperm",
+        b"Read-only file system": "erofs",
+    }
+    for line in lines:
+        owner, _, message = line.partition(b": ")
+        operation, _, detail = message.partition(b": ")
+        if owner == b"bwrap" and (map_operation := map_operations.get(operation)):
+            permission = permission_classes.get(detail, "other")
+            return f"Parser sandbox stage={stage} category={map_operation}-{permission}."
+
     categories = (
         (b"parser-fixture: owner preparation failed", "owner-preparation"),
         (b"bwrap: No permissions to create a new namespace", "namespace-permission"),
         (b"bwrap: Creating new namespace failed", "namespace-create"),
-        (b"bwrap: setting up uid map", "user-mapping"),
-        (b"bwrap: setting up gid map", "user-mapping"),
         (b"bwrap: loopback:", "private-loopback"),
         (b"bwrap: Failed to make / slave", "root-propagation"),
         (b"bwrap: Failed to mount tmpfs", "initial-tmpfs"),
@@ -409,7 +444,6 @@ def _fixture_failure(root: Path, stage: str) -> str:
         (b"bwrap: execvp", "child-exec"),
         (b"AssertionError", "child-assertion"),
     )
-    lines = captured.splitlines()
     reason = next(
         (label for marker, label in categories if any(line.startswith(marker) for line in lines)),
         "unclassified",
