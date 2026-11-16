@@ -42,6 +42,12 @@ from inframeld_backend.access.application.dtos.model_connection_grant_target_dto
 from inframeld_backend.access.application.dtos.model_connection_grants_page_dto import (
     ModelConnectionGrantsPageDTO,
 )
+from inframeld_backend.access.application.dtos.model_connection_usage_item_dto import (
+    ModelConnectionUsageItemDTO,
+)
+from inframeld_backend.access.application.dtos.model_connection_usage_page_dto import (
+    ModelConnectionUsagePageDTO,
+)
 from inframeld_backend.access.application.dtos.model_connections_page_dto import (
     ModelConnectionsPageDTO,
 )
@@ -67,6 +73,7 @@ from inframeld_backend.access.domain.enums.model_connection_authentication impor
 from inframeld_backend.access.domain.enums.model_connection_provider import ModelConnectionProvider
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
+from inframeld_backend.indexing.domain.value_objects.embedding_profile_id import EmbeddingProfileId
 from inframeld_backend.shared.application.dtos.completed_synchronous_operation_dto import (
     CompletedSynchronousOperationDTO,
 )
@@ -170,8 +177,15 @@ class MockSDKModelConnections(
         connection_id: ModelConnectionId,
         limit: int,
         cursor: str | None,
-    ) -> None:
+    ) -> ModelConnectionUsagePageDTO:
         await self.get(access, project_id, connection_id)
+        item = ModelConnectionUsageItemDTO(
+            project_id,
+            connection_id,
+            EmbeddingProfileId(UUID("00000000-0000-4000-8000-000000000246")),
+            "Original/Embedding-v1",
+        )
+        return ModelConnectionUsagePageDTO((item,), None)
 
     @override
     async def change(

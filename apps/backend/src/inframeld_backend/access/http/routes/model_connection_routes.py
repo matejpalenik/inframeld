@@ -144,13 +144,16 @@ def create_model_connection_router(
         access: Annotated[AccessContextDTO, Depends(authenticate)],
     ) -> PageResponse[ModelConnectionUsageResponse]:
         async with open_reader() as reader:
-            await reader.list_usage(
+            result = await reader.list_usage(
                 access,
                 ProjectId(project_id),
                 ModelConnectionId(model_connection_id),
                 pagination.limit,
                 pagination.cursor,
             )
-        return PageResponse[ModelConnectionUsageResponse](items=[], next_cursor=None)
+        return PageResponse[ModelConnectionUsageResponse](
+            items=[ModelConnectionMapper.usage(item) for item in result.items],
+            next_cursor=result.next_cursor,
+        )
 
     return router

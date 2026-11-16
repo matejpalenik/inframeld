@@ -17,14 +17,25 @@ from tests.support.postgres import database_session
 from tests.support.project_creation_scenarios import create_project, seed_project_creator
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
+from inframeld_backend.access.application.services.model_connection_read_service import (
+    ModelConnectionReadService,
+)
+from inframeld_backend.access.domain.enums.model_connection_action import ModelConnectionAction
 from inframeld_backend.access.domain.enums.model_connection_authentication import (
     ModelConnectionAuthentication,
 )
 from inframeld_backend.access.domain.enums.model_connection_provider import ModelConnectionProvider
+from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.enums.project_action import ProjectAction
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
+from inframeld_backend.access.infrastructure.repositories.postgres_model_connection_read_repository import (
+    PostgresModelConnectionReadRepository,
+)
 from inframeld_backend.access.infrastructure.rows.access_audit_event_row import AccessAuditEventRow
+from inframeld_backend.access.infrastructure.rows.model_connection_action_grant_row import (
+    ModelConnectionActionGrantRow,
+)
 from inframeld_backend.access.infrastructure.rows.model_connection_row import ModelConnectionRow
 from inframeld_backend.access.infrastructure.rows.project_action_grant_row import (
     ProjectActionGrantRow,
@@ -43,6 +54,7 @@ from inframeld_backend.indexing.application.services.embedding_profile_read_serv
     EmbeddingProfileReadService,
 )
 from inframeld_backend.indexing.domain.enums.embedding_profile_action import EmbeddingProfileAction
+from inframeld_backend.indexing.domain.value_objects.embedding_profile_id import EmbeddingProfileId
 from inframeld_backend.indexing.infrastructure.repositories.postgres_embedding_profile_creation_repository import (
     PostgresEmbeddingProfileCreationRepository,
 )
@@ -76,6 +88,7 @@ from inframeld_backend.shared.application.errors.application_errors import (
     AccessDeniedError,
     ConflictError,
     IdempotencyKeyReusedError,
+    InvalidInputError,
     ResourceNotFoundError,
 )
 from inframeld_backend.shared.application.services.idempotency_service import IdempotencyService
@@ -210,11 +223,16 @@ def _config(settings: DatabaseSettings) -> Config:
 
 
 async def _create(
-    database: Database, scenario: EmbeddingProfileScenarioDTO
+    database: Database, scenario: EmbeddingProfileScenarioDTO, *, name: str | None = None
 ) -> EmbeddingProfileCreationDTO:
+    command = scenario.command()
+    context = scenario.context()
+    if name is not None:
+        command = replace(command, name=ResourceName(name))
+        context = scenario.context(name)
     async with database.session() as session:
         return await _creator(session).create(
-            access=scenario.access, command=scenario.command(), context=scenario.context()
+            access=scenario.access, command=command, context=context
         )
 
 
@@ -400,6 +418,98 @@ async def test_creates_reads_and_replays_original_without_restoring_view(
             await _creator(session).create(
                 access=scenario.access, command=scenario.command(), context=scenario.context()
             )
+
+
+@pytest.mark.asyncio
+async def test_connection_usage_filters_exact_current_profile_grants_before_paging(
+    database: Database, scenario: EmbeddingProfileScenarioDTO
+) -> None:
+    project = scenario.project_id
+    actor = scenario.access.actor_principal_id
+    other_connection = ModelConnectionId(uuid4())
+    async with database.session() as session, session.begin():
+        session.add(
+            ModelConnectionRow(
+                id=other_connection.value,
+                organization_id=scenario.organization_id.value,
+                project_id=project.value,
+                name="other-embedding-connection",
+                display_name="Other embedding connection",
+                provider=ModelConnectionProvider.OPENAI.value,
+                base_url="https://api.openai.com/v1",
+                api_version=None,
+                authentication=ModelConnectionAuthentication.API_KEY.value,
+            )
+        )
+    async with database.session() as session, session.begin():
+        session.add_all(
+            ModelConnectionActionGrantRow(
+                project_id=project.value,
+                model_connection_id=connection.value,
+                recipient_principal_id=actor.value,
+                recipient_kind=PrincipalKind.HUMAN,
+                action=ModelConnectionAction.VIEW_CONFIGURATION.value,
+                can_grant=False,
+            )
+            for connection in (scenario.connection_id, other_connection)
+        )
+
+    profile_ids: list[EmbeddingProfileId] = []
+    for name in ("support-first", "support-second", "support-third"):
+        result = await _create(database, scenario, name=name)
+        profile_ids.append(result.profile.layout.embedding_profile_id)
+    hidden, first, second = sorted(profile_ids, key=lambda profile_id: profile_id.value)
+    foreign = await _create(
+        database, replace(scenario, connection_id=other_connection), name="foreign"
+    )
+
+    view_grant = delete(EmbeddingProfileActionGrantRow).where(
+        EmbeddingProfileActionGrantRow.project_id == project.value,
+        EmbeddingProfileActionGrantRow.recipient_principal_id == actor.value,
+        EmbeddingProfileActionGrantRow.action == EmbeddingProfileAction.VIEW.value,
+    )
+    async with database.session() as session, session.begin():
+        await session.execute(
+            view_grant.where(EmbeddingProfileActionGrantRow.embedding_profile_id == hidden.value)
+        )
+
+    async with database.session() as session:
+        reader = ModelConnectionReadService(
+            SqlAlchemyTransactionManager(session),
+            PostgresModelConnectionReadRepository(session, None),
+        )
+        page = await reader.list_usage(scenario.access, project, scenario.connection_id, 1, None)
+        assert [(item.embedding_profile_id, item.model_alias) for item in page.items] == [
+            (first, "SupportModel-v1"),
+        ]
+        assert page.next_cursor is not None
+        next_page = await reader.list_usage(
+            scenario.access, project, scenario.connection_id, 1, page.next_cursor
+        )
+        assert [item.embedding_profile_id for item in next_page.items] == [second]
+        assert next_page.next_cursor is None
+        foreign_page = await reader.list_usage(scenario.access, project, other_connection, 1, None)
+        assert [item.embedding_profile_id for item in foreign_page.items] == [
+            foreign.profile.layout.embedding_profile_id,
+        ]
+        assert foreign_page.next_cursor is None
+        with pytest.raises(InvalidInputError):
+            await reader.list_usage(scenario.access, project, other_connection, 1, page.next_cursor)
+
+    async with database.session() as session, session.begin():
+        await session.execute(
+            view_grant.where(EmbeddingProfileActionGrantRow.embedding_profile_id == second.value)
+        )
+    async with database.session() as session:
+        reader = ModelConnectionReadService(
+            SqlAlchemyTransactionManager(session),
+            PostgresModelConnectionReadRepository(session, None),
+        )
+        after_revocation = await reader.list_usage(
+            scenario.access, project, scenario.connection_id, 1, page.next_cursor
+        )
+        assert after_revocation.items == ()
+        assert after_revocation.next_cursor is None
 
 
 @pytest.mark.asyncio

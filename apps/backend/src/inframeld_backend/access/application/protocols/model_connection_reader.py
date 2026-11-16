@@ -3,6 +3,9 @@ from typing import Protocol
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
 from inframeld_backend.access.application.dtos.model_connection_dto import ModelConnectionDTO
+from inframeld_backend.access.application.dtos.model_connection_usage_page_dto import (
+    ModelConnectionUsagePageDTO,
+)
 from inframeld_backend.access.application.dtos.model_connections_page_dto import (
     ModelConnectionsPageDTO,
 )
@@ -29,6 +32,6 @@ class ModelConnectionReader(Protocol):
         connection_id: ModelConnectionId,
         limit: int,
         cursor: str | None,
-    ) -> None:
-        """Authorize the exact connection. V1 currently has no installed consumer owners."""
+    ) -> ModelConnectionUsagePageDTO:
+        """Page through permitted saved references under current connection authority."""
         ...

@@ -3,6 +3,9 @@ from typing import override
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
 from inframeld_backend.access.application.dtos.model_connection_dto import ModelConnectionDTO
+from inframeld_backend.access.application.dtos.model_connection_usage_page_dto import (
+    ModelConnectionUsagePageDTO,
+)
 from inframeld_backend.access.application.dtos.model_connections_page_dto import (
     ModelConnectionsPageDTO,
 )
@@ -15,6 +18,9 @@ from inframeld_backend.access.application.protocols.model_connection_reader impo
 )
 from inframeld_backend.access.application.services.principal_access_evaluation_service import (
     PrincipalAccessEvaluationService,
+)
+from inframeld_backend.access.application.value_objects.model_connection_usage_cursor import (
+    ModelConnectionUsageCursor,
 )
 from inframeld_backend.access.application.value_objects.model_connections_cursor import (
     ModelConnectionsCursor,
@@ -48,12 +54,7 @@ class ModelConnectionReadService(ModelConnectionReader):
         try:
             async with asyncio.timeout(5), self._transactions.begin():
                 _, facts = await self._require_scope(access, project_id)
-                connection = await self._repository.get_visible(facts, project_id, connection_id)
-                if connection is None:
-                    raise ResourceNotFoundError()
-                if (connection.project_id, connection.connection_id) != (project_id, connection_id):
-                    raise RuntimeError("Model connection observation changed the exact target.")
-                return connection
+                return await self._require_visible(facts, project_id, connection_id)
         except TimeoutError:
             raise DependencyUnavailableError() from None
 
@@ -107,12 +108,63 @@ class ModelConnectionReadService(ModelConnectionReader):
         connection_id: ModelConnectionId,
         limit: int,
         cursor: str | None,
-    ) -> None:
+    ) -> ModelConnectionUsagePageDTO:
         if not 1 <= limit <= 100:
             raise InvalidInputError()
-        await self.get(access, project_id, connection_id)
-        if cursor is not None:
-            raise InvalidInputError("The continuation cursor is invalid or incompatible.")
+        try:
+            async with asyncio.timeout(5), self._transactions.begin():
+                installation, facts = await self._require_scope(access, project_id)
+                await self._require_visible(facts, project_id, connection_id)
+                try:
+                    position = (
+                        ModelConnectionUsageCursor.from_token(cursor)
+                        if cursor is not None
+                        else None
+                    )
+                except ValueError:
+                    raise InvalidInputError(
+                        "The continuation cursor is invalid or incompatible."
+                    ) from None
+                if position is not None and (
+                    position.installation_id,
+                    position.project_id,
+                    position.connection_id,
+                ) != (installation, project_id, connection_id):
+                    raise InvalidInputError("The continuation cursor is invalid or incompatible.")
+
+                after = position.after if position is not None else None
+                rows = await self._repository.list_embedding_profile_usage(
+                    facts, project_id, connection_id, after, limit + 1
+                )
+                if len(rows) > limit + 1:
+                    raise RuntimeError("Model connection usage exceeded its page bound.")
+                for row in rows:
+                    if (row.project_id, row.connection_id) != (project_id, connection_id) or (
+                        after is not None and row.embedding_profile_id.value <= after.value
+                    ):
+                        raise RuntimeError("Model connection usage changed its position or scope.")
+                    after = row.embedding_profile_id
+                items = rows[:limit]
+                next_cursor = (
+                    ModelConnectionUsageCursor(
+                        installation, project_id, connection_id, items[-1].embedding_profile_id
+                    ).to_token()
+                    if len(rows) > limit
+                    else None
+                )
+                return ModelConnectionUsagePageDTO(items, next_cursor)
+        except TimeoutError:
+            raise DependencyUnavailableError() from None
+
+    async def _require_visible(
+        self, facts: ProjectActionFactsDTO, project_id: ProjectId, connection_id: ModelConnectionId
+    ) -> ModelConnectionDTO:
+        connection = await self._repository.get_visible(facts, project_id, connection_id)
+        if connection is None:
+            raise ResourceNotFoundError()
+        if (connection.project_id, connection.connection_id) != (project_id, connection_id):
+            raise RuntimeError("Model connection observation changed the exact target.")
+        return connection
 
     async def _require_scope(
         self, access: AccessContextDTO, project_id: ProjectId

@@ -189,7 +189,7 @@ EOF_HEADERS
 
 The response reports the saved base URL, selected authentication method and connection settings revision. The `credential` summary shows the current presence and revision. A new connection starts with `credential.present: false` and revision `0`. The [API reference](/api-reference/projects-and-access#list-model-connections) shows how to continue a connection list.
 
-Use the [usage read](/api-reference/projects-and-access#list-model-connection-usage) to inspect permitted saved observations. Append `/usage` to the connection URL and send the same authenticated GET. In this version the page has empty `items` and `nextCursor: null`. An empty page means there are no recorded observations to show. It gives no provider reachability or validation result. [Models, processing and search](/product/models-and-search) explains where consumer model and role settings belong.
+Use the [usage read](/api-reference/projects-and-access#list-model-connection-usage) to see saved Embedding Profiles that select the connection. Append `/usage` to the connection URL and send the same authenticated GET. The response includes only profiles you can currently view. Each item shows the exact model alias and has `null` for both provider observations, `latestAttempt` and `lastValidation`. [Models, processing and search](/product/models-and-search) explains where consumer model and role settings belong.
 
 ## Recover an uncertain creation
 
@@ -257,7 +257,7 @@ An authorized replay returns the original `credential`, `changed`, `operationId`
 
 ## Remove the saved provider credential
 
-Check the current credential revision again and review any work you know depends on this connection. The current usage page only reports saved observations. An empty page cannot establish that removal has no impact. Future calls that require the key will need a saved credential. Already sent requests may finish. Revoke the provider's own key separately at the provider if needed.
+Check the current credential revision again and review any work you know depends on this connection. The usage page shows only the saved Embedding Profiles you can view. An empty page cannot establish that removal has no impact. Future calls that require the key will need a saved credential. Already sent requests may finish. Revoke the provider's own key separately at the provider if needed.
 
 Set `CURRENT_CREDENTIAL_REVISION` to the revision you just read. Run `CREDENTIAL_REMOVE_KEY=$(uuidgen)` once for this removal and keep both values in case the reply is lost.
 
