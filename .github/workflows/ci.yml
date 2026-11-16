@@ -359,6 +359,7 @@ jobs:
           test -z "$remaining"
 
           scratch="$(mktemp -d "$RUNNER_TEMP/parser-sandbox.XXXXXXXX")"
+          trace_dir=""
           cleanup() {
             local result=$? clean=0 owned
             trap - EXIT
@@ -380,12 +381,16 @@ jobs:
             owned="$(container_ids)" && test -z "$owned" || clean=1
             owned="$(image_ids)" && test -z "$owned" || clean=1
             owned="$(profile_entries)" && test -z "$owned" || clean=1
+            if [[ -n "$trace_dir" ]]; then
+              timeout 10s sudo -n rmdir -- "$trace_dir" || clean=1
+              timeout 10s sudo -n test ! -e "$trace_dir" || clean=1
+            fi
             rm -rf -- "$scratch" && test ! -e "$scratch" || clean=1
             if (( clean )); then
               printf 'Parser probe cleanup could not be confirmed.\n' >&2
               exit 1
             fi
-            printf 'Parser probe container, image tag, AppArmor profile and scratch are absent.\n'
+            printf 'Parser probe container, image tag, AppArmor profile, scratch and trace instance are absent.\n'
             exit "$result"
           }
           trap cleanup EXIT
@@ -423,15 +428,119 @@ jobs:
 
           timeout 10s sudo -n apparmor_parser --skip-cache --add "$policy"
           test "$(profile_entries)" = "$profile (enforce)"
+          trace_root=/sys/kernel/tracing
+          if ! timeout 10s sudo -n test -d "$trace_root/instances"; then
+            trace_root=/sys/kernel/debug/tracing
+          fi
+          trace_target="$trace_root/instances/$probe"
+          timeout 10s sudo -n mkdir -- "$trace_target"
+          trace_dir="$trace_target"
+          trace_write() {
+            printf '%s\n' "$1" | timeout 10s sudo -n tee "$trace_dir/$2" >/dev/null
+          }
+          trace_write 0 tracing_on
+          trace_write global trace_clock
+          trace_write 64 buffer_size_kb
+          # Keep only relevant executable loads and Bubblewrap process relationships.
+          trace_write 'filename == "/usr/bin/true" || filename == "/usr/local/bin/python" || filename == "/opt/probe-tools/bwrap"' \
+            events/sched/sched_process_exec/filter
+          trace_write 'parent_comm == "bwrap"' events/sched/sched_process_fork/filter
+          trace_write 'ret < 0' events/syscalls/sys_exit_execve/filter
+          trace_write 1 events/sched/sched_process_exec/enable
+          trace_write 1 events/sched/sched_process_fork/enable
+          trace_write 1 events/syscalls/sys_enter_execve/enable
+          trace_write 1 events/syscalls/sys_exit_execve/enable
+          trace_write 1 tracing_on
+          (exec /usr/bin/true) &
+          trace_control=$!
+          wait "$trace_control"
+
           audit_since="$(date --utc '+%Y-%m-%d %H:%M:%S.%6N UTC')"
-          if timeout --kill-after=5s 620s docker run --rm --pull=never --name "$probe" \
+          result=0
+          timeout --kill-after=5s 620s docker run --rm --pull=never --name "$probe" \
             --network none --read-only --cap-drop ALL --security-opt no-new-privileges \
             --security-opt "apparmor=$profile" --security-opt "seccomp=$scratch/oci-seccomp.json" \
             --cpus 2 --memory 8g --memory-swap=8g --pids-limit 128 --log-driver none \
-            --tmpfs /tmp:rw,noexec,nosuid,nodev,size=1g,mode=1777 "$image_id" -k test_python_starts_with_fixed_policy; then
-            exit 0
-          else
-            result=$?
+            --tmpfs /tmp:rw,noexec,nosuid,nodev,size=1g,mode=1777 "$image_id" -k test_python_starts_with_fixed_policy || result=$?
+          trace_result=0
+          trace_write 0 tracing_on && (
+            umask 077
+            timeout 10s sudo -n head -c 65537 "$trace_dir/trace" > "$scratch/exec.trace"
+          ) && python3 -IB - "$scratch/exec.trace" "$trace_control" <<'TRACE' || trace_result=$?
+          import errno
+          import re
+          import sys
+          from pathlib import Path
+
+          capture = Path(sys.argv[1]).read_bytes()
+          if len(capture) > 65536:
+              raise SystemExit("Kernel exec trace: capture exceeded its bound.")
+          source = capture.decode("ascii")
+          counts = re.search(r"entries-in-buffer/entries-written:\s*(\d+)/(\d+)", source)
+          entries = []
+          for line in source.splitlines():
+              if not line.strip() or line.startswith("#"):
+                  continue
+              event = re.fullmatch(r"\s*.+?-(\d+)\s+\[\d+\]\s+.*?\d+\.\d+:\s+(.+)", line)
+              if event is None:
+                  raise SystemExit("Kernel exec trace: event format was unrecognized.")
+              entries.append((int(event[1]), event[2]))
+          if counts is None or int(counts[1]) != len(entries) or counts[1] != counts[2]:
+              raise SystemExit("Kernel exec trace: the trace was incomplete.")
+
+          def loaded(event, executable):
+              return event.startswith(f"sched_process_exec: filename={executable} ")
+
+          def entering(event):
+              return event.startswith(("sys_execve(", "execve("))
+
+          control = int(sys.argv[2])
+          control_events = [event for pid, event in entries if pid == control]
+          if not any(map(entering, control_events)) or not any(
+              loaded(event, "/usr/bin/true") for event in control_events
+          ):
+              raise SystemExit("Kernel exec trace: the known launch was not observed.")
+
+          python = "/usr/local/bin/python"
+          if not any(loaded(event, python) for _, event in entries):
+              raise SystemExit("Kernel exec trace: the outer Python launch was not observed.")
+          roots = [
+              (index, pid)
+              for index, (pid, event) in enumerate(entries)
+              if loaded(event, "/opt/probe-tools/bwrap")
+          ]
+          if not roots:
+              print("Kernel exec trace: Bubblewrap executable load was not observed.")
+          elif len(roots) != 1:
+              raise SystemExit("Kernel exec trace: Bubblewrap process ownership was ambiguous.")
+          else:
+              index, root = roots[0]
+              owned = {root}
+              attempts = 0
+              rejections = []
+              python_loaded = False
+              for pid, event in entries[index + 1:]:
+                  if pid not in owned:
+                      continue
+                  if fork := re.match(r"sched_process_fork: .* child_pid=(\d+)$", event):
+                      owned.add(int(fork[1]))
+                  attempts += entering(event)
+                  python_loaded |= loaded(event, python)
+                  if failure := re.fullmatch(r"(?:sys_)?execve -> 0x([0-9a-f]+)", event):
+                      value = int(failure[1], 16)
+                      if (1 << 64) - 4095 <= value < 1 << 64:
+                          rejections.append(errno.errorcode.get((1 << 64) - value, "unknown-errno"))
+              if python_loaded:
+                  print("Kernel exec trace: Linux loaded Python in the Bubblewrap process tree.")
+              elif attempts == 1 and len(rejections) == 1:
+                  print(f"Kernel exec trace: Linux rejected the Bubblewrap exec with {rejections[0]}.")
+              elif attempts == 0:
+                  print("Kernel exec trace: Bubblewrap loaded without a later exec event in its process tree.")
+              else:
+                  print("Kernel exec trace: Bubblewrap reached exec without an observed Python load.")
+          TRACE
+          if (( result == 0 )); then
+            exit "$trace_result"
           fi
 
           # The journal can omit audit events. Report only fixed matching categories.
