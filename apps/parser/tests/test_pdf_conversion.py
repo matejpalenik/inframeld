@@ -6,11 +6,14 @@ import unittest
 from hashlib import sha256
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import TypedDict, cast
+from typing import TYPE_CHECKING, TypedDict, cast
 from unittest.mock import patch
 
-from inframeld_parser.canonical_pdf import TextBlock
+from inframeld_parser.canonical_pdf import CanonicalPdf, TextBlock
 from inframeld_parser.pdf_conversion import PdfConversionError, convert_pdf
+
+if TYPE_CHECKING:
+    from docling_core.types.doc import DoclingDocument, ProvenanceItem
 
 _ROOT = Path(__file__).resolve().parents[3]
 _MANIFEST = _ROOT / "config/models/docling-parser-v1.json"
@@ -123,6 +126,55 @@ class _ConversionView(TypedDict):
 
 @unittest.skipUnless(os.getenv("INFRAMELD_PARSER_TEST_ASSETS"), "Requires pinned offline assets")
 class TrustedPdfConversionTest(unittest.TestCase):
+    def test_maps_native_picture_caption_and_child_text_once(self) -> None:
+        from docling_core.types.doc import DocItemLabel, DoclingDocument
+
+        document = DoclingDocument(name="Picture text")
+        document.add_text(DocItemLabel.PARAGRAPH, "Body text", prov=_first_page(9))
+        picture = document.add_picture(prov=_first_page(0))
+        caption = document.add_text(
+            DocItemLabel.CAPTION, "Chart caption", prov=_first_page(13), parent=picture
+        )
+        picture.captions.append(caption.get_ref())
+        document.add_text(DocItemLabel.TEXT, "North axis", prov=_first_page(10), parent=picture)
+
+        artifact = self._convert_document(document)
+        view = cast("_ConversionView", json.loads(artifact.canonical_bytes))
+        self.assertEqual(view["text"], "Body text\nChart caption\nNorth axis")
+        self.assertEqual(
+            view["blocks"],
+            [
+                {"kind": "text", "pages": [1], "span": [0, 9]},
+                {"kind": "text", "pages": [1], "span": [10, 23]},
+                {"kind": "text", "pages": [1], "span": [24, 34]},
+            ],
+        )
+
+    def test_rejects_an_orig_only_formula_even_with_mappable_body_text(self) -> None:
+        from docling_core.types.doc import DocItemLabel, DoclingDocument
+
+        document = DoclingDocument(name="Unsupported formula")
+        document.add_text(DocItemLabel.PARAGRAPH, "Body text", prov=_first_page(9))
+        document.add_formula(text="", orig="x = 1", prov=_first_page(5))
+
+        with self.assertRaisesRegex(PdfConversionError, "formula"):
+            self._convert_document(document)
+
+    def _convert_document(self, document: "DoclingDocument") -> CanonicalPdf:
+        """Supply a pinned native result without classifying an artificial PDF."""
+        from docling.datamodel.base_models import ConversionStatus
+        from docling.datamodel.document import ConversionResult, InputDocument
+        from docling.document_converter import DocumentConverter
+
+        result = ConversionResult(
+            input=InputDocument.model_construct(page_count=1),
+            status=ConversionStatus.SUCCESS,
+            document=document,
+        )
+        assets = Path(os.environ["INFRAMELD_PARSER_TEST_ASSETS"])
+        with patch.object(DocumentConverter, "convert", return_value=result):
+            return convert_pdf(_ALICE, asset_root=assets, manifest=_MANIFEST)
+
     def test_alice_text_maps_to_the_one_source_page(self) -> None:
         assets = Path(os.environ["INFRAMELD_PARSER_TEST_ASSETS"])
         artifact = convert_pdf(_ALICE, asset_root=assets, manifest=_MANIFEST)
@@ -165,3 +217,13 @@ class TrustedPdfConversionTest(unittest.TestCase):
                 (2, 1): "29",
             },
         )
+
+
+def _first_page(characters: int) -> "ProvenanceItem":
+    from docling_core.types.doc import BoundingBox, CoordOrigin, ProvenanceItem
+
+    return ProvenanceItem(
+        page_no=1,
+        bbox=BoundingBox(l=1, t=2, r=3, b=1, coord_origin=CoordOrigin.BOTTOMLEFT),
+        charspan=(0, characters),
+    )

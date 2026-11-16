@@ -148,7 +148,7 @@ def _docling_blocks(content: bytes, asset_root: Path) -> Iterator[TextBlock | Ta
     from docling.datamodel.stage_model_specs import ObjectDetectionModelSpec
     from docling.document_converter import DocumentConverter, PdfFormatOption
     from docling.exceptions import ConversionError
-    from docling_core.types.doc import RichTableCell, TableItem, TextItem
+    from docling_core.types.doc import FormulaItem, RichTableCell, TableItem, TextItem
 
     options = PdfPipelineOptions(
         artifacts_path=asset_root,
@@ -190,12 +190,14 @@ def _docling_blocks(content: bytes, asset_root: Path) -> Iterator[TextBlock | Ta
     if result.status is not ConversionStatus.SUCCESS or not (1 <= pages <= _MAX_PAGES):
         raise PdfConversionError("Docling could not complete the PDF conversion.")
 
-    for item, _ in result.document.iterate_items():
+    for item, _ in result.document.iterate_items(traverse_pictures=True):
         if not isinstance(item, (TextItem, TableItem)):
             continue
         locations = tuple(sorted({entry.page_no for entry in item.prov}))
         if any(page > pages for page in locations):
             raise PdfConversionError("Docling returned an invalid source page.")
+        if isinstance(item, FormulaItem) and not item.text and item.orig:
+            raise PdfConversionError("A native PDF formula has no supported text representation.")
         if isinstance(item, TextItem):
             yield TextBlock(item.text, locations)
             continue
