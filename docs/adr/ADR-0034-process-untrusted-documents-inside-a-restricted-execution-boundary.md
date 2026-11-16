@@ -20,6 +20,8 @@ These options summarize the recorded choices, exclusions, and deferrals. They do
 
 Validate and bound uploads, then process document bytes in the documented restricted parser environment. Separate the worker, supervisor, and processing child. Restrict credentials, network access, filesystem access, resource use, and lifetime. Validate returned artifacts before accepting them as application data, and reject unsupported hosts rather than silently weakening isolation.
 
+[ADR-0133](ADR-0133-omit-procfs-from-restricted-parser-children.md) updates the child filesystem view. The trusted supervisor uses its confined procfs and the restricted child omits that mount.
+
 **Example.** A conversion that times out must lose its attempt’s process lifetime and cannot publish a half-validated artifact merely because some output files exist.
 
 ## Consequences
