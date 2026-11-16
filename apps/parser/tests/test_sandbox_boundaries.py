@@ -147,17 +147,20 @@ class OciPolicyPreparationTest(unittest.TestCase):
 
 
 class NamespaceReportTest(unittest.TestCase):
-    def test_requires_the_exact_positive_setup_ids(self) -> None:
-        valid = {
+    def setUp(self) -> None:
+        self.namespace_report = {
             "child-pid": 41,
             "mnt-namespace": 101,
             "pid-namespace": 102,
             "ipc-namespace": 103,
             "net-namespace": 104,
         }
+
+    def test_requires_the_exact_positive_setup_ids(self) -> None:
+        valid = self.namespace_report
         with TemporaryDirectory() as directory:
             report = Path(directory) / "namespaces.json"
-            report.write_text(json.dumps(valid))
+            report.write_text(json.dumps(valid) + "\n")
             self.assertEqual(_read_namespace_report(report), valid)
             for invalid in (
                 {key: value for key, value in valid.items() if key != "net-namespace"},
@@ -167,11 +170,56 @@ class NamespaceReportTest(unittest.TestCase):
                 {**valid, "ipc-namespace": "103"},
             ):
                 with self.subTest(invalid=invalid), self.assertRaisesRegex(ValueError, "namespace"):
-                    report.write_text(json.dumps(invalid))
+                    report.write_text(json.dumps(invalid) + "\n")
                     _read_namespace_report(report)
             with self.assertRaisesRegex(ValueError, "capture limit"):
                 report.write_text(" " * (_CAPTURE_BYTES + 1))
                 _read_namespace_report(report)
+
+    def test_held_child_requires_exactly_one_complete_namespace_record(self) -> None:
+        setup = json.dumps(self.namespace_report).encode()
+        with TemporaryDirectory() as directory:
+            report = Path(directory) / "namespaces.json"
+            for invalid in (
+                setup,
+                setup + b'\n{"exit-code": 1}\n',
+                setup + b"\n\n",
+                b'{"child-pid": 99, ' + setup[1:] + b"\n",
+            ):
+                with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                    report.write_bytes(invalid)
+                    _read_namespace_report(report)
+
+    def test_reports_exec_boundary_only_for_matching_complete_terminal_record(self) -> None:
+        setup = json.dumps(self.namespace_report).encode() + b"\n"
+        with TemporaryDirectory() as directory:
+            report = Path(directory) / "namespaces.json"
+            for code in (0, 1, 159):
+                with self.subTest(code=code):
+                    report.write_bytes(setup + json.dumps({"exit-code": code}).encode() + b"\n")
+                    self.assertEqual(_exec_boundary_status(report, code), "exec-boundary-reported")
+
+            for invalid in (
+                b"",
+                setup,
+                setup + b'{"exit-code": 2}\n',
+                setup + b'{"exit-code": true}\n',
+                setup + b'{"exit-code": -31}\n',
+                setup + b'{"exit-code": 256}\n',
+                setup + b'{"exit-code": 1, "exit-code": 1}\n',
+                setup + b'{"exit-code": 1, "extra": "protected"}\n',
+                setup + b'{"exit-code": 1}',
+                setup + b'{"exit-code": 1}\n\n',
+                b'{"child-pid": 41}\n{"exit-code": 1}\n',
+                b'{"exit-code": 1}\n',
+                setup + b" " * _CAPTURE_BYTES + b'{"exit-code": 1}\n',
+            ):
+                with self.subTest(invalid=invalid[:60]):
+                    report.write_bytes(invalid)
+                    self.assertEqual(_exec_boundary_status(report, 1), "exec-boundary-unconfirmed")
+
+            report.unlink()
+            self.assertEqual(_exec_boundary_status(report, 1), "exec-boundary-unconfirmed")
 
 
 class FixtureFailureTest(unittest.TestCase):
@@ -316,7 +364,9 @@ class ParserSandboxTest(unittest.TestCase):
         ready = root / "child-ready"
         while not ready.exists() or ready.stat().st_size == 0:
             if (returncode := process.poll()) is not None:
-                self.fail(_fixture_failure(root, "before-child-ready", returncode=returncode))
+                failure = _fixture_failure(root, "before-child-ready", returncode=returncode)
+                boundary = _exec_boundary_status(root / "namespaces.json", returncode)
+                self.fail(f"{failure} {boundary}.")
             if time.monotonic() >= deadline:
                 self.fail(_fixture_failure(root, "child-ready-timeout"))
             time.sleep(0.02)
@@ -425,12 +475,39 @@ def _apparmor(process: Path = Path("/proc/self")) -> str:
     return (process / "attr/current").read_text().strip()
 
 
-def _read_namespace_report(path: Path) -> dict[str, int]:
+def _exec_boundary_status(path: Path, returncode: int) -> str:
+    # The pinned monitor can omit the record. A report does not prove the exec succeeded.
+    try:
+        _read_namespace_report(path, expected_exit=returncode)
+    except (OSError, ValueError):
+        return "exec-boundary-unconfirmed"
+    return "exec-boundary-reported"
+
+
+def _unique_report_fields(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    fields = dict(pairs)
+    if len(fields) != len(pairs):
+        raise ValueError("Duplicate Bubblewrap report field.")
+    return fields
+
+
+def _read_namespace_report(path: Path, *, expected_exit: int | None = None) -> dict[str, int]:
     with path.open("rb") as capture:
         data = capture.read(_CAPTURE_BYTES + 1)
     if len(data) > _CAPTURE_BYTES:
         raise ValueError("The sandbox probe exceeded its capture limit.")
-    report: object = json.loads(data)
+    records = data.split(b"\n")
+    if len(records) != (2 if expected_exit is None else 3) or records[-1]:
+        raise ValueError("Incomplete Bubblewrap namespace report.")
+    try:
+        report: object = json.loads(records[0], object_pairs_hook=_unique_report_fields)
+        terminal: object = (
+            json.loads(records[1], object_pairs_hook=_unique_report_fields)
+            if expected_exit is not None
+            else None
+        )
+    except (ValueError, RecursionError):
+        raise ValueError("Invalid Bubblewrap namespace report.") from None
     if type(report) is not dict:
         raise ValueError("Incomplete Bubblewrap namespace report.")
     values = cast("dict[str, object]", report)
@@ -438,6 +515,17 @@ def _read_namespace_report(path: Path) -> dict[str, int]:
         type(value) is not int or value <= 0 for value in values.values()
     ):
         raise ValueError("Incomplete Bubblewrap namespace report.")
+    if expected_exit is not None:
+        if type(terminal) is not dict:
+            raise ValueError("Invalid Bubblewrap terminal report.")
+        fields = cast("dict[str, object]", terminal)
+        if (
+            set(fields) != {"exit-code"}
+            or type(code := fields["exit-code"]) is not int
+            or not 0 <= code <= 255
+            or code != expected_exit
+        ):
+            raise ValueError("Invalid Bubblewrap terminal report.")
     return cast("dict[str, int]", report)
 
 
@@ -556,7 +644,7 @@ def _owner(root: Path, mode: str) -> int:
             "--new-session",
             "--die-with-parent",
             "--clearenv",
-            "--info-fd",
+            "--json-status-fd",
             str(report.fileno()),
         ]
         for path in ("/usr/local", "/usr/lib/x86_64-linux-gnu", "/lib64/ld-linux-x86-64.so.2"):
