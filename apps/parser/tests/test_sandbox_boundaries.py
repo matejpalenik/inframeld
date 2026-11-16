@@ -298,6 +298,26 @@ class ParserSandboxTest(unittest.TestCase):
         with self.assertRaises(PermissionError):
             Path("/probe-denied").read_bytes()
 
+    def test_python_starts_with_fixed_policy(self) -> None:
+        with TemporaryDirectory(dir="/tmp") as directory:
+            root = Path(directory)
+            deadline = time.monotonic() + _WORK_SECONDS
+            process = _start_owner(root, "launch")
+            cleanup_deadline: float | None = None
+            try:
+                try:
+                    status = process.wait(timeout=max(0.0, deadline - time.monotonic()))
+                except subprocess.TimeoutExpired:
+                    raise AssertionError(_fixture_failure(root, "python-start-timeout")) from None
+                cleanup_deadline = time.monotonic() + _CLEANUP_SECONDS
+                with (root / "child-ready").open("rb") as captured:
+                    entered = captured.read(16) == b"python-started\n"
+                print("Python entry observed." if entered else "Python entry unconfirmed.", flush=True)
+                self.assertTrue(entered, _fixture_failure(root, "python-start", returncode=status))
+                self.assertEqual(status, 0, _fixture_failure(root, "python-exit", returncode=status))
+            finally:
+                _stop_owner(process, cleanup_deadline)
+
     def test_fixed_child_observes_new_namespaces_and_denied_effects(self) -> None:
         with TemporaryDirectory(dir="/tmp") as directory:
             root = Path(directory)
@@ -410,7 +430,7 @@ def _start_owner(root: Path, mode: str) -> subprocess.Popen[bytes]:
         with os.fdopen(descriptor, "wb") as diagnostics:
             return subprocess.Popen(
                 [sys.executable, "-IB", __file__, "--owner", str(root), mode],
-                stdin=subprocess.PIPE if mode == "once" else subprocess.DEVNULL,
+                stdin=subprocess.PIPE if mode in ("once", "launch") else subprocess.DEVNULL,
                 stdout=subprocess.DEVNULL,
                 stderr=diagnostics,
                 env={**os.environ, "LC_ALL": "C"},
@@ -658,19 +678,22 @@ def _owner(root: Path, mode: str) -> int:
             ("--seccomp", str(policy.fileno())),
         ):
             arguments.extend(option)
-        arguments.extend(
-            [
-                "--",
-                _CHILD_PYTHON,
-                "-IB",
-                "/fixture/test_sandbox_boundaries.py",
-                "--child",
-                str(root),
-                str(control.fileno()),
-                str(report.fileno()),
-                mode,
-            ]
-        )
+        if mode == "launch":
+            arguments.extend(["--", _CHILD_PYTHON, "-IB", "-c", 'print("python-started", flush=True)'])
+        else:
+            arguments.extend(
+                [
+                    "--",
+                    _CHILD_PYTHON,
+                    "-IB",
+                    "/fixture/test_sandbox_boundaries.py",
+                    "--child",
+                    str(root),
+                    str(control.fileno()),
+                    str(report.fileno()),
+                    mode,
+                ]
+            )
         with subprocess.Popen(
             arguments,
             stdout=ready,
@@ -752,7 +775,7 @@ def _require_namespace_syscalls_denied() -> None:
 
 if __name__ == "__main__":
     match sys.argv[1:]:
-        case ["--owner", root, ("once" | "hold") as mode]:
+        case ["--owner", root, ("once" | "hold" | "launch") as mode]:
             try:
                 raise SystemExit(_owner(Path(root), mode))
             except OSError:

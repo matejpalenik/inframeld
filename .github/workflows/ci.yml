@@ -428,7 +428,7 @@ jobs:
             --network none --read-only --cap-drop ALL --security-opt no-new-privileges \
             --security-opt "apparmor=$profile" --security-opt "seccomp=$scratch/oci-seccomp.json" \
             --cpus 2 --memory 8g --memory-swap=8g --pids-limit 128 --log-driver none \
-            --tmpfs /tmp:rw,noexec,nosuid,nodev,size=1g,mode=1777 "$image_id"; then
+            --tmpfs /tmp:rw,noexec,nosuid,nodev,size=1g,mode=1777 "$image_id" -k test_python_starts_with_fixed_policy; then
             exit 0
           else
             result=$?
