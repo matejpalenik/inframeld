@@ -4,6 +4,7 @@ import ctypes
 import errno
 import json
 import os
+import re
 import resource
 import select
 import socket
@@ -238,6 +239,34 @@ class NamespaceReportTest(unittest.TestCase):
             self.assertEqual(_exec_boundary_status(report, 1), "exec-boundary-unconfirmed")
 
 
+class NamespaceIdentityTest(unittest.TestCase):
+    def test_reads_exact_kernel_link_identity_without_following_it(self) -> None:
+        with TemporaryDirectory() as directory:
+            process = Path(directory)
+            link = process / "ns" / "mnt"
+            link.parent.mkdir()
+            link.symlink_to("mnt:[4026531840]")
+            self.assertEqual(_namespace(process, "mnt", role="child"), 4026531840)
+
+            for target in ("pid:[41]", "mnt:[0]", "mnt:[+41]", "mnt:[４１]", "mnt:[41]\n"):
+                with (
+                    self.subTest(target=target),
+                    self.assertRaisesRegex(
+                        AssertionError, "namespace-link-invalid namespace=mnt role=child"
+                    ),
+                ):
+                    link.unlink()
+                    link.symlink_to(target)
+                    _namespace(process, "mnt", role="child")
+
+            link.unlink()
+            with self.assertRaisesRegex(
+                AssertionError,
+                rf"namespace-unavailable namespace=mnt role=init errno={errno.ENOENT}",
+            ):
+                _namespace(process, "mnt", role="init")
+
+
 class FixtureFailureTest(unittest.TestCase):
     def test_reports_fixed_mapping_operation_and_permission_classes(self) -> None:
         with TemporaryDirectory() as directory:
@@ -409,19 +438,9 @@ class ParserSandboxTest(unittest.TestCase):
         # Bubblewrap can omit inodes during setup. Verify both held processes directly.
         outer = Path("/proc/self")
         for namespace in (*_SETUP_NAMESPACES, "user"):
-            try:
-                outer_id = _namespace(outer, namespace)
-                init_id = _namespace(init_process, namespace)
-                actual_id = _namespace(actual, namespace)
-            except OSError as error:
-                category = (
-                    "namespace-permission"
-                    if isinstance(error, PermissionError)
-                    else "namespace-unavailable"
-                )
-                raise AssertionError(
-                    f"Parser sandbox stage=child-observation category={category} namespace={namespace}."
-                ) from None
+            outer_id = _namespace(outer, namespace, role="supervisor")
+            init_id = _namespace(init_process, namespace, role="init")
+            actual_id = _namespace(actual, namespace, role="child")
             if (
                 min(outer_id, init_id, actual_id) <= 0
                 or actual_id != init_id
@@ -490,8 +509,28 @@ def _children(pid: int) -> tuple[int, ...]:
     )
 
 
-def _namespace(process: Path, name: str) -> int:
-    return (process / "ns" / name).stat().st_ino
+def _namespace(process: Path, name: str, *, role: str) -> int:
+    context = f"namespace={name} role={role}"
+    try:
+        # The kernel checks access when reading the proc namespace link.
+        target = os.readlink(process / "ns" / name)
+    except OSError as error:
+        category = (
+            "namespace-permission"
+            if isinstance(error, PermissionError)
+            else "namespace-unavailable"
+        )
+        detail = f" errno={error.errno}" if error.errno is not None else ""
+        raise AssertionError(
+            f"Parser sandbox stage=child-observation category={category} {context}{detail}."
+        ) from None
+
+    match = re.fullmatch(rf"{re.escape(name)}:\[([1-9][0-9]*)\]", target)
+    if match is None:
+        raise AssertionError(
+            f"Parser sandbox stage=child-observation category=namespace-link-invalid {context}."
+        )
+    return int(match[1])
 
 
 def _session(pid: int) -> int:
