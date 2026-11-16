@@ -796,20 +796,26 @@ def _child(root: Path, control_fd: int, report_fd: int, mode: str) -> None:
         raise AssertionError("The child resolved an external name.")
     _require_namespace_syscalls_denied()
 
-    reader, writer = os.pipe()
+    ready_reader, ready_writer = os.pipe()
+    # Each held process keeps a hold writer open so peer death cannot release it by EOF.
+    hold = os.pipe() if mode == "hold" else None
     descendant = os.fork()
     if descendant == 0:
+        os.close(ready_reader)
         os.setsid()
-        os.write(writer, b"r")
-        if mode == "hold":
-            os.read(reader, 1)
+        os.write(ready_writer, b"r")
+        os.close(ready_writer)
+        if hold is not None:
+            os.read(hold[0], 1)
         os._exit(0)
-    assert os.read(reader, 1) == b"r"
+    os.close(ready_writer)
+    assert os.read(ready_reader, 1) == b"r"
+    os.close(ready_reader)
     if mode == "once":
         assert os.waitpid(descendant, 0) == (descendant, 0)
     assert os.write(sys.stdout.fileno(), b"ready\n") == len(b"ready\n")
-    if mode == "hold":
-        os.read(reader, 1)
+    if hold is not None:
+        os.read(hold[0], 1)
     else:
         assert os.read(sys.stdin.fileno(), 1) == b"r"
 
