@@ -644,6 +644,10 @@ def _owner(root: Path, mode: str) -> int:
             "--new-session",
             "--die-with-parent",
             "--clearenv",
+            # glibc needs the fixed Python origin when the child has no /proc/self/exe.
+            "--setenv",
+            "LD_ORIGIN_PATH",
+            "/usr/local/bin",
             "--json-status-fd",
             str(report.fileno()),
         ]
