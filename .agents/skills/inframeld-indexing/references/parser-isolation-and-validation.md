@@ -167,6 +167,8 @@ An offline Linux ARM64 component check used Python 3.13.18, Docling Slim 2.148.0
 
 The check loaded the verified local `tokenizer.json` with `tokenizers.Tokenizer.from_file`, disabled the file's fixed padding and 128-token truncation, and supplied the tokenizer explicitly to Docling's `HybridChunker`. It verified a 1,024-content-token limit that excludes the tokenizer's `[CLS]` and `[SEP]` markers. A 1,024-token paragraph stayed in one chunk, and a 1,025-token paragraph split without losing content. The production Ubuntu x86-64 sandbox and untrusted-input limits still require the supported-profile qualification.
 
+The private [PDF converter](../../../../apps/parser/src/inframeld_parser/pdf_conversion.py) converts one local text-native PDF to versioned canonical text with code-point block and table-cell spans. Native figure text keeps its source coordinates, and a formula found only in Docling's original-text field causes conversion to fail. The converter checks the pinned manifest and asset files before loading Docling, and returns a digest of the source bytes it actually consumed. In the existing trusted offline fixture, with the parser source on the Python path, call `convert_pdf(Path("/specimen/inventory.pdf"), asset_root=Path("/assets"), manifest=Path("/qualification/docling-parser-v1.json"))`. Import `Path` from `pathlib` and `convert_pdf` from `inframeld_parser.pdf_conversion`. The fixture tests call the same converter for the ruled table and repository Alice excerpt. The supervisor, supported Ubuntu sandbox, attempt binding, worker validation and mapped chunk publication remain separate acceptance work.
+
 <a id="bound-work-and-validate-output"></a>
 
 <a id="limits"></a>
