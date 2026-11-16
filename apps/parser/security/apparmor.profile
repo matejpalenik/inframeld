@@ -50,6 +50,8 @@ profile inframeld-parser-probe flags=(mediate_deleted) {
   pivot_root oldroot=/tmp/oldroot/ /tmp/,
   mount options=(rbind) /oldroot/proc/ -> /proc/,
   mount fstype=tmpfs -> /newroot/scratch/,
+  # The setup descriptor reaches mountinfo through the old root during remounts.
+  owner /oldroot/proc/[0-9]*/mountinfo r,
   /oldroot/usr/local/ r,
   /oldroot/usr/lib/x86_64-linux-gnu/ r,
   /oldroot/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2 r,
