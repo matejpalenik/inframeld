@@ -3,6 +3,14 @@ name: CI
 on:
   pull_request:
   workflow_dispatch:
+    inputs:
+      parser_sandbox_only:
+        description: Run only the reviewed Ubuntu parser sandbox probe
+        type: boolean
+        default: false
+      parser_sandbox_sha:
+        description: Exact reviewed commit for the parser sandbox probe
+        type: string
   push:
     branches:
       - main
@@ -11,7 +19,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}${{ github.event_name == 'workflow_dispatch' && inputs.parser_sandbox_only && '-parser-sandbox' || '' }}
   cancel-in-progress: true
 
 env:
@@ -27,12 +35,13 @@ env:
 
 jobs:
   changes:
+    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.parser_sandbox_only) }}
     uses: ./.github/workflows/changes.yml
 
   quality:
-    name: Quality
+    name: ${{ github.event_name == 'workflow_dispatch' && inputs.parser_sandbox_only && 'Quality (outside parser probe)' || 'Quality' }}
     needs: changes
-    if: ${{ !cancelled() }}
+    if: ${{ !cancelled() && !(github.event_name == 'workflow_dispatch' && inputs.parser_sandbox_only) }}
     runs-on: ubuntu-26.04
     timeout-minutes: 15
     env:
@@ -200,9 +209,9 @@ jobs:
         run: echo 'Application checks were not required. Formatting, commit and delivery helper tests applied.' >> "$GITHUB_STEP_SUMMARY"
 
   backend:
-    name: Backend foundation
+    name: ${{ github.event_name == 'workflow_dispatch' && inputs.parser_sandbox_only && 'Backend foundation (outside parser probe)' || 'Backend foundation' }}
     needs: [changes, quality]
-    if: ${{ !cancelled() }}
+    if: ${{ !cancelled() && !(github.event_name == 'workflow_dispatch' && inputs.parser_sandbox_only) }}
     runs-on: ubuntu-26.04
     timeout-minutes: 95
     env:
@@ -294,3 +303,165 @@ jobs:
             esac
           done
           docker volume inspect inframeld_test_postgres_data inframeld_test_kratos_postgres_data >/dev/null
+
+  parser-sandbox:
+    name: Ubuntu parser sandbox probe
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.parser_sandbox_only }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Require the reviewed Inframeld branch commit
+        env:
+          REVIEWED_SHA: ${{ inputs.parser_sandbox_sha }}
+        run: |
+          test "$GITHUB_REPOSITORY" = matejpalenik/inframeld
+          test "$GITHUB_REF_TYPE" = branch
+          test "$REVIEWED_SHA" = "$GITHUB_SHA"
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Exercise the fixed child on stock Docker and enforcing AppArmor
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(uname -m)" = x86_64
+          . /etc/os-release
+          test "$ID/$VERSION_ID" = ubuntu/24.04
+          test "$(cat /sys/module/apparmor/parameters/enabled)" = Y
+          test -z "${DOCKER_HOST:-}"
+          test "$(docker context show)" = default
+          test "$(docker info --format '{{.CgroupVersion}}')" = 2
+          docker version --format 'Docker server {{.Server.Version}} on {{.Server.Os}}/{{.Server.Arch}}'
+          uname -r
+
+          probe="inframeld-parser-probe-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          image="$probe:local"
+          profile=inframeld-parser-probe
+          policy=apps/parser/security/apparmor.profile
+          container_ids() {
+            timeout 10s docker ps -aq --filter "name=^/$probe$"
+          }
+          image_ids() {
+            timeout 10s docker image ls -q "$image"
+          }
+          profile_entries() {
+            local entries
+            entries="$(timeout 10s sudo -n cat /sys/kernel/security/apparmor/profiles)" || return 1
+            grep -E "^${profile} " <<< "$entries" || test "$?" = 1
+          }
+          remaining="$(container_ids)"
+          test -z "$remaining"
+          remaining="$(image_ids)"
+          test -z "$remaining"
+          remaining="$(profile_entries)"
+          test -z "$remaining"
+
+          scratch="$(mktemp -d "$RUNNER_TEMP/parser-sandbox.XXXXXXXX")"
+          cleanup() {
+            local result=$? clean=0 owned
+            trap - EXIT
+            set +e
+            owned="$(container_ids)" || clean=1
+            if [[ -n "$owned" ]]; then
+              printf 'Parser probe required emergency container removal.\n' >&2
+              timeout 10s docker rm --force "$probe" >/dev/null || clean=1
+              result=1
+            fi
+            owned="$(image_ids)" || clean=1
+            if [[ -n "$owned" ]]; then
+              timeout 10s docker image rm "$image" >/dev/null || clean=1
+            fi
+            owned="$(profile_entries)" || clean=1
+            if [[ -n "$owned" ]]; then
+              timeout 10s sudo -n apparmor_parser --skip-cache --remove "$policy" || clean=1
+            fi
+            owned="$(container_ids)" && test -z "$owned" || clean=1
+            owned="$(image_ids)" && test -z "$owned" || clean=1
+            owned="$(profile_entries)" && test -z "$owned" || clean=1
+            rm -rf -- "$scratch" && test ! -e "$scratch" || clean=1
+            if (( clean )); then
+              printf 'Parser probe cleanup could not be confirmed.\n' >&2
+              exit 1
+            fi
+            printf 'Parser probe container, image tag, AppArmor profile and scratch are absent.\n'
+            exit "$result"
+          }
+          trap cleanup EXIT
+          trap 'exit 130' INT
+          trap 'exit 143' TERM
+
+          mkdir "$scratch/sources"
+          curl --proto '=https' --proto-redir '=https' --fail --silent --show-error --location \
+            --max-time 45 --max-filesize 262144 \
+            --output "$scratch/sources/bubblewrap-0.13.1.tar.xz" \
+            https://github.com/containers/bubblewrap/releases/download/v0.13.1/bubblewrap-0.13.1.tar.xz
+          curl --proto '=https' --proto-redir '=https' --fail --silent --show-error --location \
+            --max-time 45 --max-filesize 262144 --output "$scratch/moby-seccomp.json" \
+            https://raw.githubusercontent.com/moby/moby/v28.0.4/profiles/seccomp/default.json
+          echo "0e85c8702248b8dd64144f594147553650cdd0e4c951690345faace79c217c4d  $scratch/sources/bubblewrap-0.13.1.tar.xz" | sha256sum --check
+          python3 -IB - "$scratch" <<'PY'
+          import json
+          import runpy
+          import sys
+          from pathlib import Path
+
+          scratch = Path(sys.argv[1])
+          delta = json.loads(Path("apps/parser/security/oci-seccomp.json").read_bytes())
+          compose = runpy.run_path("apps/parser/tests/test_sandbox_boundaries.py")["compose_oci_profile"]
+          policy = compose((scratch / "moby-seccomp.json").read_bytes(), delta)
+          (scratch / "oci-seccomp.json").write_text(json.dumps(policy))
+          PY
+          sha256sum "$policy" "$scratch/oci-seccomp.json" apps/parser/security/child-seccomp.c
+          timeout --kill-after=5s 300s docker buildx build --platform linux/amd64 --load --no-cache \
+            --build-context "parser_sources=$scratch/sources" --tag "$image" \
+            --file apps/parser/Dockerfile .
+          test "$(docker image inspect --format '{{.Os}}/{{.Architecture}}' "$image")" = linux/amd64
+          image_id="$(docker image inspect --format '{{.Id}}' "$image")"
+          printf 'Parser probe image %s\n' "$image_id"
+
+          timeout 10s sudo -n apparmor_parser --skip-cache --add "$policy"
+          test "$(profile_entries)" = "$profile (enforce)"
+          audit_since="$(date --utc '+%Y-%m-%d %H:%M:%S.%6N UTC')"
+          if timeout --kill-after=5s 620s docker run --rm --pull=never --name "$probe" \
+            --network none --read-only --cap-drop ALL --security-opt no-new-privileges \
+            --security-opt "apparmor=$profile" --security-opt "seccomp=$scratch/oci-seccomp.json" \
+            --cpus 2 --memory 8g --memory-swap=8g --pids-limit 128 --log-driver none \
+            --tmpfs /tmp:rw,noexec,nosuid,nodev,size=1g,mode=1777 "$image_id"; then
+            exit 0
+          else
+            result=$?
+          fi
+
+          # The journal can omit audit events. Report only fixed matching categories.
+          audit="$(timeout --kill-after=1s 9s bash -o pipefail -s "$audit_since" <<'AUDIT'
+          sudo -n journalctl --boot --since "$1" -n 128 --no-pager --quiet --output=cat \
+            --grep 'apparmor="DENIED"' _TRANSPORT=kernel _TRANSPORT=audit 2>/dev/null |
+            LC_ALL=C awk '
+              !/(^|[[:space:]])apparmor="DENIED"([[:space:]]|$)/ ||
+              !/(^|[[:space:]])profile="inframeld-parser-probe"([[:space:]]|$)/ ||
+              !/(^|[[:space:]])comm="bwrap"([[:space:]]|$)/ { next }
+              / name="\/?proc\/([[:digit:]]+|self|thread-self)\/uid_map"([[:space:]]|$)/ { uid = 1 }
+              / name="\/?proc\/([[:digit:]]+|self|thread-self)\/gid_map"([[:space:]]|$)/ { gid = 1 }
+              / name="\/?proc\/([[:digit:]]+|self|thread-self)\/setgroups"([[:space:]]|$)/ { groups = 1 }
+              / name="\/?(proc|oldroot\/proc)\/?"([[:space:]]|$)/ { proc_open = 1 }
+              / name="\/?(oldroot|newroot|tmp\/(oldroot|newroot))(\/[^"]*)?"([[:space:]]|$)/ { setup_path = 1 }
+              / operation="(mount|umount|pivotroot)"([[:space:]]|$)/ { mount = 1 }
+              / info="Failed name lookup - disconnected path"([[:space:]]|$)/ { disconnected = 1 }
+              / operation="capable"([[:space:]]|$)/ { capability = 1 }
+              END {
+                if (uid) print "Parser probe kernel audit: uid-map-denied"
+                if (gid) print "Parser probe kernel audit: gid-map-denied"
+                if (groups) print "Parser probe kernel audit: setgroups-denied"
+                if (proc_open) print "Parser probe kernel audit: setup-proc-denied"
+                if (setup_path) print "Parser probe kernel audit: setup-path-denied"
+                if (mount) print "Parser probe kernel audit: mount-denied"
+                if (disconnected) print "Parser probe kernel audit: disconnected-path-denied"
+                if (capability) print "Parser probe kernel audit: capability-denied"
+              }
+            '
+          AUDIT
+          )" || audit=""
+          printf '%s\n' "${audit:-Parser probe kernel audit: unknown}"
+          exit "$result"
