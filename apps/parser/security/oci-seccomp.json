@@ -1,0 +1,22 @@
+{
+  "baseline": {
+    "url": "https://raw.githubusercontent.com/moby/moby/v28.0.4/profiles/seccomp/default.json",
+    "sha256": "9c1025c88ccaa517b648da571961838744ea2137f176bfe6a48b21294cae9c76"
+  },
+  "addSyscalls": [
+    {
+      "names": ["clone"],
+      "action": "SCMP_ACT_ALLOW",
+      "args": [{ "index": 0, "value": 2013397009, "op": "SCMP_CMP_EQ" }]
+    },
+    {
+      "names": ["mount", "umount2", "pivot_root"],
+      "action": "SCMP_ACT_ALLOW"
+    },
+    {
+      "names": ["mount_setattr"],
+      "action": "SCMP_ACT_ERRNO",
+      "errnoRet": 38
+    }
+  ]
+}
