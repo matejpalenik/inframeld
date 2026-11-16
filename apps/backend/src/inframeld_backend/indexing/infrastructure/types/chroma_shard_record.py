@@ -40,6 +40,8 @@ class ChromaShardRecord:
             key, value = entry
             if type(key) is not str or not key:
                 raise ValueError("Chroma metadata requires nonempty keys.")
+            if key.startswith(("chroma:", "#", "$")):
+                raise ValueError("Chroma metadata keys must avoid reserved prefixes.")
             if (
                 type(value) not in (str, bool, int, float)
                 or (type(value) is int and not -(2**63) <= value < 2**63)

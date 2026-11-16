@@ -186,6 +186,31 @@ async def test_add_sends_explicit_vectors_and_read_returns_only_observed_ids(
 
 
 @pytest.mark.asyncio
+async def test_read_preserves_mixed_empty_and_populated_metadata(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _respond(
+        monkeypatch,
+        lambda _: _response(
+            200,
+            b'{"ids":["empty","populated"],"embeddings":[[1.0],[2.0]],'
+            b'"metadatas":[null,{"Chroma:label":"support","interior#$":true}]}',
+        ),
+    )
+
+    found = await ChromaShardStorage(_ORIGIN).read(_ID, ("populated", "empty"), dimensions=1)
+
+    assert found == {
+        "empty": ChromaShardRecord(record_id="empty", vector=pack("<f", 1.0), metadata=()),
+        "populated": ChromaShardRecord(
+            record_id="populated",
+            vector=pack("<f", 2.0),
+            metadata=(("Chroma:label", "support"), ("interior#$", True)),
+        ),
+    }
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "body",
     [
@@ -198,7 +223,11 @@ async def test_add_sends_explicit_vectors_and_read_returns_only_observed_ids(
         b'{"ids":["first"],"embeddings":[[1.0,1e50,3.0]],"metadatas":[{}]}',
         b'{"ids":["first"],"embeddings":[[1.0,2.0,3.0]],"metadatas":[{"a":1,"a":2}]}',
         b'{"ids":["first"],"embeddings":[[1.0,2.0,3.0]],"metadatas":[{"a":[] }]}',
-        b'{"ids":["first"],"embeddings":[[1.0,2.0,3.0]],"metadatas":[null]}',
+        b'{"ids":["first"],"embeddings":[[1.0,2.0,3.0]]}',
+        b'{"ids":["first"],"embeddings":[[1.0,2.0,3.0]],"metadatas":null}',
+        b'{"ids":["first"],"embeddings":[[1.0,2.0,3.0]],"metadatas":[]}',
+        b'{"ids":["first"],"embeddings":[[1.0,2.0,3.0]],"metadatas":[[]]}',
+        b'{"ids":["first"],"embeddings":[[1.0,2.0,3.0]],"metadatas":[{"a":null}]}',
     ],
 )
 async def test_read_rejects_malformed_identity_shape_and_values(
@@ -282,6 +311,19 @@ async def test_invalid_inputs_reject_before_transport(monkeypatch: pytest.Monkey
         with pytest.raises(ChromaShardStorageError) as failure:
             await operation()
         assert not failure.value.write_outcome_unknown
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("key", ["chroma:internal", "#internal", "$internal"])
+async def test_reserved_metadata_keys_reject_before_transport(
+    monkeypatch: pytest.MonkeyPatch, key: str
+) -> None:
+    def unexpected(_: httpx.Request) -> httpx.Response:
+        pytest.fail("A reserved metadata key reached the transport.")
+
+    _respond(monkeypatch, unexpected)
+    with pytest.raises(ValueError, match="Chroma metadata keys must avoid reserved prefixes"):
+        await ChromaShardStorage(_ORIGIN).add(_ID, (replace(_RECORD, metadata=((key, "value"),)),))
 
 
 @pytest.mark.asyncio

@@ -313,10 +313,12 @@ class ChromaShardStorage:
                 raise ValueError("Unexpected Chroma float32 vector shape.")
 
             metadata: list[tuple[str, str | bool | int | float]] = []
-            for key, value in cls._object(raw_metadata).items():
-                if not isinstance(value, str | bool | int | float):
-                    raise ValueError("Unexpected Chroma metadata value.")
-                metadata.append((key, value))
+            # Chroma encodes an empty record's metadata as null within the required column.
+            if raw_metadata is not None:
+                for key, value in cls._object(raw_metadata).items():
+                    if not isinstance(value, str | bool | int | float):
+                        raise ValueError("Unexpected Chroma metadata value.")
+                    metadata.append((key, value))
             records[record_id] = ChromaShardRecord(
                 record_id=record_id,
                 vector=pack(f"<{dimensions}f", *cast(list[float], embedding)),
