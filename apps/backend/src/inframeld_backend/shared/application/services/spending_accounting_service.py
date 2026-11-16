@@ -110,35 +110,44 @@ class SpendingAccountingService(SpendingAccountant):
             if current.cancel_requested:
                 raise JobStoppedError("Canceled work cannot reserve a new call.")
             policy = await self._lock_account(call)
-            await self._spending_ledger_writer.ensure_operation(
-                call=call, operation_limit=operation_limit
-            )
-            existing = await self._find_call(call)
-            if existing is not None:
-                self._require_binding(existing, call)
-                if existing.basis != basis or existing.operation_limit != operation_limit:
-                    raise ConflictError("Original call reservation meaning changed.")
-                return SpendingAccountingResultDTO(existing, recovered=True)
-            amount = self._cost(basis, None if basis is None else basis.maximum_usage)
-            record = SpendingCallRecordDTO(
-                call_id=call.call_id,
-                operation_id=call.operation_id,
-                authority=call.authority,
-                job_id=call.attempt.job_id,
-                meaning_fingerprint=call.meaning_fingerprint,
-                period=SpendingPeriod.from_instant(policy.observed_at),
-                operation_limit=operation_limit,
-                basis=basis,
-                reserved_amount=amount,
-                hold_amount=amount,
-                settled_amount=None,
-                state=SpendingCallState.RESERVED,
-                revision=0,
-                reservation_policy_revision=policy.revision,
-            )
-            await self._require_allowance(policy, record, amount)
-            await self._spending_ledger_writer.insert_call(record)
-            return SpendingAccountingResultDTO(record)
+            return await self._reserve(call, basis, operation_limit, policy)
+
+    async def _reserve(
+        self,
+        call: SpendingCallContextDTO,
+        basis: CapturedSpendingBasisDTO | None,
+        operation_limit: UsdAmount | None,
+        policy: ProjectSpendingPolicyDTO,
+    ) -> SpendingAccountingResultDTO:
+        await self._spending_ledger_writer.ensure_operation(
+            call=call, operation_limit=operation_limit
+        )
+        existing = await self._find_call(call)
+        if existing is not None:
+            self._require_binding(existing, call)
+            if existing.basis != basis or existing.operation_limit != operation_limit:
+                raise ConflictError("Original call reservation meaning changed.")
+            return SpendingAccountingResultDTO(existing, recovered=True)
+        amount = self._cost(basis, None if basis is None else basis.maximum_usage)
+        record = SpendingCallRecordDTO(
+            call_id=call.call_id,
+            operation_id=call.operation_id,
+            authority=call.authority,
+            job_id=call.attempt.job_id,
+            meaning_fingerprint=call.meaning_fingerprint,
+            period=SpendingPeriod.from_instant(policy.observed_at),
+            operation_limit=operation_limit,
+            basis=basis,
+            reserved_amount=amount,
+            hold_amount=amount,
+            settled_amount=None,
+            state=SpendingCallState.RESERVED,
+            revision=0,
+            reservation_policy_revision=policy.revision,
+        )
+        await self._require_allowance(policy, record, amount)
+        await self._spending_ledger_writer.insert_call(record)
+        return SpendingAccountingResultDTO(record)
 
     @override
     async def approve_accounting(
@@ -150,23 +159,49 @@ class SpendingAccountingService(SpendingAccountant):
             if current.cancel_requested:
                 raise JobStoppedError("Canceled work cannot receive accounting approval.")
             policy = await self._lock_account(call)
-            record = await self._require_call(call)
-            if record.state is SpendingCallState.ACCOUNTING_APPROVED:
-                return SpendingAccountingResultDTO(record, recovered=True)
-            self._require_revision(record, expected_call_revision)
-            if record.state is not SpendingCallState.RESERVED:
-                raise ConflictError(
-                    "An unresolved or completed call cannot receive accounting approval."
-                )
-            await self._require_allowance(policy, record, record.hold_amount, exclude_self=True)
-            updated = replace(
-                record,
-                state=SpendingCallState.ACCOUNTING_APPROVED,
-                approved_policy_revision=policy.revision,
-                revision=SpendingAccountingService._next_revision(record.revision),
+            return await self._approve_accounting(
+                call, expected_call_revision, policy, recover=True
             )
-            await self._spending_ledger_writer.save_call(updated, expected_revision=record.revision)
-            return SpendingAccountingResultDTO(updated)
+
+    async def prepare_new_dispatch_in_transaction(
+        self,
+        *,
+        call: SpendingCallContextDTO,
+        basis: CapturedSpendingBasisDTO,
+        operation_limit: UsdAmount | None,
+    ) -> SpendingAccountingResultDTO:
+        """Reserve and freshly approve within the caller's checked issuance transaction."""
+        if operation_limit is not None and operation_limit.value < 0:
+            raise ValueError("An operation spending limit cannot be negative.")
+        policy = await self._lock_account(call)
+        reserved = await self._reserve(call, basis, operation_limit, policy)
+        return await self._approve_accounting(call, reserved.record.revision, policy, recover=False)
+
+    async def _approve_accounting(
+        self,
+        call: SpendingCallContextDTO,
+        expected_call_revision: int,
+        policy: ProjectSpendingPolicyDTO,
+        *,
+        recover: bool,
+    ) -> SpendingAccountingResultDTO:
+        record = await self._require_call(call)
+        if recover and record.state is SpendingCallState.ACCOUNTING_APPROVED:
+            return SpendingAccountingResultDTO(record, recovered=True)
+        self._require_revision(record, expected_call_revision)
+        if record.state is not SpendingCallState.RESERVED:
+            raise ConflictError(
+                "An unresolved or completed call cannot receive accounting approval."
+            )
+        await self._require_allowance(policy, record, record.hold_amount, exclude_self=True)
+        updated = replace(
+            record,
+            state=SpendingCallState.ACCOUNTING_APPROVED,
+            approved_policy_revision=policy.revision,
+            revision=SpendingAccountingService._next_revision(record.revision),
+        )
+        await self._spending_ledger_writer.save_call(updated, expected_revision=record.revision)
+        return SpendingAccountingResultDTO(updated)
 
     @override
     async def record_observation(
@@ -176,33 +211,45 @@ class SpendingAccountingService(SpendingAccountant):
         observation: SpendingObservationDTO,
         expected_call_revision: int,
     ) -> SpendingAccountingResultDTO:
+        async with self._transaction_manager.begin():
+            return await self.record_observation_in_transaction(
+                call=call, observation=observation, expected_call_revision=expected_call_revision
+            )
+
+    async def record_observation_in_transaction(
+        self,
+        *,
+        call: SpendingCallContextDTO,
+        observation: SpendingObservationDTO,
+        expected_call_revision: int,
+    ) -> SpendingAccountingResultDTO:
+        """Apply or retain evidence so the caller can commit the matching durable progress."""
         if observation.call_id != call.call_id:
             raise ConflictError("Evidence must identify the original call.")
-        async with self._transaction_manager.begin():
-            await self._admitted_work_authorizer.require_current(call.authority)
-            await self._require_call(call)
-            try:
-                await self._job_ownership.require_current(call.attempt)
-            except JobFenceLostError:
-                await self._job_ownership.require_issued_attempt(call.attempt)
-                # Commit recognized late evidence without changing the hold.
-                await self._lock_account(call)
-                record = await self._require_call(call)
-                return await self._retain_pending(record, observation, expected_call_revision)
+        await self._admitted_work_authorizer.require_current(call.authority)
+        await self._require_call(call)
+        try:
+            await self._job_ownership.require_current(call.attempt)
+        except JobFenceLostError:
+            await self._job_ownership.require_issued_attempt(call.attempt)
+            # Commit recognized late evidence without changing the hold.
             await self._lock_account(call)
             record = await self._require_call(call)
-            recovered = await self._recover_observation(record, observation)
-            if recovered is not None:
-                return recovered
-            self._require_revision(record, expected_call_revision)
-            if record.state in (SpendingCallState.SETTLED, SpendingCallState.RELEASED):
-                return await self._retain_pending(record, observation, expected_call_revision)
-            updated = self._apply_observation(record, observation)
-            await self._spending_ledger_writer.record_observation(
-                record=record, observation=observation, applied_result=updated
-            )
-            await self._spending_ledger_writer.save_call(updated, expected_revision=record.revision)
-            return SpendingAccountingResultDTO(updated)
+            return await self._retain_pending(record, observation, expected_call_revision)
+        await self._lock_account(call)
+        record = await self._require_call(call)
+        recovered = await self._recover_observation(record, observation)
+        if recovered is not None:
+            return recovered
+        self._require_revision(record, expected_call_revision)
+        if record.state in (SpendingCallState.SETTLED, SpendingCallState.RELEASED):
+            return await self._retain_pending(record, observation, expected_call_revision)
+        updated = self._apply_observation(record, observation)
+        await self._spending_ledger_writer.record_observation(
+            record=record, observation=observation, applied_result=updated
+        )
+        await self._spending_ledger_writer.save_call(updated, expected_revision=record.revision)
+        return SpendingAccountingResultDTO(updated)
 
     @override
     async def reconcile(

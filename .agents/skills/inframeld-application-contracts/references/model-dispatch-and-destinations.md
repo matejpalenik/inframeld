@@ -16,6 +16,8 @@ The accepted [PD-CONTRACTS-01](decision-gateway-enforcement.md#approved-resoluti
 
 The initial profile disables automatic redirects, ambient proxies/credentials, router fallbacks and independent SDK/library retries. Preserve verified HTTPS/custom CAs, explicitly allowlisted private routes and the existing credential-free local Ollama HTTP exception. Known not-sent, known response/failure and uncertain dispatch remain distinct. A timeout or cancellation after a possible send never authorizes redispatch. Implementation and hostile-endpoint qualification remain pending.
 
+The private job-backed embedding slice binds one reviewed OpenAI-compatible selection and its exact pretokenized input to the admitted job. One transaction commits current credential checks, the reservation and approval, the permanent issuance, and the job's pending effect. The session closes before provider I/O. The pinned SDK requires the offline process profile with effective logging suppressed and callbacks absent. The transport constructs the selected HTTPS request for an explicit loopback route, verifies the original certificate name against the configured CA, and gives the SDK only validated response fields. The fixture uses controlled pricing and development dependencies. Deployment egress, real tariffs, additional mappings, and product callers remain separate delivery work.
+
 <a id="approve-and-validate-a-destination"></a>
 
 <a id="destinations"></a>
