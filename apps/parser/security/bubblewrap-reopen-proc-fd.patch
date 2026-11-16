@@ -1,0 +1,31 @@
+From cc580a9f4ce744cf5115c1b4f1e44d020f2cfa93 Mon Sep 17 00:00:00 2001
+From: Duncan Overbruck <mail@duncano.de>
+Date: Wed, 29 Jul 2026 18:47:05 +0200
+Subject: [PATCH] bubblewrap: reopen proc_fd from inside namespace
+
+Reopen the /proc file descriptor from inside the namespace to avoid
+AppArmor complaining about the path being disconnected.
+
+Signed-off-by: Duncan Overbruck <mail@duncano.de>
+---
+ bubblewrap.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/bubblewrap.c b/bubblewrap.c
+index 97040fe1..5ede8363 100644
+--- a/bubblewrap.c
++++ b/bubblewrap.c
+@@ -3151,6 +3151,13 @@ main (int    argc,
+       return monitor_child (event_fd, pid, setup_finished_pipe[0]);
+     }
+ 
++  /* Reopen the /proc file descriptor from inside the namespace to avoid
++   * AppArmor complaining about the path being disconnected. */
++  close (proc_fd);
++  proc_fd = TEMP_FAILURE_RETRY (open ("/proc", O_PATH));
++  if (proc_fd == -1)
++    die_with_error ("Can't open /proc");
++
+   if (opt_pidns_fd != -1)
+     {
+       if (setns (opt_pidns_fd, CLONE_NEWPID) != 0)

@@ -10,7 +10,7 @@ from hashlib import file_digest, sha256
 from importlib.metadata import PackageNotFoundError, version
 from io import BufferedReader, BytesIO
 from pathlib import Path
-from typing import TypedDict, cast
+from typing import TYPE_CHECKING, TypedDict, cast
 
 from inframeld_parser.canonical_pdf import (
     CanonicalPdf,
@@ -20,6 +20,10 @@ from inframeld_parser.canonical_pdf import (
     TextBlock,
     canonicalize,
 )
+from inframeld_parser.prose_chunks import ProseChunk, ProseMappingError, map_stock_prose
+
+if TYPE_CHECKING:
+    from docling_core.types.doc import DocItem, DoclingDocument
 
 MAX_INPUT_BYTES = 25 * 1024**2
 _MAX_PAGES = 500
@@ -53,6 +57,43 @@ def convert_pdf(source: Path, *, asset_root: Path, manifest: Path) -> CanonicalP
     The caller owns OS isolation, input path ancestry, and process lifetime.
     Later validation must bind these bytes to the admitted source and attempt.
     """
+    content = _verified_pdf_bytes(source, asset_root=asset_root, manifest=manifest)
+    return _canonical_pdf(content, _docling_blocks(content, asset_root))
+
+
+def convert_pdf_with_prose_chunks(
+    source: Path,
+    *,
+    asset_root: Path,
+    manifest: Path,
+    max_content_tokens: int,
+    merge_peers: bool,
+) -> tuple[CanonicalPdf, tuple[ProseChunk, ...]]:
+    """Return exact stock prose spans and the full canonical parse, including picture text."""
+    if merge_peers is not False:
+        raise PdfConversionError("Verified stock prose mapping requires merge_peers=False.")
+    if type(max_content_tokens) is not int or not 1 <= max_content_tokens <= 1024:
+        raise PdfConversionError("The prose chunk limit must be an integer from 1 to 1024.")
+    content = _verified_pdf_bytes(source, asset_root=asset_root, manifest=manifest)
+    document, pages = _convert_docling(content, asset_root)
+    items: list[DocItem] = []
+
+    def prose_blocks() -> Iterator[TextBlock]:
+        for item, block in _canonical_blocks(document, pages):
+            if isinstance(block, TableBlock):
+                raise PdfConversionError("Verified stock chunk mapping supports plain prose only.")
+            items.append(item)
+            yield block
+
+    artifact = _canonical_pdf(content, prose_blocks())
+    try:
+        chunks = map_stock_prose(document, items, artifact, asset_root, max_content_tokens)
+    except ProseMappingError as error:
+        raise PdfConversionError(str(error)) from None
+    return artifact, chunks
+
+
+def _verified_pdf_bytes(source: Path, *, asset_root: Path, manifest: Path) -> bytes:
     try:
         with _open_regular_file(source) as file:
             content = file.read(MAX_INPUT_BYTES + 1)
@@ -64,10 +105,12 @@ def convert_pdf(source: Path, *, asset_root: Path, manifest: Path) -> CanonicalP
         raise PdfConversionError("The source has no supported PDF header.")
 
     _verify_assets(asset_root, manifest)
+    return content
+
+
+def _canonical_pdf(content: bytes, blocks: Iterator[TextBlock | TableBlock]) -> CanonicalPdf:
     try:
-        return canonicalize(
-            _docling_blocks(content, asset_root), source_sha256=sha256(content).hexdigest()
-        )
+        return canonicalize(blocks, source_sha256=sha256(content).hexdigest())
     except InvalidCanonicalPdf as error:
         raise PdfConversionError(str(error)) from None
 
@@ -125,6 +168,11 @@ def _verify_assets(root: Path, manifest: Path) -> None:
 
 
 def _docling_blocks(content: bytes, asset_root: Path) -> Iterator[TextBlock | TableBlock]:
+    document, pages = _convert_docling(content, asset_root)
+    return (block for _, block in _canonical_blocks(document, pages))
+
+
+def _convert_docling(content: bytes, asset_root: Path) -> tuple["DoclingDocument", int]:
     try:
         if (version("docling-slim"), version("docling-core")) != ("2.148.0", "2.106.0"):
             raise PdfConversionError("The pinned Docling versions are required.")
@@ -148,7 +196,6 @@ def _docling_blocks(content: bytes, asset_root: Path) -> Iterator[TextBlock | Ta
     from docling.datamodel.stage_model_specs import ObjectDetectionModelSpec
     from docling.document_converter import DocumentConverter, PdfFormatOption
     from docling.exceptions import ConversionError
-    from docling_core.types.doc import FormulaItem, RichTableCell, TableItem, TextItem
 
     options = PdfPipelineOptions(
         artifacts_path=asset_root,
@@ -189,8 +236,15 @@ def _docling_blocks(content: bytes, asset_root: Path) -> Iterator[TextBlock | Ta
     pages = result.input.page_count
     if result.status is not ConversionStatus.SUCCESS or not (1 <= pages <= _MAX_PAGES):
         raise PdfConversionError("Docling could not complete the PDF conversion.")
+    return result.document, pages
 
-    for item, _ in result.document.iterate_items(traverse_pictures=True):
+
+def _canonical_blocks(
+    document: "DoclingDocument", pages: int
+) -> Iterator[tuple["DocItem", TextBlock | TableBlock]]:
+    from docling_core.types.doc import FormulaItem, RichTableCell, TableItem, TextItem
+
+    for item, _ in document.iterate_items(traverse_pictures=True):
         if not isinstance(item, (TextItem, TableItem)):
             continue
         locations = tuple(sorted({entry.page_no for entry in item.prov}))
@@ -199,7 +253,7 @@ def _docling_blocks(content: bytes, asset_root: Path) -> Iterator[TextBlock | Ta
         if isinstance(item, FormulaItem) and not item.text and item.orig:
             raise PdfConversionError("A native PDF formula has no supported text representation.")
         if isinstance(item, TextItem):
-            yield TextBlock(item.text, locations)
+            yield item, TextBlock(item.text, locations)
             continue
         cells: list[TableCell] = []
         for cell in item.data.table_cells:
@@ -216,4 +270,4 @@ def _docling_blocks(content: bytes, asset_root: Path) -> Iterator[TextBlock | Ta
                     cell.row_header,
                 )
             )
-        yield TableBlock(item.data.num_rows, item.data.num_cols, tuple(cells), locations)
+        yield item, TableBlock(item.data.num_rows, item.data.num_cols, tuple(cells), locations)
