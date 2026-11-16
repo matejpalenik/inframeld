@@ -442,14 +442,22 @@ jobs:
               !/(^|[[:space:]])apparmor="DENIED"([[:space:]]|$)/ ||
               !/(^|[[:space:]])profile="inframeld-parser-probe"([[:space:]]|$)/ ||
               !/(^|[[:space:]])comm="bwrap"([[:space:]]|$)/ { next }
-              / name="\/proc\/([[:digit:]]+|self|thread-self)\/uid_map"([[:space:]]|$)/ { uid = 1 }
-              / name="\/proc\/([[:digit:]]+|self|thread-self)\/gid_map"([[:space:]]|$)/ { gid = 1 }
-              / name="\/proc\/([[:digit:]]+|self|thread-self)\/setgroups"([[:space:]]|$)/ { groups = 1 }
+              / name="\/?proc\/([[:digit:]]+|self|thread-self)\/uid_map"([[:space:]]|$)/ { uid = 1 }
+              / name="\/?proc\/([[:digit:]]+|self|thread-self)\/gid_map"([[:space:]]|$)/ { gid = 1 }
+              / name="\/?proc\/([[:digit:]]+|self|thread-self)\/setgroups"([[:space:]]|$)/ { groups = 1 }
+              / name="\/?(proc|oldroot\/proc)\/?"([[:space:]]|$)/ { proc_open = 1 }
+              / name="\/?(oldroot|newroot|tmp\/(oldroot|newroot))(\/[^"]*)?"([[:space:]]|$)/ { setup_path = 1 }
+              / operation="(mount|umount|pivotroot)"([[:space:]]|$)/ { mount = 1 }
+              / info="Failed name lookup - disconnected path"([[:space:]]|$)/ { disconnected = 1 }
               / operation="capable"([[:space:]]|$)/ { capability = 1 }
               END {
                 if (uid) print "Parser probe kernel audit: uid-map-denied"
                 if (gid) print "Parser probe kernel audit: gid-map-denied"
                 if (groups) print "Parser probe kernel audit: setgroups-denied"
+                if (proc_open) print "Parser probe kernel audit: setup-proc-denied"
+                if (setup_path) print "Parser probe kernel audit: setup-path-denied"
+                if (mount) print "Parser probe kernel audit: mount-denied"
+                if (disconnected) print "Parser probe kernel audit: disconnected-path-denied"
                 if (capability) print "Parser probe kernel audit: capability-denied"
               }
             '

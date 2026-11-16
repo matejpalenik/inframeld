@@ -188,7 +188,49 @@ class FixtureFailureTest(unittest.TestCase):
                     (root / "stderr").write_bytes(b"bwrap: " + message + b"\n")
                     self.assertEqual(
                         _fixture_failure(root, "before-child-ready"),
-                        f"Parser sandbox stage=before-child-ready category={category}.",
+                        f"Parser sandbox stage=before-child-ready category={category} status=unobserved.",
+                    )
+
+    def test_labels_known_setup_failures_without_copying_error_detail(self) -> None:
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            for message, category in (
+                (b"Can't open /proc: Permission denied", "setup-proc-open"),
+                (b"Can't open /proc/self/mountinfo: secret", "setup-mountinfo"),
+                (b"Creating newroot failed: secret", "newroot-mkdir"),
+                (b"Creating oldroot failed: secret", "oldroot-mkdir"),
+                (b"Can't get type of source /oldroot/secret", "source-metadata"),
+                (b"Can't get type of dest /newroot/secret", "destination-metadata"),
+                (b"Can't mkdir parents for /secret", "setup-mkdir"),
+                (b"Can't create file /secret", "setup-file"),
+                (b"Can't make symlink at /secret", "setup-symlink"),
+                (b"Can't mount tmpfs on /scratch: secret", "scratch-mount"),
+                (b"fchdir to oldroot: secret", "oldroot-fchdir"),
+                (b"Can't chdir to /scratch: secret", "setup-chdir"),
+                (b"prctl(PR_SET_SECCOMP): secret", "child-seccomp"),
+            ):
+                with self.subTest(category=category):
+                    (root / "stderr").write_bytes(b"bwrap: " + message + b"\n")
+                    self.assertEqual(
+                        _fixture_failure(root, "before-child-ready", returncode=1),
+                        f"Parser sandbox stage=before-child-ready category={category} status=exit-nonzero.",
+                    )
+
+    def test_distinguishes_empty_capture_and_observed_process_status(self) -> None:
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            for capture, returncode, category, status in (
+                (b"", None, "stderr-empty", "unobserved"),
+                (b"", 0, "stderr-empty", "exit-zero"),
+                (b"", -31, "stderr-empty", "signal"),
+                (b"", 159, "stderr-empty", "signal-compatible-exit"),
+                (b"unexpected protected detail", 1, "unclassified", "exit-nonzero"),
+            ):
+                with self.subTest(category=category, status=status):
+                    (root / "stderr").write_bytes(capture)
+                    self.assertEqual(
+                        _fixture_failure(root, "before-child-ready", returncode=returncode),
+                        f"Parser sandbox stage=before-child-ready category={category} status={status}.",
                     )
 
 
@@ -227,9 +269,9 @@ class ParserSandboxTest(unittest.TestCase):
                     finished_at = time.monotonic()
                     cleanup_deadline = finished_at + _CLEANUP_SECONDS
                     if status != 0:
-                        self.fail(_fixture_failure(root, "child-exit"))
+                        self.fail(_fixture_failure(root, "child-exit", returncode=status))
                     if finished_at > deadline:
-                        self.fail(_fixture_failure(root, "child-timeout"))
+                        self.fail(_fixture_failure(root, "child-timeout", returncode=status))
                     self.assertEqual(select.select([descriptor], [], [], 0)[0], [descriptor])
                 finally:
                     os.close(descriptor)
@@ -273,8 +315,8 @@ class ParserSandboxTest(unittest.TestCase):
     ) -> tuple[int, int, int]:
         ready = root / "child-ready"
         while not ready.exists() or ready.stat().st_size == 0:
-            if process.poll() is not None:
-                self.fail(_fixture_failure(root, "before-child-ready"))
+            if (returncode := process.poll()) is not None:
+                self.fail(_fixture_failure(root, "before-child-ready", returncode=returncode))
             if time.monotonic() >= deadline:
                 self.fail(_fixture_failure(root, "child-ready-timeout"))
             time.sleep(0.02)
@@ -399,15 +441,30 @@ def _read_namespace_report(path: Path) -> dict[str, int]:
     return cast("dict[str, int]", report)
 
 
-def _fixture_failure(root: Path, stage: str) -> str:
+def _fixture_failure(root: Path, stage: str, *, returncode: int | None = None) -> str:
     """Report a fixed classification while the raw stderr stays in private scratch."""
+    if returncode is None:
+        status = "unobserved"
+    elif returncode < 0:
+        status = "signal"
+    elif returncode == 0:
+        status = "exit-zero"
+    elif returncode > 128:
+        # Bubblewrap may turn a child's signal into an ordinary exit of 128 + signal.
+        status = "signal-compatible-exit"
+    else:
+        status = "exit-nonzero"
+    summary = f"Parser sandbox stage={stage} category="
+    outcome = f" status={status}."
     try:
         with (root / "stderr").open("rb") as diagnostics:
             captured = diagnostics.read(_CAPTURE_BYTES + 1)
     except OSError:
-        return f"Parser sandbox stage={stage} category=capture-unavailable."
+        return f"{summary}capture-unavailable{outcome}"
     if len(captured) > _CAPTURE_BYTES:
-        return f"Parser sandbox stage={stage} category=capture-overflow."
+        return f"{summary}capture-overflow{outcome}"
+    if not captured:
+        return f"{summary}stderr-empty{outcome}"
     lines = captured.splitlines()
     map_operations = {
         b"setting up uid map": "uid-map",
@@ -424,23 +481,49 @@ def _fixture_failure(root: Path, stage: str) -> str:
         operation, _, detail = message.partition(b": ")
         if owner == b"bwrap" and (map_operation := map_operations.get(operation)):
             permission = permission_classes.get(detail, "other")
-            return f"Parser sandbox stage={stage} category={map_operation}-{permission}."
+            return f"{summary}{map_operation}-{permission}{outcome}"
 
     categories = (
         (b"parser-fixture: owner preparation failed", "owner-preparation"),
         (b"bwrap: No permissions to create a new namespace", "namespace-permission"),
         (b"bwrap: Creating new namespace failed", "namespace-create"),
+        (b"bwrap: Can't open /proc:", "setup-proc-open"),
+        (b"bwrap: open /proc/", "setup-proc-metadata"),
+        (b"bwrap: Can't open /proc/self/mountinfo:", "setup-mountinfo"),
         (b"bwrap: loopback:", "private-loopback"),
         (b"bwrap: Failed to make / slave", "root-propagation"),
         (b"bwrap: Failed to mount tmpfs", "initial-tmpfs"),
+        (b"bwrap: Creating newroot failed", "newroot-mkdir"),
+        (b"bwrap: Creating oldroot failed", "oldroot-mkdir"),
         (b"bwrap: setting up newroot bind", "newroot-bind"),
+        (b"bwrap: Creating proc failed", "setup-proc-mkdir"),
         (b"bwrap: mounting proc", "outer-proc-bind"),
+        (b"bwrap: Can't find source path ", "source-metadata"),
+        (b"bwrap: Can't open source ", "source-metadata"),
+        (b"bwrap: Can't get type of source ", "source-metadata"),
+        (b"bwrap: Can't get type of dest ", "destination-metadata"),
+        (b"bwrap: Destination is not a ", "destination-metadata"),
+        (b"bwrap: Can't mount on symlink destination ", "destination-metadata"),
+        (b"bwrap: Can't mkdir parents for ", "setup-mkdir"),
+        (b"bwrap: Can't create file ", "setup-file"),
+        (b"bwrap: Can't make symlink at ", "setup-symlink"),
+        (b"bwrap: Can't mount tmpfs on /scratch:", "scratch-mount"),
         (b"bwrap: Can't bind mount", "fixture-bind-or-remount"),
         (b"bwrap: Failed to make old root rprivate", "oldroot-propagation"),
         (b"bwrap: unmount old root", "oldroot-detach"),
         (b"bwrap: umount old root", "oldroot-detach"),
         (b"bwrap: pivot_root", "pivot-root"),
+        (b"bwrap: can't open /:", "oldroot-open"),
+        (b"bwrap: fchdir to oldroot", "oldroot-fchdir"),
+        (b"bwrap: chdir ", "setup-chdir"),
+        (b"bwrap: Can't chdir to ", "setup-chdir"),
+        (b"bwrap: capset failed", "setup-privileges"),
+        (b"bwrap: can't set dumpable", "setup-privileges"),
+        (b"bwrap: prctl(PR_SET_NO_NEW_PRIVS)", "setup-privileges"),
+        (b"bwrap: Can't read seccomp data", "child-seccomp"),
+        (b"bwrap: Invalid seccomp data", "child-seccomp"),
         (b"bwrap: Unable to set up system call filtering", "child-seccomp"),
+        (b"bwrap: prctl(PR_SET_SECCOMP)", "child-seccomp"),
         (b"bwrap: execvp", "child-exec"),
         (b"AssertionError", "child-assertion"),
     )
@@ -448,7 +531,7 @@ def _fixture_failure(root: Path, stage: str) -> str:
         (label for marker, label in categories if any(line.startswith(marker) for line in lines)),
         "unclassified",
     )
-    return f"Parser sandbox stage={stage} category={reason}."
+    return f"{summary}{reason}{outcome}"
 
 
 def _owner(root: Path, mode: str) -> int:
