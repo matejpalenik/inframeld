@@ -15,6 +15,7 @@ from inframeld_backend.access.domain.policy_inputs.project_departure_responsibil
     ProjectDepartureResponsibilityPolicyInput,
 )
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
+from inframeld_backend.indexing.domain.enums.embedding_profile_action import EmbeddingProfileAction
 from inframeld_backend.indexing.domain.enums.processing_profile_action import (
     ProcessingProfileAction,
 )
@@ -40,6 +41,8 @@ class ProjectDeparturePolicy:
             return action_id.value in ModelConnectionAction
         if target_kind == ProjectDepartureTargetKind.PROCESSING_PROFILE:
             return action_id.value in ProcessingProfileAction
+        if target_kind == ProjectDepartureTargetKind.EMBEDDING_PROFILE:
+            return action_id.value in EmbeddingProfileAction
         if target_kind == ProjectDepartureTargetKind.APPLICATION_ACCOUNT:
             return action_id.value in {
                 "issue-application-keys",

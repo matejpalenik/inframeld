@@ -64,6 +64,25 @@ def test_processing_profile_departure_requires_an_exact_eligible_grantor(action:
     )
 
 
+@pytest.mark.parametrize("action", ["view-embedding-profile", "use-embedding-profile"])
+def test_embedding_profile_departure_requires_an_exact_eligible_grantor(action: str) -> None:
+    responsibility = ProjectDepartureResponsibilityPolicyInput(
+        target_kind=ProjectDepartureTargetKind.EMBEDDING_PROFILE,
+        action_id=ActionId(action),
+        candidates=(CANDIDATE,),
+    )
+    assert ProjectDeparturePolicy.may_depart((responsibility,))
+    use_only_manager = replace(
+        CANDIDATE, can_grant=False, is_group_member=True, is_group_manager=True
+    )
+    assert not ProjectDeparturePolicy.may_depart(
+        (replace(responsibility, candidates=(use_only_manager,)),)
+    )
+    assert not ProjectDeparturePolicy.may_depart(
+        (replace(responsibility, action_id=ActionId("use-processing-profile")),)
+    )
+
+
 @pytest.mark.parametrize(
     "field", ["has_pending_recovery", "is_project_member", "has_coherent_identity"]
 )
