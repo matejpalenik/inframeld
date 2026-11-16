@@ -64,6 +64,7 @@ const BINDINGS: &[&str] = &[
     "setModelConnectionActionGrant",
     "removeModelConnectionActionGrant",
     "createProcessingProfile",
+    "uploadDocument",
     "getProcessingProfile",
     "listProcessingProfiles",
     "listProcessingProfileActionGrants",
@@ -183,6 +184,7 @@ async fn main() {
                 | "setModelConnectionActionGrant"
                 | "removeModelConnectionActionGrant"
                 | "createProcessingProfile"
+                | "uploadDocument"
                 | "getProcessingProfile"
                 | "listProcessingProfiles"
                 | "listProcessingProfileActionGrants"
@@ -231,6 +233,7 @@ async fn main() {
                 | "setModelConnectionActionGrant"
                 | "removeModelConnectionActionGrant"
                 | "createProcessingProfile"
+                | "uploadDocument"
                 | "setProcessingProfileActionGrant"
                 | "removeProcessingProfileActionGrant"
                 | "deleteApplicationAccount"

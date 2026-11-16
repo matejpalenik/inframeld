@@ -413,6 +413,17 @@ export const zDoclingProcessingDefinitionResponse = z.object({
 });
 
 /**
+ * DocumentUploadResponse
+ */
+export const zDocumentUploadResponse = z.object({
+    documentId: z.uuid(),
+    documentVersionId: z.uuid(),
+    idempotencyExpiresAt: z.iso.datetime().nullable(),
+    operationId: z.string(),
+    projectId: z.uuid()
+});
+
+/**
  * GrantTargetKind
  *
  * Discriminate published grant targets without changing their wire tags.
@@ -4940,6 +4951,76 @@ export const zRevokeApplicationKey503Representation0Response = zProblemDetails;
  * Successful Response
  */
 export const zRevokeApplicationKeyResponse = zApplicationKeyRevocationResponse;
+
+export const zUploadDocumentBody = z.string();
+
+export const zUploadDocumentHeaders = z.object({
+    'Idempotency-Key': z.string().min(1).max(128).regex(/.*\S.*/)
+});
+
+export const zUploadDocumentPath = z.object({
+    project_id: z.uuid()
+});
+
+export const zUploadDocumentQuery = z.object({
+    groupIds: z.array(z.uuid()).min(1),
+    filename: z.string().min(1).max(255)
+});
+
+/**
+ * Successful Response
+ */
+export const zUploadDocument201Representation0Response = zDocumentUploadResponse;
+
+/**
+ * Invalid authentication request
+ */
+export const zUploadDocument400Representation0Response = zProblemDetails;
+
+/**
+ * Unauthorized
+ */
+export const zUploadDocument401Representation0Response = zProblemDetails;
+
+/**
+ * Access denied
+ */
+export const zUploadDocument403Representation0Response = zProblemDetails;
+
+/**
+ * Resource not found
+ */
+export const zUploadDocument404Representation0Response = zProblemDetails;
+
+/**
+ * Operation conflicts with current state
+ */
+export const zUploadDocument409Representation0Response = zProblemDetails;
+
+/**
+ * Content Too Large
+ */
+export const zUploadDocument413Representation0Response = zProblemDetails;
+
+/**
+ * Unsupported Media Type
+ */
+export const zUploadDocument415Representation0Response = zProblemDetails;
+
+/**
+ * Request validation failed
+ */
+export const zUploadDocument422Representation0Response = zProblemDetails;
+
+/**
+ * Dependency unavailable
+ */
+export const zUploadDocument503Representation0Response = zProblemDetails;
+
+/**
+ * Successful Response
+ */
+export const zUploadDocumentResponse = zDocumentUploadResponse;
 
 export const zListProjectGrantRecipientsPath = z.object({
     project_id: z.uuid()

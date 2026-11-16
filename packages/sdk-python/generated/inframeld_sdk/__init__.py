@@ -22,6 +22,7 @@ __all__ = [
     "DiscoveryApi",
     "HealthApi",
     "IndexingApi",
+    "KnowledgeApi",
     "OperationsApi",
     "ApiResponse",
     "ApiClient",
@@ -74,6 +75,7 @@ __all__ = [
     "DeletionStatusResponse",
     "DoclingProcessingDefinitionRequest",
     "DoclingProcessingDefinitionResponse",
+    "DocumentUploadResponse",
     "GrantRecipientResponse",
     "GrantTargetKind",
     "HttpMethod",
@@ -224,6 +226,7 @@ from inframeld_sdk.api.access_api import AccessApi as AccessApi
 from inframeld_sdk.api.discovery_api import DiscoveryApi as DiscoveryApi
 from inframeld_sdk.api.health_api import HealthApi as HealthApi
 from inframeld_sdk.api.indexing_api import IndexingApi as IndexingApi
+from inframeld_sdk.api.knowledge_api import KnowledgeApi as KnowledgeApi
 from inframeld_sdk.api.operations_api import OperationsApi as OperationsApi
 
 # import ApiClient
@@ -280,6 +283,7 @@ from inframeld_sdk.models.current_session_response import CurrentSessionResponse
 from inframeld_sdk.models.deletion_status_response import DeletionStatusResponse as DeletionStatusResponse
 from inframeld_sdk.models.docling_processing_definition_request import DoclingProcessingDefinitionRequest as DoclingProcessingDefinitionRequest
 from inframeld_sdk.models.docling_processing_definition_response import DoclingProcessingDefinitionResponse as DoclingProcessingDefinitionResponse
+from inframeld_sdk.models.document_upload_response import DocumentUploadResponse as DocumentUploadResponse
 from inframeld_sdk.models.grant_recipient_response import GrantRecipientResponse as GrantRecipientResponse
 from inframeld_sdk.models.grant_target_kind import GrantTargetKind as GrantTargetKind
 from inframeld_sdk.models.http_method import HttpMethod as HttpMethod

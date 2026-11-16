@@ -130,6 +130,8 @@ class _Scenario(
         self.in_transaction = False
         self.allow = True
         self.block_after_read = False
+        self.admitted_during_preparation = False
+        self.receipt_deadline = datetime(2026, 1, 1, tzinfo=UTC)
         self.prepare_calls = 0
         self.admissions = 0
         self.source_reads = 0
@@ -175,11 +177,13 @@ class _Scenario(
     @override
     async def admit(
         self, *, record: DocumentUploadRecordDTO, verified: VerifiedArtifactDTO
-    ) -> None:
+    ) -> DocumentUploadResultDTO:
         assert self.in_transaction and record == self.original
         assert verified.attempt.digest == record.allocation.reservation.digest
         self.admissions += 1
-        self.original = replace(record, state=DocumentUploadState.ADMITTED)
+        result = replace(record.result, idempotency_expires_at=self.receipt_deadline)
+        self.original = replace(record, result=result, state=DocumentUploadState.ADMITTED)
+        return result
 
     @override
     async def decline(self, *, record: DocumentUploadRecordDTO) -> None:
@@ -203,6 +207,11 @@ class _Scenario(
         )
         if self.block_after_read:
             self.allow = False
+        if self.admitted_during_preparation:
+            result = replace(self.original.result, idempotency_expires_at=self.receipt_deadline)
+            self.original = replace(
+                self.original, result=result, state=DocumentUploadState.ADMITTED
+            )
         return VerifiedArtifactDTO(
             ArtifactAttemptDTO(
                 original.artifact_id, original.attempt_id, self.scope, len(content), digest
@@ -229,10 +238,23 @@ async def test_original_result_recovers_without_second_preparation_or_admission(
     scenario = _Scenario()
 
     original = await scenario.upload()
+    assert original.idempotency_expires_at == scenario.receipt_deadline
+    scenario.receipt_deadline += timedelta(days=1)
     assert await scenario.upload() == original
     with pytest.raises(IdempotencyKeyReusedError):
         await scenario.upload(_PDF + b"changed")
     assert scenario.prepare_calls == scenario.admissions == 1
+
+
+@pytest.mark.asyncio
+async def test_concurrent_admission_returns_saved_deadline_for_same_original() -> None:
+    scenario = _Scenario()
+    scenario.admitted_during_preparation = True
+
+    result = await scenario.upload()
+
+    assert result.idempotency_expires_at == scenario.receipt_deadline
+    assert scenario.admissions == 0
 
 
 @pytest.mark.asyncio

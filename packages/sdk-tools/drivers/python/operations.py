@@ -11,6 +11,7 @@ from inframeld_sdk.api.access_api import AccessApi
 from inframeld_sdk.api.discovery_api import DiscoveryApi
 from inframeld_sdk.api.health_api import HealthApi
 from inframeld_sdk.api.indexing_api import IndexingApi
+from inframeld_sdk.api.knowledge_api import KnowledgeApi
 from inframeld_sdk.api.operations_api import OperationsApi
 from inframeld_sdk.models.access_group_action_grant_request import AccessGroupActionGrantRequest
 from inframeld_sdk.models.access_group_creation_request import AccessGroupCreationRequest
@@ -452,6 +453,41 @@ async def list_model_connection_usage_async(clients: Clients, call: Call) -> Nat
         model_connection_id=UUID(call.path["model_connection_id"]),
         limit=integer(call.query["limit"]) if "limit" in call.query else None,
         cursor=string(call.query["cursor"]) if "cursor" in call.query else None,
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+def _document_upload_inputs(call: Call) -> tuple[list[UUID], bytes]:
+    groups, source = call.query["groupIds"], call.body
+    if not isinstance(groups, list) or source is None:
+        raise ValueError("Document upload requires repeated group IDs and binary input")
+    return [UUID(value) for value in groups], base64.b64decode(
+        string(source["fileBase64"]), validate=True
+    )
+
+
+def upload_document_sync(clients: Clients, call: Call) -> NativeResponse:
+    groups, pdf = _document_upload_inputs(call)
+    return KnowledgeApi(clients.production).upload_document_sync_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        group_ids=groups,
+        filename=string(call.query["filename"]),
+        idempotency_key=call.headers["Idempotency-Key"],
+        body=pdf,
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def upload_document_async(clients: Clients, call: Call) -> NativeResponse:
+    groups, pdf = _document_upload_inputs(call)
+    return await KnowledgeApi(clients.production).upload_document_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        group_ids=groups,
+        filename=string(call.query["filename"]),
+        idempotency_key=call.headers["Idempotency-Key"],
+        body=pdf,
         _headers=call.headers,
         _request_timeout=call.timeout / 1000,
     )
@@ -1921,6 +1957,7 @@ BINDINGS: dict[Operation, Binding] = {
     Operation.CREATE_PROCESSING_PROFILE: Binding(
         create_processing_profile_sync, create_processing_profile_async
     ),
+    Operation.UPLOAD_DOCUMENT: Binding(upload_document_sync, upload_document_async),
     Operation.GET_PROCESSING_PROFILE: Binding(
         get_processing_profile_sync, get_processing_profile_async
     ),

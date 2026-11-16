@@ -43,7 +43,7 @@ Manual read-only S3 sync is the accepted bounded path. Do not infer a connector 
 
 ## Admit and replace content
 
-Alice uploads a supported PDF, Markdown, or text file.
+The implemented single-file admission accepts one PDF. Markdown, text and replacement remain separate accepted workflows.
 
 The API streams the file into private temporary storage, checks its size and format, and gives it server-generated storage IDs. An application command then saves the accepted upload.
 
@@ -89,7 +89,7 @@ Imported documents receive an explicit list of Inframeld access groups. The sour
 
 ## Validate before admission
 
-Accept **one PDF, Markdown, or plain-text file per upload request**, with a maximum size of **25 MiB**.
+The public route accepts one raw `application/pdf` body up to **25 MiB** of actual received bytes. Supply one UTF-8 filename and a distinct, nonempty list of Project group UUIDs. The broader accepted ingestion design also includes Markdown and plain text.
 
 Stream bytes into private temporary storage, where queries cannot see them. Count the actual bytes received. Reject files exceeding the limit before saving that the application has accepted the upload, a step called **admission**.
 
@@ -105,7 +105,7 @@ The server chooses storage keys. Original filenames are display text, never path
 
 ### Alice changes the default audience for uploads
 
-The implemented Access [saved upload-default contract](../../inframeld-access-models/references/upload-default-contracts.md) owns authoritative inspection and revision-checked replacement. Changing defaults requires Manage upload defaults on the Project and current membership plus management of every current or proposed group, including retained groups. The new set is nonempty and all groups belong to the same Project. The receiving upload admission reads Access's coordinated set/revision projection without requiring administration GET authority, then checks its own current actor and Add documents authority on every selected group. This actual consumption remains in #41.
+The implemented Access [saved upload-default contract](../../inframeld-access-models/references/upload-default-contracts.md) owns authoritative inspection and revision-checked replacement. Changing defaults requires Manage upload defaults on the Project and current membership plus management of every current or proposed group, including retained groups. The new set is nonempty and all groups belong to the same Project. An upload that uses saved defaults reads Access's coordinated set and revision without requiring administration GET authority, then checks its own current actor and Add documents authority on every selected group. The single-PDF HTTP route currently requires explicit group IDs. It does not use the saved default when the query omits them.
 
 Changing the default from HRPrivate to SupportKnowledge affects future uploads, not existing documents. Each upload still needs Add documents on every selected group. If that fails, the backend must report the failure rather than silently choose a different audience.
 
@@ -139,7 +139,9 @@ Apply accepted entries when their scope matches. Discuss only choices still expl
 
 ## Status and sources
 
-These are accepted admission, permission and sync boundaries. Exact public schemas, runtime bounds and delivery qualification remain in the owning guides. Inspect code before presenting these workflows as implemented.
+The [PDF HTTP route](../../../../apps/backend/src/inframeld_backend/knowledge/http/routes/document_upload_routes.py) checks the request and its current human caller. The [admission service](../../../../apps/backend/src/inframeld_backend/knowledge/application/services/document_upload_service.py) checks Add documents on every explicit group before reserving storage and again before admitting or replaying. A matching filename, audience and byte digest/length recover the same original result under the original key. [The 0039 migration](../../../../apps/backend/migrations/versions/0039_document_upload_replay.py) preserves the required nullable receipt expiry. New admissions save the database admission time plus 24 hours as the fixed expiry. Legacy originals preserve a null expiry. Retaining a result beyond the guarantee does not renew it.
+
+The route needs the managed capacity and shared private staging binding. The default server has that binding disabled. The [upload guide](../../../../apps/docs/src/app/guides/knowledge/page.mdx#upload-one-pdf) gives the request and recovery path. Storage deployment, replacement, additional formats, protected reads and source sync remain separately owned.
 
 - [Admission and replacement](#admission), [Knowledge lifecycle](documents-and-collections.md), [ingestion security](./uploads-and-source-sync.md) and [jobs/retries](../../inframeld-application-contracts/references/jobs-and-recovery.md).
 - [Private onboarding](../../inframeld-architecture/references/first-use-and-private-defaults.md), [Access rules](../../inframeld-access-models/references/authorization.md), [portable sources](source-configuration-and-credentials.md#portable-knowledge) and [Access contracts](../../inframeld-access-models/references/actions-and-initial-grants.md).

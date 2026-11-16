@@ -1,6 +1,7 @@
+from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import String, Text, Uuid
+from sqlalchemy import DateTime, String, Text, Uuid
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -29,3 +30,6 @@ class DocumentUploadRow(SharedPersistenceBase):
     filename: Mapped[str] = mapped_column(Text, repr=False)
     group_ids: Mapped[list[UUID]] = mapped_column(ARRAY(Uuid(as_uuid=True)))
     state: Mapped[str] = mapped_column(String(16))
+    replay_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None
+    )

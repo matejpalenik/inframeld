@@ -460,6 +460,26 @@ pub async fn observe(
                 )
                 .await
         ),
+        "uploadDocument" => {
+            use base64::Engine;
+            let query = request.query.as_ref().unwrap();
+            let pdf = base64::engine::general_purpose::STANDARD
+                .decode(body["fileBase64"].as_str().unwrap())
+                .unwrap();
+            observed!(
+                client
+                    .upload_document(
+                        request.path.as_ref().unwrap()["project_id"]
+                            .as_str()
+                            .unwrap(),
+                        serde_json::from_value(query["groupIds"].clone()).unwrap(),
+                        query["filename"].as_str().unwrap(),
+                        &request.headers["Idempotency-Key"],
+                        pdf,
+                    )
+                    .await
+            )
+        }
         "createProcessingProfile" => observed!(
             client
                 .create_processing_profile(

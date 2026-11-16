@@ -1,20 +1,31 @@
 export const pageMetadata = {
   title: "Add and manage knowledge",
   description:
-    "Find the current interface availability and the relevant product model.",
+    "Upload a PDF with an explicit audience and recover its original receipt.",
 }
 
 # Add and manage knowledge
 
-<Note>
-  Document upload, collection editing and source synchronization are not exposed
-  by the public interfaces in this preview.
-</Note>
+The HTTP upload operation defines how to save one PDF and its initial audience in an existing Project. The checked-in server startup returns `503` for a valid upload request while the managed capacity and shared staging binding is pending.
 
-## Understand the workflow
+## Upload one PDF
 
-[Read the product model](/product/documents-and-collections) for the resources, ordinary permissions and result boundaries this workflow uses. This entry will hold the supported procedure as its public interfaces are delivered.
+These steps describe the typed request and receipt used for isolated verification.
 
-## Use the available preview
+1. Use the permanent Project UUID from [Project inspection](/guides/name-and-rename-project). Obtain each audience group's UUID from [group creation or inspection](/guides/manage-access-groups#inspect-the-group-and-its-relationships). The current human caller needs Project membership and Add documents on every group selected. Use an accepted human bearer token or the installation's signed-in browser session with the trusted Origin and `X-Inframeld-CSRF: 1`. See [Authentication](/api-reference#authentication).
+2. Choose a PDF no larger than 25 MiB. Use a filename that ends in `.pdf`, takes at most 255 UTF-8 bytes and contains no path separators or control characters. URL-encode it in the single `filename` query value. For example, `Q2 report.pdf` becomes `filename=Q2%20report.pdf`.
+3. Save the installation, acting human, Project, filename, distinct group IDs, exact file bytes and one unique request key before sending. POST the raw bytes with `Content-Type: application/pdf` and `Idempotency-Key`. For two audience groups, put both UUIDs in the query as two `groupIds` values. Supply the audience explicitly even if the Project has saved defaults. See the [upload API](/api-reference/documents#upload-a-pdf) for the route and response.
+4. Keep the `201` receipt. Its `documentId` and `documentVersionId` identify the accepted PDF. The receipt establishes that the server saved the original bytes and audience. Parsing, collection selection, indexing and reads are separate steps. See [Documents and collections](/product/documents-and-collections).
 
-You can [set up a client](/clients/http), inspect [the delivered API](/api-reference), and work with [existing Project metadata](/guides/name-and-rename-project) under current authority. For a broad first-use path, start with [Get started](/get-started).
+## Recover an uncertain upload
+
+If a response is lost or the outcome is uncertain, deliberately resend the saved request under the same current human authority. Use the same Project, filename, audience, PDF bytes and key. An authorized replay returns the original receipt and does not create a second Document. If the result remains retained after its `idempotencyExpiresAt`, the receipt stays unchanged. A legacy `null` expiry gives no timestamp to rely on.
+
+| Response                         | What to do                                                                                                                                                |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `409`, `idempotency_in_progress` | Wait for the time in `Retry-After`, then use the same saved request if you still need the result.                                                         |
+| `409`, `idempotency_key_reused`  | Check the saved filename, audience and bytes. A new key would submit separate work and cannot recover the earlier result.                                 |
+| `413` or `415`                   | Check the actual file size and send one raw PDF with `Content-Type: application/pdf`.                                                                     |
+| `503` or no usable response      | Keep the original inputs. Check installation availability before a deliberate replay. The response cannot establish whether an earlier request committed. |
+
+Other upload formats, replacement, collection editing, source synchronization and Document sharing and reading remain outside this upload operation.

@@ -358,6 +358,25 @@ const calls = {
       },
       query: call.query as sdk.RemoveModelConnectionActionGrantData["query"],
     }),
+  uploadDocument: (client: Client, call: SdkCall) => {
+    const bytes = Uint8Array.from(
+      atob(z.string().parse(call.body?.fileBase64)),
+      (character) => character.charCodeAt(0),
+    );
+    return sdk.uploadDocument({
+      ...options(client, call),
+      path: call.path as sdk.UploadDocumentData["path"],
+      query: {
+        groupIds: z.array(z.string()).parse(call.query?.groupIds),
+        filename: z.string().parse(call.query?.filename),
+      },
+      headers: {
+        ...call.headers,
+        "Idempotency-Key": call.headers["Idempotency-Key"]!,
+      },
+      body: new Blob([bytes], { type: "application/pdf" }),
+    });
+  },
   createProcessingProfile: (client: Client, call: SdkCall) =>
     sdk.createProcessingProfile({
       ...options(client, call),

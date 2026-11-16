@@ -9027,6 +9027,22 @@ pub struct CurrentSessionResponse {
     #[serde(rename = "principalId")]
     pub principal_id: uuid::Uuid,
 }
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct DocumentUploadResponse {
+    #[serde(rename = "documentId")]
+    pub document_id: uuid::Uuid,
+    #[serde(rename = "documentVersionId")]
+    pub document_version_id: uuid::Uuid,
+    #[serde(
+        rename = "idempotencyExpiresAt",
+        deserialize_with = "presence_serde::required_nullable"
+    )]
+    pub idempotency_expires_at: Option<chrono::DateTime<chrono::Utc>>,
+    #[serde(rename = "operationId")]
+    pub operation_id: String,
+    #[serde(rename = "projectId")]
+    pub project_id: uuid::Uuid,
+}
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct GetHealthResponse {
     /// Additional properties matching the spec's

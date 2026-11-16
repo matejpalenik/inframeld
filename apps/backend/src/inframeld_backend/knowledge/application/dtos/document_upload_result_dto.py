@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import datetime
 
 from inframeld_backend.access.domain.value_objects.document_id import DocumentId
 from inframeld_backend.access.domain.value_objects.document_version_id import DocumentVersionId
@@ -14,3 +15,13 @@ class DocumentUploadResultDTO:
     project_id: ProjectId
     document_id: DocumentId
     version_id: DocumentVersionId
+    idempotency_expires_at: datetime | None = None
+
+    def matches_original(self, other: "DocumentUploadResultDTO") -> bool:
+        """Compare the identities assigned before the receipt deadline exists."""
+        return (self.operation_id, self.project_id, self.document_id, self.version_id) == (
+            other.operation_id,
+            other.project_id,
+            other.document_id,
+            other.version_id,
+        )

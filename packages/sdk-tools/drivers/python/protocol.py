@@ -64,6 +64,7 @@ class Operation(StrEnum):
     SET_MODEL_CONNECTION_ACTION_GRANT = "setModelConnectionActionGrant"
     REMOVE_MODEL_CONNECTION_ACTION_GRANT = "removeModelConnectionActionGrant"
     CREATE_PROCESSING_PROFILE = "createProcessingProfile"
+    UPLOAD_DOCUMENT = "uploadDocument"
     GET_PROCESSING_PROFILE = "getProcessingProfile"
     LIST_PROCESSING_PROFILES = "listProcessingProfiles"
     LIST_PROCESSING_PROFILE_ACTION_GRANTS = "listProcessingProfileActionGrants"
@@ -141,7 +142,7 @@ class Call(Record):
     headers: dict[str, str]
     timeout: int = Field(gt=0)
     body: dict[str, JsonValue] | None = None
-    query: dict[str, str | int] = Field(default_factory=dict)
+    query: dict[str, str | int | list[str]] = Field(default_factory=dict)
     path: dict[str, str] = Field(default_factory=dict)
     unchecked_model: bool = Field(default=False, alias="uncheckedModel")
 

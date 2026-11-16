@@ -6,7 +6,7 @@ It is test support, not an alternative deployment or authorization implementatio
 
 import asyncio
 import base64
-from collections.abc import AsyncGenerator, AsyncIterator
+from collections.abc import AsyncGenerator, AsyncIterable, AsyncIterator
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
 from datetime import UTC, datetime
@@ -330,6 +330,8 @@ from inframeld_backend.access.domain.enums.project_status import ProjectStatus
 from inframeld_backend.access.domain.policies.project_creation_policy import ProjectCreationPolicy
 from inframeld_backend.access.domain.value_objects.access_group_id import AccessGroupId
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
+from inframeld_backend.access.domain.value_objects.document_id import DocumentId
+from inframeld_backend.access.domain.value_objects.document_version_id import DocumentVersionId
 from inframeld_backend.access.domain.value_objects.human_api_audience import HumanAPIAudience
 from inframeld_backend.access.domain.value_objects.human_credential_version import (
     HumanCredentialVersion,
@@ -445,6 +447,16 @@ from inframeld_backend.access.http.routes.project_upload_default_routes import (
 from inframeld_backend.indexing.http.routes.processing_profile_routes import (
     create_processing_profile_router,
 )
+from inframeld_backend.knowledge.application.commands.upload_document_command import (
+    UploadDocumentCommand,
+)
+from inframeld_backend.knowledge.application.dtos.document_upload_result_dto import (
+    DocumentUploadResultDTO,
+)
+from inframeld_backend.knowledge.application.protocols.document_uploader import DocumentUploader
+from inframeld_backend.knowledge.http.routes.document_upload_routes import (
+    create_document_upload_router,
+)
 from inframeld_backend.shared.application.dtos.accepted_async_operation_dto import (
     AcceptedAsyncOperationDTO,
 )
@@ -479,6 +491,7 @@ from inframeld_backend.shared.application.errors.application_errors import (
     AuthenticationRequiredError,
     ConflictError,
     DependencyUnavailableError,
+    IdempotencyKeyReusedError,
     InvalidInputError,
     ResourceNotFoundError,
     StaleRevisionError,
@@ -592,6 +605,49 @@ class MockSDKTokenAuthenticator(HumanAccessTokenAuthenticator):
             raise AuthenticationRequiredError()
 
         return AccessContextDTO(PRINCIPAL, MockAuthenticationEvidence.human_oauth(IDENTITY))
+
+
+class MockSDKDocumentUploader(DocumentUploader):
+    """Return controlled original outcomes through the production streamed route."""
+
+    @override
+    async def upload(
+        self,
+        *,
+        access: AccessContextDTO,
+        command: UploadDocumentCommand,
+        chunks: AsyncIterable[bytes],
+    ) -> DocumentUploadResultDTO:
+        if access.actor_principal_id != PRINCIPAL:
+            raise AccessDeniedError()
+        if command.project_id != ProjectId(UUID("00000000-0000-4000-8000-000000000003")):
+            raise ResourceNotFoundError()
+        if (
+            tuple(group.value for group in command.audience.group_ids)
+            != (
+                UUID("00000000-0000-4000-8000-000000000007"),
+                UUID("00000000-0000-4000-8000-000000000008"),
+            )
+            or command.filename != "règlement + &.pdf"
+        ):
+            raise InvalidInputError()
+        key = command.key.value
+        if key not in {"sdk-pdf-original", "sdk-pdf-legacy"}:
+            raise InvalidInputError()
+        if b"".join([chunk async for chunk in chunks]) != b"%PDF-1.7\n\xff\x00":
+            raise IdempotencyKeyReusedError()
+        return DocumentUploadResultDTO(
+            OperationId(key),
+            command.project_id,
+            DocumentId(UUID("00000000-0000-4000-8000-000000000034")),
+            DocumentVersionId(UUID("00000000-0000-4000-8000-000000000035")),
+            None if key == "sdk-pdf-legacy" else datetime(2030, 1, 1, tzinfo=UTC),
+        )
+
+
+@asynccontextmanager
+async def _open_document_uploader() -> AsyncGenerator[DocumentUploader]:
+    yield MockSDKDocumentUploader()
 
 
 class MockSDKConsentHandler(HumanOAuthConsentHandler):
@@ -2159,6 +2215,7 @@ def create_sdk_conformance_app(browser_origin: str | None = None) -> FastAPI:
     application.include_router(
         create_processing_profile_router(authenticate, open_profiles, open_profiles)
     )
+    application.include_router(create_document_upload_router(authenticate, _open_document_uploader))
     application.include_router(
         create_processing_profile_grant_router(authenticate, open_profiles, open_profiles)
     )

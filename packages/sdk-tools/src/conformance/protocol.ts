@@ -63,6 +63,7 @@ export const operations = [
   "setModelConnectionActionGrant",
   "removeModelConnectionActionGrant",
   "createProcessingProfile",
+  "uploadDocument",
   "getProcessingProfile",
   "listProcessingProfiles",
   "listProcessingProfileActionGrants",
@@ -117,7 +118,9 @@ export const callSchema = z.object({
   headers: z.record(z.string(), z.string()),
   timeout: z.number().int().positive(),
   body: z.record(z.string(), z.json()).optional(),
-  query: z.record(z.string(), z.union([z.string(), z.number()])).optional(),
+  query: z
+    .record(z.string(), z.union([z.string(), z.number(), z.array(z.string())]))
+    .optional(),
   path: z.record(z.string(), z.string()).optional(),
   uncheckedModel: z.boolean().optional(),
 });
