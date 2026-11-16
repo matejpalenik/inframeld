@@ -1,6 +1,6 @@
 import asyncio
 from collections.abc import Callable
-from contextlib import AbstractAsyncContextManager
+from contextlib import AbstractAsyncContextManager, suppress
 from dataclasses import asdict
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -37,6 +37,7 @@ from inframeld_backend.shared.application.enums.spending_call_state import Spend
 from inframeld_backend.shared.application.enums.spending_observation_kind import (
     SpendingObservationKind,
 )
+from inframeld_backend.shared.application.errors.application_error import ApplicationError
 from inframeld_backend.shared.application.errors.application_errors import ConflictError
 from inframeld_backend.shared.application.errors.job_errors import JobFenceLostError
 from inframeld_backend.shared.application.protocols.model_dispatch_issuance_repository import (
@@ -231,6 +232,53 @@ class ModelEmbeddingGateway:
             result.provider_reference or "original-embedding-adapter",
             usage=usage,
         )
+        lost_confirmation: JobFenceLostError | None = None
+        try:
+            async with (
+                asyncio.timeout(5),
+                self._open_phase() as (transactions, _, spending, issuances),
+                transactions.begin(),
+            ):
+                if await issuances.get(context.call_id) != issuance:
+                    raise ConflictError("The observation differs from the original issued work.")
+                accounting = await spending.record_observation_in_transaction(
+                    call=context, observation=evidence, expected_call_revision=approval_revision
+                )
+                if accounting.pending:
+                    return _UNKNOWN
+                if result.kind is SpendingObservationKind.UNCERTAIN:
+                    return result
+                checkpoint = (
+                    b""
+                    if result.kind is SpendingObservationKind.NOT_SENT
+                    else dumps(
+                        {"call_id": str(context.call_id.value), "vector": result.vector},
+                        separators=(",", ":"),
+                        allow_nan=False,
+                    ).encode()
+                )
+                try:
+                    confirmed = await issuances.confirm(
+                        context.attempt, context.call_id, checkpoint
+                    )
+                except JobFenceLostError as error:
+                    lost_confirmation = error
+                    raise
+        except JobFenceLostError as error:
+            if error is lost_confirmation:
+                # The attempted settlement rolled back. Retain only the original evidence.
+                with suppress(ApplicationError, TimeoutError):
+                    await self._retain_late(context, issuance, evidence, approval_revision)
+            raise
+        return result if confirmed else _UNKNOWN
+
+    async def _retain_late(
+        self,
+        context: SpendingCallContextDTO,
+        issuance: ModelDispatchIssuanceDTO,
+        evidence: SpendingObservationDTO,
+        approval_revision: int,
+    ) -> None:
         async with (
             asyncio.timeout(5),
             self._open_phase() as (transactions, _, spending, issuances),
@@ -238,21 +286,6 @@ class ModelEmbeddingGateway:
         ):
             if await issuances.get(context.call_id) != issuance:
                 raise ConflictError("The observation differs from the original issued work.")
-            accounting = await spending.record_observation_in_transaction(
+            await spending.retain_late_observation_in_transaction(
                 call=context, observation=evidence, expected_call_revision=approval_revision
             )
-            if accounting.pending:
-                return _UNKNOWN
-            if result.kind is SpendingObservationKind.UNCERTAIN:
-                return result
-            checkpoint = (
-                b""
-                if result.kind is SpendingObservationKind.NOT_SENT
-                else dumps(
-                    {"call_id": str(context.call_id.value), "vector": result.vector},
-                    separators=(",", ":"),
-                    allow_nan=False,
-                ).encode()
-            )
-            confirmed = await issuances.confirm(context.attempt, context.call_id, checkpoint)
-        return result if confirmed else _UNKNOWN

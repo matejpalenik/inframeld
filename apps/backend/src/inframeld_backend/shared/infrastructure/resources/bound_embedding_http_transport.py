@@ -1,3 +1,5 @@
+import asyncio
+from contextlib import suppress
 from ipaddress import IPv4Address, IPv6Address
 from json import dumps, loads
 from math import isfinite
@@ -6,6 +8,7 @@ from ssl import CERT_REQUIRED, SSLContext
 from time import monotonic
 from typing import cast, override
 
+import httpcore
 import httpx
 
 from inframeld_backend.access.application.value_objects.provider_credential_value import (
@@ -69,6 +72,7 @@ class BoundEmbeddingHttpTransport(httpx.AsyncBaseTransport):
             limits=httpx.Limits(max_connections=1, max_keepalive_connections=0),
         )
         self._entered = False
+        self.not_sent = False
         self.response_status: int | None = None
         self.result: EmbeddingDispatchResultDTO | None = None
 
@@ -103,9 +107,7 @@ class BoundEmbeddingHttpTransport(httpx.AsyncBaseTransport):
                 "sni_hostname": self._endpoint.host,
             },
         )
-        if monotonic() >= self._dispatch_deadline:
-            raise httpx.RequestError("The original embedding lease expired before transport entry.")
-        received = await self._delegate.handle_async_request(outbound)
+        received = await self._dispatch(outbound)
         self.response_status = received.status_code
         try:
             if received.status_code != 200:
@@ -151,6 +153,59 @@ class BoundEmbeddingHttpTransport(httpx.AsyncBaseTransport):
 
         finally:
             await received.aclose()
+
+    async def _dispatch(self, request: httpx.Request) -> httpx.Response:
+        remaining = self._dispatch_deadline - monotonic()
+        if remaining <= 0:
+            self.not_sent = True
+            raise httpx.ConnectTimeout("The original lease expired before transport entry.")
+
+        deadline = asyncio.timeout(remaining)
+        connecting = False
+        connection_failed = False
+        possibly_written = False
+        tcp_stream: httpcore.AsyncNetworkStream | None = None
+
+        async def trace(event: str, info: dict[str, object]) -> None:
+            nonlocal connecting, connection_failed, possibly_written, tcp_stream
+            match event:
+                case "connection.connect_tcp.started" | "connection.start_tls.started":
+                    connecting = True
+                case "connection.connect_tcp.complete":
+                    stream = info.get("return_value")
+                    if isinstance(stream, httpcore.AsyncNetworkStream):
+                        tcp_stream = stream
+                case "connection.start_tls.complete":
+                    tcp_stream = None
+                case "connection.connect_tcp.failed" | "connection.start_tls.failed":
+                    connection_failed = True
+                case "http11.send_request_headers.started":
+                    if monotonic() >= self._dispatch_deadline:
+                        self.not_sent = True
+                        raise httpx.ConnectTimeout("The original lease expired before HTTP write.")
+                    possibly_written = True
+                case "http11.send_request_headers.complete":
+                    if deadline.expired() or monotonic() >= self._dispatch_deadline:
+                        raise httpx.WriteTimeout("The original lease expired during HTTP write.")
+                    deadline.reschedule(None)
+                case _:
+                    pass
+
+        request.extensions["trace"] = trace
+        try:
+            async with deadline:
+                return await self._delegate.handle_async_request(request)
+        except (httpx.ConnectError, httpx.ConnectTimeout):
+            self.not_sent = self.not_sent or (connection_failed and not possibly_written)
+            raise
+        except TimeoutError:
+            self.not_sent = deadline.expired() and connecting and not possibly_written
+            raise
+        finally:
+            # HTTPcore has no connection to close if the timer cancels its TLS setup.
+            if tcp_stream is not None:
+                with suppress(OSError):
+                    await tcp_stream.aclose()
 
     def _vector(self, body: bytearray) -> tuple[float, ...]:
         payload = self._object(loads(body, object_pairs_hook=self._unique_object))

@@ -18,6 +18,8 @@ The initial profile disables automatic redirects, ambient proxies/credentials, r
 
 The private job-backed embedding slice binds one reviewed OpenAI-compatible selection and its exact pretokenized input to the admitted job. One transaction commits current credential checks, the reservation and approval, the permanent issuance, and the job's pending effect. The session closes before provider I/O. The pinned SDK requires the offline process profile with effective logging suppressed and callbacks absent. The transport constructs the selected HTTPS request for an explicit loopback route, verifies the original certificate name against the configured CA, and gives the SDK only validated response fields. The fixture uses controlled pricing and development dependencies. Deployment egress, real tariffs, additional mappings, and product callers remain separate delivery work.
 
+The original send deadline runs during TCP connection and TLS negotiation. The transport checks it again immediately before admitting the HTTP header write. Once admitted, the timer attempts to cancel the write, and scheduling may delay cancellation. If the deadline passes before the admitted write completes, dispatch remains uncertain. After timely header completion, the existing response deadline applies. The adapter records known no-send when its own guard stops the request before admitting the write or when the pinned transport confirms a connection failure before any possible HTTP write.
+
 <a id="approve-and-validate-a-destination"></a>
 
 <a id="destinations"></a>

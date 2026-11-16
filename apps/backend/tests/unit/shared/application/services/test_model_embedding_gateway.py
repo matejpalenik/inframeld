@@ -1,4 +1,5 @@
-from collections.abc import AsyncGenerator
+import asyncio
+from collections.abc import AsyncGenerator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
@@ -10,7 +11,7 @@ from ssl import create_default_context
 from sys import modules
 from time import monotonic
 from types import ModuleType
-from typing import override
+from typing import cast, override
 from unittest.mock import create_autospec
 from uuid import uuid4
 
@@ -187,6 +188,7 @@ class MockTransaction(TransactionManager):
         self.active = False
         self.session_open = False
         self.commits = 0
+        self.rollbacks = 0
         self.lose_acknowledgment = False
 
     @override
@@ -199,6 +201,9 @@ class MockTransaction(TransactionManager):
             self.commits += 1
             if self.lose_acknowledgment:
                 raise ConnectionError("Issued transaction acknowledgment lost.")
+        except JobFenceLostError:
+            self.rollbacks += 1
+            raise
         finally:
             self.active = False
 
@@ -209,6 +214,7 @@ class MockIssuances(ModelDispatchIssuanceRepository):
         self.issued: ModelDispatchIssuanceDTO | None = None
         self.checkpoint: bytes | None = None
         self.remaining = timedelta(seconds=30)
+        self.lost_at_confirmation: JobFenceLostError | None = None
 
     @override
     async def add(
@@ -230,6 +236,8 @@ class MockIssuances(ModelDispatchIssuanceRepository):
     ) -> bool:
         assert self.transaction.active and self.issued is not None
         assert self.issued.call_id == call_id and self.issued.fence == attempt.fence
+        if self.lost_at_confirmation is not None:
+            raise self.lost_at_confirmation
         self.checkpoint = checkpoint
         return True
 
@@ -272,11 +280,14 @@ class GatewayScenario:
         self.issuances = MockIssuances(self.transactions)
         self.adapter = MockAdapter(self.transactions)
         self.settled = False
+        self.observed: SpendingObservationDTO | None = None
+        self.late: SpendingObservationDTO | None = None
         credentials = create_autospec(ModelDispatchCredentialService, instance=True)
         credentials.read.return_value = _CREDENTIAL
         spending = create_autospec(SpendingAccountingService, instance=True)
         spending.prepare_new_dispatch_in_transaction.side_effect = self.prepare
         spending.record_observation_in_transaction.side_effect = self.observe
+        spending.retain_late_observation_in_transaction.side_effect = self.retain_late
 
         @asynccontextmanager
         async def phase() -> AsyncGenerator[ModelDispatchPhase]:
@@ -324,7 +335,20 @@ class GatewayScenario:
             observation.call_id == call.call_id and observation.usage == _CALL.basis.maximum_usage
         )
         self.settled = True
+        self.observed = observation
         return SpendingAccountingResultDTO(self.record(call, SpendingCallState.SETTLED, 2))
+
+    async def retain_late(
+        self,
+        *,
+        call: SpendingCallContextDTO,
+        observation: SpendingObservationDTO,
+        expected_call_revision: int,
+    ) -> None:
+        assert self.transactions.active and self.transactions.rollbacks == 1
+        assert self.transactions.commits == 1 and expected_call_revision == 1
+        assert self.issuances.issued is not None and call.call_id == self.issuances.issued.call_id
+        self.late = observation
 
     @staticmethod
     def record(
@@ -394,6 +418,21 @@ async def test_acknowledgment_after_lease_deadline_cannot_enter_the_adapter() ->
         await scenario.gateway.embed(scenario.attempt, _CALL)
 
     assert scenario.issuances.issued is not None and scenario.adapter.invocations == 0
+
+
+@pytest.mark.asyncio
+async def test_fence_lost_at_confirmation_retains_the_original_observation_after_rollback() -> None:
+    scenario = GatewayScenario()
+    expected = JobFenceLostError("Original fence expired at confirmation.")
+    scenario.issuances.lost_at_confirmation = expected
+
+    with pytest.raises(JobFenceLostError) as raised:
+        await scenario.gateway.embed(scenario.attempt, _CALL)
+
+    assert raised.value is expected
+    assert scenario.observed is not None and scenario.late is scenario.observed
+    assert scenario.transactions.commits == 2 and scenario.transactions.rollbacks == 1
+    assert scenario.issuances.checkpoint is None and scenario.adapter.invocations == 1
 
 
 def test_sdk_preflight_rejects_an_effective_poison_callback(
@@ -512,3 +551,84 @@ async def test_embedding_transport_rebuilds_request_and_sdk_response(
 
     assert response.json() == safe_response and "x-unapproved" not in response.headers
     assert transport.result is not None and transport.result.provider_reference is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "phase", ["tls-deadline", "header-deadline", "response", "refused", "untraced", "canceled"]
+)
+async def test_transport_tracks_header_admission_and_prewrite_evidence(
+    monkeypatch: pytest.MonkeyPatch, phase: str
+) -> None:
+    import httpx
+
+    from inframeld_backend.access.application.value_objects.provider_credential_value import (
+        ProviderCredentialValue,
+    )
+    from inframeld_backend.shared.infrastructure.resources.bound_embedding_http_transport import (
+        BoundEmbeddingHttpTransport,
+    )
+
+    finish_reached = False
+
+    async def peer(_self: httpx.AsyncHTTPTransport, request: httpx.Request) -> httpx.Response:
+        nonlocal finish_reached
+        trace = cast(
+            Callable[[str, dict[str, object]], Awaitable[None]] | None,
+            request.extensions.get("trace"),
+        )
+        if phase in ("refused", "untraced"):
+            if trace is not None and phase == "refused":
+                await trace("connection.connect_tcp.failed", {})
+            raise httpx.ConnectError("Controlled connection failure.")
+        if trace is not None:
+            await trace("connection.start_tls.started", {})
+        if phase == "canceled":
+            raise asyncio.CancelledError
+        if phase != "tls-deadline" and trace is not None:
+            await trace("http11.send_request_headers.started", {})
+            if phase == "response":
+                await trace("http11.send_request_headers.complete", {})
+        await asyncio.sleep(0.15)
+        finish_reached = True
+        return httpx.Response(503, request=request)
+
+    monkeypatch.setattr(httpx.AsyncHTTPTransport, "handle_async_request", peer)
+    transport = BoundEmbeddingHttpTransport(
+        base_url="https://fixture.example.test/v1",
+        address=IPv4Address("127.0.0.1"),
+        tls=create_default_context(),
+        model="text-embedding-3-small",
+        tokens=(31, 32),
+        dimensions=3,
+        credential=ProviderCredentialValue("fixture-key"),
+        dispatch_deadline=monotonic() + 0.08,
+    )
+    request = httpx.Request(
+        "POST",
+        "https://fixture.example.test/v1/embeddings",
+        json={
+            "model": "text-embedding-3-small",
+            "input": [[31, 32]],
+            "encoding_format": "float",
+            "dimensions": 3,
+        },
+        extensions={"timeout": {"connect": 2.0, "read": 2.0, "write": 2.0}},
+    )
+
+    async with transport:
+        if phase == "response":
+            assert (await transport.handle_async_request(request)).status_code == 503
+            assert finish_reached
+        else:
+            expected = {
+                "tls-deadline": TimeoutError,
+                "header-deadline": TimeoutError,
+                "refused": httpx.ConnectError,
+                "untraced": httpx.ConnectError,
+                "canceled": asyncio.CancelledError,
+            }[phase]
+            with pytest.raises(expected):
+                await transport.handle_async_request(request)
+            assert not finish_reached
+    assert transport.not_sent == (phase in ("tls-deadline", "refused"))

@@ -1,6 +1,6 @@
 import asyncio
 import os
-from asyncio import StreamReader, StreamWriter
+from asyncio import StreamReader, StreamReaderProtocol, StreamWriter
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager, suppress
 from datetime import UTC, datetime, timedelta
@@ -11,6 +11,7 @@ from ipaddress import IPv4Address
 from json import dumps, loads
 from logging import CRITICAL
 from pathlib import Path
+from socket import AF_INET, MSG_PEEK, SOCK_STREAM, socket
 from ssl import PROTOCOL_TLS_SERVER, SSLContext, create_default_context
 from uuid import uuid4, uuid5
 
@@ -112,6 +113,7 @@ from inframeld_backend.shared.application.enums.spending_observation_kind import
     SpendingObservationKind,
 )
 from inframeld_backend.shared.application.errors.application_errors import ConflictError
+from inframeld_backend.shared.application.errors.job_errors import JobFenceLostError
 from inframeld_backend.shared.application.errors.spending_errors import SpendingLimitExceededError
 from inframeld_backend.shared.application.services.artifact_cleanup_authorization_service import (
     ArtifactCleanupAuthorizationService,
@@ -146,6 +148,9 @@ from inframeld_backend.shared.infrastructure.readers.postgres_artifact_cleanup_f
     PostgresArtifactCleanupFactsReader,
 )
 from inframeld_backend.shared.infrastructure.repositories.postgres_job_store import PostgresJobStore
+from inframeld_backend.shared.infrastructure.repositories.postgres_model_dispatch_issuance_repository import (
+    PostgresModelDispatchIssuanceRepository,
+)
 from inframeld_backend.shared.infrastructure.resources.database import Database
 from inframeld_backend.shared.infrastructure.resources.sqlalchemy_transaction_manager import (
     SqlAlchemyTransactionManager,
@@ -241,9 +246,12 @@ async def _admit(
         "accepted",
         "lost",
         "late",
+        "confirm-fence",
         "canceled",
         "invalid",
         "redirect",
+        "tls-deadline",
+        "refused",
         "missing-key",
         "legacy",
         "cap",
@@ -268,6 +276,7 @@ async def test_original_model_embedding_uses_committed_issuance_and_exact_wire_e
     requests = 0
     names: list[str | None] = []
     handlers: list[asyncio.Task[None]] = []
+    saw_client_hello = False
     open_sessions = 0
     open_session = database.session
 
@@ -419,15 +428,70 @@ async def test_original_model_embedding_uses_committed_issuance_and_exact_wire_e
     def on_connection(reader: StreamReader, writer: StreamWriter) -> None:
         handlers.append(asyncio.create_task(serve(reader, writer)))
 
-    server = await asyncio.start_server(
-        on_connection, str(_ADDRESS), 0, ssl=peer_tls, ssl_handshake_timeout=2
-    )
-    port = server.sockets[0].getsockname()[1]
-    base = f"https://{_HOSTNAME}:{port}/v1"
-    destinations = ModelConnectionDestinationSettings(https_base_urls=frozenset({base}))
-    connection_path = f"/v1/projects/{owner.project_id.value}/model-connections"
+    async def hold_handshake(listener: socket) -> None:
+        nonlocal saw_client_hello
+        loop = asyncio.get_running_loop()
+        async with asyncio.timeout(4):
+            peer, _ = await loop.sock_accept(listener)
+            with peer:
+                while True:
+                    try:
+                        hello = peer.recv(2, MSG_PEEK)
+                    except BlockingIOError:
+                        await asyncio.sleep(0.01)
+                        continue
+                    if len(hello) >= 2 or not hello:
+                        break
+                    await asyncio.sleep(0.01)
+                assert hello == b"\x16\x03"
+                saw_client_hello = True
+
+                # Leave the actual ClientHello queued until after the original send window.
+                await asyncio.sleep(1.2)
+                reader = StreamReader()
+                protocol = StreamReaderProtocol(reader)
+                try:
+                    transport, _ = await loop.connect_accepted_socket(
+                        lambda: protocol, peer, ssl=peer_tls, ssl_handshake_timeout=1
+                    )
+                except (OSError, TimeoutError):
+                    return
+                await serve(reader, StreamWriter(transport, protocol, reader, loop))
+
+    @asynccontextmanager
+    async def endpoint() -> AsyncGenerator[int]:
+        if outcome not in ("refused", "tls-deadline"):
+            server = await asyncio.start_server(
+                on_connection, str(_ADDRESS), 0, ssl=peer_tls, ssl_handshake_timeout=2
+            )
+            async with server:
+                yield server.sockets[0].getsockname()[1]
+            return
+
+        with socket(AF_INET, SOCK_STREAM) as listener:
+            listener.bind((str(_ADDRESS), 0))
+            listener.setblocking(False)
+            if outcome == "refused":
+                yield listener.getsockname()[1]
+                return
+            listener.listen(1)
+            async with asyncio.TaskGroup() as group:
+                group.create_task(hold_handshake(listener))
+                yield listener.getsockname()[1]
+
+    async def lose_at_confirmation(
+        _repository: PostgresModelDispatchIssuanceRepository,
+        _attempt: JobAttemptContextDTO,
+        _call_id: ModelCallId,
+        _checkpoint: bytes,
+    ) -> bool:
+        raise JobFenceLostError("Controlled fence loss during confirmation.")
+
     try:
-        async with server:
+        async with endpoint() as port:
+            base = f"https://{_HOSTNAME}:{port}/v1"
+            destinations = ModelConnectionDestinationSettings(https_base_urls=frozenset({base}))
+            connection_path = f"/v1/projects/{owner.project_id.value}/model-connections"
             async with open_model_connection_creation(
                 database, _FINGERPRINTS, destinations
             ) as creator:
@@ -520,6 +584,12 @@ async def test_original_model_embedding_uses_committed_issuance_and_exact_wire_e
                 _FINGERPRINTS,
             )
             attempt = await _admit(database, owner, gateway.admission_payload(call))
+            if outcome == "tls-deadline":
+                async with database.session() as session, session.begin():
+                    current = await PostgresJobStore(session).require_current(attempt)
+                    job = await session.get(DurableJobRow, attempt.job_id.value)
+                    assert job is not None
+                    job.lease_expires_at = current.observed_at + timedelta(seconds=1)
             if outcome == "issue-conflict":
                 async with database.session() as session, session.begin():
                     job = await session.get(DurableJobRow, attempt.job_id.value)
@@ -595,15 +665,25 @@ async def test_original_model_embedding_uses_committed_issuance_and_exact_wire_e
                     )
                     assert job.checkpoint == b"conflicting-job-progress"
                 return
-            result = await gateway.embed(attempt, call)
-            if outcome not in ("late", "canceled"):
+            if outcome == "confirm-fence":
+                monkeypatch.setattr(
+                    PostgresModelDispatchIssuanceRepository, "confirm", lose_at_confirmation
+                )
+                with pytest.raises(JobFenceLostError, match="fence loss during confirmation"):
+                    await gateway.embed(attempt, call)
+                result = None
+            else:
+                result = await gateway.embed(attempt, call)
+            if outcome not in ("late", "canceled", "confirm-fence", "tls-deadline"):
                 with pytest.raises(ConflictError):
                     await gateway.embed(attempt, call)
     finally:
         await asyncio.gather(*handlers)
 
-    if outcome == "missing-key":
+    if outcome in ("missing-key", "refused"):
         assert requests == 0 and not names
+    elif outcome == "tls-deadline":
+        assert saw_client_hello and requests == 0
     else:
         assert requests == 1 and names == [_HOSTNAME]
     assert attempt is not None
@@ -617,6 +697,16 @@ async def test_original_model_embedding_uses_committed_issuance_and_exact_wire_e
         assert (
             issuance.credential_revision == 1 and issuance.access_revision == call.access_revision
         )
+        if outcome == "confirm-fence":
+            evidence = await session.scalar(select(ModelCallAccountingEvidenceRow))
+            assert evidence is not None and evidence.was_pending
+            assert evidence.kind == SpendingObservationKind.USAGE and evidence.applied_state is None
+            assert accounting.state == SpendingCallState.ACCOUNTING_APPROVED
+            assert accounting.hold_amount == Decimal("0.2") and accounting.settled_amount is None
+            assert job.pending_effect == f"model-call:{issuance.call_id}" and job.checkpoint == b""
+            assert result is None
+            return
+        assert result is not None
         if outcome == "accepted":
             assert result.vector == _VECTOR and result.provider_reference == "native-fixture-call"
             assert accounting.settled_amount == Decimal("0.2") and accounting.hold_amount == 0
@@ -627,8 +717,23 @@ async def test_original_model_embedding_uses_committed_issuance_and_exact_wire_e
             assert accounting.state == SpendingCallState.SETTLED
             assert accounting.settled_amount == Decimal("0.2") and accounting.hold_amount == 0
             assert job.cancel_requested and job.pending_effect is None and job.checkpoint == b""
-        elif outcome == "missing-key":
+        elif outcome in ("missing-key", "refused", "tls-deadline"):
+            evidence = await session.scalar(select(ModelCallAccountingEvidenceRow))
+            assert evidence is not None and evidence.kind == SpendingObservationKind.NOT_SENT
+            # The conservative local cutoff can precede the database fence.
+            if outcome == "tls-deadline" and evidence.was_pending:
+                assert result.kind is SpendingObservationKind.UNCERTAIN and result.vector is None
+                assert evidence.applied_state is None
+                assert accounting.state == SpendingCallState.ACCOUNTING_APPROVED
+                assert (
+                    accounting.hold_amount == Decimal("0.2") and accounting.settled_amount is None
+                )
+                assert (
+                    job.pending_effect == f"model-call:{issuance.call_id}" and job.checkpoint == b""
+                )
+                return
             assert result.kind is SpendingObservationKind.NOT_SENT and result.vector is None
+            assert not evidence.was_pending
             assert accounting.state == SpendingCallState.RELEASED
             assert (
                 accounting.hold_amount == 0 and job.pending_effect is None and job.checkpoint == b""
@@ -641,7 +746,10 @@ async def test_original_model_embedding_uses_committed_issuance_and_exact_wire_e
             assert job.pending_effect == f"model-call:{issuance.call_id}" and job.checkpoint == b""
             if outcome == "late":
                 evidence = await session.scalar(select(ModelCallAccountingEvidenceRow))
-                assert evidence is not None and evidence.applied_state is None
+                assert (
+                    evidence is not None and evidence.was_pending and evidence.applied_state is None
+                )
+                assert evidence.kind == SpendingObservationKind.USAGE
                 assert accounting.state == SpendingCallState.ACCOUNTING_APPROVED
             else:
                 assert accounting.state == SpendingCallState.UNRESOLVED

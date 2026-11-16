@@ -231,11 +231,9 @@ class SpendingAccountingService(SpendingAccountant):
         try:
             await self._job_ownership.require_current(call.attempt)
         except JobFenceLostError:
-            await self._job_ownership.require_issued_attempt(call.attempt)
-            # Commit recognized late evidence without changing the hold.
-            await self._lock_account(call)
-            record = await self._require_call(call)
-            return await self._retain_pending(record, observation, expected_call_revision)
+            return await self._retain_late_after_authority(
+                call, observation, expected_call_revision
+            )
         await self._lock_account(call)
         record = await self._require_call(call)
         recovered = await self._recover_observation(record, observation)
@@ -250,6 +248,31 @@ class SpendingAccountingService(SpendingAccountant):
         )
         await self._spending_ledger_writer.save_call(updated, expected_revision=record.revision)
         return SpendingAccountingResultDTO(updated)
+
+    async def retain_late_observation_in_transaction(
+        self,
+        *,
+        call: SpendingCallContextDTO,
+        observation: SpendingObservationDTO,
+        expected_call_revision: int,
+    ) -> None:
+        """Retain evidence from a previously rejected, historically issued attempt."""
+        if observation.call_id != call.call_id:
+            raise ConflictError("Evidence must identify the original call.")
+        await self._admitted_work_authorizer.require_current(call.authority)
+        await self._require_call(call)
+        await self._retain_late_after_authority(call, observation, expected_call_revision)
+
+    async def _retain_late_after_authority(
+        self,
+        call: SpendingCallContextDTO,
+        observation: SpendingObservationDTO,
+        expected_call_revision: int,
+    ) -> SpendingAccountingResultDTO:
+        await self._job_ownership.require_issued_attempt(call.attempt)
+        await self._lock_account(call)
+        record = await self._require_call(call)
+        return await self._retain_pending(record, observation, expected_call_revision)
 
     @override
     async def reconcile(

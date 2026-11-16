@@ -188,7 +188,10 @@ class LiteLLMEmbeddingAdapter(ModelEmbeddingAdapter):
                         raise ValueError("The embedding SDK changed its retry profile.")
             except (openai.OpenAIError, httpx.HTTPError, TimeoutError, ValueError):
                 return EmbeddingDispatchResultDTO(
-                    SpendingObservationKind.UNCERTAIN, response_status=route.response_status
+                    SpendingObservationKind.NOT_SENT
+                    if route.not_sent
+                    else SpendingObservationKind.UNCERTAIN,
+                    response_status=route.response_status,
                 )
         return route.result or EmbeddingDispatchResultDTO(
             SpendingObservationKind.UNCERTAIN, response_status=route.response_status
