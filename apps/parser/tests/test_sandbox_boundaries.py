@@ -156,17 +156,19 @@ class NamespaceReportTest(unittest.TestCase):
             "net-namespace": 104,
         }
 
-    def test_requires_the_exact_positive_setup_ids(self) -> None:
+    def test_requires_a_positive_child_pid_and_only_known_positive_namespace_ids(self) -> None:
         valid = self.namespace_report
         with TemporaryDirectory() as directory:
             report = Path(directory) / "namespaces.json"
             report.write_text(json.dumps(valid) + "\n")
             self.assertEqual(_read_namespace_report(report), valid)
             for invalid in (
-                {key: value for key, value in valid.items() if key != "net-namespace"},
+                {key: value for key, value in valid.items() if key != "child-pid"},
                 {**valid, "user-namespace": 105},
                 {**valid, "pid-namespace": 0},
+                {**valid, "net-namespace": False},
                 {**valid, "child-pid": True},
+                {**valid, "child-pid": -1},
                 {**valid, "ipc-namespace": "103"},
             ):
                 with self.subTest(invalid=invalid), self.assertRaisesRegex(ValueError, "namespace"):
@@ -175,6 +177,17 @@ class NamespaceReportTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "capture limit"):
                 report.write_text(" " * (_CAPTURE_BYTES + 1))
                 _read_namespace_report(report)
+
+    def test_allows_pid_only_and_partial_namespace_reports(self) -> None:
+        with TemporaryDirectory() as directory:
+            report = Path(directory) / "namespaces.json"
+            for valid in (
+                {"child-pid": 41},
+                {"child-pid": 41, "mnt-namespace": 101, "net-namespace": 104},
+            ):
+                with self.subTest(fields=tuple(valid)):
+                    report.write_text(json.dumps(valid) + "\n")
+                    self.assertEqual(_read_namespace_report(report), valid)
 
     def test_held_child_requires_exactly_one_complete_namespace_record(self) -> None:
         setup = json.dumps(self.namespace_report).encode()
@@ -199,6 +212,9 @@ class NamespaceReportTest(unittest.TestCase):
                     report.write_bytes(setup + json.dumps({"exit-code": code}).encode() + b"\n")
                     self.assertEqual(_exec_boundary_status(report, code), "exec-boundary-reported")
 
+            report.write_bytes(b'{"child-pid": 41}\n{"exit-code": 1}\n')
+            self.assertEqual(_exec_boundary_status(report, 1), "exec-boundary-reported")
+
             for invalid in (
                 b"",
                 setup,
@@ -210,7 +226,7 @@ class NamespaceReportTest(unittest.TestCase):
                 setup + b'{"exit-code": 1, "extra": "protected"}\n',
                 setup + b'{"exit-code": 1}',
                 setup + b'{"exit-code": 1}\n\n',
-                b'{"child-pid": 41}\n{"exit-code": 1}\n',
+                b'{"pid-namespace": 102}\n{"exit-code": 1}\n',
                 b'{"exit-code": 1}\n',
                 setup + b" " * _CAPTURE_BYTES + b'{"exit-code": 1}\n',
             ):
@@ -379,7 +395,8 @@ class ParserSandboxTest(unittest.TestCase):
         (init,) = _children(monitor)
         (child,) = _children(init)
         self.assertEqual(report["child-pid"], init)
-        self.assertEqual(_status(Path(f"/proc/{init}"))["NSpid"].split(), [str(init), "1"])
+        init_process = Path(f"/proc/{init}")
+        self.assertEqual(_status(init_process)["NSpid"].split(), [str(init), "1"])
         actual = Path(f"/proc/{child}")
         status = _status(actual)
         self.assertEqual(status["NSpid"].split(), [str(child), "2"])
@@ -388,17 +405,36 @@ class ParserSandboxTest(unittest.TestCase):
         self.assertTrue(all(int(status[key], 16) == 0 for key in ("CapEff", "CapPrm", "CapBnd")))
         self.assertEqual(status["Seccomp"], "2")
         self.assertEqual(_apparmor(actual), _PROFILE)
+
+        # Bubblewrap can omit inodes during setup. Verify both held processes directly.
         outer = Path("/proc/self")
-        for namespace in _SETUP_NAMESPACES:
-            outer_id = _namespace(outer, namespace)
-            self.assertGreater(outer_id, 0)
-            self.assertNotEqual(report[f"{namespace}-namespace"], outer_id)
-        outer_user = _namespace(outer, "user")
-        actual_user = _namespace(actual, "user")
-        self.assertGreater(outer_user, 0)
-        self.assertGreater(actual_user, 0)
-        self.assertNotEqual(actual_user, outer_user)
-        self.assertEqual(_namespace(actual, "pid"), report["pid-namespace"])
+        for namespace in (*_SETUP_NAMESPACES, "user"):
+            try:
+                outer_id = _namespace(outer, namespace)
+                init_id = _namespace(init_process, namespace)
+                actual_id = _namespace(actual, namespace)
+            except OSError as error:
+                category = (
+                    "namespace-permission"
+                    if isinstance(error, PermissionError)
+                    else "namespace-unavailable"
+                )
+                raise AssertionError(
+                    f"Parser sandbox stage=child-observation category={category} namespace={namespace}."
+                ) from None
+            if (
+                min(outer_id, init_id, actual_id) <= 0
+                or actual_id != init_id
+                or actual_id == outer_id
+            ):
+                self.fail(
+                    f"Parser sandbox stage=child-observation category=namespace-identity-mismatch namespace={namespace}."
+                )
+            reported_id = report.get(f"{namespace}-namespace")
+            if reported_id is not None and reported_id != actual_id:
+                self.fail(
+                    f"Parser sandbox stage=child-observation category=namespace-report-mismatch namespace={namespace}."
+                )
         if time.monotonic() > deadline:
             self.fail(_fixture_failure(root, "child-observation-timeout"))
         return monitor, init, child
@@ -511,8 +547,11 @@ def _read_namespace_report(path: Path, *, expected_exit: int | None = None) -> d
     if type(report) is not dict:
         raise ValueError("Incomplete Bubblewrap namespace report.")
     values = cast("dict[str, object]", report)
-    if set(values) != {"child-pid", *(f"{name}-namespace" for name in _SETUP_NAMESPACES)} or any(
-        type(value) is not int or value <= 0 for value in values.values()
+    allowed_fields = {"child-pid", *(f"{name}-namespace" for name in _SETUP_NAMESPACES)}
+    if (
+        "child-pid" not in values
+        or not values.keys() <= allowed_fields
+        or any(type(value) is not int or value <= 0 for value in values.values())
     ):
         raise ValueError("Incomplete Bubblewrap namespace report.")
     if expected_exit is not None:
