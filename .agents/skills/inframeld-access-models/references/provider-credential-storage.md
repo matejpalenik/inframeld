@@ -28,6 +28,12 @@ The credential slot changes independently. At call time, the gateway uses the se
 
 The origin is the scheme, hostname, and port. A similar model name is not permission to send a saved key to a different origin.
 
+### Read the current sealed slot for dispatch
+
+The private API-key reader takes the connection ID and access revision from the trusted caller's original admitted selection. The product job binding alone carries no connection selection. In one short caller-owned PostgreSQL `READ COMMITTED` transaction, it checks current actor and job authority, rejects cancellation, and requires exact connection Use in the original Project. It checks the admitted access revision and current destination approval before loading the sealed credential. Use alone suffices for this internal read.
+
+Rotation makes the current sealed revision available on the next read. A missing, removed, or invalid stored slot fails safely. The API-key reader rejects credential-free Ollama before loading a slot. The returned envelope is private. Dispatch must still obtain the authority to send, validate the outbound destination, and authenticate and decrypt the envelope inside the authorized provider adapter.
+
 <a id="encrypt-the-value-and-bind-it-to-the-correct-resource"></a>
 
 ### Encrypt the value and bind it to the correct resource
