@@ -440,7 +440,7 @@ jobs:
           }
           trace_write 0 tracing_on
           trace_write global trace_clock
-          trace_write 64 buffer_size_kb
+          trace_write 128 buffer_size_kb
           # Keep only relevant executable loads and Bubblewrap process relationships.
           trace_write 'filename == "/usr/bin/true" || filename == "/usr/local/bin/python" || filename == "/opt/probe-tools/bwrap"' \
             events/sched/sched_process_exec/filter
@@ -450,10 +450,39 @@ jobs:
           trace_write 1 events/sched/sched_process_fork/enable
           trace_write 1 events/syscalls/sys_enter_execve/enable
           trace_write 1 events/syscalls/sys_exit_execve/enable
+          trace_write 'id == 1 || id == 20 || id == 60 || id == 231' events/raw_syscalls/sys_enter/filter
+          trace_write 'ret < 0 || id == 1 || id == 20' events/raw_syscalls/sys_exit/filter
+          trace_write 'comm ~ "python*"' events/signal/signal_generate/filter
+          trace_write 'comm ~ "python*"' events/sched/sched_process_exit/filter
+          trace_write 1 events/raw_syscalls/sys_enter/enable
+          trace_write 1 events/raw_syscalls/sys_exit/enable
+          trace_write 1 events/signal/signal_generate/enable
+          trace_write 1 events/signal/signal_deliver/enable
+          trace_write 1 events/sched/sched_process_exit/enable
           trace_write 1 tracing_on
           (exec /usr/bin/true) &
           trace_control=$!
           wait "$trace_control"
+          # Verify error, output, signal and exit visibility independently of the sandbox.
+          syscall_header=/usr/include/x86_64-linux-gnu/asm/unistd_64.h
+          test -r "$syscall_header"
+          (exec /usr/bin/python3 -IB -c '
+          import errno
+          import os
+          import signal
+
+          try:
+              os.close(-1)
+          except OSError as failure:
+              assert failure.errno == errno.EBADF
+          else:
+              raise AssertionError("Invalid descriptor unexpectedly closed")
+          assert os.write(1, b"x") == 1
+          signal.signal(signal.SIGUSR1, lambda *_: None)
+          signal.raise_signal(signal.SIGUSR1)
+          ') >/dev/null &
+          startup_control=$!
+          wait "$startup_control"
 
           audit_since="$(date --utc '+%Y-%m-%d %H:%M:%S.%6N UTC')"
           result=0
@@ -465,15 +494,17 @@ jobs:
           trace_result=0
           trace_write 0 tracing_on && (
             umask 077
-            timeout 10s sudo -n head -c 65537 "$trace_dir/trace" > "$scratch/exec.trace"
-          ) && python3 -IB - "$scratch/exec.trace" "$trace_control" <<'TRACE' || trace_result=$?
+            timeout 10s sudo -n head -c 524289 "$trace_dir/trace" > "$scratch/exec.trace"
+          ) && python3 -IB - "$scratch/exec.trace" "$trace_control" "$startup_control" "$scratch/startup.pid" "$syscall_header" <<'TRACE' || trace_result=$?
           import errno
           import re
+          import signal
+          from itertools import groupby
           import sys
           from pathlib import Path
 
           capture = Path(sys.argv[1]).read_bytes()
-          if len(capture) > 65536:
+          if len(capture) > 524288:
               raise SystemExit("Kernel exec trace: capture exceeded its bound.")
           source = capture.decode("ascii")
           counts = re.search(r"entries-in-buffer/entries-written:\s*(\d+)/(\d+)", source)
@@ -501,6 +532,58 @@ jobs:
           ):
               raise SystemExit("Kernel exec trace: the known launch was not observed.")
 
+          def startup_events(entries, pid, numbers):
+              pending = {}
+              startup = []
+              ended = False
+              for actor, event in entries:
+                  if target := re.match(r"signal_generate: sig=(\d+) errno=-?\d+ code=(-?\d+) comm=\S+ pid=(\d+).* res=0$", event):
+                      if int(target[3]) == pid:
+                          startup.append(f"{signal_name(int(target[1]))} queued (code {target[2]})")
+                  if actor != pid:
+                      continue
+                  if received := re.match(r"signal_deliver: sig=(\d+) errno=-?\d+ code=(-?\d+) ", event):
+                      startup.append(f"{signal_name(int(received[1]))} delivered (code {received[2]})")
+                  if call := re.fullmatch(r"sys_enter: NR (\d+) \(([0-9a-f]+), .*\)", event):
+                      number, argument = int(call[1]), int(call[2], 16)
+                      if number in (60, 231):
+                          startup.append(f"{numbers[number]}({argument & 255})")
+                      else:
+                          pending[number] = argument
+                  if returned := re.fullmatch(r"sys_exit: NR (-?\d+) = (-?\d+)", event):
+                      number, status = int(returned[1]), int(returned[2])
+                      argument = pending.pop(number, None)
+                      name = numbers.get(number, f"syscall_{number}")
+                      if argument is not None and number in (1, 20):
+                          name += f"(fd={argument})"
+                      outcome = errno.errorcode.get(-status, str(status)) if status < 0 else str(status)
+                      startup.append(f"{name} -> {outcome}")
+                  if event.startswith("sched_process_exit: "):
+                      ended = True
+                      break
+              return startup, ended
+
+
+          def signal_name(number):
+              try:
+                  return signal.Signals(number).name
+              except ValueError:
+                  return f"signal_{number}"
+
+
+          syscall_header = Path(sys.argv[5])
+          numbers = {
+              int(number): name
+              for name, number in re.findall(r"^#define __NR_(\w+) (\d+)$", syscall_header.read_text(), re.M)
+          }
+          if any(numbers.get(number) != name for number, name in ((1, "write"), (20, "writev"), (60, "exit"), (231, "exit_group"))):
+              raise SystemExit("Kernel startup trace: syscall table does not match amd64.")
+
+          startup_control = int(sys.argv[3])
+          control_startup, control_exited = startup_events(entries, startup_control, numbers)
+          if not (control_exited and {"write(fd=1) -> 1", "close -> EBADF"}.issubset(control_startup) and any(event.startswith("SIGUSR1 delivered ") for event in control_startup)):
+              raise SystemExit("Kernel startup trace: syscall, exit or signal control was not observed.")
+
           python = "/usr/local/bin/python"
           if not any(loaded(event, python) for _, event in entries):
               raise SystemExit("Kernel exec trace: the outer Python launch was not observed.")
@@ -518,20 +601,32 @@ jobs:
               owned = {root}
               attempts = 0
               rejections = []
-              python_loaded = False
-              for pid, event in entries[index + 1:]:
+              python_loads = []
+              for position, (pid, event) in enumerate(entries[index + 1:], index + 1):
                   if pid not in owned:
                       continue
                   if fork := re.match(r"sched_process_fork: .* child_pid=(\d+)$", event):
                       owned.add(int(fork[1]))
                   attempts += entering(event)
-                  python_loaded |= loaded(event, python)
+                  if loaded(event, python):
+                      python_loads.append((position, pid))
                   if failure := re.fullmatch(r"(?:sys_)?execve -> 0x([0-9a-f]+)", event):
                       value = int(failure[1], 16)
                       if (1 << 64) - 4095 <= value < 1 << 64:
                           rejections.append(errno.errorcode.get((1 << 64) - value, "unknown-errno"))
-              if python_loaded:
+              if python_loads:
+                  if len(python_loads) != 1:
+                      raise SystemExit("Kernel startup trace: Python process ownership was ambiguous.")
+                  position, pid = python_loads[0]
+                  Path(sys.argv[4]).write_text(f"{pid}\n")
                   print("Kernel exec trace: Linux loaded Python in the Bubblewrap process tree.")
+                  startup, exited = startup_events(entries[position + 1:], pid, numbers)
+                  grouped = [(event, sum(1 for _ in repeat)) for event, repeat in groupby(startup)]
+                  print(f"Python startup trace: {len(startup)} events, process exit observed={str(exited).lower()}.")
+                  for event, count in grouped[-32:]:
+                      print(f"Python startup trace: {event}" + (f" (x{count})" if count > 1 else ""))
+                  if not exited:
+                      raise SystemExit("Kernel startup trace: the Python exit event was not observed.")
               elif attempts == 1 and len(rejections) == 1:
                   print(f"Kernel exec trace: Linux rejected the Bubblewrap exec with {rejections[0]}.")
               elif attempts == 0:
@@ -544,12 +639,22 @@ jobs:
           fi
 
           # The journal can omit audit events. Report only fixed matching categories.
-          audit="$(timeout --kill-after=1s 9s bash -o pipefail -s "$audit_since" <<'AUDIT'
+          startup_pid=""
+          if [[ -f "$scratch/startup.pid" ]]; then
+            read -r startup_pid < "$scratch/startup.pid"
+          fi
+          audit="$(timeout --kill-after=1s 9s bash -o pipefail -s "$audit_since" "$startup_pid" <<'AUDIT'
           sudo -n journalctl --boot --since "$1" -n 128 --no-pager --quiet --output=cat \
             --grep 'apparmor="DENIED"' _TRANSPORT=kernel _TRANSPORT=audit 2>/dev/null |
-            LC_ALL=C awk '
+            LC_ALL=C awk -v startup_pid="$2" '
               !/(^|[[:space:]])apparmor="DENIED"([[:space:]]|$)/ ||
-              !/(^|[[:space:]])profile="inframeld-parser-probe"([[:space:]]|$)/ ||
+              !/(^|[[:space:]])profile="inframeld-parser-probe"([[:space:]]|$)/ { next }
+              startup_pid != "" && $0 ~ ("(^|[[:space:]])pid=" startup_pid "([[:space:]]|$)") {
+                if (/ operation="file_inherit"/) inherited = 1
+                if (/ operation="(open|file_mmap)"/) startup_file = 1
+                if (/ info="Failed name lookup - disconnected path"/) startup_disconnected = 1
+                next
+              }
               !/(^|[[:space:]])comm="bwrap"([[:space:]]|$)/ { next }
               / name="\/?proc\/([[:digit:]]+|self|thread-self)\/uid_map"([[:space:]]|$)/ { uid = 1 }
               / name="\/?proc\/([[:digit:]]+|self|thread-self)\/gid_map"([[:space:]]|$)/ { gid = 1 }
@@ -560,6 +665,9 @@ jobs:
               / info="Failed name lookup - disconnected path"([[:space:]]|$)/ { disconnected = 1 }
               / operation="capable"([[:space:]]|$)/ { capability = 1 }
               END {
+                if (inherited) print "Python startup audit: inherited-file-denied"
+                if (startup_file) print "Python startup audit: startup-file-denied"
+                if (startup_disconnected) print "Python startup audit: disconnected-path"
                 if (uid) print "Parser probe kernel audit: uid-map-denied"
                 if (gid) print "Parser probe kernel audit: gid-map-denied"
                 if (groups) print "Parser probe kernel audit: setgroups-denied"
