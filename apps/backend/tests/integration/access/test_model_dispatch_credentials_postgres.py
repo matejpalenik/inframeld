@@ -1,11 +1,12 @@
+import asyncio
 import os
 from dataclasses import replace
 from hashlib import sha256
 from pathlib import Path
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
-from sqlalchemy import update
+from sqlalchemy import select, update
 from tests.support.project_creation_scenarios import ProjectCreationSeedDTO, create_project
 from tests.support.spending_scenarios import (
     finish_fixture_job,
@@ -28,6 +29,9 @@ from inframeld_backend.access.application.dtos.model_connection_access_dto impor
 )
 from inframeld_backend.access.application.dtos.model_connection_creation_dto import (
     ModelConnectionCreationDTO,
+)
+from inframeld_backend.access.application.dtos.model_connection_credential_result_dto import (
+    ModelConnectionCredentialResultDTO,
 )
 from inframeld_backend.access.application.dtos.model_dispatch_credential_dto import (
     ModelDispatchCredentialDTO,
@@ -56,6 +60,13 @@ from inframeld_backend.access.infrastructure.readers.postgres_admitted_work_fact
 from inframeld_backend.access.infrastructure.readers.postgres_model_dispatch_credential_reader import (
     PostgresModelDispatchCredentialReader,
 )
+from inframeld_backend.access.infrastructure.resources.pynacl_provider_credential_cipher import (
+    PyNaClProviderCredentialCipher,
+)
+from inframeld_backend.access.infrastructure.rows.access_audit_event_row import AccessAuditEventRow
+from inframeld_backend.access.infrastructure.rows.model_connection_credential_row import (
+    ModelConnectionCredentialRow,
+)
 from inframeld_backend.access.infrastructure.rows.model_connection_row import ModelConnectionRow
 from inframeld_backend.access.infrastructure.rows.organization_row import OrganizationRow
 from inframeld_backend.access.infrastructure.settings.model_connection_destination_settings import (
@@ -64,6 +75,7 @@ from inframeld_backend.access.infrastructure.settings.model_connection_destinati
 from inframeld_backend.access.infrastructure.settings.provider_credential_settings import (
     ProviderCredentialSettings,
 )
+from inframeld_backend.bootstrap.application_settings import get_settings
 from inframeld_backend.bootstrap.model_connection_composition import (
     open_model_connection_creation,
     open_model_connection_credentials,
@@ -76,6 +88,8 @@ from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.errors.application_errors import (
     AccessDeniedError,
     ConflictError,
+    DependencyUnavailableError,
+    IdempotencyKeyReusedError,
     StaleRevisionError,
 )
 from inframeld_backend.shared.application.errors.job_errors import (
@@ -94,6 +108,10 @@ from inframeld_backend.shared.application.value_objects.request_fingerprint_key 
 from inframeld_backend.shared.domain.value_objects.resource_name import ResourceName
 from inframeld_backend.shared.domain.value_objects.submitted_display_name import (
     SubmittedDisplayName,
+)
+from inframeld_backend.shared.infrastructure.migrations.migration_runner import run_migrations
+from inframeld_backend.shared.infrastructure.readers.file_request_fingerprint_key_reader import (
+    FileRequestFingerprintKeyReader,
 )
 from inframeld_backend.shared.infrastructure.repositories.postgres_job_store import PostgresJobStore
 from inframeld_backend.shared.infrastructure.resources.database import Database
@@ -153,12 +171,14 @@ async def _change_credential(
     settings: ProviderCredentialSettings,
     revision: int,
     value: str | None,
-) -> None:
+    *,
+    fingerprint_key: RequestFingerprintKey = _FINGERPRINT_KEY,
+) -> ModelConnectionCredentialResultDTO:
     project, selected = connection.connection.project_id, connection.connection.connection_id
     async with open_model_connection_credentials(
-        database, _FINGERPRINT_KEY, _DESTINATIONS, settings
+        database, fingerprint_key, _DESTINATIONS, settings
     ) as credentials:
-        await credentials.change(
+        return await credentials.change(
             access,
             ChangeModelConnectionCredentialCommand(
                 project,
@@ -323,3 +343,196 @@ async def test_current_credential_requires_exact_use_in_the_original_job_scope(
         await PostgresJobStore(session).request_cancel(applicant.attempt.job_id)
     with pytest.raises(JobStoppedError):
         await _snapshot(database, applicant.attempt, selected, revision)
+
+
+async def _credential_audit_ids(
+    database: Database, connection: ModelConnectionId
+) -> tuple[UUID, ...]:
+    async with database.session() as session:
+        return tuple(
+            await session.scalars(
+                select(AccessAuditEventRow.id)
+                .where(
+                    AccessAuditEventRow.event_type == "model_connection_credential_changed",
+                    AccessAuditEventRow.target_id == connection.value,
+                )
+                .order_by(AccessAuditEventRow.id)
+            )
+        )
+
+
+async def test_current_credential_and_original_receipt_survive_stopped_cluster_copy() -> None:
+    """Use the restored credential only after a fresh job passes current authorization."""
+    directory = os.getenv("INFRAMELD_TEST_CREDENTIAL_COLD_COPY_DIR")
+    if directory is None:
+        pytest.skip("Requires the separately operated stopped PostgreSQL copy.")
+    root = Path(directory)
+    source, restored, handoff = root / "source", root / "restored", root / "handoff"
+    seed_ready, restore_ready = handoff / "seed.ready", handoff / "restore.ready"
+    assert root.is_absolute() and handoff.is_dir()
+    assert not seed_ready.exists() and not restore_ready.exists()
+
+    settings = get_settings()
+    assert settings.database.host == "postgres-credential-restore"
+    assert settings.database.name == "inframeld_credential_restore"
+    assert settings.request_fingerprint.key_file == source / "fingerprint.key"
+    assert settings.provider_credential.key_file == source / "provider.key"
+    expected_key_id = settings.provider_credential.expected_key_id
+    assert expected_key_id is not None
+
+    # This database belongs to the coordinator across both phases.
+    run_migrations(settings.database)
+    database = Database(settings.database)
+    await database.startup()
+    value = "synthetic-cold-copy-credential"
+    try:
+        owner = await seed_spending_scenario(database, create_account=False)
+        created = await _create_connection(database, owner.access, owner.project_id, "cold-copy")
+        selected = created.connection.connection_id
+        revision = created.connection.connection_access_revision
+        saved = await _change_credential(
+            database,
+            owner.access,
+            created,
+            settings.provider_credential,
+            0,
+            value,
+            fingerprint_key=FileRequestFingerprintKeyReader(
+                settings.request_fingerprint.key_file
+            ).read(),
+        )
+        assert saved.operation.created and saved.changed and saved.credential.present
+        original_slot = await _snapshot(database, owner.attempt, selected, revision)
+        assert original_slot.binding.credential_id == saved.credential.credential_id
+        assert original_slot.binding.revision == saved.credential.revision == 1
+        original_audit = await _credential_audit_ids(database, selected)
+        assert len(original_audit) == 1
+        await finish_fixture_job(database, owner)
+    finally:
+        await database.shutdown()
+
+    # The coordinator releases the test after verifying the stopped copy and replacement.
+    seed_ready.touch(exist_ok=False)
+    async with asyncio.timeout(120):
+        while not restore_ready.is_file():  # noqa: ASYNC110 - the coordinator is a separate process
+            await asyncio.sleep(0.1)
+    assert restore_ready.stat().st_size == 0
+
+    database = Database(settings.database)
+    await database.startup()
+    try:
+        restored_provider = ProviderCredentialSettings(
+            key_file=restored / "provider.key", expected_key_id=expected_key_id
+        )
+        restored_fingerprint = FileRequestFingerprintKeyReader(restored / "fingerprint.key").read()
+        replay = await _change_credential(
+            database,
+            owner.access,
+            created,
+            restored_provider,
+            0,
+            value,
+            fingerprint_key=restored_fingerprint,
+        )
+        assert replay == replace(saved, operation=replace(saved.operation, created=False))
+
+        missing_fingerprint = restored / "missing-fingerprint.key"
+        assert not missing_fingerprint.exists()
+        with pytest.raises(RuntimeError, match="Cannot read the idempotency fingerprint key file"):
+            FileRequestFingerprintKeyReader(missing_fingerprint).read()
+        wrong_fingerprint = FileRequestFingerprintKeyReader(
+            restored / "wrong-fingerprint.key"
+        ).read()
+        with pytest.raises(IdempotencyKeyReusedError):
+            await _change_credential(
+                database,
+                owner.access,
+                created,
+                restored_provider,
+                0,
+                value,
+                fingerprint_key=wrong_fingerprint,
+            )
+
+        applicant = await seed_human_work(database, owner, "cold-copy-reader")
+        recipient = applicant.access.actor_principal_id
+        action = ModelConnectionAction.USE
+        grant_route = (
+            f"/v1/model-connections/{selected.value}/grants/{recipient.value}/{action.value}"
+        )
+        async with open_model_connection_grant_change(
+            database, RequestFingerprintService(restored_fingerprint)
+        ) as changer:
+            grant = await changer.change(
+                owner.access,
+                ChangeModelConnectionGrantCommand(
+                    selected, recipient, action, created.project_access_revision, False
+                ),
+                IdempotencyContextDTO(
+                    HttpMethod.PUT, grant_route, IdempotencyKey("grant-cold-use")
+                ),
+            )
+            slot = await _snapshot(database, applicant.attempt, selected, revision)
+            slot_matches_original = slot == original_slot
+            assert slot_matches_original
+
+            fingerprint_id = sha256(restored_fingerprint.value).hexdigest()
+            cipher = PyNaClProviderCredentialCipher(
+                restored_provider.key_file, expected_key_id, fingerprint_id
+            )
+            value_matches_original = cipher.decrypt(
+                slot.envelope, slot.binding
+            ) == ProviderCredentialValue(value)
+            assert value_matches_original
+
+            missing_provider = restored / "missing-provider.key"
+            wrong_provider = restored / "wrong-provider.key"
+            assert not missing_provider.exists()
+            assert wrong_provider.is_file()
+            wrong_key_stat = wrong_provider.stat()
+            assert wrong_key_stat.st_mode & 0o077 == 0 and wrong_key_stat.st_size == 32
+            with wrong_provider.open("rb") as wrong_file:
+                wrong_provider_id = sha256(wrong_file.read(32)).hexdigest()
+            wrong_provider_is_distinct = wrong_provider_id != expected_key_id
+            assert wrong_provider_is_distinct
+            for path in (missing_provider, wrong_provider):
+                unavailable_cipher = PyNaClProviderCredentialCipher(
+                    path, expected_key_id, fingerprint_id
+                )
+                with pytest.raises(
+                    DependencyUnavailableError, match="encryption key is unavailable"
+                ):
+                    unavailable_cipher.decrypt(slot.envelope, slot.binding)
+
+            await changer.change(
+                owner.access,
+                ChangeModelConnectionGrantCommand(
+                    selected, recipient, action, grant.access_revision, None
+                ),
+                IdempotencyContextDTO(
+                    HttpMethod.DELETE, grant_route, IdempotencyKey("revoke-cold-use")
+                ),
+            )
+        with pytest.raises(AccessDeniedError):
+            await _snapshot(database, applicant.attempt, selected, revision)
+        await finish_fixture_job(database, applicant)
+
+        async with open_model_connection_credentials(
+            database, restored_fingerprint, _DESTINATIONS, restored_provider
+        ) as credentials:
+            assert (
+                await credentials.get(owner.access, owner.project_id, selected) == saved.credential
+            )
+        async with database.session() as session:
+            row = await session.get(ModelConnectionCredentialRow, slot.binding.credential_id)
+            slot_unchanged = (
+                row is not None
+                and row.key_id == slot.envelope.key_id
+                and row.algorithm == slot.envelope.algorithm
+                and row.format_version == slot.envelope.format_version
+                and row.ciphertext == slot.envelope.message
+            )
+            assert slot_unchanged
+        assert await _credential_audit_ids(database, selected) == original_audit
+    finally:
+        await database.shutdown()
