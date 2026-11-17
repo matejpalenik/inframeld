@@ -307,6 +307,12 @@ def convert(path, *, asset_root, manifest, max_content_tokens, merge_peers):
         if Path.home() != Path('/scratch'):
             os.write(2, b'Controlled converter did not resolve the sandbox home.\\n')
             raise AssertionError('Unexpected sandbox home.')
+        if (
+            os.environ['TORCHINDUCTOR_COMPILE_THREADS'] != '1'
+            or os.environ['TORCHINDUCTOR_CACHE_DIR'] != '/scratch'
+        ):
+            os.write(2, b'Controlled converter received inherited TorchInductor settings.\\n')
+            raise AssertionError('Unexpected TorchInductor settings.')
     assert path == Path('/input/source.pdf')
     assert asset_root == Path('/opt/inframeld-parser/assets')
     assert manifest == Path('/opt/inframeld-parser/docling-parser-v1.json')
@@ -321,6 +327,8 @@ if require_scratch == '1':
         return []
 
     os.environ['HOME'] = '/outside-parser-home'
+    os.environ['TORCHINDUCTOR_COMPILE_THREADS'] = '9'
+    os.environ['TORCHINDUCTOR_CACHE_DIR'] = '/outside-parser-cache'
     tempfile.tempdir = None
     tempfile._candidate_tempdir_list = no_temp_candidates
 sys.argv = [script, *arguments]

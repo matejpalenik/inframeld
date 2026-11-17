@@ -84,6 +84,9 @@ def _convert(attempt_id: UUID, source_sha256: str, max_content_tokens: int) -> b
         HF_HUB_DISABLE_IMPLICIT_TOKEN="1",
         HF_HUB_DISABLE_TELEMETRY="1",
         TRANSFORMERS_OFFLINE="1",
+        # TorchInductor reads these even when model compilation is disabled.
+        TORCHINDUCTOR_COMPILE_THREADS="1",
+        TORCHINDUCTOR_CACHE_DIR="/scratch",
     )
 
     from inframeld_parser.parse_result import encode_parse_result
