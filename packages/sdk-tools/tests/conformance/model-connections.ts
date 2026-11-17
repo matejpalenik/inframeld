@@ -85,7 +85,19 @@ for (const read of [
     route: `${root}/${modelConnectionId}/usage`,
     path,
     query: { limit: 1 },
-    expected: { items: [], nextCursor: null },
+    expected: {
+      items: [
+        {
+          consumerKind: "embedding-profile",
+          consumerId: "00000000-0000-4000-8000-000000000246",
+          role: "embedding",
+          model: "Original/Embedding-v1",
+          latestAttempt: null,
+          lastValidation: null,
+        },
+      ],
+      nextCursor: null,
+    },
   },
 ] as const) {
   sdkTest(

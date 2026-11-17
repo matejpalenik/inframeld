@@ -1,10 +1,10 @@
 from typing import override
 
-from sqlalchemy import exists, select
+from sqlalchemy import and_, exists, select
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.exc import TimeoutError as SqlAlchemyTimeoutError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.sql import Select
+from sqlalchemy.sql import ColumnElement
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
 from inframeld_backend.access.application.dtos.application_key_authentication_dto import (
@@ -86,7 +86,10 @@ class PostgresEmbeddingProfileReadRepository(EmbeddingProfileReadRepository):
     ) -> EmbeddingProfileDTO | None:
         try:
             row = await self._session.scalar(
-                self._visible(facts, project_id).where(EmbeddingProfileRow.id == profile_id.value)
+                select(EmbeddingProfileRow).where(
+                    self.profile_visibility(facts, project_id),
+                    EmbeddingProfileRow.id == profile_id.value,
+                )
             )
         except (OperationalError, SqlAlchemyTimeoutError):
             raise DependencyUnavailableError() from None
@@ -99,12 +102,13 @@ class PostgresEmbeddingProfileReadRepository(EmbeddingProfileReadRepository):
             ) from None
 
     @staticmethod
-    def _visible(
+    def profile_visibility(
         facts: ProjectActionFactsDTO, project_id: ProjectId
-    ) -> Select[tuple[EmbeddingProfileRow]]:
+    ) -> ColumnElement[bool]:
+        """Restrict profile reads to the exact scope and recipient's current View grant."""
         profile = EmbeddingProfileRow
         grant = EmbeddingProfileActionGrantRow
-        return select(profile).where(
+        return and_(
             profile.project_id == project_id.value,
             profile.organization_id == facts.principal.organization_id.value,
             exists().where(

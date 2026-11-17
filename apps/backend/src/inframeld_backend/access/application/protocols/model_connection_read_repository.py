@@ -3,8 +3,12 @@ from typing import Protocol
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
 from inframeld_backend.access.application.dtos.model_connection_dto import ModelConnectionDTO
+from inframeld_backend.access.application.dtos.model_connection_usage_item_dto import (
+    ModelConnectionUsageItemDTO,
+)
 from inframeld_backend.access.application.dtos.project_action_facts_dto import ProjectActionFactsDTO
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
+from inframeld_backend.indexing.domain.value_objects.embedding_profile_id import EmbeddingProfileId
 from inframeld_backend.shared.application.value_objects.model_connection_id import ModelConnectionId
 from inframeld_backend.shared.domain.value_objects.installation_id import InstallationId
 
@@ -30,3 +34,15 @@ class ModelConnectionReadRepository(Protocol):
         after: ModelConnectionId | None,
         limit: int,
     ) -> tuple[ModelConnectionDTO, ...]: ...
+
+    @abstractmethod
+    async def list_embedding_profile_usage(
+        self,
+        facts: ProjectActionFactsDTO,
+        project_id: ProjectId,
+        connection_id: ModelConnectionId,
+        after: EmbeddingProfileId | None,
+        limit: int,
+    ) -> tuple[ModelConnectionUsageItemDTO, ...]:
+        """Select exact visible profile references in ID order after the optional position."""
+        ...

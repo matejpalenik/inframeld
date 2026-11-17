@@ -8,6 +8,9 @@ from inframeld_backend.access.application.dtos.model_connection_creation_dto imp
     ModelConnectionCreationDTO,
 )
 from inframeld_backend.access.application.dtos.model_connection_dto import ModelConnectionDTO
+from inframeld_backend.access.application.dtos.model_connection_usage_item_dto import (
+    ModelConnectionUsageItemDTO,
+)
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
 from inframeld_backend.access.http.requests.model_connection_creation_request import (
     ModelConnectionCreationRequest,
@@ -24,6 +27,10 @@ from inframeld_backend.access.http.responses.model_connection_response import (
     ModelConnectionCredentialResponse,
     ModelConnectionResponse,
 )
+from inframeld_backend.access.http.responses.model_connection_usage_response import (
+    ModelConnectionUsageResponse,
+)
+from inframeld_backend.shared.application.enums.model_role import ModelRole
 from inframeld_backend.shared.domain.value_objects.resource_name import ResourceName
 from inframeld_backend.shared.domain.value_objects.submitted_display_name import (
     SubmittedDisplayName,
@@ -65,6 +72,17 @@ class ModelConnectionMapper:
                 present=item.credential_present,
                 revision=item.credential_revision,
             ),
+        )
+
+    @staticmethod
+    def usage(item: ModelConnectionUsageItemDTO) -> ModelConnectionUsageResponse:
+        return ModelConnectionUsageResponse(
+            consumer_kind="embedding-profile",
+            consumer_id=item.embedding_profile_id.value,
+            role=ModelRole.EMBEDDING,
+            model=item.model_alias,
+            latest_attempt=None,
+            last_validation=None,
         )
 
     @staticmethod

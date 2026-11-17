@@ -18,6 +18,7 @@ from tests.unit.access.application.services.test_model_connection_creation_servi
 )
 from tests.unit.access.application.services.test_model_connection_read_service import (
     FIRST,
+    FIRST_USAGE,
     MockReadRepository,
 )
 from tests.unit.access.http.routes.test_application_account_routes import MockAccountAuthenticator
@@ -69,7 +70,7 @@ BODY = {
 HEADERS = {"Authorization": "Bearer human-access-token", "Idempotency-Key": "original"}
 
 
-def _client(events: list[str]) -> TestClient:
+def _client(events: list[str], *, saved_usage: bool = False) -> TestClient:
     idempotency = MockOperationIdempotency(events)
     idempotency.result = NEW_RESERVATION
 
@@ -85,7 +86,10 @@ def _client(events: list[str]) -> TestClient:
 
     @asynccontextmanager
     async def open_reader() -> AsyncGenerator[ModelConnectionReadService]:
-        yield ModelConnectionReadService(MockTransactions(events), MockReadRepository(events))
+        repository = MockReadRepository(events)
+        if saved_usage:
+            repository.usage_items = (FIRST_USAGE,)
+        yield ModelConnectionReadService(MockTransactions(events), repository)
 
     auth = MockAccountAuthenticator()
     app = FastAPI()
@@ -157,3 +161,24 @@ def test_reject_duplicate_inputs_and_credentials_without_invoking_creation() -> 
         for r in (ambiguous, unknown, duplicate, unknown_query)
     )
     assert not events
+
+
+def test_usage_reports_saved_profile_without_provider_observations() -> None:
+    with _client([], saved_usage=True) as client:
+        response = client.get(f"{ROUTE}/{FIRST.connection_id.value}/usage", headers=HEADERS)
+
+    assert response.status_code == 200
+    assert response.headers["cache-control"] == "no-store"
+    assert response.json() == {
+        "items": [
+            {
+                "consumerKind": "embedding-profile",
+                "consumerId": str(FIRST_USAGE.embedding_profile_id.value),
+                "role": "embedding",
+                "model": "Exact/Embedding-A",
+                "latestAttempt": None,
+                "lastValidation": None,
+            }
+        ],
+        "nextCursor": None,
+    }

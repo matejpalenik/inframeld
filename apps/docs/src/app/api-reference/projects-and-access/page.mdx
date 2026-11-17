@@ -394,7 +394,7 @@ Use the same exact management authority and an `Idempotency-Key`. Send a bodyles
 
 <ApiOperation operationId="listModelConnectionUsage" />
 
-Use the same exact target and current configuration-view permission. Usage observations belong to a specific consumer, role, model and observed access/credential revisions. Latest attempt and last validation are separate observations. In this version the endpoint returns an empty page after authorizing the read. It makes no provider request and supplies no information about hidden consumers.
+List saved Embedding Profiles that select the connection. Each page requires current `view-model-connection-configuration` on the exact connection and View on each returned profile. Use `limit` and `cursor` to continue in the same scope. Each item shows the profile ID, the `embedding` role and the exact model alias. The server reads saved configuration without contacting the provider, and `latestAttempt` and `lastValidation` are both `null`. An empty page cannot establish that the connection has no other references.
 
 ## Read model connection action grants
 

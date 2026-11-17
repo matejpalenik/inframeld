@@ -17,6 +17,9 @@ from inframeld_backend.access.application.dtos.model_connection_access_dto impor
     ModelConnectionAccessDTO,
 )
 from inframeld_backend.access.application.dtos.model_connection_dto import ModelConnectionDTO
+from inframeld_backend.access.application.dtos.model_connection_usage_item_dto import (
+    ModelConnectionUsageItemDTO,
+)
 from inframeld_backend.access.application.dtos.project_action_facts_dto import ProjectActionFactsDTO
 from inframeld_backend.access.application.dtos.project_action_target_dto import (
     ProjectActionTargetDTO,
@@ -43,6 +46,11 @@ from inframeld_backend.access.infrastructure.rows.model_connection_row import Mo
 from inframeld_backend.access.infrastructure.rows.organization_row import OrganizationRow
 from inframeld_backend.access.infrastructure.rows.principal_row import PrincipalRow
 from inframeld_backend.access.infrastructure.rows.project_row import ProjectRow
+from inframeld_backend.indexing.domain.value_objects.embedding_profile_id import EmbeddingProfileId
+from inframeld_backend.indexing.infrastructure.repositories.postgres_embedding_profile_read_repository import (
+    PostgresEmbeddingProfileReadRepository,
+)
+from inframeld_backend.indexing.infrastructure.rows.embedding_profile_row import EmbeddingProfileRow
 from inframeld_backend.shared.application.errors.application_errors import (
     DependencyUnavailableError,
 )
@@ -161,6 +169,38 @@ class PostgresModelConnectionReadRepository(ModelConnectionReadRepository):
         except (OperationalError, SqlAlchemyTimeoutError):
             raise DependencyUnavailableError() from None
         return tuple(self._metadata(*row) for row in rows)
+
+    @override
+    async def list_embedding_profile_usage(
+        self,
+        facts: ProjectActionFactsDTO,
+        project_id: ProjectId,
+        connection_id: ModelConnectionId,
+        after: EmbeddingProfileId | None,
+        limit: int,
+    ) -> tuple[ModelConnectionUsageItemDTO, ...]:
+        profile = EmbeddingProfileRow
+        query = select(
+            profile.project_id, profile.model_connection_id, profile.id, profile.model_alias
+        ).where(
+            PostgresEmbeddingProfileReadRepository.profile_visibility(facts, project_id),
+            profile.model_connection_id == connection_id.value,
+        )
+        if after is not None:
+            query = query.where(profile.id > after.value)
+        try:
+            result = await self._session.execute(query.order_by(profile.id).limit(limit))
+            return tuple(
+                ModelConnectionUsageItemDTO(
+                    ProjectId(project),
+                    ModelConnectionId(connection),
+                    EmbeddingProfileId(profile_id),
+                    model,
+                )
+                for project, connection, profile_id, model in result.tuples()
+            )
+        except (OperationalError, SqlAlchemyTimeoutError):
+            raise DependencyUnavailableError() from None
 
     @staticmethod
     def _visible(
