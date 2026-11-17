@@ -78,6 +78,7 @@ def _convert(attempt_id: UUID, source_sha256: str, max_content_tokens: int) -> b
     tempfile.tempdir = "/scratch"
     sys.path[:0] = [str(_RUNTIME / "src"), str(_RUNTIME / "site")]
     os.environ.update(
+        HOME="/scratch",
         HF_HOME="/scratch/huggingface",
         HF_HUB_OFFLINE="1",
         HF_HUB_DISABLE_IMPLICIT_TOKEN="1",

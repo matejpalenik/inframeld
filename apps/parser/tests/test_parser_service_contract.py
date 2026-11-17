@@ -304,6 +304,9 @@ def convert(path, *, asset_root, manifest, max_content_tokens, merge_peers):
     assert os.environ['HF_HUB_OFFLINE'] == '1'
     if require_scratch == '1':
         assert tempfile.gettempdir() == '/scratch'
+        if Path.home() != Path('/scratch'):
+            os.write(2, b'Controlled converter did not resolve the sandbox home.\\n')
+            raise AssertionError('Unexpected sandbox home.')
     assert path == Path('/input/source.pdf')
     assert asset_root == Path('/opt/inframeld-parser/assets')
     assert manifest == Path('/opt/inframeld-parser/docling-parser-v1.json')
@@ -317,6 +320,7 @@ if require_scratch == '1':
         os.write(2, b'Controlled temp-directory discovery was required.\\n')
         return []
 
+    os.environ['HOME'] = '/outside-parser-home'
     tempfile.tempdir = None
     tempfile._candidate_tempdir_list = no_temp_candidates
 sys.argv = [script, *arguments]
