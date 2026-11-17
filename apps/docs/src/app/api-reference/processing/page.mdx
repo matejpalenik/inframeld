@@ -1,6 +1,7 @@
 export const pageMetadata = {
   title: "Processing and search",
-  description: "Create and inspect immutable processing profiles.",
+  description:
+    "Create and inspect immutable processing and embedding profiles.",
 }
 
 # Processing and search
@@ -22,3 +23,23 @@ Returns HTTP `200` with `items` and nullable `nextCursor`. Each page filters by 
 <ApiOperation operationId="getProcessingProfile" />
 
 Use the permanent profile ID in its owning Project with current `view-processing-profile` authority. HTTP `200` returns the saved definition and safe IDs. A hidden, missing or wrong-Project profile receives the same resource-not-found response. These operations use no-store responses. [Read or share a processing profile](/guides/models-and-processing#read-or-share-a-processing-profile).
+
+## Create an embedding profile
+
+<ApiOperation operationId="createEmbeddingProfile" />
+
+Use current human `create-embedding-profiles` authority in the Project and one `Idempotency-Key`. A fresh request needs a live Model Connection in that Project for the deployment-approved OpenAI v1 destination and the supported `text-embedding-3-small` definition. HTTP `201` returns the saved definition, logical layout and original View and Use creator grants. The server advances the Project Access revision once. It saves configuration without contacting the provider.
+
+Repeat the exact request and key to recover the original `201` receipt while you still have current Create authority. The server checks the current destination for fresh requests. A request with changed settings under the same key conflicts. [Create an embedding profile](/guides/models-and-processing#create-an-embedding-profile).
+
+## List embedding profiles
+
+<ApiOperation operationId="listEmbeddingProfiles" />
+
+HTTP `200` returns saved profiles with current exact `view-embedding-profile` authority. Use `limit` from 1 to 100, with a default of 25. Pass the returned `nextCursor` to continue on the same installation and Project while it is non-null. Each page checks current credentials and permissions.
+
+## Read an embedding profile
+
+<ApiOperation operationId="getEmbeddingProfile" />
+
+Use the permanent profile ID in its owning Project with current `view-embedding-profile` authority. HTTP `200` returns saved settings and logical layout. A hidden, missing or wrong-Project profile receives the same `404`. These operations use no-store responses. [Read an embedding profile](/guides/models-and-processing#read-an-embedding-profile).

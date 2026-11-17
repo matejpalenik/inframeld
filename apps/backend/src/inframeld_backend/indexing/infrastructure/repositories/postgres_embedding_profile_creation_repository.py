@@ -8,6 +8,9 @@ from sqlalchemy.exc import TimeoutError as SqlAlchemyTimeoutError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
+from inframeld_backend.access.application.dtos.model_connection_access_dto import (
+    ModelConnectionAccessDTO,
+)
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.enums.project_action import ProjectAction
 from inframeld_backend.access.domain.enums.project_status import ProjectStatus
@@ -146,13 +149,13 @@ class PostgresEmbeddingProfileCreationRepository(EmbeddingProfileCreationReposit
     @override
     async def lock_live_selection(
         self, *, facts: EmbeddingProfileCreationFactsDTO, connection_id: ModelConnectionId
-    ) -> bool:
+    ) -> ModelConnectionAccessDTO | None:
         self._require_transaction()
         try:
-            return await ModelConnectionReferenceQueries.has_live_target(
+            return await ModelConnectionReferenceQueries.live_access(
                 self._session, facts.organization_id, facts.project_id, connection_id
             )
-        except (OperationalError, SqlAlchemyTimeoutError):
+        except (OperationalError, SqlAlchemyTimeoutError, ValueError):
             raise DependencyUnavailableError() from None
 
     @override

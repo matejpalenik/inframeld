@@ -865,6 +865,39 @@ problems!(
 );
 
 problems!(
+    CreateEmbeddingProfileApiError,
+    CreateEmbeddingProfileApiError::Status400,
+    CreateEmbeddingProfileApiError::Status401,
+    CreateEmbeddingProfileApiError::Status403,
+    CreateEmbeddingProfileApiError::Status404,
+    CreateEmbeddingProfileApiError::Status409,
+    CreateEmbeddingProfileApiError::Status413,
+    CreateEmbeddingProfileApiError::Status415,
+    CreateEmbeddingProfileApiError::Status422,
+    CreateEmbeddingProfileApiError::Status503
+);
+
+problems!(
+    GetEmbeddingProfileApiError,
+    GetEmbeddingProfileApiError::Status400,
+    GetEmbeddingProfileApiError::Status401,
+    GetEmbeddingProfileApiError::Status403,
+    GetEmbeddingProfileApiError::Status404,
+    GetEmbeddingProfileApiError::Status422,
+    GetEmbeddingProfileApiError::Status503
+);
+
+problems!(
+    ListEmbeddingProfilesApiError,
+    ListEmbeddingProfilesApiError::Status400,
+    ListEmbeddingProfilesApiError::Status401,
+    ListEmbeddingProfilesApiError::Status403,
+    ListEmbeddingProfilesApiError::Status404,
+    ListEmbeddingProfilesApiError::Status422,
+    ListEmbeddingProfilesApiError::Status503
+);
+
+problems!(
     ListProcessingProfileActionGrantsApiError,
     ListProcessingProfileActionGrantsApiError::Status400,
     ListProcessingProfileActionGrantsApiError::Status401,

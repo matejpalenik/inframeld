@@ -46,6 +46,10 @@ from inframeld_backend.indexing.infrastructure.rows.embedding_profile_row import
 from inframeld_backend.shared.application.errors.application_errors import (
     DependencyUnavailableError,
 )
+from inframeld_backend.shared.domain.value_objects.installation_id import InstallationId
+from inframeld_backend.shared.infrastructure.rows.installation_identity_row import (
+    InstallationIdentityRow,
+)
 
 
 class PostgresEmbeddingProfileReadRepository(EmbeddingProfileReadRepository):
@@ -62,7 +66,7 @@ class PostgresEmbeddingProfileReadRepository(EmbeddingProfileReadRepository):
     @override
     async def lock_scope(
         self, access: AccessContextDTO, project_id: ProjectId
-    ) -> ProjectActionFactsDTO | None:
+    ) -> tuple[InstallationId, ProjectActionFactsDTO] | None:
         if not self._session.in_transaction() or not self._session.is_active:
             raise RuntimeError("Embedding Profile access requires an active transaction.")
         try:
@@ -74,11 +78,21 @@ class PostgresEmbeddingProfileReadRepository(EmbeddingProfileReadRepository):
                 if organization is None:
                     return None
 
-            return await self._scope_reader.read_scope_facts(
+            facts = await self._scope_reader.read_scope_facts(
                 access=access, target=ProjectActionTargetDTO(project_id)
+            )
+            if facts is None:
+                return None
+            installation = await self._session.scalar(
+                select(InstallationIdentityRow.installation_id).where(
+                    InstallationIdentityRow.singleton_key == 1
+                )
             )
         except (OperationalError, SqlAlchemyTimeoutError):
             raise DependencyUnavailableError() from None
+        if installation is None:
+            raise DependencyUnavailableError("The installation identity is unavailable.")
+        return InstallationId(installation), facts
 
     @override
     async def get_visible(
@@ -94,8 +108,29 @@ class PostgresEmbeddingProfileReadRepository(EmbeddingProfileReadRepository):
         except (OperationalError, SqlAlchemyTimeoutError):
             raise DependencyUnavailableError() from None
 
+        return self._mapped(row) if row is not None else None
+
+    @override
+    async def list_visible(
+        self,
+        facts: ProjectActionFactsDTO,
+        project_id: ProjectId,
+        after: EmbeddingProfileId | None,
+        limit: int,
+    ) -> tuple[EmbeddingProfileDTO, ...]:
+        query = select(EmbeddingProfileRow).where(self.profile_visibility(facts, project_id))
+        if after is not None:
+            query = query.where(EmbeddingProfileRow.id > after.value)
         try:
-            return PostgresEmbeddingProfileMapper.profile(row) if row is not None else None
+            rows = await self._session.scalars(query.order_by(EmbeddingProfileRow.id).limit(limit))
+        except (OperationalError, SqlAlchemyTimeoutError):
+            raise DependencyUnavailableError() from None
+        return tuple(self._mapped(row) for row in rows)
+
+    @staticmethod
+    def _mapped(row: EmbeddingProfileRow) -> EmbeddingProfileDTO:
+        try:
+            return PostgresEmbeddingProfileMapper.profile(row)
         except ValueError:
             raise DependencyUnavailableError(
                 "The stored Embedding Profile is unavailable."

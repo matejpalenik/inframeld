@@ -398,6 +398,27 @@ const calls = {
       path: call.path as sdk.ListProcessingProfilesData["path"],
       query: call.query as sdk.ListProcessingProfilesData["query"],
     }),
+  createEmbeddingProfile: (client: Client, call: SdkCall) =>
+    sdk.createEmbeddingProfile({
+      ...options(client, call),
+      path: call.path as sdk.CreateEmbeddingProfileData["path"],
+      headers: {
+        ...call.headers,
+        "Idempotency-Key": call.headers["Idempotency-Key"]!,
+      },
+      body: call.body as sdk.CreateEmbeddingProfileData["body"],
+    }),
+  getEmbeddingProfile: (client: Client, call: SdkCall) =>
+    sdk.getEmbeddingProfile({
+      ...options(client, call),
+      path: call.path as sdk.GetEmbeddingProfileData["path"],
+    }),
+  listEmbeddingProfiles: (client: Client, call: SdkCall) =>
+    sdk.listEmbeddingProfiles({
+      ...options(client, call),
+      path: call.path as sdk.ListEmbeddingProfilesData["path"],
+      query: call.query as sdk.ListEmbeddingProfilesData["query"],
+    }),
   listProcessingProfileActionGrants: (client: Client, call: SdkCall) =>
     sdk.listProcessingProfileActionGrants({
       ...options(client, call),

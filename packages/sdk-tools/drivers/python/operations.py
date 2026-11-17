@@ -25,6 +25,7 @@ from inframeld_sdk.models.application_account_creation_request import (
 )
 from inframeld_sdk.models.application_key_issue_request import ApplicationKeyIssueRequest
 from inframeld_sdk.models.application_key_revocation_request import ApplicationKeyRevocationRequest
+from inframeld_sdk.models.embedding_profile_creation_request import EmbeddingProfileCreationRequest
 from inframeld_sdk.models.grant_target_kind import GrantTargetKind
 from inframeld_sdk.models.human_admission_request import HumanAdmissionRequest
 from inframeld_sdk.models.human_o_auth_consent_request import HumanOAuthConsentRequest
@@ -547,6 +548,68 @@ def list_processing_profiles_sync(clients: Clients, call: Call) -> NativeRespons
 
 async def list_processing_profiles_async(clients: Clients, call: Call) -> NativeResponse:
     return await IndexingApi(clients.production).list_processing_profiles_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        limit=integer(call.query["limit"]) if "limit" in call.query else None,
+        cursor=string(call.query["cursor"]) if "cursor" in call.query else None,
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+def create_embedding_profile_sync(clients: Clients, call: Call) -> NativeResponse:
+    return IndexingApi(clients.production).create_embedding_profile_sync_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        idempotency_key=call.headers["Idempotency-Key"],
+        embedding_profile_creation_request=EmbeddingProfileCreationRequest.model_validate(
+            call.body
+        ),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def create_embedding_profile_async(clients: Clients, call: Call) -> NativeResponse:
+    return await IndexingApi(clients.production).create_embedding_profile_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        idempotency_key=call.headers["Idempotency-Key"],
+        embedding_profile_creation_request=EmbeddingProfileCreationRequest.model_validate(
+            call.body
+        ),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+def get_embedding_profile_sync(clients: Clients, call: Call) -> NativeResponse:
+    return IndexingApi(clients.production).get_embedding_profile_sync_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        embedding_profile_id=UUID(call.path["embedding_profile_id"]),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def get_embedding_profile_async(clients: Clients, call: Call) -> NativeResponse:
+    return await IndexingApi(clients.production).get_embedding_profile_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        embedding_profile_id=UUID(call.path["embedding_profile_id"]),
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+def list_embedding_profiles_sync(clients: Clients, call: Call) -> NativeResponse:
+    return IndexingApi(clients.production).list_embedding_profiles_sync_with_http_info(
+        project_id=UUID(call.path["project_id"]),
+        limit=integer(call.query["limit"]) if "limit" in call.query else None,
+        cursor=string(call.query["cursor"]) if "cursor" in call.query else None,
+        _headers=call.headers,
+        _request_timeout=call.timeout / 1000,
+    )
+
+
+async def list_embedding_profiles_async(clients: Clients, call: Call) -> NativeResponse:
+    return await IndexingApi(clients.production).list_embedding_profiles_with_http_info(
         project_id=UUID(call.path["project_id"]),
         limit=integer(call.query["limit"]) if "limit" in call.query else None,
         cursor=string(call.query["cursor"]) if "cursor" in call.query else None,
@@ -1957,12 +2020,21 @@ BINDINGS: dict[Operation, Binding] = {
     Operation.CREATE_PROCESSING_PROFILE: Binding(
         create_processing_profile_sync, create_processing_profile_async
     ),
+    Operation.CREATE_EMBEDDING_PROFILE: Binding(
+        create_embedding_profile_sync, create_embedding_profile_async
+    ),
     Operation.UPLOAD_DOCUMENT: Binding(upload_document_sync, upload_document_async),
     Operation.GET_PROCESSING_PROFILE: Binding(
         get_processing_profile_sync, get_processing_profile_async
     ),
+    Operation.GET_EMBEDDING_PROFILE: Binding(
+        get_embedding_profile_sync, get_embedding_profile_async
+    ),
     Operation.LIST_PROCESSING_PROFILES: Binding(
         list_processing_profiles_sync, list_processing_profiles_async
+    ),
+    Operation.LIST_EMBEDDING_PROFILES: Binding(
+        list_embedding_profiles_sync, list_embedding_profiles_async
     ),
     Operation.LIST_PROCESSING_PROFILE_ACTION_GRANTS: Binding(
         list_processing_profile_action_grants_sync, list_processing_profile_action_grants_async

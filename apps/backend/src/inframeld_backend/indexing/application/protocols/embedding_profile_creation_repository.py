@@ -2,6 +2,9 @@ from abc import abstractmethod
 from typing import Literal, Protocol
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
+from inframeld_backend.access.application.dtos.model_connection_access_dto import (
+    ModelConnectionAccessDTO,
+)
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
 from inframeld_backend.indexing.application.dtos.embedding_profile_creation_dto import (
     EmbeddingProfileCreationDTO,
@@ -31,8 +34,8 @@ class EmbeddingProfileCreationRepository(Protocol):
     @abstractmethod
     async def lock_live_selection(
         self, *, facts: EmbeddingProfileCreationFactsDTO, connection_id: ModelConnectionId
-    ) -> bool:
-        """Check the live same-scope reference under the connection liveness gate through commit."""
+    ) -> ModelConnectionAccessDTO | None:
+        """Read live same-scope provider configuration under the liveness gate through commit."""
         ...
 
     @abstractmethod

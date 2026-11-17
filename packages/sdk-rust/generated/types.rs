@@ -498,6 +498,15 @@ pub struct PageResponseGrantRecipientResponse {
     pub next_cursor: Option<String>,
 }
 #[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct PageResponseEmbeddingProfileResponse {
+    pub items: Vec<EmbeddingProfileResponse>,
+    #[serde(
+        rename = "nextCursor",
+        deserialize_with = "presence_serde::required_nullable"
+    )]
+    pub next_cursor: Option<String>,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct PageResponseApplicationKeyMetadataResponse {
     pub items: Vec<ApplicationKeyMetadataResponse>,
     #[serde(
@@ -7567,6 +7576,291 @@ pub struct GrantRecipientResponse {
     pub kind: PrincipalKind,
     #[serde(rename = "principalId")]
     pub principal_id: uuid::Uuid,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct EmbeddingProfileCreationResponse {
+    #[serde(rename = "idempotencyExpiresAt")]
+    pub idempotency_expires_at: chrono::DateTime<chrono::Utc>,
+    ///Constraint: minItems=2, maxItems=2
+    #[serde(rename = "initialGrants")]
+    pub initial_grants: Vec<InitialEmbeddingProfileGrantResponse>,
+    #[serde(rename = "operationId")]
+    pub operation_id: String,
+    pub profile: EmbeddingProfileResponse,
+    ///Constraint: minimum=1, maximum=9007199254740991
+    #[serde(rename = "projectAccessRevision")]
+    pub project_access_revision: i64,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct InitialEmbeddingProfileGrantResponse {
+    #[serde(rename = "actionId")]
+    pub action_id: EmbeddingProfileAction,
+    #[serde(rename = "canGrant")]
+    pub can_grant: BooleanConstant<true>,
+    pub target: EmbeddingProfileGrantTargetResponse,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct EmbeddingProfileGrantTargetResponse {
+    #[serde(rename = "embeddingProfileId")]
+    pub embedding_profile_id: uuid::Uuid,
+    pub kind: EmbeddingProfileGrantTargetResponseKind,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum EmbeddingProfileGrantTargetResponseKind {
+    #[default]
+    #[serde(rename = "embedding-profile")]
+    EmbeddingProfile,
+}
+impl EmbeddingProfileGrantTargetResponseKind {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::EmbeddingProfile => "embedding-profile",
+        }
+    }
+}
+impl ::std::fmt::Display for EmbeddingProfileGrantTargetResponseKind {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for EmbeddingProfileGrantTargetResponseKind {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum EmbeddingProfileAction {
+    #[default]
+    #[serde(rename = "view-embedding-profile")]
+    ViewEmbeddingProfile,
+    #[serde(rename = "use-embedding-profile")]
+    UseEmbeddingProfile,
+}
+impl EmbeddingProfileAction {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::ViewEmbeddingProfile => "view-embedding-profile",
+            Self::UseEmbeddingProfile => "use-embedding-profile",
+        }
+    }
+}
+impl ::std::fmt::Display for EmbeddingProfileAction {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for EmbeddingProfileAction {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+///Describe saved vector meaning and its intended logical layout.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct EmbeddingProfileResponse {
+    pub definition: EmbeddingProfileDefinitionResponse,
+    #[serde(rename = "displayName")]
+    pub display_name: String,
+    #[serde(rename = "embeddingProfileId")]
+    pub embedding_profile_id: uuid::Uuid,
+    pub name: String,
+    ///Constraint: minimum=1, maximum=1
+    #[serde(rename = "placementVersion")]
+    pub placement_version: i64,
+    #[serde(rename = "projectId")]
+    pub project_id: uuid::Uuid,
+    ///Constraint: minimum=2, maximum=2
+    #[serde(rename = "shardCount")]
+    pub shard_count: i64,
+    #[serde(rename = "vectorIndexId")]
+    pub vector_index_id: uuid::Uuid,
+    #[serde(rename = "vectorLayoutId")]
+    pub vector_layout_id: uuid::Uuid,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct EmbeddingProfileDefinitionResponse {
+    ///Constraint: minimum=1, maximum=9007199254740991
+    #[serde(rename = "contextTokens")]
+    pub context_tokens: i64,
+    ///Constraint: minimum=1, maximum=1536
+    pub dimensions: i64,
+    pub distance: EmbeddingDistance,
+    #[serde(rename = "documentPrefix")]
+    pub document_prefix: String,
+    #[serde(
+        rename = "expectedModelRevision",
+        deserialize_with = "presence_serde::required_nullable"
+    )]
+    pub expected_model_revision: Option<String>,
+    #[serde(rename = "expectedProvider")]
+    pub expected_provider: String,
+    pub model: String,
+    #[serde(rename = "modelConnectionId")]
+    pub model_connection_id: uuid::Uuid,
+    pub normalization: EmbeddingNormalization,
+    #[serde(rename = "queryPrefix")]
+    pub query_prefix: String,
+    pub role: EmbeddingProfileDefinitionResponseRole,
+    #[serde(rename = "tokenBound")]
+    pub token_bound: EmbeddingProfileTokenBoundResponse,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct EmbeddingProfileTokenBoundResponse {
+    pub implementation: String,
+    pub kind: ModelTokenBoundKind,
+    pub revision: String,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum ModelTokenBoundKind {
+    #[default]
+    #[serde(rename = "exact")]
+    Exact,
+    #[serde(rename = "conservative-upper-bound")]
+    ConservativeUpperBound,
+}
+impl ModelTokenBoundKind {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Exact => "exact",
+            Self::ConservativeUpperBound => "conservative-upper-bound",
+        }
+    }
+}
+impl ::std::fmt::Display for ModelTokenBoundKind {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for ModelTokenBoundKind {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum EmbeddingProfileDefinitionResponseRole {
+    #[default]
+    #[serde(rename = "embedding")]
+    Embedding,
+}
+impl EmbeddingProfileDefinitionResponseRole {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Embedding => "embedding",
+        }
+    }
+}
+impl ::std::fmt::Display for EmbeddingProfileDefinitionResponseRole {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for EmbeddingProfileDefinitionResponseRole {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct EmbeddingProfileCreationRequest {
+    pub definition: EmbeddingProfileDefinitionRequest,
+    ///Constraint: minLength=1, maxLength=128
+    #[serde(rename = "displayName")]
+    pub display_name: String,
+    ///Constraint: minLength=1, maxLength=63, pattern=`^[a-z](?:[a-z0-9-]*[a-z0-9])?$`
+    pub name: String,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct EmbeddingProfileDefinitionRequest {
+    ///Constraint: minimum=1, maximum=8191
+    #[serde(rename = "contextTokens")]
+    pub context_tokens: i64,
+    ///Constraint: minimum=1, maximum=1536
+    pub dimensions: i64,
+    pub distance: EmbeddingDistance,
+    #[serde(rename = "documentPrefix")]
+    pub document_prefix: String,
+    pub model: EmbeddingProfileDefinitionRequestModel,
+    #[serde(rename = "modelConnectionId")]
+    pub model_connection_id: uuid::Uuid,
+    pub normalization: EmbeddingNormalization,
+    #[serde(rename = "queryPrefix")]
+    pub query_prefix: String,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum EmbeddingProfileDefinitionRequestModel {
+    #[default]
+    #[serde(rename = "text-embedding-3-small")]
+    TextEmbedding3Small,
+}
+impl EmbeddingProfileDefinitionRequestModel {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::TextEmbedding3Small => "text-embedding-3-small",
+        }
+    }
+}
+impl ::std::fmt::Display for EmbeddingProfileDefinitionRequestModel {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for EmbeddingProfileDefinitionRequestModel {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum EmbeddingNormalization {
+    #[default]
+    #[serde(rename = "none")]
+    None,
+    #[serde(rename = "l2")]
+    L2,
+}
+impl EmbeddingNormalization {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::None => "none",
+            Self::L2 => "l2",
+        }
+    }
+}
+impl ::std::fmt::Display for EmbeddingNormalization {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for EmbeddingNormalization {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum EmbeddingDistance {
+    #[default]
+    #[serde(rename = "cosine")]
+    Cosine,
+    #[serde(rename = "dot-product")]
+    DotProduct,
+    #[serde(rename = "euclidean")]
+    Euclidean,
+}
+impl EmbeddingDistance {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Cosine => "cosine",
+            Self::DotProduct => "dot-product",
+            Self::Euclidean => "euclidean",
+        }
+    }
+}
+impl ::std::fmt::Display for EmbeddingDistance {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+impl AsRef<str> for EmbeddingDistance {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
 }
 #[derive(Debug, Clone)]
 pub enum DeletionStatusResponse {

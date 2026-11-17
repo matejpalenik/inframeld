@@ -53,9 +53,11 @@ from inframeld_backend.shared.application.enums.model_role import ModelRole
 from inframeld_backend.shared.application.enums.model_token_bound_kind import ModelTokenBoundKind
 from inframeld_backend.shared.application.errors.application_errors import (
     AuthenticationRequiredError,
+    InvalidInputError,
     ResourceNotFoundError,
 )
 from inframeld_backend.shared.application.value_objects.model_connection_id import ModelConnectionId
+from inframeld_backend.shared.domain.value_objects.installation_id import InstallationId
 from inframeld_backend.shared.domain.value_objects.resource_name import ResourceName
 from inframeld_backend.shared.domain.value_objects.submitted_display_name import (
     SubmittedDisplayName,
@@ -112,14 +114,15 @@ class MockEmbeddingProfileReadRepository(EmbeddingProfileReadRepository):
         self.events = events
         self.facts = _FACTS
         self.visible: EmbeddingProfileDTO | None = _PROFILE
+        self.installation = InstallationId(UUID(int=11))
 
     @override
     async def lock_scope(
         self, access: AccessContextDTO, project_id: ProjectId
-    ) -> ProjectActionFactsDTO:
+    ) -> tuple[InstallationId, ProjectActionFactsDTO]:
         assert access == ACCESS and project_id == PROJECT_ID
         self.events.append("scope")
-        return self.facts
+        return self.installation, self.facts
 
     @override
     async def get_visible(
@@ -128,6 +131,45 @@ class MockEmbeddingProfileReadRepository(EmbeddingProfileReadRepository):
         assert facts == self.facts and (project_id, profile_id) == (PROJECT_ID, _PROFILE_ID)
         self.events.append("view")
         return self.visible
+
+    @override
+    async def list_visible(
+        self,
+        facts: ProjectActionFactsDTO,
+        project_id: ProjectId,
+        after: EmbeddingProfileId | None,
+        limit: int,
+    ) -> tuple[EmbeddingProfileDTO, ...]:
+        assert facts == self.facts and project_id == PROJECT_ID and limit == 2
+        self.events.append("list")
+        layout = replace(_LAYOUT, embedding_profile_id=EmbeddingProfileId(UUID(int=5)))
+        second = replace(
+            _PROFILE,
+            layout=layout,
+            shard_names=(layout.collection_name(0), layout.collection_name(1)),
+        )
+        return (_PROFILE, second) if after is None else (second,)
+
+
+@pytest.mark.asyncio
+async def test_list_exposes_visible_profiles_in_a_bounded_page() -> None:
+    events: list[str] = []
+    repository = MockEmbeddingProfileReadRepository(events)
+    service = EmbeddingProfileReadService(MockTransactions(events), repository)
+
+    page = await service.list_profiles(ACCESS, PROJECT_ID, 1, None)
+
+    assert page.items == (_PROFILE,)
+    assert page.next_cursor is not None
+    assert events == ["begin", "scope", "list", "commit"]
+    next_page = await service.list_profiles(ACCESS, PROJECT_ID, 1, page.next_cursor)
+    assert next_page.items[0].layout.embedding_profile_id != _PROFILE_ID
+    assert next_page.next_cursor is None
+
+    repository.installation = InstallationId(UUID(int=12))
+    with pytest.raises(InvalidInputError):
+        await service.list_profiles(ACCESS, PROJECT_ID, 1, page.next_cursor)
+    assert events[-3:] == ["begin", "scope", "rollback"]
 
 
 @pytest.mark.asyncio

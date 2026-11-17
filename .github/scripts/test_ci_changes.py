@@ -115,6 +115,10 @@ class SelectionTests(unittest.TestCase):
                 {"backend", "integration", "sdk", "codeql_python"},
             ),
             (
+                "apps/backend/tests/support/mock_sdk_embedding_profiles.py",
+                {"backend", "integration", "sdk", "codeql_python"},
+            ),
+            (
                 "apps/backend/tests/support/mock_sdk_processing_profiles.py",
                 {"backend", "integration", "sdk", "codeql_python"},
             ),

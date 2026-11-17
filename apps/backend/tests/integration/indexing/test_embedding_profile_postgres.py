@@ -2,13 +2,18 @@
 
 import asyncio
 import os
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, replace
+from unittest.mock import AsyncMock, patch
 from uuid import UUID, uuid4
 
+import httpx2
 import pytest
 import pytest_asyncio
 from alembic import command
 from alembic.config import Config
+from pydantic import HttpUrl
 from sqlalchemy import Integer, column, delete, event, func, inspect, select, table, update
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,6 +22,9 @@ from tests.support.postgres import database_session
 from tests.support.project_creation_scenarios import create_project, seed_project_creator
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
+from inframeld_backend.access.application.dtos.browser_session_authentication_dto import (
+    BrowserSessionAuthenticationDTO,
+)
 from inframeld_backend.access.application.services.model_connection_read_service import (
     ModelConnectionReadService,
 )
@@ -41,6 +49,16 @@ from inframeld_backend.access.infrastructure.rows.project_action_grant_row impor
     ProjectActionGrantRow,
 )
 from inframeld_backend.access.infrastructure.rows.project_row import ProjectRow
+from inframeld_backend.access.infrastructure.settings.csrf_settings import CSRFSettings
+from inframeld_backend.access.infrastructure.settings.kratos_settings import KratosSettings
+from inframeld_backend.access.infrastructure.settings.model_connection_destination_settings import (
+    ModelConnectionDestinationSettings,
+)
+from inframeld_backend.access.infrastructure.verifiers.kratos_browser_session_verifier import (
+    KratosBrowserSessionVerifier,
+)
+from inframeld_backend.bootstrap.application_factory import create_app
+from inframeld_backend.bootstrap.application_settings import get_settings
 from inframeld_backend.indexing.application.commands.create_embedding_profile_command import (
     CreateEmbeddingProfileCommand,
 )
@@ -213,6 +231,7 @@ def _creator(session: AsyncSession) -> EmbeddingProfileCreationService:
         IdempotencyService(PostgresOperationReservationWriter(session)),
         RequestFingerprintService(RequestFingerprintKey(b"E" * 32)),
         transactions=SqlAlchemyTransactionManager(session),
+        official_destinations=None,
     )
 
 
@@ -510,6 +529,136 @@ async def test_connection_usage_filters_exact_current_profile_grants_before_pagi
         )
         assert after_revocation.items == ()
         assert after_revocation.next_cursor is None
+
+
+@pytest.mark.asyncio
+async def test_public_profile_replay_survives_destination_policy_and_view_changes(
+    database: Database,
+    scenario: EmbeddingProfileScenarioDTO,
+    temporary_postgres_settings: DatabaseSettings,
+) -> None:
+    evidence = scenario.access.authentication_evidence
+    assert isinstance(evidence, BrowserSessionAuthenticationDTO)
+    settings = get_settings().model_copy(
+        update={
+            "database": temporary_postgres_settings,
+            "kratos": KratosSettings(
+                public_url=HttpUrl("http://kratos.test"),
+                admin_url=HttpUrl("http://kratos-admin.test"),
+                authority=evidence.identity.authority,
+            ),
+            "csrf": CSRFSettings(trusted_origins=(HttpUrl("https://account.test"),)),
+        }
+    )
+
+    @asynccontextmanager
+    async def open_client(*, approve_destination: bool) -> AsyncGenerator[httpx2.AsyncClient]:
+        destinations: frozenset[str] = (
+            frozenset({"https://api.openai.com/v1"}) if approve_destination else frozenset()
+        )
+        app = create_app(
+            settings.model_copy(
+                update={
+                    "model_connection_destinations": ModelConnectionDestinationSettings(
+                        https_base_urls=destinations
+                    )
+                }
+            )
+        )
+        with patch.object(
+            KratosBrowserSessionVerifier, "verify", AsyncMock(return_value=evidence.identity)
+        ):
+            async with (
+                app.router.lifespan_context(app),
+                httpx2.AsyncClient(
+                    transport=httpx2.ASGITransport(app=app),
+                    base_url="https://api.test",
+                    cookies={"ory_kratos_session": "controlled-alice"},
+                    headers={"Origin": "https://account.test", "X-Inframeld-CSRF": "1"},
+                ) as client,
+            ):
+                yield client
+
+    route = f"/v1/projects/{scenario.project_id.value}/embedding-profiles"
+    definition = {
+        "modelConnectionId": str(scenario.connection_id.value),
+        "model": "text-embedding-3-small",
+        "dimensions": 1536,
+        "normalization": "l2",
+        "distance": "cosine",
+        "documentPrefix": "  passage: é\n",
+        "queryPrefix": " query: ",
+        "contextTokens": 8191,
+    }
+    body = {"name": "public-profile", "displayName": "Public profile", "definition": definition}
+    async with open_client(approve_destination=True) as client:
+        created: dict[str, tuple[str, httpx2.Response]] = {}
+        for name in ("public-profile", "second-profile", "third-profile"):
+            result = await client.post(
+                route, json={**body, "name": name}, headers={"Idempotency-Key": name}
+            )
+            assert result.status_code == 201
+            profile_id = result.json()["profile"]["embeddingProfileId"]
+            assert isinstance(profile_id, str)
+            created[profile_id] = name, result
+        hidden, first, second = sorted(created)
+        original_name, original = created[hidden]
+
+        grants = EmbeddingProfileActionGrantRow
+        revoke_view = delete(grants).where(
+            grants.project_id == scenario.project_id.value,
+            grants.recipient_principal_id == scenario.access.actor_principal_id.value,
+            grants.action == EmbeddingProfileAction.VIEW.value,
+        )
+        async with database.session() as session, session.begin():
+            await session.execute(revoke_view.where(grants.embedding_profile_id == UUID(hidden)))
+
+        assert (await client.get(f"{route}/{hidden}")).status_code == 404
+        visible = await client.get(f"{route}/{first}")
+        page = await client.get(route, params={"limit": 1})
+        assert visible.status_code == page.status_code == 200
+        assert visible.json()["embeddingProfileId"] == first
+        assert page.json()["items"] == [visible.json()]
+        cursor = page.json()["nextCursor"]
+        assert isinstance(cursor, str)
+        wrong_scope = await client.get(
+            f"/v1/projects/{scenario.other_project_id.value}/embedding-profiles",
+            params={"cursor": cursor},
+        )
+        assert wrong_scope.status_code == 422
+
+        async with database.session() as session, session.begin():
+            await session.execute(revoke_view.where(grants.embedding_profile_id == UUID(second)))
+        final = await client.get(route, params={"limit": 1, "cursor": cursor})
+        assert final.status_code == 200 and final.json() == {"items": [], "nextCursor": None}
+
+    async with open_client(approve_destination=False) as client:
+        original_body = {**body, "name": original_name}
+        headers = {"Idempotency-Key": original_name}
+        replay = await client.post(route, json=original_body, headers=headers)
+        assert replay.status_code == 201 and replay.json() == original.json()
+        changed = await client.post(
+            route,
+            json={**original_body, "definition": {**definition, "queryPrefix": "different"}},
+            headers=headers,
+        )
+        assert changed.status_code == 409 and changed.json()["code"] == "idempotency_key_reused"
+        fresh = await client.post(
+            route,
+            json={**body, "name": "fresh-profile"},
+            headers={"Idempotency-Key": "fresh-profile"},
+        )
+        assert fresh.status_code == 409 and fresh.json()["code"] == "conflict"
+
+    async with database.session() as session:
+        assert await session.scalar(select(func.count()).select_from(EmbeddingProfileRow)) == 3
+        assert (
+            await session.scalar(
+                select(func.count()).select_from(EmbeddingProfileCreationResultRow)
+            )
+            == 3
+        )
+        assert await session.scalar(select(func.count()).select_from(grants)) == 4
 
 
 @pytest.mark.asyncio

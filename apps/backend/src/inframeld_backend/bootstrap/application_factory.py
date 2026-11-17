@@ -377,6 +377,10 @@ from inframeld_backend.bootstrap.application_lifespan import application_lifespa
 from inframeld_backend.bootstrap.application_resources import ApplicationResources
 from inframeld_backend.bootstrap.application_settings import ApplicationSettings, get_settings
 from inframeld_backend.bootstrap.deletion_status_composition import open_deletion_status_lookup
+from inframeld_backend.bootstrap.embedding_profile_composition import (
+    open_embedding_profile_creation,
+    open_embedding_profile_read,
+)
 from inframeld_backend.bootstrap.grant_recipients_composition import open_project_grant_recipients
 from inframeld_backend.bootstrap.human_admission_composition import open_human_admission
 from inframeld_backend.bootstrap.human_lifecycle_composition import (
@@ -425,8 +429,14 @@ from inframeld_backend.bootstrap.project_metadata_composition import (
 from inframeld_backend.bootstrap.project_upload_default_composition import (
     open_project_upload_default,
 )
+from inframeld_backend.indexing.http.responses.embedding_profile_creation_response import (
+    EmbeddingProfileCreationResponse,
+)
 from inframeld_backend.indexing.http.responses.processing_profile_creation_response import (
     ProcessingProfileCreationResponse,
+)
+from inframeld_backend.indexing.http.routes.embedding_profile_routes import (
+    create_embedding_profile_router,
 )
 from inframeld_backend.indexing.http.routes.processing_profile_routes import (
     create_processing_profile_router,
@@ -458,6 +468,9 @@ from inframeld_backend.shared.infrastructure.readers.file_request_fingerprint_ke
     FileRequestFingerprintKeyReader,
 )
 from inframeld_backend.shared.infrastructure.resources.database import Database
+from inframeld_backend.shared.infrastructure.resources.openai_embedding_tokenizer import (
+    OpenAIEmbeddingTokenizer,
+)
 
 API_TITLE = "Inframeld API"
 API_VERSION = "0.1.0"
@@ -645,6 +658,7 @@ def create_app(
                 ModelConnectionCredentialResponse,
                 ModelConnectionCredentialDetailsResponse,
                 ProcessingProfileCreationResponse,
+                EmbeddingProfileCreationResponse,
                 ProcessingProfileActionGrantResponse,
                 ProcessingProfileActionGrantRemovalResponse,
             ),
@@ -811,6 +825,19 @@ def create_app(
                 product_access,
                 partial(open_processing_profile_creation, database, request_fingerprints),
                 partial(open_processing_profile_read, database, http_application_key_profile),
+            )
+        )
+        application.include_router(
+            create_embedding_profile_router(
+                product_access,
+                partial(
+                    open_embedding_profile_creation,
+                    database,
+                    request_fingerprints,
+                    resolved_settings.model_connection_destinations,
+                ),
+                partial(open_embedding_profile_read, database, http_application_key_profile),
+                OpenAIEmbeddingTokenizer.token_bound,
             )
         )
         application.include_router(
