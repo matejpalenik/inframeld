@@ -72,6 +72,10 @@ def _result_output() -> Generator[BufferedWriter]:
 
 
 def _convert(attempt_id: UUID, source_sha256: str, max_content_tokens: int) -> bytes:
+    import tempfile
+
+    # Use the bounded scratch mount without tempfile probing by creating and removing a file.
+    tempfile.tempdir = "/scratch"
     sys.path[:0] = [str(_RUNTIME / "src"), str(_RUNTIME / "site")]
     os.environ.update(
         HF_HOME="/scratch/huggingface",

@@ -258,7 +258,7 @@ class ParseChildContractTest(TestCase):
                 )
 
     def test_released_child_emits_one_verified_frame_without_converter_chatter(self) -> None:
-        outcome = self._run_released_child(_SOURCE_SHA)
+        outcome = self._run_released_child(_SOURCE_SHA, require_scratch=True)
         self.assertEqual(outcome.returncode, 0, outcome.stderr)
         self.assertEqual(outcome.stderr, b"")
         self.assertTrue(outcome.stdout.startswith(b"ready\n"))
@@ -272,16 +272,19 @@ class ParseChildContractTest(TestCase):
         self.assertEqual(outcome.stdout, b"ready\n")
         self.assertEqual(outcome.stderr, b"Parser child conversion or result failed.\n")
 
-    def _run_released_child(self, converted_digest: str) -> subprocess.CompletedProcess[bytes]:
+    def _run_released_child(
+        self, converted_digest: str, *, require_scratch: bool = False
+    ) -> subprocess.CompletedProcess[bytes]:
         # A controlled converter exercises the real child and its result descriptor.
         code = """
 import errno
 import os
 import runpy
 import sys
+import tempfile
 from pathlib import Path
 
-script, source, canonical, digest, *arguments = sys.argv[1:]
+script, source, canonical, digest, require_scratch, *arguments = sys.argv[1:]
 sys.path.insert(0, source)
 from inframeld_parser import pdf_conversion
 from inframeld_parser.canonical_pdf import CanonicalPdf
@@ -299,6 +302,8 @@ def convert(path, *, asset_root, manifest, max_content_tokens, merge_peers):
     else:
         raise AssertionError('The release descriptor reached the converter.')
     assert os.environ['HF_HUB_OFFLINE'] == '1'
+    if require_scratch == '1':
+        assert tempfile.gettempdir() == '/scratch'
     assert path == Path('/input/source.pdf')
     assert asset_root == Path('/opt/inframeld-parser/assets')
     assert manifest == Path('/opt/inframeld-parser/docling-parser-v1.json')
@@ -307,6 +312,13 @@ def convert(path, *, asset_root, manifest, max_content_tokens, merge_peers):
     return CanonicalPdf(digest, bytes.fromhex(canonical)), (ProseChunk('🙂', 8, 9), ProseChunk('Tail', 11, 15))
 
 pdf_conversion.convert_pdf_with_prose_chunks = convert
+if require_scratch == '1':
+    def no_temp_candidates():
+        os.write(2, b'Controlled temp-directory discovery was required.\\n')
+        return []
+
+    tempfile.tempdir = None
+    tempfile._candidate_tempdir_list = no_temp_candidates
 sys.argv = [script, *arguments]
 runpy.run_path(script, run_name='__main__')
 """
@@ -320,6 +332,7 @@ runpy.run_path(script, run_name='__main__')
                 str(_PARSER_SOURCE),
                 _CANONICAL.hex(),
                 converted_digest,
+                "1" if require_scratch else "0",
                 *_CHILD_ARGUMENTS,
             ],
             input=b"r",
