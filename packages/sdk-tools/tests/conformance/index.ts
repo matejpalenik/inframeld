@@ -22,6 +22,7 @@ import "./human-lifecycle.ts";
 import "./application-accounts.ts";
 import "./model-connections.ts";
 import "./processing-profiles.ts";
+import "./embedding-profiles.ts";
 import "./documents.ts";
 import "./application-key-issuance.ts";
 import "./application-key-revocation.ts";

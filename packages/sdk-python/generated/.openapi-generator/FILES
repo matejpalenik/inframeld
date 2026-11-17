@@ -54,6 +54,16 @@ inframeld_sdk/models/deletion_status_response.py
 inframeld_sdk/models/docling_processing_definition_request.py
 inframeld_sdk/models/docling_processing_definition_response.py
 inframeld_sdk/models/document_upload_response.py
+inframeld_sdk/models/embedding_distance.py
+inframeld_sdk/models/embedding_normalization.py
+inframeld_sdk/models/embedding_profile_action.py
+inframeld_sdk/models/embedding_profile_creation_request.py
+inframeld_sdk/models/embedding_profile_creation_response.py
+inframeld_sdk/models/embedding_profile_definition_request.py
+inframeld_sdk/models/embedding_profile_definition_response.py
+inframeld_sdk/models/embedding_profile_grant_target_response.py
+inframeld_sdk/models/embedding_profile_response.py
+inframeld_sdk/models/embedding_profile_token_bound_response.py
 inframeld_sdk/models/grant_recipient_response.py
 inframeld_sdk/models/grant_target_kind.py
 inframeld_sdk/models/http_method.py
@@ -70,6 +80,7 @@ inframeld_sdk/models/human_suspension_response.py
 inframeld_sdk/models/in_progress_operation_lookup_response.py
 inframeld_sdk/models/inframeld_discovery_response.py
 inframeld_sdk/models/initial_application_account_grant_response.py
+inframeld_sdk/models/initial_embedding_profile_grant_response.py
 inframeld_sdk/models/initial_model_connection_grant_response.py
 inframeld_sdk/models/initial_processing_profile_grant_response.py
 inframeld_sdk/models/initial_project_grant_response.py
@@ -126,6 +137,7 @@ inframeld_sdk/models/model_connection_provider.py
 inframeld_sdk/models/model_connection_response.py
 inframeld_sdk/models/model_connection_usage_response.py
 inframeld_sdk/models/model_role.py
+inframeld_sdk/models/model_token_bound_kind.py
 inframeld_sdk/models/my_organization_access_response.py
 inframeld_sdk/models/my_project_access_grant_response.py
 inframeld_sdk/models/my_project_access_group_response.py
@@ -144,6 +156,7 @@ inframeld_sdk/models/own_organization_grant_response.py
 inframeld_sdk/models/page_response_access_group_action_grant_item_response.py
 inframeld_sdk/models/page_response_application_account_action_grant_item_response.py
 inframeld_sdk/models/page_response_application_key_metadata_response.py
+inframeld_sdk/models/page_response_embedding_profile_response.py
 inframeld_sdk/models/page_response_grant_recipient_response.py
 inframeld_sdk/models/page_response_model_connection_action_grant_item_response.py
 inframeld_sdk/models/page_response_model_connection_response.py

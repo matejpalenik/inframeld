@@ -20,11 +20,21 @@ from inframeld_backend.access.application.dtos.application_key_authentication_dt
 from inframeld_backend.access.application.dtos.human_credential_facts_dto import (
     HumanCredentialFactsDTO,
 )
+from inframeld_backend.access.application.dtos.model_connection_access_dto import (
+    ModelConnectionAccessDTO,
+)
 from inframeld_backend.access.application.dtos.project_action_facts_dto import ProjectActionFactsDTO
 from inframeld_backend.access.domain.entities.principal import Principal
+from inframeld_backend.access.domain.enums.model_connection_authentication import (
+    ModelConnectionAuthentication,
+)
+from inframeld_backend.access.domain.enums.model_connection_provider import ModelConnectionProvider
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.enums.principal_status import PrincipalStatus
 from inframeld_backend.access.domain.enums.project_status import ProjectStatus
+from inframeld_backend.access.domain.policies.model_connection_destination_policy import (
+    ModelConnectionDestinationPolicy,
+)
 from inframeld_backend.access.domain.value_objects.application_key_id import ApplicationKeyId
 from inframeld_backend.access.domain.value_objects.human_credential_version import (
     HumanCredentialVersion,
@@ -140,7 +150,12 @@ class MockEmbeddingProfileCreationRepository(EmbeddingProfileCreationRepository)
     def __init__(self, events: list[str]) -> None:
         self.events = events
         self.facts = _FACTS
-        self.live_connection = True
+        self.live_connection: ModelConnectionAccessDTO | None = ModelConnectionAccessDTO(
+            ModelConnectionProvider.OPENAI,
+            "https://api.openai.com/v1",
+            None,
+            ModelConnectionAuthentication.API_KEY,
+        )
         self.saved: EmbeddingProfileCreationDTO | None = None
 
     @override
@@ -155,7 +170,7 @@ class MockEmbeddingProfileCreationRepository(EmbeddingProfileCreationRepository)
     @override
     async def lock_live_selection(
         self, *, facts: EmbeddingProfileCreationFactsDTO, connection_id: ModelConnectionId
-    ) -> bool:
+    ) -> ModelConnectionAccessDTO | None:
         assert facts == self.facts and connection_id == _COMMAND.selection.connection_id
         self.events.append("selection")
         return self.live_connection
@@ -219,6 +234,7 @@ def creation() -> _Creation:
         idempotency,
         RequestFingerprintService(RequestFingerprintKey(b"B" * 32)),
         transactions=transactions,
+        official_destinations=None,
     )
     idempotency.result = NEW_RESERVATION
     return events, repository, idempotency, transactions, service
@@ -271,7 +287,7 @@ async def test_creates_once_and_replays_the_original_layout_and_assignments(
     fingerprint = idempotency.fingerprint
 
     events.clear()
-    repository.live_connection = False
+    repository.live_connection = None
     repository.facts = replace(_FACTS, access_revision=12)
     idempotency.result = SAVED_RESULT
     replayed = await service.create(access=ACCESS, command=_COMMAND, context=_CONTEXT)
@@ -315,13 +331,65 @@ async def test_unavailable_connection_does_not_save_or_complete(
     creation: _Creation,
 ) -> None:
     events, repository, _, _, service = creation
-    repository.live_connection = False
+    repository.live_connection = None
 
     with pytest.raises(ResourceNotFoundError):
         await service.create(access=ACCESS, command=_COMMAND, context=_CONTEXT)
 
     assert events == ["begin", "authority", "reserve", "selection", "rollback"]
     assert repository.saved is None
+
+
+@pytest.mark.asyncio
+async def test_public_creation_rechecks_destination_only_for_fresh_requests(
+    creation: _Creation,
+) -> None:
+    events, repository, idempotency, transactions, _ = creation
+    fingerprints = RequestFingerprintService(RequestFingerprintKey(b"B" * 32))
+    allowed = EmbeddingProfileCreationService(
+        repository,
+        idempotency,
+        fingerprints,
+        transactions=transactions,
+        official_destinations=ModelConnectionDestinationPolicy(
+            https_base_urls=frozenset({"https://api.openai.com/v1"})
+        ),
+    )
+    blocked = EmbeddingProfileCreationService(
+        repository,
+        idempotency,
+        fingerprints,
+        transactions=transactions,
+        official_destinations=ModelConnectionDestinationPolicy(),
+    )
+
+    with pytest.raises(ConflictError):
+        await blocked.create(access=ACCESS, command=_COMMAND, context=_CONTEXT)
+    assert events == ["begin", "authority", "reserve", "selection", "rollback"]
+    assert repository.saved is None
+
+    events.clear()
+    official = repository.live_connection
+    assert official is not None
+    repository.live_connection = replace(
+        official, provider=ModelConnectionProvider.OPENAI_COMPATIBLE
+    )
+    with pytest.raises(ConflictError):
+        await allowed.create(access=ACCESS, command=_COMMAND, context=_CONTEXT)
+    assert events == ["begin", "authority", "reserve", "selection", "rollback"]
+    assert repository.saved is None
+
+    events.clear()
+    repository.live_connection = official
+    original = await allowed.create(access=ACCESS, command=_COMMAND, context=_CONTEXT)
+    fingerprint = idempotency.fingerprint
+    events.clear()
+    idempotency.result = SAVED_RESULT
+    repository.facts = replace(_FACTS, access_revision=8)
+    replayed = await blocked.create(access=ACCESS, command=_COMMAND, context=_CONTEXT)
+    assert replayed == replace(original, operation=SAVED_RESULT)
+    assert idempotency.fingerprint == fingerprint
+    assert events == ["begin", "authority", "reserve", "original", "commit"]
 
 
 @pytest.mark.asyncio

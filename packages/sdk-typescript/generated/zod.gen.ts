@@ -424,6 +424,56 @@ export const zDocumentUploadResponse = z.object({
 });
 
 /**
+ * EmbeddingDistance
+ */
+export const zEmbeddingDistance = z.enum([
+    'cosine',
+    'dot-product',
+    'euclidean'
+]);
+
+/**
+ * EmbeddingNormalization
+ */
+export const zEmbeddingNormalization = z.enum(['none', 'l2']);
+
+/**
+ * EmbeddingProfileAction
+ */
+export const zEmbeddingProfileAction = z.enum(['view-embedding-profile', 'use-embedding-profile']);
+
+/**
+ * EmbeddingProfileDefinitionRequest
+ */
+export const zEmbeddingProfileDefinitionRequest = z.object({
+    contextTokens: z.int().gte(1).lte(8191),
+    dimensions: z.int().gte(1).lte(1536),
+    distance: zEmbeddingDistance,
+    documentPrefix: z.string(),
+    model: z.literal('text-embedding-3-small'),
+    modelConnectionId: z.uuid(),
+    normalization: zEmbeddingNormalization,
+    queryPrefix: z.string()
+});
+
+/**
+ * EmbeddingProfileCreationRequest
+ */
+export const zEmbeddingProfileCreationRequest = z.object({
+    definition: zEmbeddingProfileDefinitionRequest,
+    displayName: z.string().min(1).max(128),
+    name: z.string().min(1).max(63).regex(/^[a-z](?:[a-z0-9-]*[a-z0-9])?$/)
+});
+
+/**
+ * EmbeddingProfileGrantTargetResponse
+ */
+export const zEmbeddingProfileGrantTargetResponse = z.object({
+    embeddingProfileId: z.uuid(),
+    kind: z.literal('embedding-profile')
+});
+
+/**
  * GrantTargetKind
  *
  * Discriminate published grant targets without changing their wire tags.
@@ -591,6 +641,15 @@ export const zApplicationAccountCreationResponse = z.object({
     operationId: z.string(),
     principalId: z.uuid(),
     projectId: z.uuid()
+});
+
+/**
+ * InitialEmbeddingProfileGrantResponse
+ */
+export const zInitialEmbeddingProfileGrantResponse = z.object({
+    actionId: zEmbeddingProfileAction,
+    canGrant: z.literal(true),
+    target: zEmbeddingProfileGrantTargetResponse
 });
 
 /**
@@ -1101,6 +1160,66 @@ export const zModelRole = z.enum([
 ]);
 
 /**
+ * ModelTokenBoundKind
+ */
+export const zModelTokenBoundKind = z.enum(['exact', 'conservative-upper-bound']);
+
+/**
+ * EmbeddingProfileTokenBoundResponse
+ */
+export const zEmbeddingProfileTokenBoundResponse = z.object({
+    implementation: z.string(),
+    kind: zModelTokenBoundKind,
+    revision: z.string()
+});
+
+/**
+ * EmbeddingProfileDefinitionResponse
+ */
+export const zEmbeddingProfileDefinitionResponse = z.object({
+    contextTokens: z.int().gte(1).lte(9007199254740991),
+    dimensions: z.int().gte(1).lte(1536),
+    distance: zEmbeddingDistance,
+    documentPrefix: z.string(),
+    expectedModelRevision: z.string().nullable(),
+    expectedProvider: z.string(),
+    model: z.string(),
+    modelConnectionId: z.uuid(),
+    normalization: zEmbeddingNormalization,
+    queryPrefix: z.string(),
+    role: z.literal('embedding'),
+    tokenBound: zEmbeddingProfileTokenBoundResponse
+});
+
+/**
+ * EmbeddingProfileResponse
+ *
+ * Describe saved vector meaning and its intended logical layout.
+ */
+export const zEmbeddingProfileResponse = z.object({
+    definition: zEmbeddingProfileDefinitionResponse,
+    displayName: z.string(),
+    embeddingProfileId: z.uuid(),
+    name: z.string(),
+    placementVersion: z.int().gte(1).lte(1),
+    projectId: z.uuid(),
+    shardCount: z.int().gte(2).lte(2),
+    vectorIndexId: z.uuid(),
+    vectorLayoutId: z.uuid()
+});
+
+/**
+ * EmbeddingProfileCreationResponse
+ */
+export const zEmbeddingProfileCreationResponse = z.object({
+    idempotencyExpiresAt: z.iso.datetime(),
+    initialGrants: z.tuple([zInitialEmbeddingProfileGrantResponse, zInitialEmbeddingProfileGrantResponse]),
+    operationId: z.string(),
+    profile: zEmbeddingProfileResponse,
+    projectAccessRevision: z.int().gte(1).lte(9007199254740991)
+});
+
+/**
  * MyProjectAccessGroupResponse
  */
 export const zMyProjectAccessGroupResponse = z.object({
@@ -1258,6 +1377,14 @@ export const zPageResponseApplicationAccountActionGrantItemResponse = z.object({
  */
 export const zPageResponseApplicationKeyMetadataResponse = z.object({
     items: z.array(zApplicationKeyMetadataResponse),
+    nextCursor: z.string().nullable()
+});
+
+/**
+ * PageResponse[EmbeddingProfileResponse]
+ */
+export const zPageResponseEmbeddingProfileResponse = z.object({
+    items: z.array(zEmbeddingProfileResponse),
     nextCursor: z.string().nullable()
 });
 
@@ -5021,6 +5148,165 @@ export const zUploadDocument503Representation0Response = zProblemDetails;
  * Successful Response
  */
 export const zUploadDocumentResponse = zDocumentUploadResponse;
+
+export const zListEmbeddingProfilesPath = z.object({
+    project_id: z.uuid()
+});
+
+export const zListEmbeddingProfilesQuery = z.object({
+    limit: z.int().gte(1).lte(100).optional().default(25),
+    cursor: z.string().min(1).max(1024).regex(/^[A-Za-z0-9_-]+$/).nullish()
+});
+
+/**
+ * Successful Response
+ */
+export const zListEmbeddingProfiles200Representation0Response = zPageResponseEmbeddingProfileResponse;
+
+/**
+ * Invalid authentication request
+ */
+export const zListEmbeddingProfiles400Representation0Response = zProblemDetails;
+
+/**
+ * Unauthorized
+ */
+export const zListEmbeddingProfiles401Representation0Response = zProblemDetails;
+
+/**
+ * Access denied
+ */
+export const zListEmbeddingProfiles403Representation0Response = zProblemDetails;
+
+/**
+ * Resource not found
+ */
+export const zListEmbeddingProfiles404Representation0Response = zProblemDetails;
+
+/**
+ * Request validation failed
+ */
+export const zListEmbeddingProfiles422Representation0Response = zProblemDetails;
+
+/**
+ * Dependency unavailable
+ */
+export const zListEmbeddingProfiles503Representation0Response = zProblemDetails;
+
+/**
+ * Successful Response
+ */
+export const zListEmbeddingProfilesResponse = zPageResponseEmbeddingProfileResponse;
+
+export const zCreateEmbeddingProfileBody = zEmbeddingProfileCreationRequest;
+
+export const zCreateEmbeddingProfileHeaders = z.object({
+    'Idempotency-Key': z.string().min(1).max(128).regex(/.*\S.*/)
+});
+
+export const zCreateEmbeddingProfilePath = z.object({
+    project_id: z.uuid()
+});
+
+/**
+ * Successful Response
+ */
+export const zCreateEmbeddingProfile201Representation0Response = zEmbeddingProfileCreationResponse;
+
+/**
+ * Invalid authentication request
+ */
+export const zCreateEmbeddingProfile400Representation0Response = zProblemDetails;
+
+/**
+ * Unauthorized
+ */
+export const zCreateEmbeddingProfile401Representation0Response = zProblemDetails;
+
+/**
+ * Access denied
+ */
+export const zCreateEmbeddingProfile403Representation0Response = zProblemDetails;
+
+/**
+ * Resource not found
+ */
+export const zCreateEmbeddingProfile404Representation0Response = zProblemDetails;
+
+/**
+ * Operation conflicts with current state
+ */
+export const zCreateEmbeddingProfile409Representation0Response = zProblemDetails;
+
+/**
+ * Content Too Large
+ */
+export const zCreateEmbeddingProfile413Representation0Response = zProblemDetails;
+
+/**
+ * Unsupported Media Type
+ */
+export const zCreateEmbeddingProfile415Representation0Response = zProblemDetails;
+
+/**
+ * Request validation failed
+ */
+export const zCreateEmbeddingProfile422Representation0Response = zProblemDetails;
+
+/**
+ * Dependency unavailable
+ */
+export const zCreateEmbeddingProfile503Representation0Response = zProblemDetails;
+
+/**
+ * Successful Response
+ */
+export const zCreateEmbeddingProfileResponse = zEmbeddingProfileCreationResponse;
+
+export const zGetEmbeddingProfilePath = z.object({
+    project_id: z.uuid(),
+    embedding_profile_id: z.uuid()
+});
+
+/**
+ * Successful Response
+ */
+export const zGetEmbeddingProfile200Representation0Response = zEmbeddingProfileResponse;
+
+/**
+ * Invalid authentication request
+ */
+export const zGetEmbeddingProfile400Representation0Response = zProblemDetails;
+
+/**
+ * Unauthorized
+ */
+export const zGetEmbeddingProfile401Representation0Response = zProblemDetails;
+
+/**
+ * Access denied
+ */
+export const zGetEmbeddingProfile403Representation0Response = zProblemDetails;
+
+/**
+ * Resource not found
+ */
+export const zGetEmbeddingProfile404Representation0Response = zProblemDetails;
+
+/**
+ * Request validation failed
+ */
+export const zGetEmbeddingProfile422Representation0Response = zProblemDetails;
+
+/**
+ * Dependency unavailable
+ */
+export const zGetEmbeddingProfile503Representation0Response = zProblemDetails;
+
+/**
+ * Successful Response
+ */
+export const zGetEmbeddingProfileResponse = zEmbeddingProfileResponse;
 
 export const zListProjectGrantRecipientsPath = z.object({
     project_id: z.uuid()

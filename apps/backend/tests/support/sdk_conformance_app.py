@@ -444,6 +444,9 @@ from inframeld_backend.access.http.routes.project_metadata_routes import (
 from inframeld_backend.access.http.routes.project_upload_default_routes import (
     create_project_upload_default_router,
 )
+from inframeld_backend.indexing.http.routes.embedding_profile_routes import (
+    create_embedding_profile_router,
+)
 from inframeld_backend.indexing.http.routes.processing_profile_routes import (
     create_processing_profile_router,
 )
@@ -521,6 +524,9 @@ from inframeld_backend.shared.http.routes.health_routes import router as health_
 from inframeld_backend.shared.http.routes.original_operation_lookup_routes import (
     create_original_operation_lookup_router,
 )
+from inframeld_backend.shared.infrastructure.resources.openai_embedding_tokenizer import (
+    OpenAIEmbeddingTokenizer,
+)
 from tests.support.authentication_evidence import MockAuthenticationEvidence
 from tests.support.mock_application_authenticator import MockApplicationAuthenticator
 from tests.support.mock_sdk_access_groups import MockSDKAccessGroups
@@ -529,6 +535,7 @@ from tests.support.mock_sdk_application_authenticator import MockSDKApplicationA
 from tests.support.mock_sdk_application_key_issuer import MockSDKApplicationKeyIssuer
 from tests.support.mock_sdk_application_key_revoker import MockSDKApplicationKeyRevoker
 from tests.support.mock_sdk_application_session_reader import MockSDKApplicationSessionReader
+from tests.support.mock_sdk_embedding_profiles import MockSDKEmbeddingProfiles
 from tests.support.mock_sdk_invitations import MockSDKInvitations
 from tests.support.mock_sdk_model_connections import (
     SDK_MODEL_CONNECTION_ID,
@@ -2129,6 +2136,10 @@ def create_sdk_conformance_app(browser_origin: str | None = None) -> FastAPI:
     async def open_profiles() -> AsyncGenerator[MockSDKProcessingProfiles]:
         yield profiles
 
+    @asynccontextmanager
+    async def open_embedding_profiles() -> AsyncGenerator[MockSDKEmbeddingProfiles]:
+        yield MockSDKEmbeddingProfiles()
+
     browser_authenticator = MockSDKBrowserAuthenticator()
     token_authenticator = MockSDKTokenAuthenticator()
     human_session = HumanSessionDependency(
@@ -2214,6 +2225,14 @@ def create_sdk_conformance_app(browser_origin: str | None = None) -> FastAPI:
     )
     application.include_router(
         create_processing_profile_router(authenticate, open_profiles, open_profiles)
+    )
+    application.include_router(
+        create_embedding_profile_router(
+            authenticate,
+            open_embedding_profiles,
+            open_embedding_profiles,
+            OpenAIEmbeddingTokenizer.token_bound,
+        )
     )
     application.include_router(create_document_upload_router(authenticate, _open_document_uploader))
     application.include_router(

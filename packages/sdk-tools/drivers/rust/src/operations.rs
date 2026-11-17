@@ -522,6 +522,48 @@ pub async fn observe(
                 )
                 .await
         ),
+        "createEmbeddingProfile" => observed!(
+            client
+                .create_embedding_profile(
+                    request.path.as_ref().unwrap()["project_id"]
+                        .as_str()
+                        .unwrap(),
+                    &request.headers["Idempotency-Key"],
+                    serde_json::from_value(body).unwrap(),
+                )
+                .await
+        ),
+        "getEmbeddingProfile" => observed!(
+            client
+                .get_embedding_profile(
+                    request.path.as_ref().unwrap()["project_id"]
+                        .as_str()
+                        .unwrap(),
+                    request.path.as_ref().unwrap()["embedding_profile_id"]
+                        .as_str()
+                        .unwrap(),
+                )
+                .await
+        ),
+        "listEmbeddingProfiles" => observed!(
+            client
+                .list_embedding_profiles(
+                    request.path.as_ref().unwrap()["project_id"]
+                        .as_str()
+                        .unwrap(),
+                    request
+                        .query
+                        .as_ref()
+                        .and_then(|query| query.get("limit"))
+                        .and_then(Value::as_i64),
+                    request
+                        .query
+                        .as_ref()
+                        .and_then(|query| query.get("cursor"))
+                        .and_then(Value::as_str),
+                )
+                .await
+        ),
         "listProcessingProfileActionGrants" => observed!(
             client
                 .list_processing_profile_action_grants(

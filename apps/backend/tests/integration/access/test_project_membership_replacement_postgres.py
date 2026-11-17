@@ -340,6 +340,7 @@ async def test_embedding_creator_can_leave_only_after_exact_grantor_handover(
             IdempotencyService(PostgresOperationReservationWriter(session)),
             RequestFingerprintService(RequestFingerprintKey(b"E" * 32)),
             transactions=SqlAlchemyTransactionManager(session),
+            official_destinations=None,
         )
         created = await service.create(access=seed.bob_access, command=command, context=context)
         other = await service.create(

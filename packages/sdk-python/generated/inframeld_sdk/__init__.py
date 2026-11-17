@@ -76,6 +76,16 @@ __all__ = [
     "DoclingProcessingDefinitionRequest",
     "DoclingProcessingDefinitionResponse",
     "DocumentUploadResponse",
+    "EmbeddingDistance",
+    "EmbeddingNormalization",
+    "EmbeddingProfileAction",
+    "EmbeddingProfileCreationRequest",
+    "EmbeddingProfileCreationResponse",
+    "EmbeddingProfileDefinitionRequest",
+    "EmbeddingProfileDefinitionResponse",
+    "EmbeddingProfileGrantTargetResponse",
+    "EmbeddingProfileResponse",
+    "EmbeddingProfileTokenBoundResponse",
     "GrantRecipientResponse",
     "GrantTargetKind",
     "HttpMethod",
@@ -92,6 +102,7 @@ __all__ = [
     "InProgressOperationLookupResponse",
     "InframeldDiscoveryResponse",
     "InitialApplicationAccountGrantResponse",
+    "InitialEmbeddingProfileGrantResponse",
     "InitialModelConnectionGrantResponse",
     "InitialProcessingProfileGrantResponse",
     "InitialProjectGrantResponse",
@@ -148,6 +159,7 @@ __all__ = [
     "ModelConnectionResponse",
     "ModelConnectionUsageResponse",
     "ModelRole",
+    "ModelTokenBoundKind",
     "MyOrganizationAccessResponse",
     "MyProjectAccessGrantResponse",
     "MyProjectAccessGroupResponse",
@@ -166,6 +178,7 @@ __all__ = [
     "PageResponseAccessGroupActionGrantItemResponse",
     "PageResponseApplicationAccountActionGrantItemResponse",
     "PageResponseApplicationKeyMetadataResponse",
+    "PageResponseEmbeddingProfileResponse",
     "PageResponseGrantRecipientResponse",
     "PageResponseModelConnectionActionGrantItemResponse",
     "PageResponseModelConnectionResponse",
@@ -284,6 +297,16 @@ from inframeld_sdk.models.deletion_status_response import DeletionStatusResponse
 from inframeld_sdk.models.docling_processing_definition_request import DoclingProcessingDefinitionRequest as DoclingProcessingDefinitionRequest
 from inframeld_sdk.models.docling_processing_definition_response import DoclingProcessingDefinitionResponse as DoclingProcessingDefinitionResponse
 from inframeld_sdk.models.document_upload_response import DocumentUploadResponse as DocumentUploadResponse
+from inframeld_sdk.models.embedding_distance import EmbeddingDistance as EmbeddingDistance
+from inframeld_sdk.models.embedding_normalization import EmbeddingNormalization as EmbeddingNormalization
+from inframeld_sdk.models.embedding_profile_action import EmbeddingProfileAction as EmbeddingProfileAction
+from inframeld_sdk.models.embedding_profile_creation_request import EmbeddingProfileCreationRequest as EmbeddingProfileCreationRequest
+from inframeld_sdk.models.embedding_profile_creation_response import EmbeddingProfileCreationResponse as EmbeddingProfileCreationResponse
+from inframeld_sdk.models.embedding_profile_definition_request import EmbeddingProfileDefinitionRequest as EmbeddingProfileDefinitionRequest
+from inframeld_sdk.models.embedding_profile_definition_response import EmbeddingProfileDefinitionResponse as EmbeddingProfileDefinitionResponse
+from inframeld_sdk.models.embedding_profile_grant_target_response import EmbeddingProfileGrantTargetResponse as EmbeddingProfileGrantTargetResponse
+from inframeld_sdk.models.embedding_profile_response import EmbeddingProfileResponse as EmbeddingProfileResponse
+from inframeld_sdk.models.embedding_profile_token_bound_response import EmbeddingProfileTokenBoundResponse as EmbeddingProfileTokenBoundResponse
 from inframeld_sdk.models.grant_recipient_response import GrantRecipientResponse as GrantRecipientResponse
 from inframeld_sdk.models.grant_target_kind import GrantTargetKind as GrantTargetKind
 from inframeld_sdk.models.http_method import HttpMethod as HttpMethod
@@ -300,6 +323,7 @@ from inframeld_sdk.models.human_suspension_response import HumanSuspensionRespon
 from inframeld_sdk.models.in_progress_operation_lookup_response import InProgressOperationLookupResponse as InProgressOperationLookupResponse
 from inframeld_sdk.models.inframeld_discovery_response import InframeldDiscoveryResponse as InframeldDiscoveryResponse
 from inframeld_sdk.models.initial_application_account_grant_response import InitialApplicationAccountGrantResponse as InitialApplicationAccountGrantResponse
+from inframeld_sdk.models.initial_embedding_profile_grant_response import InitialEmbeddingProfileGrantResponse as InitialEmbeddingProfileGrantResponse
 from inframeld_sdk.models.initial_model_connection_grant_response import InitialModelConnectionGrantResponse as InitialModelConnectionGrantResponse
 from inframeld_sdk.models.initial_processing_profile_grant_response import InitialProcessingProfileGrantResponse as InitialProcessingProfileGrantResponse
 from inframeld_sdk.models.initial_project_grant_response import InitialProjectGrantResponse as InitialProjectGrantResponse
@@ -356,6 +380,7 @@ from inframeld_sdk.models.model_connection_provider import ModelConnectionProvid
 from inframeld_sdk.models.model_connection_response import ModelConnectionResponse as ModelConnectionResponse
 from inframeld_sdk.models.model_connection_usage_response import ModelConnectionUsageResponse as ModelConnectionUsageResponse
 from inframeld_sdk.models.model_role import ModelRole as ModelRole
+from inframeld_sdk.models.model_token_bound_kind import ModelTokenBoundKind as ModelTokenBoundKind
 from inframeld_sdk.models.my_organization_access_response import MyOrganizationAccessResponse as MyOrganizationAccessResponse
 from inframeld_sdk.models.my_project_access_grant_response import MyProjectAccessGrantResponse as MyProjectAccessGrantResponse
 from inframeld_sdk.models.my_project_access_group_response import MyProjectAccessGroupResponse as MyProjectAccessGroupResponse
@@ -374,6 +399,7 @@ from inframeld_sdk.models.own_organization_grant_response import OwnOrganization
 from inframeld_sdk.models.page_response_access_group_action_grant_item_response import PageResponseAccessGroupActionGrantItemResponse as PageResponseAccessGroupActionGrantItemResponse
 from inframeld_sdk.models.page_response_application_account_action_grant_item_response import PageResponseApplicationAccountActionGrantItemResponse as PageResponseApplicationAccountActionGrantItemResponse
 from inframeld_sdk.models.page_response_application_key_metadata_response import PageResponseApplicationKeyMetadataResponse as PageResponseApplicationKeyMetadataResponse
+from inframeld_sdk.models.page_response_embedding_profile_response import PageResponseEmbeddingProfileResponse as PageResponseEmbeddingProfileResponse
 from inframeld_sdk.models.page_response_grant_recipient_response import PageResponseGrantRecipientResponse as PageResponseGrantRecipientResponse
 from inframeld_sdk.models.page_response_model_connection_action_grant_item_response import PageResponseModelConnectionActionGrantItemResponse as PageResponseModelConnectionActionGrantItemResponse
 from inframeld_sdk.models.page_response_model_connection_response import PageResponseModelConnectionResponse as PageResponseModelConnectionResponse

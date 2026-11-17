@@ -1,7 +1,7 @@
 export const pageMetadata = {
   title: "Configure models and processing",
   description:
-    "Configure model connections, manage provider credentials and save processing profiles.",
+    "Configure model connections, manage provider credentials and save processing and embedding profiles.",
 }
 
 # Configure models and processing
@@ -424,3 +424,180 @@ print(json.dumps(request, indent=2))
 Run `python3 convert_profile.py > processing-profile.json`. After it succeeds, set `PROJECT_ID` to the ID of a destination Project where that profile Name is available, then choose a fresh `PROFILE_CREATE_KEY`. Run the [creation POST](#create-a-processing-profile) from the same directory with current create authority in the destination.
 
 Read the newly created profile in the destination. Compare its `name`, `displayName` and every field in `definition` with the source. The destination has its own new `processingProfileId` and its ordinary creator assignments. The file carries only settings and labels. It transfers no existing grants or processing results.
+
+## Create an embedding profile
+
+Save the model and vector settings a Project will use for embeddings. To change those settings later, create a profile with a new Name.
+
+You need a current human credential and `create-embedding-profiles` in the Project. Set `INFRAMELD_URL` and `INFRAMELD_TOKEN` using the [HTTP setup](/clients/http#call-protected-operations), and set `PROJECT_ID` to the permanent Project UUID. Export them so the SDK examples can read them. Generate the create key once for a fresh request and keep it for replay.
+
+```shell
+export INFRAMELD_URL INFRAMELD_TOKEN PROJECT_ID
+export EMBEDDING_PROFILE_CREATE_KEY="$(uuidgen)"
+```
+
+Use a saved Model Connection in the same Project with provider `openai`, base URL `https://api.openai.com/v1`, `apiVersion: null` and `authentication: "api-key"`. Your installation operator must approve that exact URL. The credential slot can be empty because creating a profile makes no provider request. [Create a model connection](#create-the-connection).
+
+Save this request as `embedding-profile.json`. Replace the example connection ID with your connection's permanent ID. The example uses 1,536 dimensions, L2 normalization and cosine distance. Set both prefixes explicitly. Leading and trailing spaces become part of the saved settings. `contextTokens` accepts a whole number from 1 to 8,191. Inframeld records the pinned tokenizer for `text-embedding-3-small`.
+
+<CodeGroup>
+
+```json
+{
+  "name": "support-embeddings",
+  "displayName": "Support embeddings",
+  "definition": {
+    "modelConnectionId": "00000000-0000-4000-8000-000000000030",
+    "model": "text-embedding-3-small",
+    "dimensions": 1536,
+    "normalization": "l2",
+    "distance": "cosine",
+    "documentPrefix": "passage: ",
+    "queryPrefix": "query: ",
+    "contextTokens": 8191
+  }
+}
+```
+
+</CodeGroup>
+
+Run one alternative from the directory containing `embedding-profile.json`. For SDKs, use the [Python](/clients/python#install-from-a-checkout), [TypeScript](/clients/typescript#build-and-install-the-package) or [Rust](/clients/rust#set-up-an-example-project) setup. Save the program as `create_embedding_profile.py`, `create-embedding-profile.ts` or `src/main.rs` in the corresponding example project.
+
+<CodeGroup>
+
+```shell {{ title: "cURL" }}
+curl --fail-with-body --silent --show-error --max-time 5 \
+  --url "$INFRAMELD_URL/v1/projects/$PROJECT_ID/embedding-profiles" \
+  --header @- \
+  --header "Idempotency-Key: $EMBEDDING_PROFILE_CREATE_KEY" \
+  --header 'Content-Type: application/json' \
+  --data-binary @embedding-profile.json <<EOF_HEADERS
+Authorization: Bearer $INFRAMELD_TOKEN
+EOF_HEADERS
+```
+
+```python
+import asyncio
+import os
+from pathlib import Path
+from uuid import UUID
+
+import httpx
+from inframeld_sdk import ApiClient, Configuration
+from inframeld_sdk.api.indexing_api import IndexingApi
+from inframeld_sdk.exceptions import ApiException
+from inframeld_sdk.models.embedding_profile_creation_request import (
+    EmbeddingProfileCreationRequest,
+)
+
+
+async def main() -> None:
+    request = EmbeddingProfileCreationRequest.model_validate_json(
+        Path("embedding-profile.json").read_text(encoding="utf-8")
+    )
+    config = Configuration(
+        host=os.environ["INFRAMELD_URL"],
+        access_token=os.environ["INFRAMELD_TOKEN"],
+    )
+    async with ApiClient(config) as client:
+        try:
+            receipt = await IndexingApi(client).create_embedding_profile(
+                project_id=UUID(os.environ["PROJECT_ID"]),
+                idempotency_key=os.environ["EMBEDDING_PROFILE_CREATE_KEY"],
+                embedding_profile_creation_request=request,
+            )
+        except (ApiException, httpx.HTTPError):
+            raise SystemExit("No usable receipt. Keep the original request and key.") from None
+    print(receipt.to_json())
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+```typescript
+import { readFileSync } from "node:fs"
+import {
+  createClient,
+  createEmbeddingProfile,
+  type EmbeddingProfileCreationRequest,
+} from "@inframeld/sdk"
+
+const baseUrl = process.env.INFRAMELD_URL
+const token = process.env.INFRAMELD_TOKEN
+const projectId = process.env.PROJECT_ID
+const key = process.env.EMBEDDING_PROFILE_CREATE_KEY
+if (!baseUrl || !token || !projectId || !key) {
+  throw new Error(
+    "Set the URL, human token, Project ID and original create key."
+  )
+}
+
+const body: EmbeddingProfileCreationRequest = JSON.parse(
+  readFileSync("embedding-profile.json", "utf8")
+)
+const result = await createEmbeddingProfile({
+  client: createClient({ baseUrl }),
+  path: { project_id: projectId },
+  body,
+  headers: { Authorization: "Bearer " + token, "Idempotency-Key": key },
+  responseStyle: "fields",
+  throwOnError: false,
+})
+
+if (result.error || !result.data) {
+  console.error("Keep the original request and key.", result.response?.status)
+  process.exitCode = 1
+} else {
+  console.log(JSON.stringify(result.data, null, 2))
+}
+```
+
+```rust
+use inframeld_sdk::{EmbeddingProfileCreationRequest, HttpClient};
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let request: EmbeddingProfileCreationRequest =
+        serde_json::from_str(&std::fs::read_to_string("embedding-profile.json")?)?;
+    let client = HttpClient::new()
+        .with_base_url(std::env::var("INFRAMELD_URL")?)
+        .with_api_key(std::env::var("INFRAMELD_TOKEN")?);
+    match client
+        .create_embedding_profile(
+            std::env::var("PROJECT_ID")?,
+            std::env::var("EMBEDDING_PROFILE_CREATE_KEY")?,
+            request,
+        )
+        .await
+    {
+        Ok(response) => {
+            println!("{}", serde_json::to_string_pretty(&response.body)?);
+            Ok(())
+        }
+        Err(_) => Err("Keep the original request and key.".into()),
+    }
+}
+```
+
+</CodeGroup>
+
+Run `.venv/bin/python create_embedding_profile.py`, `node create-embedding-profile.ts` with Node 26, or `cargo run` in the Rust example project.
+
+HTTP `201` returns the permanent `profile.embeddingProfileId`, the original receipt and expiry, and two creator assignments for View and Use. The layout IDs describe the intended two-shard layout. Creating the profile saves that layout without building an index.
+
+If the response is lost, repeat the original body with the original key while you still have Create authority. During receipt retention, the server returns the original `201` even if the destination is no longer approved or you have lost View on the profile. The recovered receipt describes the original assignments. Changing the body under the same key returns a conflict.
+
+## Read an embedding profile
+
+Set `EMBEDDING_PROFILE_ID` from the receipt. You need current `view-embedding-profile` on the exact profile. A successful GET returns `200` with the saved settings and layout. A missing, hidden or wrong-Project profile returns `404`. [Read request and response](/api-reference/processing#read-an-embedding-profile).
+
+```shell
+curl --fail-with-body --silent --show-error --max-time 5 \
+  --url "$INFRAMELD_URL/v1/projects/$PROJECT_ID/embedding-profiles/$EMBEDDING_PROFILE_ID" \
+  --header @- <<EOF_HEADERS
+Authorization: Bearer $INFRAMELD_TOKEN
+EOF_HEADERS
+```
+
+To list visible profiles, send GET to the collection URL without the profile ID. Use `limit` from 1 to 100, with a default of 25. When `nextCursor` is present, pass it as the `cursor` query parameter on the same Project and installation. Each page checks your current access. [List request and response](/api-reference/processing#list-embedding-profiles).

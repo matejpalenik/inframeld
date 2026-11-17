@@ -1089,6 +1089,209 @@ export type DocumentUploadResponse = {
 };
 
 /**
+ * EmbeddingDistance
+ */
+export type EmbeddingDistance = 'cosine' | 'dot-product' | 'euclidean';
+
+/**
+ * EmbeddingNormalization
+ */
+export type EmbeddingNormalization = 'none' | 'l2';
+
+/**
+ * EmbeddingProfileAction
+ */
+export type EmbeddingProfileAction = 'view-embedding-profile' | 'use-embedding-profile';
+
+/**
+ * EmbeddingProfileCreationRequest
+ */
+export type EmbeddingProfileCreationRequest = {
+    definition: EmbeddingProfileDefinitionRequest;
+    /**
+     * Displayname
+     */
+    displayName: string;
+    /**
+     * Name
+     */
+    name: string;
+};
+
+/**
+ * EmbeddingProfileCreationResponse
+ */
+export type EmbeddingProfileCreationResponse = {
+    /**
+     * Idempotencyexpiresat
+     */
+    idempotencyExpiresAt: string;
+    /**
+     * Initialgrants
+     */
+    initialGrants: [
+        InitialEmbeddingProfileGrantResponse,
+        InitialEmbeddingProfileGrantResponse
+    ];
+    /**
+     * Operationid
+     */
+    operationId: string;
+    profile: EmbeddingProfileResponse;
+    /**
+     * Projectaccessrevision
+     */
+    projectAccessRevision: number;
+};
+
+/**
+ * EmbeddingProfileDefinitionRequest
+ */
+export type EmbeddingProfileDefinitionRequest = {
+    /**
+     * Contexttokens
+     */
+    contextTokens: number;
+    /**
+     * Dimensions
+     */
+    dimensions: number;
+    distance: EmbeddingDistance;
+    /**
+     * Documentprefix
+     */
+    documentPrefix: string;
+    /**
+     * Model
+     */
+    model: 'text-embedding-3-small';
+    /**
+     * Modelconnectionid
+     */
+    modelConnectionId: string;
+    normalization: EmbeddingNormalization;
+    /**
+     * Queryprefix
+     */
+    queryPrefix: string;
+};
+
+/**
+ * EmbeddingProfileDefinitionResponse
+ */
+export type EmbeddingProfileDefinitionResponse = {
+    /**
+     * Contexttokens
+     */
+    contextTokens: number;
+    /**
+     * Dimensions
+     */
+    dimensions: number;
+    distance: EmbeddingDistance;
+    /**
+     * Documentprefix
+     */
+    documentPrefix: string;
+    /**
+     * Expectedmodelrevision
+     */
+    expectedModelRevision: string | null;
+    /**
+     * Expectedprovider
+     */
+    expectedProvider: string;
+    /**
+     * Model
+     */
+    model: string;
+    /**
+     * Modelconnectionid
+     */
+    modelConnectionId: string;
+    normalization: EmbeddingNormalization;
+    /**
+     * Queryprefix
+     */
+    queryPrefix: string;
+    /**
+     * Role
+     */
+    role: 'embedding';
+    tokenBound: EmbeddingProfileTokenBoundResponse;
+};
+
+/**
+ * EmbeddingProfileGrantTargetResponse
+ */
+export type EmbeddingProfileGrantTargetResponse = {
+    /**
+     * Embeddingprofileid
+     */
+    embeddingProfileId: string;
+    /**
+     * Kind
+     */
+    kind: 'embedding-profile';
+};
+
+/**
+ * EmbeddingProfileResponse
+ *
+ * Describe saved vector meaning and its intended logical layout.
+ */
+export type EmbeddingProfileResponse = {
+    definition: EmbeddingProfileDefinitionResponse;
+    /**
+     * Displayname
+     */
+    displayName: string;
+    /**
+     * Embeddingprofileid
+     */
+    embeddingProfileId: string;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Placementversion
+     */
+    placementVersion: number;
+    /**
+     * Projectid
+     */
+    projectId: string;
+    /**
+     * Shardcount
+     */
+    shardCount: number;
+    /**
+     * Vectorindexid
+     */
+    vectorIndexId: string;
+    /**
+     * Vectorlayoutid
+     */
+    vectorLayoutId: string;
+};
+
+/**
+ * EmbeddingProfileTokenBoundResponse
+ */
+export type EmbeddingProfileTokenBoundResponse = {
+    /**
+     * Implementation
+     */
+    implementation: string;
+    kind: ModelTokenBoundKind;
+    /**
+     * Revision
+     */
+    revision: string;
+};
+
+/**
  * GrantRecipientResponse
  */
 export type GrantRecipientResponse = {
@@ -1367,6 +1570,18 @@ export type InitialApplicationAccountGrantResponse = {
      */
     canGrant: true;
     target: ApplicationAccountGrantTargetResponse;
+};
+
+/**
+ * InitialEmbeddingProfileGrantResponse
+ */
+export type InitialEmbeddingProfileGrantResponse = {
+    actionId: EmbeddingProfileAction;
+    /**
+     * Cangrant
+     */
+    canGrant: true;
+    target: EmbeddingProfileGrantTargetResponse;
 };
 
 /**
@@ -2324,6 +2539,11 @@ export type ModelConnectionUsageResponse = {
 export type ModelRole = 'generation' | 'embedding' | 'reranking';
 
 /**
+ * ModelTokenBoundKind
+ */
+export type ModelTokenBoundKind = 'exact' | 'conservative-upper-bound';
+
+/**
  * MyOrganizationAccessResponse
  */
 export type MyOrganizationAccessResponse = {
@@ -2644,6 +2864,20 @@ export type PageResponseApplicationKeyMetadataResponse = {
      * Items
      */
     items: Array<ApplicationKeyMetadataResponse>;
+    /**
+     * Nextcursor
+     */
+    nextCursor: string | null;
+};
+
+/**
+ * PageResponse[EmbeddingProfileResponse]
+ */
+export type PageResponseEmbeddingProfileResponse = {
+    /**
+     * Items
+     */
+    items: Array<EmbeddingProfileResponse>;
     /**
      * Nextcursor
      */
@@ -7315,6 +7549,187 @@ export type UploadDocumentResponses = {
 };
 
 export type UploadDocumentResponse = UploadDocumentResponses[keyof UploadDocumentResponses];
+
+export type ListEmbeddingProfilesData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: {
+        /**
+         * Limit
+         */
+        limit?: number;
+        /**
+         * Cursor
+         */
+        cursor?: string | null;
+    };
+    url: '/v1/projects/{project_id}/embedding-profiles';
+};
+
+export type ListEmbeddingProfilesErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type ListEmbeddingProfilesError = ListEmbeddingProfilesErrors[keyof ListEmbeddingProfilesErrors];
+
+export type ListEmbeddingProfilesResponses = {
+    /**
+     * Successful Response
+     */
+    200: PageResponseEmbeddingProfileResponse;
+};
+
+export type ListEmbeddingProfilesResponse = ListEmbeddingProfilesResponses[keyof ListEmbeddingProfilesResponses];
+
+export type CreateEmbeddingProfileData = {
+    body: EmbeddingProfileCreationRequest;
+    headers: {
+        /**
+         * Idempotency-Key
+         */
+        'Idempotency-Key': string;
+    };
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    query?: never;
+    url: '/v1/projects/{project_id}/embedding-profiles';
+};
+
+export type CreateEmbeddingProfileErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Operation conflicts with current state
+     */
+    409: ProblemDetails;
+    /**
+     * Content Too Large
+     */
+    413: ProblemDetails;
+    /**
+     * Unsupported Media Type
+     */
+    415: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type CreateEmbeddingProfileError = CreateEmbeddingProfileErrors[keyof CreateEmbeddingProfileErrors];
+
+export type CreateEmbeddingProfileResponses = {
+    /**
+     * Successful Response
+     */
+    201: EmbeddingProfileCreationResponse;
+};
+
+export type CreateEmbeddingProfileResponse = CreateEmbeddingProfileResponses[keyof CreateEmbeddingProfileResponses];
+
+export type GetEmbeddingProfileData = {
+    body?: never;
+    path: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Embedding Profile Id
+         */
+        embedding_profile_id: string;
+    };
+    query?: never;
+    url: '/v1/projects/{project_id}/embedding-profiles/{embedding_profile_id}';
+};
+
+export type GetEmbeddingProfileErrors = {
+    /**
+     * Invalid authentication request
+     */
+    400: ProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: ProblemDetails;
+    /**
+     * Access denied
+     */
+    403: ProblemDetails;
+    /**
+     * Resource not found
+     */
+    404: ProblemDetails;
+    /**
+     * Request validation failed
+     */
+    422: ProblemDetails;
+    /**
+     * Dependency unavailable
+     */
+    503: ProblemDetails;
+};
+
+export type GetEmbeddingProfileError = GetEmbeddingProfileErrors[keyof GetEmbeddingProfileErrors];
+
+export type GetEmbeddingProfileResponses = {
+    /**
+     * Successful Response
+     */
+    200: EmbeddingProfileResponse;
+};
+
+export type GetEmbeddingProfileResponse = GetEmbeddingProfileResponses[keyof GetEmbeddingProfileResponses];
 
 export type ListProjectGrantRecipientsData = {
     body?: never;

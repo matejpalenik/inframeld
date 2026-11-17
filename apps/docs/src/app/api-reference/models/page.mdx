@@ -331,6 +331,62 @@ The pinned Docling source and effective chunk options saved on the profile.
 
 <ApiSchema name="DoclingProcessingDefinitionResponse" />
 
+<a id="EmbeddingProfileCreationRequest" />
+
+## EmbeddingProfileCreationRequest
+
+The Project-unique Name, display name and explicitly selected embedding settings.
+
+<ApiSchema name="EmbeddingProfileCreationRequest" />
+
+<a id="EmbeddingProfileCreationResponse" />
+
+## EmbeddingProfileCreationResponse
+
+The original immutable profile, creator assignments, Project Access revision and receipt expiry.
+
+<ApiSchema name="EmbeddingProfileCreationResponse" />
+
+<a id="EmbeddingProfileDefinitionRequest" />
+
+## EmbeddingProfileDefinitionRequest
+
+The supported model choice and exact document and query input settings.
+
+<ApiSchema name="EmbeddingProfileDefinitionRequest" />
+
+<a id="EmbeddingProfileDefinitionResponse" />
+
+## EmbeddingProfileDefinitionResponse
+
+The saved vector settings, expected provider identity and bound tokenizer.
+
+<ApiSchema name="EmbeddingProfileDefinitionResponse" />
+
+<a id="EmbeddingProfileGrantTargetResponse" />
+
+## EmbeddingProfileGrantTargetResponse
+
+The permanent profile ID in an original creator assignment.
+
+<ApiSchema name="EmbeddingProfileGrantTargetResponse" />
+
+<a id="EmbeddingProfileResponse" />
+
+## EmbeddingProfileResponse
+
+The saved profile and its intended logical layout.
+
+<ApiSchema name="EmbeddingProfileResponse" />
+
+<a id="EmbeddingProfileTokenBoundResponse" />
+
+## EmbeddingProfileTokenBoundResponse
+
+The recorded tokenizer implementation, revision and bound type.
+
+<ApiSchema name="EmbeddingProfileTokenBoundResponse" />
+
 <a id="HumanAdmissionRequest" />
 
 ## HumanAdmissionRequest
@@ -422,6 +478,14 @@ Records the original local block and the cleanup obligation accepted with it. `c
 One original use-and-grant assignment to the human creator on the new application account. The three assignments do not belong to the application.
 
 <ApiSchema name="InitialApplicationAccountGrantResponse" />
+
+<a id="InitialEmbeddingProfileGrantResponse" />
+
+## InitialEmbeddingProfileGrantResponse
+
+One original use-and-grant assignment for View or Use on the new embedding profile.
+
+<ApiSchema name="InitialEmbeddingProfileGrantResponse" />
 
 <a id="InitialProcessingProfileGrantResponse" />
 
@@ -986,6 +1050,14 @@ A bounded key-UUID-ordered page with safe `items` and required nullable `nextCur
 Stored assignments for one exact group/action, with nullable `nextCursor` and no current Access revision.
 
 <ApiSchema name="PageResponse_AccessGroupActionGrantItemResponse_" />
+
+<a id="PageResponse_EmbeddingProfileResponse_" />
+
+## Embedding profile page
+
+A bounded page of embedding profiles visible to the current caller.
+
+<ApiSchema name="PageResponse_EmbeddingProfileResponse_" />
 
 <a id="PageResponse_ApplicationAccountActionGrantItemResponse_" />
 

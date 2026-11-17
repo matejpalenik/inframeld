@@ -1,6 +1,7 @@
 import asyncio
 from hashlib import sha256
 from json import dumps
+from typing import override
 from uuid import uuid4
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
@@ -10,7 +11,11 @@ from inframeld_backend.access.application.services.action_authorization_service 
 from inframeld_backend.access.application.services.principal_access_evaluation_service import (
     PrincipalAccessEvaluationService,
 )
+from inframeld_backend.access.domain.enums.model_connection_provider import ModelConnectionProvider
 from inframeld_backend.access.domain.enums.project_action import ProjectAction
+from inframeld_backend.access.domain.policies.model_connection_destination_policy import (
+    ModelConnectionDestinationPolicy,
+)
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
 from inframeld_backend.indexing.application.commands.create_embedding_profile_command import (
     CreateEmbeddingProfileCommand,
@@ -24,6 +29,9 @@ from inframeld_backend.indexing.application.dtos.embedding_profile_creation_fact
 from inframeld_backend.indexing.application.dtos.embedding_profile_dto import EmbeddingProfileDTO
 from inframeld_backend.indexing.application.protocols.embedding_profile_creation_repository import (
     EmbeddingProfileCreationRepository,
+)
+from inframeld_backend.indexing.application.protocols.embedding_profile_creator import (
+    EmbeddingProfileCreator,
 )
 from inframeld_backend.indexing.domain.enums.embedding_profile_action import EmbeddingProfileAction
 from inframeld_backend.indexing.domain.value_objects.embedding_profile_id import EmbeddingProfileId
@@ -74,7 +82,7 @@ _INITIAL_ACTIONS = (EmbeddingProfileAction.VIEW, EmbeddingProfileAction.USE)
 _SETTINGS_DOMAIN = b"inframeld:embedding-profile-settings:v1\x00"
 
 
-class EmbeddingProfileCreationService:
+class EmbeddingProfileCreationService(EmbeddingProfileCreator):
     """Create the immutable profile, original layout and initial creator assignments."""
 
     def __init__(
@@ -84,12 +92,15 @@ class EmbeddingProfileCreationService:
         fingerprints: RequestFingerprintService,
         *,
         transactions: TransactionManager,
+        official_destinations: ModelConnectionDestinationPolicy | None,
     ) -> None:
         self._repository = repository
         self._idempotency = idempotency
         self._fingerprints = fingerprints
         self._transactions = transactions
+        self._official_destinations = official_destinations
 
+    @override
     async def create(
         self,
         *,
@@ -153,10 +164,21 @@ class EmbeddingProfileCreationService:
         RevisionValidation.require(facts.access_revision)
         if facts.access_revision == RevisionValidation.MAX_VALUE:
             raise ConflictError("The Project access revision is exhausted.")
-        if not await self._repository.lock_live_selection(
+        current_access = await self._repository.lock_live_selection(
             facts=facts, connection_id=reviewed.selection.connection_id
-        ):
+        )
+        if current_access is None:
             raise ResourceNotFoundError("The selected Model Connection is not available.")
+        if self._official_destinations is not None and (
+            current_access.provider is not ModelConnectionProvider.OPENAI
+            or not self._official_destinations.permits(
+                provider=current_access.provider,
+                base_url=current_access.base_url,
+                api_version=current_access.api_version,
+                authentication=current_access.authentication,
+            )
+        ):
+            raise ConflictError("Select an approved official OpenAI Model Connection.")
 
         layout = VectorShardLayout(
             organization_id=facts.organization_id,
