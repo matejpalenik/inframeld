@@ -48,7 +48,7 @@ int main(void)
         SCMP_SYS(readlinkat), SCMP_SYS(rseq),
         SCMP_SYS(rt_sigaction), SCMP_SYS(rt_sigprocmask), SCMP_SYS(rt_sigreturn),
         SCMP_SYS(set_robust_list), SCMP_SYS(set_tid_address), SCMP_SYS(setsid),
-        SCMP_SYS(wait4), SCMP_SYS(write),
+        SCMP_SYS(uname), SCMP_SYS(wait4), SCMP_SYS(write),
     };
     for (size_t number = 0; number < sizeof(calls) / sizeof(calls[0]); number++) {
         if (seccomp_rule_add(filter, SCMP_ACT_ALLOW, calls[number], 0) < 0) {
@@ -59,8 +59,12 @@ int main(void)
     const uint64_t namespace_flags =
         CLONE_NEWNS | CLONE_NEWUSER | CLONE_NEWPID | CLONE_NEWIPC | CLONE_NEWNET |
         CLONE_NEWUTS | CLONE_NEWCGROUP | CLONE_NEWTIME;
-    int status = seccomp_rule_add(filter, SCMP_ACT_ALLOW, SCMP_SYS(clone), 1,
+    /* ENOSYS makes glibc retry through the argument-filtered legacy clone. */
+    int status = seccomp_rule_add(filter, SCMP_ACT_ERRNO(ENOSYS), SCMP_SYS(clone3), 0);
+    if (status == 0) {
+        status = seccomp_rule_add(filter, SCMP_ACT_ALLOW, SCMP_SYS(clone), 1,
                                   SCMP_A0(SCMP_CMP_MASKED_EQ, namespace_flags, 0));
+    }
     if (status == 0) {
         status = seccomp_export_bpf(filter, STDOUT_FILENO);
     }

@@ -8,6 +8,7 @@ import re
 import resource
 import select
 import socket
+import stat
 import subprocess
 import sys
 import time
@@ -16,6 +17,7 @@ from contextlib import suppress
 from hashlib import sha256
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from threading import Thread
 from typing import TypedDict, cast
 from unittest.mock import patch
 
@@ -33,6 +35,7 @@ _SETUP_RULES = [
 ]
 _SETUP_NAMESPACES = ("mnt", "pid", "ipc", "net")
 _DISABLED = errno.EOPNOTSUPP
+_UTS_READ_UNSUPPORTED = b"parser-fixture: uts-read-unsupported"
 _USER_NAMESPACE = 0x10000000
 _WORK_SECONDS = 300
 _CLEANUP_SECONDS = 10
@@ -346,6 +349,15 @@ class FixtureFailureTest(unittest.TestCase):
                         f"Parser sandbox stage=before-child-ready category={category} status=exit-nonzero.",
                     )
 
+    def test_labels_the_exact_uts_read_denial_marker(self) -> None:
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "stderr").write_bytes(b"parser-fixture: uts-read-unsupported\n")
+            self.assertEqual(
+                _fixture_failure(root, "before-child-ready", returncode=1),
+                "Parser sandbox stage=before-child-ready category=uts-read-unsupported status=exit-nonzero.",
+            )
+
     def test_distinguishes_empty_capture_and_observed_process_status(self) -> None:
         with TemporaryDirectory() as directory:
             root = Path(directory)
@@ -504,6 +516,25 @@ class ParserSandboxTest(unittest.TestCase):
                 self.fail(
                     f"Parser sandbox stage=child-observation category=namespace-report-mismatch namespace={namespace}."
                 )
+        try:
+            with (actual / "mountinfo").open("rb") as mounts:
+                inventory = mounts.read(64 * 1024 + 1)
+        except OSError as error:
+            raise AssertionError(
+                f"Parser sandbox stage=child-observation category=mountinfo-unavailable errno={error.errno}."
+            ) from None
+        if len(inventory) > 64 * 1024 or not inventory.endswith(b"\n"):
+            self.fail("Parser sandbox stage=child-observation category=mountinfo-invalid.")
+        devices: list[bytes] = []
+        for line in inventory.splitlines():
+            fields = line.split(b" ", 5)
+            if len(fields) != 6:
+                self.fail("Parser sandbox stage=child-observation category=mountinfo-invalid.")
+            target = fields[4]
+            if target == b"/dev" or target.startswith(b"/dev/"):
+                devices.append(target)
+        if sorted(devices) != [b"/dev/null", b"/dev/urandom"]:
+            self.fail("Parser sandbox stage=child-observation category=device-mount-mismatch.")
         if time.monotonic() > deadline:
             self.fail(_fixture_failure(root, "child-observation-timeout"))
         return monitor, init, child
@@ -682,6 +713,8 @@ def _fixture_failure(root: Path, stage: str, *, returncode: int | None = None) -
     if not captured:
         return f"{summary}stderr-empty{outcome}"
     lines = captured.splitlines()
+    if _UTS_READ_UNSUPPORTED in lines:
+        return f"{summary}uts-read-unsupported{outcome}"
     map_operations = {
         b"setting up uid map": "uid-map",
         b"setting up gid map": "gid-map",
@@ -800,6 +833,7 @@ def _owner(root: Path, mode: str) -> int:
             ("--symlink", "usr/lib", "/lib"),
             ("--ro-bind", __file__, "/fixture/test_sandbox_boundaries.py"),
             ("--dev-bind", "/dev/null", "/dev/null"),
+            ("--dev-bind", "/dev/urandom", "/dev/urandom"),
             ("--perms", "0700", "--size", str(1024**3), "--tmpfs", "/scratch"),
             ("--chdir", "/scratch"),
             ("--seccomp", str(policy.fileno())),
@@ -847,6 +881,17 @@ def _child(root: Path, control_fd: int, report_fd: int, machine: str, mode: str)
             assert error.errno == errno.EBADF
         else:
             raise AssertionError("An outer descriptor reached the sandbox.")
+    entropy = Path("/dev/urandom")
+    expected = entropy.lstat()
+    descriptor = os.open(entropy, os.O_RDONLY | os.O_NOFOLLOW)
+    try:
+        opened = os.fstat(descriptor)
+        assert stat.S_ISCHR(expected.st_mode) and stat.S_ISCHR(opened.st_mode)
+        assert (opened.st_dev, opened.st_ino) == (expected.st_dev, expected.st_ino)
+        assert opened.st_rdev == expected.st_rdev == os.makedev(1, 9)
+        assert len(os.read(descriptor, 8)) == 8
+    finally:
+        os.close(descriptor)
     scratch = Path("/scratch/owned")
     scratch.write_bytes(b"private")
     assert scratch.read_bytes() == b"private"
@@ -863,6 +908,28 @@ def _child(root: Path, control_fd: int, report_fd: int, machine: str, mode: str)
     else:
         raise AssertionError("The child resolved an external name.")
     _require_namespace_syscalls_denied(machine)
+
+    if mode == "once":
+        try:
+            uts = os.uname()
+        except OSError as error:
+            if error.errno != _DISABLED:
+                raise
+            os.write(2, _UTS_READ_UNSUPPORTED + b"\n")
+            raise SystemExit(1) from None
+        assert uts.sysname == "Linux" and uts.machine == machine
+
+        libc = ctypes.CDLL(None, use_errno=True)
+        for set_name in (libc.sethostname, libc.setdomainname):
+            set_name.argtypes = (ctypes.c_char_p, ctypes.c_size_t)
+            set_name.restype = ctypes.c_int
+            assert set_name(None, 1) == -1 and ctypes.get_errno() == _DISABLED
+
+        thread_result: list[bool] = []
+        worker = Thread(target=thread_result.append, args=(True,), daemon=True)
+        worker.start()
+        worker.join(timeout=5)
+        assert not worker.is_alive() and thread_result == [True]
 
     ready_reader, ready_writer = os.pipe()
     # Each held process keeps a hold writer open so peer death cannot release it by EOF.
@@ -954,7 +1021,8 @@ def _require_namespace_syscalls_denied(machine: str) -> None:
         outcome = syscall(*operation)
         if operation[0] in (clone_call, clone3_call) and outcome == 0:
             os._exit(1)
-        assert outcome == -1 and ctypes.get_errno() == _DISABLED
+        expected_errno = errno.ENOSYS if operation[0] == clone3_call else _DISABLED
+        assert outcome == -1 and ctypes.get_errno() == expected_errno
 
 
 if __name__ == "__main__":

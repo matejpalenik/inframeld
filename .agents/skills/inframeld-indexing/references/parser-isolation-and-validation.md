@@ -98,7 +98,7 @@ A **namespace** gives the child a separate view of operating-system resources. T
 
 ### Expose only what this document needs
 
-Expose only the pinned read-only runtime and model assets, that attempt's input, the required device files, and size-limited scratch and output space.
+Expose only the pinned read-only runtime and model assets, that attempt's input, the required device files, and size-limited scratch and output space. The child receives only `/dev/null` for discarded output and `/dev/urandom` for Torch's startup entropy.
 
 Omit the child's `/proc` mount under [ADR-0133](../../../../docs/adr/ADR-0133-omit-procfs-from-restricted-parser-children.md). The trusted supervisor uses its own confined process filesystem for setup and to observe the held child. Verify the actual namespace and enforcement state and independently confirm exit and reaping. A missing observation fails qualification.
 
