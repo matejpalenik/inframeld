@@ -8,6 +8,7 @@ import socket
 import stat
 import subprocess
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from hashlib import sha256
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -27,6 +28,7 @@ from inframeld_parser.parse_result import (
     encode_parse_result,
     validate_parse_result,
 )
+from inframeld_parser.parse_service import serve_parse_connection
 from inframeld_parser.pdf_conversion import MAX_INPUT_BYTES
 
 _ATTEMPT = UUID("018b596c-4db5-7e1a-ae43-855809cd985b")
@@ -238,6 +240,143 @@ class ParseResultContractTest(TestCase):
         artifact = CanonicalPdf(_SOURCE_SHA, bytes(MAX_OUTPUT_BYTES - 32))
         with self.assertRaisesRegex(ParseResultError, "size"):
             encode_parse_result(_ATTEMPT, artifact, ((0, 1),))
+
+
+class ParseConnectionContractTest(TestCase):
+    def setUp(self) -> None:
+        self.launcher = parse_launcher.ParserLauncher(selinux_level=None)
+        self.frame = _frame(_result_header(_CANONICAL), _CANONICAL)
+        self.result = validate_parse_result(self.frame, request=_REQUEST)
+
+    def test_returns_one_bound_reply_on_the_caller_owned_connection(self) -> None:
+        sender, receiver = socket.socketpair()
+        with sender, receiver, patch.object(self.launcher, "run", return_value=self.result) as run:
+            sender.sendall(_frame(_header(), _SOURCE))
+            deadline = monotonic() + 1
+            serve_parse_connection(receiver, self.launcher, deadline=deadline)
+            run.assert_called_once_with(_REQUEST, deadline=deadline, peer_fd=receiver.fileno())
+            self.assertGreaterEqual(receiver.fileno(), 0)
+            receiver.close()
+            capture = _read_reply(sender, deadline)
+        self.assertEqual(validate_parse_result(capture, request=_REQUEST), self.result)
+
+    def test_reports_the_fixed_request_and_cleanup_outcomes(self) -> None:
+        cases = (
+            (_frame(b"{}"), None, b"\0\0\0\0\x01"),
+            (
+                _frame(_header(), _SOURCE),
+                parse_launcher.ParseLaunchError("private failure", cleanup_confirmed=True),
+                b"\0\0\0\0\x02",
+            ),
+            (
+                _frame(_header(), _SOURCE),
+                parse_launcher.ParseLaunchError("private failure", cleanup_confirmed=False),
+                b"\0\0\0\0\x03",
+            ),
+        )
+        for request, error, expected in cases:
+            sender, receiver = socket.socketpair()
+            with (
+                self.subTest(status=expected[-1]),
+                sender,
+                receiver,
+                patch.object(
+                    self.launcher, "run", side_effect=error, return_value=self.result
+                ) as run,
+            ):
+                sender.sendall(request)
+                deadline = monotonic() + 1
+                serve_parse_connection(receiver, self.launcher, deadline=deadline)
+                receiver.close()
+                self.assertEqual(_read_reply(sender, deadline), expected)
+                self.assertEqual(run.call_count, int(error is not None))
+
+    def test_refuses_surplus_input_or_half_close_before_launch(self) -> None:
+        for surplus in (True, False):
+            sender, receiver = socket.socketpair()
+            with (
+                self.subTest(surplus=surplus),
+                sender,
+                receiver,
+                patch.object(self.launcher, "run", return_value=self.result) as run,
+            ):
+                sender.sendall(_frame(_header(), _SOURCE) + (b"x" if surplus else b""))
+                if not surplus:
+                    sender.shutdown(socket.SHUT_WR)
+                deadline = monotonic() + 1
+                serve_parse_connection(receiver, self.launcher, deadline=deadline)
+                run.assert_not_called()
+                receiver.shutdown(socket.SHUT_WR)
+                self.assertEqual(_read_reply(sender, deadline), b"")
+
+    def test_refuses_an_incomplete_request_at_the_original_deadline(self) -> None:
+        sender, receiver = socket.socketpair()
+        with sender, receiver, patch.object(self.launcher, "run", return_value=self.result) as run:
+            sender.sendall(b"\0")
+            serve_parse_connection(receiver, self.launcher, deadline=monotonic() + 0.02)
+            run.assert_not_called()
+            receiver.close()
+            self.assertEqual(_read_reply(sender, monotonic() + 1), b"")
+
+    def test_stalled_reply_ends_without_replacing_a_partial_success(self) -> None:
+        result, frame = self._large_result()
+        sender, receiver = socket.socketpair()
+        with sender, receiver, patch.object(self.launcher, "run", return_value=result):
+            receiver.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, 4096)
+            sender.sendall(_frame(_header(), _SOURCE))
+            initial_timeout = 0.4
+            receiver.settimeout(initial_timeout)
+            serve_parse_connection(receiver, self.launcher, deadline=monotonic() + 0.2)
+            self.assertEqual(receiver.gettimeout(), initial_timeout)
+            receiver.close()
+            partial = _read_reply(sender, monotonic() + 1)
+        self.assertGreater(len(partial), 4)
+        self.assertLess(len(partial), len(frame))
+        self.assertTrue(frame.startswith(partial), "The reply changed after partial output.")
+
+    def test_delayed_surplus_input_stops_a_reply_without_draining_the_byte(self) -> None:
+        result, frame = self._large_result()
+        sender, receiver = socket.socketpair()
+
+        def interrupt(deadline: float) -> bytes:
+            sender.settimeout(deadline - monotonic())
+            first = sender.recv(1)
+            sender.sendall(b"x")
+            return first + _read_reply(sender, deadline)
+
+        with sender, ThreadPoolExecutor(max_workers=1) as worker:
+            with receiver, patch.object(self.launcher, "run", return_value=result):
+                receiver.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, 4096)
+                sender.sendall(_frame(_header(), _SOURCE))
+                deadline = monotonic() + 1
+                pending = worker.submit(interrupt, deadline)
+                serve_parse_connection(receiver, self.launcher, deadline=deadline)
+                self.assertEqual(receiver.recv(1, socket.MSG_DONTWAIT), b"x")
+                receiver.shutdown(socket.SHUT_WR)
+            partial = pending.result(timeout=1)
+        self.assertGreater(len(partial), 4)
+        self.assertLess(len(partial), len(frame))
+        self.assertTrue(frame.startswith(partial), "The reply changed after partial output.")
+
+    @staticmethod
+    def _large_result() -> tuple[ParseResult, bytes]:
+        artifact = canonicalize((TextBlock("x" * (512 * 1024), (1,)),), source_sha256=_SOURCE_SHA)
+        frame = encode_parse_result(_ATTEMPT, artifact, ((0, 1),))
+        return validate_parse_result(frame, request=_REQUEST), frame
+
+
+def _read_reply(sender: socket.socket, deadline: float) -> bytes:
+    reply = bytearray()
+    while len(reply) <= MAX_OUTPUT_BYTES:
+        remaining = deadline - monotonic()
+        if remaining <= 0:
+            raise TimeoutError("The controlled client did not receive reply EOF.")
+        sender.settimeout(remaining)
+        block = sender.recv(min(64 * 1024, MAX_OUTPUT_BYTES + 1 - len(reply)))
+        if not block:
+            return bytes(reply)
+        reply.extend(block)
+    raise ValueError("The parser reply was outside its output bound.")
 
 
 class ParseChildContractTest(TestCase):
@@ -527,6 +666,38 @@ class ParseLauncherContractTest(TestCase):
         self.assertEqual(len(self.owned), 2)
         self._assert_no_release()
 
+    def test_disconnected_peer_wins_over_simultaneous_monitor_exit_and_ready(self) -> None:
+        sender, receiver = socket.socketpair()
+        with sender, receiver:
+            os.write(self.ready_out, b"ready\n")
+            os.write(self.pid_signals[101][1], b"exited")
+            sender.shutdown(socket.SHUT_WR)
+            with self.assertRaisesRegex(parse_launcher.ParseObservationError, "connection"):
+                self._observe(peer_fd=receiver.fileno())
+            self.assertGreaterEqual(receiver.fileno(), 0)
+        self.assertEqual(self.owned, [])
+        self._assert_no_release()
+
+    def test_delayed_surplus_before_release_retains_pinned_children(self) -> None:
+        sender, receiver = socket.socketpair()
+        readlink = os.readlink
+
+        def send_extra(path: Path) -> str:
+            target = readlink(path)
+            if path == self.proc / "103/ns/user":
+                sender.sendall(b"x")
+            return target
+
+        with sender, receiver, patch.object(os, "readlink", send_extra):
+            os.write(self.ready_out, b"ready\n")
+            with self.assertRaisesRegex(parse_launcher.ParseObservationError, "connection"):
+                self._observe(peer_fd=receiver.fileno())
+            self.assertEqual(receiver.recv(1, socket.MSG_DONTWAIT), b"x")
+        self.assertEqual(len(self.owned), 2)
+        for descriptor in self.owned:
+            os.fstat(descriptor)
+        self._assert_no_release()
+
     def _use_arm_labels(self) -> None:
         self.machine.return_value = SimpleNamespace(machine="aarch64")
         for subject in ("self", "101", "102", "103"):
@@ -534,7 +705,13 @@ class ParseLauncherContractTest(TestCase):
                 self.proc / subject / "attr/current", b"system_u:system_r:container_t:s0:c21,c25\0"
             )
 
-    def _observe(self, *, deadline: float | None = None, selinux_level: str | None = None) -> None:
+    def _observe(
+        self,
+        *,
+        deadline: float | None = None,
+        selinux_level: str | None = None,
+        peer_fd: int | None = None,
+    ) -> None:
         parse_launcher.observe_and_release(
             self.monitor,
             self.pid_signals[101][0],
@@ -543,6 +720,7 @@ class ParseLauncherContractTest(TestCase):
             owned_pidfds=self.owned,
             selinux_level=selinux_level,
             deadline=deadline if deadline is not None else monotonic() + 1,
+            peer_fd=peer_fd,
         )
 
     def _assert_no_release(self) -> None:
@@ -724,6 +902,35 @@ class ParseAttemptOwnerTest(TestCase):
         self.assertTrue(signalled)
         send_signal.assert_not_called()
 
+    def test_disconnect_after_capture_wins_over_monitor_retirement(self) -> None:
+        sender, receiver = socket.socketpair()
+        read = os.read
+        eof_count = 0
+        waits: list[float] = []
+        frame = _frame(_result_header(_CANONICAL), _CANONICAL)
+
+        def disconnect(descriptor: int, limit: int) -> bytes:
+            nonlocal eof_count
+            output = read(descriptor, limit)
+            if not output:
+                eof_count += 1
+                if eof_count == 2:
+                    sender.close()
+            return output
+
+        with (
+            sender,
+            receiver,
+            patch.object(os, "read", disconnect),
+            patch.object(parse_launcher, "validate_parse_result") as validate,
+            self.assertRaisesRegex(parse_launcher.ParseLaunchError, "connection") as failure,
+        ):
+            self._run_captured(frame, [], peer_fd=receiver.fileno(), waits=waits)
+        self.assertTrue(failure.exception.cleanup_confirmed)
+        self.assertEqual(len(waits), 1, "Only cleanup should reap after a disconnected peer.")
+        self.assertEqual(list(self.scratch.iterdir()), [])
+        validate.assert_not_called()
+
     def test_reserves_staged_input_and_report_pages_inside_the_attempt_quota(self) -> None:
         for size, reservation in ((4096, 8192), (4097, 12288)):
             source = _SOURCE.ljust(size, b" ")
@@ -749,6 +956,8 @@ class ParseAttemptOwnerTest(TestCase):
         *,
         exit_status: int = 0,
         pending: tuple[int, list[int]] | None = None,
+        peer_fd: int | None = None,
+        waits: list[float] | None = None,
     ) -> ParseResult:
         signal_fd = self._filled_pipe(b"exited")
         stdout = os.fdopen(self._filled_pipe(frame), "rb", closefd=False)
@@ -770,6 +979,8 @@ class ParseAttemptOwnerTest(TestCase):
         def wait(timeout: float) -> int:
             self.assertTrue(pinned)
             self.assertGreaterEqual(timeout, 0)
+            if waits is not None:
+                waits.append(timeout)
             return exit_status
 
         def release(
@@ -797,7 +1008,7 @@ class ParseAttemptOwnerTest(TestCase):
             patch.object(parse_launcher, "observe_and_release", side_effect=release),
         ):
             return parse_launcher.ParserLauncher(selinux_level=None).run(
-                _REQUEST, deadline=monotonic() + 1
+                _REQUEST, deadline=monotonic() + 1, peer_fd=peer_fd
             )
 
     def _filled_pipe(self, content: bytes) -> int:
@@ -838,7 +1049,20 @@ class ParseRuntimeContractTest(TestCase):
         self.assertEqual(sha256(source).hexdigest(), digest)
         self._assert_empty_runtime()
         launcher = parse_launcher.ParserLauncher(selinux_level=selinux_level)
-        result = launcher.run(ParseRequest(_ATTEMPT, digest, 8, source), deadline=monotonic() + 300)
+        request = ParseRequest(_ATTEMPT, digest, 8, source)
+        sender, receiver = socket.socketpair()
+        deadline = monotonic() + 300
+
+        def exchange() -> ParseResult:
+            sender.settimeout(max(0, deadline - monotonic()))
+            sender.sendall(_frame(_header(source_sha256=digest, source_size=len(source)), source))
+            return validate_parse_result(_read_reply(sender, deadline), request=request)
+
+        with sender, ThreadPoolExecutor(max_workers=1) as worker:
+            with receiver:
+                pending = worker.submit(exchange)
+                serve_parse_connection(receiver, launcher, deadline=deadline)
+            result = pending.result(timeout=max(0, deadline - monotonic()))
         self._assert_empty_runtime()
 
         self.assertEqual((result.attempt_id, result.source_sha256), (_ATTEMPT, digest))

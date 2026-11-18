@@ -45,6 +45,19 @@ def encode_parse_result(
     chunk_ranges: tuple[tuple[int, int], ...],
 ) -> bytes:
     """Encode one bounded child frame for independent validation by the supervisor."""
+    return _encode(attempt_id, artifact, chunk_ranges)
+
+
+def encode_verified_result(result: ParseResult) -> bytes:
+    """Return the same frame format after the supervisor has verified the child reply."""
+    return _encode(result.attempt_id, result, result.chunk_ranges)
+
+
+def _encode(
+    attempt_id: UUID,
+    artifact: "CanonicalPdf | ParseResult",
+    chunk_ranges: tuple[tuple[int, int], ...],
+) -> bytes:
     canonical = artifact.canonical_bytes
     if not 0 < len(canonical) < MAX_OUTPUT_BYTES - 4:
         raise ParseResultError(_FRAME_SIZE)

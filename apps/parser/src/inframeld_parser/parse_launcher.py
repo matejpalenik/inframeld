@@ -10,7 +10,7 @@ import signal
 import stat
 import subprocess
 from contextlib import suppress
-from math import isfinite
+from math import ceil, isfinite
 from pathlib import Path
 from tempfile import mkdtemp
 from threading import Lock
@@ -34,7 +34,7 @@ _READ_CHUNK = 64 * 1024
 _DIAGNOSTIC_LIMIT = 4096
 _REPORT_LIMIT = 4096
 _ATTEMPT_SCRATCH_BYTES = 1024**3
-_WORK_SECONDS = 300
+MAX_ATTEMPT_SECONDS = 300
 _CLEANUP_SECONDS = 10
 _READY = b"ready\n"
 _APPARMOR_LABEL = b"inframeld-parser-probe (enforce)"
@@ -44,6 +44,7 @@ _BAD_IDENTITY = "The parser process identity could not be verified."
 _BAD_REPORT = "The parser namespace report is invalid."
 _NOT_LIVE = "A held parser process was no longer live."
 _BAD_READY = "The parser readiness marker is invalid."
+_PEER_ENDED = "The parser connection ended or sent extra input."
 _BAD_SECCOMP = "The held parser seccomp filters did not match."
 
 
@@ -68,13 +69,16 @@ class ParserLauncher:
         self._quarantined = False
         self._unreconciled_monitor: Popen[bytes] | None = None
 
-    def run(self, request: "ParseRequest", *, deadline: float) -> ParseResult:
+    def run(
+        self, request: "ParseRequest", *, deadline: float, peer_fd: int | None = None
+    ) -> ParseResult:
+        """Run one attempt while borrowing the optional caller-owned connection descriptor."""
         if not self._turn.acquire(blocking=False):
             raise ParseLaunchError("The parser already owns an attempt.", cleanup_confirmed=True)
         try:
             if self._quarantined:
                 raise ParseLaunchError("The parser is quarantined.", cleanup_confirmed=False)
-            if os.getpid() != 1 or not 0 < deadline - monotonic() <= _WORK_SECONDS:
+            if os.getpid() != 1 or not 0 < deadline - monotonic() <= MAX_ATTEMPT_SECONDS:
                 raise ParseLaunchError(
                     "The parser attempt owner or deadline is invalid.", cleanup_confirmed=True
                 )
@@ -87,11 +91,13 @@ class ParserLauncher:
                 raise ParseLaunchError(
                     "The parser process inventory is uncertain.", cleanup_confirmed=False
                 )
-            return self._run_attempt(request, deadline)
+            return self._run_attempt(request, deadline, peer_fd)
         finally:
             self._turn.release()
 
-    def _run_attempt(self, request: "ParseRequest", deadline: float) -> ParseResult:
+    def _run_attempt(
+        self, request: "ParseRequest", deadline: float, peer_fd: int | None
+    ) -> ParseResult:
         scratch = None
         monitor = None
         monitor_fd = None
@@ -101,6 +107,7 @@ class ParserLauncher:
         failure = None
         stage = "The parser could not start the attempt."
         try:
+            _require_silent_peer(peer_fd)
             _expected_label(self._selinux_level)
             entropy = _URANDOM.lstat()
             if not stat.S_ISCHR(entropy.st_mode) or (
@@ -122,6 +129,7 @@ class ParserLauncher:
                 (_HELPERS / "child-seccomp.bpf").open("rb") as policy,
             ):
                 _remaining(deadline)
+                _require_silent_peer(peer_fd)
                 monitor = subprocess.Popen(
                     _arguments(source, report.fileno(), policy.fileno(), request),
                     stdin=subprocess.PIPE,
@@ -148,17 +156,25 @@ class ParserLauncher:
                     owned_pidfds=held,
                     selinux_level=self._selinux_level,
                     deadline=deadline,
+                    peer_fd=peer_fd,
                 )
                 stage = "The parser output could not be captured."
                 assert monitor.stdout is not None
-                payload = _capture_result(monitor.stdout.fileno(), stderr_fd, diagnostics, deadline)
-                if monitor.wait(timeout=_remaining(deadline)) != 0:
+                payload = _capture_result(
+                    monitor.stdout.fileno(), stderr_fd, diagnostics, deadline, peer_fd=peer_fd
+                )
+                if peer_fd is not None and _wait_handles([monitor_fd], deadline, peer_fd=peer_fd):
+                    raise ParseObservationError("The parser observation deadline elapsed.")
+                remaining = _remaining(deadline)
+                if monitor.wait(timeout=remaining if peer_fd is None else 0) != 0:
                     raise ParseObservationError("The parser child did not finish successfully.")
-                if _wait_handles(held, deadline):
+                if _wait_handles(held, deadline, peer_fd=peer_fd):
                     raise ParseObservationError("The parser observation deadline elapsed.")
                 _remaining(deadline)
+                _require_silent_peer(peer_fd)
                 result = validate_parse_result(payload, request=request)
                 _remaining(deadline)
+                _require_silent_peer(peer_fd)
         except (ParseObservationError, ParseResultError) as error:
             failure = str(error)
         except subprocess.TimeoutExpired:
@@ -283,14 +299,19 @@ def _child_scratch_bytes(staged_input_bytes: int) -> int:
 
 
 def _capture_result(
-    stdout_fd: int, stderr_fd: int | None, diagnostics: bytearray, deadline: float
+    stdout_fd: int,
+    stderr_fd: int | None,
+    diagnostics: bytearray,
+    deadline: float,
+    *,
+    peer_fd: int | None = None,
 ) -> bytes:
     result = bytearray()
     streams = {stdout_fd: (result, MAX_OUTPUT_BYTES)}
     if stderr_fd is not None:
         streams[stderr_fd] = diagnostics, _DIAGNOSTIC_LIMIT
     while streams:
-        readable, _, _ = select.select(list(streams), [], [], _remaining(deadline))
+        readable = _readable(list(streams), _remaining(deadline), peer_fd)
         if not readable:
             raise ParseObservationError("The parser observation deadline elapsed.")
         for descriptor in readable:
@@ -354,13 +375,35 @@ def _signal_owned(descriptors: list[int], sig: signal.Signals) -> None:
             signal.pidfd_send_signal(descriptor, sig)
 
 
-def _wait_handles(descriptors: list[int], deadline: float) -> list[int]:
+def _wait_handles(
+    descriptors: list[int], deadline: float, *, peer_fd: int | None = None
+) -> list[int]:
     while descriptors:
-        retired = select.select(descriptors, [], [], max(0, deadline - monotonic()))[0]
+        retired = _readable(descriptors, max(0, deadline - monotonic()), peer_fd)
         if not retired:
             break
         descriptors = [fd for fd in descriptors if fd not in retired]
     return descriptors
+
+
+def _readable(descriptors: list[int], timeout: float, peer_fd: int | None) -> list[int]:
+    if peer_fd is None:
+        return select.select(descriptors, [], [], timeout)[0]
+    poller = select.poll()
+    for descriptor in descriptors:
+        poller.register(descriptor, select.POLLIN)
+    poller.register(peer_fd, select.POLLIN)
+    ready = poller.poll(ceil(timeout * 1000))
+    if any(descriptor == peer_fd for descriptor, _ in ready):
+        raise ParseObservationError(_PEER_ENDED)
+    if any(events & select.POLLNVAL for _, events in ready):
+        raise ParseObservationError(_BAD_IDENTITY)
+    return [descriptor for descriptor, _ in ready]
+
+
+def _require_silent_peer(peer_fd: int | None) -> None:
+    if peer_fd is not None:
+        _readable([], 0, peer_fd)
 
 
 def _close_attempt(monitor: "Popen[bytes] | None", monitor_fd: int | None, held: list[int]) -> bool:
@@ -389,6 +432,7 @@ def observe_and_release(
     owned_pidfds: list[int],
     selinux_level: str | None,
     deadline: float,
+    peer_fd: int | None = None,
 ) -> int | None:
     """Verify the held process tree and release its child exactly once.
 
@@ -407,7 +451,7 @@ def observe_and_release(
         ready_fd = monitor.stdout.fileno()
         release_fd = monitor.stdin.fileno()
         stderr_fd = _read_ready(
-            ready_fd, monitor_pidfd, monitor.stderr.fileno(), diagnostics, deadline
+            ready_fd, monitor_pidfd, monitor.stderr.fileno(), diagnostics, deadline, peer_fd
         )
 
         init = _sole_child(monitor.pid)
@@ -435,6 +479,7 @@ def observe_and_release(
         if ready_fd in readable:
             raise ParseObservationError(_BAD_READY)
         _remaining(deadline)
+        _require_silent_peer(peer_fd)
         if not writable or os.write(release_fd, b"r") != 1:
             raise ParseObservationError("The parser release could not be sent.")
         monitor.stdin.close()
@@ -467,13 +512,14 @@ def _read_ready(
     stderr_fd: int | None,
     diagnostics: bytearray,
     deadline: float,
+    peer_fd: int | None,
 ) -> int | None:
     marker = b""
     while len(marker) < len(_READY):
         descriptors = [ready_fd, monitor_pidfd]
         if stderr_fd is not None:
             descriptors.append(stderr_fd)
-        readable, _, _ = select.select(descriptors, [], [], _remaining(deadline))
+        readable = _readable(descriptors, _remaining(deadline), peer_fd)
         if (
             stderr_fd is not None
             and stderr_fd in readable
