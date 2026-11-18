@@ -6,6 +6,7 @@ from typing import Protocol
 from inframeld_backend.shared.application.dtos.artifact_allocation_dto import ArtifactAllocationDTO
 from inframeld_backend.shared.application.dtos.artifact_attempt_dto import ArtifactAttemptDTO
 from inframeld_backend.shared.application.dtos.verified_artifact_dto import VerifiedArtifactDTO
+from inframeld_backend.shared.application.value_objects.job_effect_id import JobEffectId
 
 
 class ArtifactPreparationIO(Protocol):
@@ -25,4 +26,10 @@ class ArtifactPreparationIO(Protocol):
     ) -> ArtifactAttemptDTO: ...
 
     @abstractmethod
-    async def verify(self, attempt: ArtifactAttemptDTO, *, upload: bool) -> VerifiedArtifactDTO: ...
+    async def verify(
+        self,
+        attempt: ArtifactAttemptDTO,
+        *,
+        upload: bool,
+        observation: JobEffectId | None = None,
+    ) -> VerifiedArtifactDTO: ...

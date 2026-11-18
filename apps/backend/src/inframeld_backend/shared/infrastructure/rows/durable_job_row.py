@@ -61,3 +61,6 @@ class DurableJobRow(SharedPersistenceBase):
     suspension_obligation_id: Mapped[UUID | None] = mapped_column(
         Uuid(as_uuid=True), nullable=True, default=None
     )
+    pipeline_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True), nullable=True, default=None
+    )

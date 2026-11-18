@@ -58,11 +58,13 @@ profile inframeld-parser-probe flags=(mediate_deleted) {
   /oldroot/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2 r,
   /oldroot/probe/tests/test_sandbox_boundaries.py r,
   /oldroot/dev/null r,
+  /oldroot/dev/urandom r,
   mount options=(rbind) /oldroot/usr/local/ -> /newroot/usr/local/,
   mount options=(rbind) /oldroot/usr/lib/x86_64-linux-gnu/ -> /newroot/usr/lib/x86_64-linux-gnu/,
   mount options=(rbind) /oldroot/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2 -> /newroot/lib64/ld-linux-x86-64.so.2,
   mount options=(rbind) /oldroot/probe/tests/test_sandbox_boundaries.py -> /newroot/fixture/test_sandbox_boundaries.py,
   mount options=(rbind) /oldroot/dev/null -> /newroot/dev/null,
+  mount options=(rbind) /oldroot/dev/urandom -> /newroot/dev/urandom,
   # ENOSYS selects Bubblewrap's legacy remount, which adds nosuid, nodev and ro.
   mount options=(remount,bind,ro,nosuid,nodev,silent) -> @{probe_readonly},
   mount options=(remount,bind,ro,nosuid,nodev,relatime,silent) -> @{probe_readonly},

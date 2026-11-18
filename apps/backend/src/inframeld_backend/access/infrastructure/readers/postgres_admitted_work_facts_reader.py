@@ -39,6 +39,10 @@ from inframeld_backend.access.infrastructure.rows.project_action_grant_row impor
 )
 from inframeld_backend.access.infrastructure.rows.project_membership_row import ProjectMembershipRow
 from inframeld_backend.access.infrastructure.rows.project_row import ProjectRow
+from inframeld_backend.pipelines.infrastructure.rows.pipeline_action_grant_row import (
+    PipelineActionGrantRow,
+)
+from inframeld_backend.pipelines.infrastructure.rows.pipeline_row import PipelineRow
 from inframeld_backend.shared.application.errors.application_errors import (
     DependencyUnavailableError,
 )
@@ -108,11 +112,30 @@ class PostgresAdmittedWorkFactsReader(AdmittedWorkFactsReader):
             ProjectMembershipRow.project_id == ProjectRow.id,
             ProjectMembershipRow.principal_id == PrincipalRow.id,
         )
-        granted = exists().where(
-            ProjectActionGrantRow.project_id == ProjectRow.id,
-            ProjectActionGrantRow.recipient_principal_id == PrincipalRow.id,
-            ProjectActionGrantRow.action == authority.action_id.value,
-        )
+        pipeline_id = authority.pipeline_id
+        if pipeline_id is None:
+            granted = exists().where(
+                ProjectActionGrantRow.project_id == ProjectRow.id,
+                ProjectActionGrantRow.recipient_principal_id == PrincipalRow.id,
+                ProjectActionGrantRow.action == authority.action_id.value,
+            )
+        else:
+            granted = (
+                select(PipelineActionGrantRow.pipeline_id)
+                .join(PipelineRow, PipelineRow.id == PipelineActionGrantRow.pipeline_id)
+                .where(
+                    PipelineRow.id == pipeline_id.value,
+                    PipelineRow.installation_id == installation,
+                    PipelineRow.organization_id == organization,
+                    PipelineRow.project_id == ProjectRow.id,
+                    PipelineActionGrantRow.project_id == ProjectRow.id,
+                    PipelineActionGrantRow.recipient_principal_id == PrincipalRow.id,
+                    PipelineActionGrantRow.recipient_kind == PrincipalRow.kind,
+                    PipelineActionGrantRow.action == authority.action_id.value,
+                )
+                .exists()
+                .correlate(ProjectRow, PrincipalRow)
+            )
         recovery = (
             select(IdentityRecoveryAdmissionRow.operation_id)
             .join(

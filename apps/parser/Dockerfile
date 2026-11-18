@@ -26,6 +26,27 @@ RUN --network=none echo '0e85c8702248b8dd64144f594147553650cdd0e4c951690345faace
     && library="$(gcc -print-multiarch)/libcap.so.2" \
     && install -D -m 0555 "/usr/lib/$library" "/build/runtime-lib/$library"
 
+FROM docker.io/library/python:3.13.18-slim-trixie@sha256:ae14d4ce8771606477a81446e7ef429edd6762305fc50c84507c1041fa8285d1 AS parser-dependencies
+
+COPY --from=parser_wheels / /wheelhouse/
+COPY apps/parser/requirements.lock /requirements.lock
+RUN --network=none python -m pip --isolated --disable-pip-version-check --no-cache-dir install \
+        --no-index --find-links=/wheelhouse --require-hashes --only-binary=:all: \
+        --no-compile --target=/parser-site --requirement=/requirements.lock
+
+FROM docker.io/library/python:3.13.18-slim-trixie@sha256:ae14d4ce8771606477a81446e7ef429edd6762305fc50c84507c1041fa8285d1 AS parser-runtime
+
+COPY --from=builder /build/runtime-lib/ /usr/lib/
+COPY --from=builder --chmod=0555 /build/out/bwrap /opt/inframeld-sandbox/bwrap
+COPY --from=builder --chmod=0444 /build/child-seccomp.bpf /opt/inframeld-sandbox/child-seccomp.bpf
+COPY --from=parser-dependencies /parser-site/ /opt/inframeld-parser/site/
+COPY --from=parser_assets --chown=10001:10001 / /opt/inframeld-parser/assets/
+COPY config/models/docling-parser-v1.json /opt/inframeld-parser/docling-parser-v1.json
+COPY apps/parser/src/ /opt/inframeld-parser/src/
+
+USER 10001:10001
+WORKDIR /opt/inframeld-parser
+
 FROM docker.io/library/python:3.13.18-slim-trixie@sha256:ae14d4ce8771606477a81446e7ef429edd6762305fc50c84507c1041fa8285d1 AS sandbox-probe
 
 COPY --from=builder /build/runtime-lib/ /usr/lib/

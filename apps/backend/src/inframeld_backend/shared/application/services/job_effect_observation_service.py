@@ -1,3 +1,4 @@
+from collections.abc import Awaitable, Callable
 from typing import override
 
 from inframeld_backend.access.application.protocols.admitted_work_authorizer import (
@@ -11,6 +12,7 @@ from inframeld_backend.shared.application.dtos.artifact_scope_dto import Artifac
 from inframeld_backend.shared.application.dtos.human_suspension_job_binding_dto import (
     HumanSuspensionJobBindingDTO,
 )
+from inframeld_backend.shared.application.dtos.job_attempt_context_dto import JobAttemptContextDTO
 from inframeld_backend.shared.application.dtos.job_effect_binding_dto import JobEffectBindingDTO
 from inframeld_backend.shared.application.dtos.job_effect_observation_dto import (
     JobEffectObservationDTO,
@@ -43,11 +45,14 @@ class JobEffectObservationService(JobEffectObservationRecorder):
         job_store: JobStore,
         admitted_work_authorizer: AdmittedWorkAuthorizer,
         artifact_cleanup_authorizer: ArtifactCleanupAuthorizer,
+        *,
+        before_product_put: Callable[[JobAttemptContextDTO], Awaitable[None]] | None = None,
     ) -> None:
         self._transaction_manager = transaction_manager
         self._job_store = job_store
         self._admitted_work_authorizer = admitted_work_authorizer
         self._artifact_cleanup_authorizer = artifact_cleanup_authorizer
+        self._before_product_put = before_product_put
 
     async def register(self, binding: JobEffectBindingDTO) -> None:
         async with self._transaction_manager.begin():
@@ -66,7 +71,7 @@ class JobEffectObservationService(JobEffectObservationRecorder):
                 attempt.digest,
             ):
                 raise ConflictError("The sealed PUT expectation differs from the original.")
-            await self._admit(stored)
+            await self._admit(stored, guard_product_put=True)
 
     @override
     async def admit_delete(
@@ -116,7 +121,9 @@ class JobEffectObservationService(JobEffectObservationRecorder):
             raise ConflictError("The original physical invocation cannot be confirmed.")
         return stored
 
-    async def _admit(self, stored: JobEffectObservationDTO) -> None:
+    async def _admit(
+        self, stored: JobEffectObservationDTO, *, guard_product_put: bool = False
+    ) -> None:
         """Authorize one previously unadmitted physical invocation without replaying its admission."""
         if (
             stored.admitted_at is not None
@@ -124,7 +131,7 @@ class JobEffectObservationService(JobEffectObservationRecorder):
             or stored.consumed_at is not None
         ):
             raise ConflictError("Physical invocation admission cannot be replayed.")
-        await self._guard(stored.binding)
+        await self._guard(stored.binding, guard_product_put=guard_product_put)
         await self._job_store.admit_effect(stored)
 
     async def _record(self, stored: JobEffectObservationDTO) -> None:
@@ -134,7 +141,9 @@ class JobEffectObservationService(JobEffectObservationRecorder):
         await self._guard(stored.binding)
         await self._job_store.record_effect_abort(stored)
 
-    async def _guard(self, binding: JobEffectBindingDTO) -> None:
+    async def _guard(
+        self, binding: JobEffectBindingDTO, *, guard_product_put: bool = False
+    ) -> None:
         """Recheck the original artifact scope, current authority and fenced job ownership."""
         if (
             not binding.unit
@@ -157,6 +166,8 @@ class JobEffectObservationService(JobEffectObservationRecorder):
             ):
                 raise ConflictError("The artifact is outside the admitted product scope.")
             await self._admitted_work_authorizer.require_current(authority)
+            if guard_product_put and self._before_product_put is not None:
+                await self._before_product_put(context)
         current = await self._job_store.require_current(context)
         if current.pending_effect not in (None, binding.unit):
             raise ConflictError("Another original effect is unresolved.")

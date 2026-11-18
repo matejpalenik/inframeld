@@ -315,7 +315,7 @@ def test_additive_schema_preserves_0040_in_both_directions(
 
     command.upgrade(config, _REVISION)
     with database_session(temporary_postgres_settings) as session:
-        assert session.scalar(select(AlembicVersionRow.version_num)) == SUPPORTED_SCHEMA_REVISION
+        assert session.scalar(select(AlembicVersionRow.version_num)) == _REVISION
         assert set(inspect(session.connection()).get_table_names()) == original | _TABLES
 
     command.downgrade(config, _PRIOR)
@@ -524,7 +524,9 @@ async def test_retained_profile_refuses_downgrade(
         command.downgrade(_config(temporary_postgres_settings), _PRIOR)
 
     async with database.session() as session:
-        assert await session.scalar(select(AlembicVersionRow.version_num)) == _REVISION
+        assert (
+            await session.scalar(select(AlembicVersionRow.version_num)) == SUPPORTED_SCHEMA_REVISION
+        )
     await _assert_profile_effects(database, scenario, result)
 
 

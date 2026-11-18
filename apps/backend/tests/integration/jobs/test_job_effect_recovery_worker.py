@@ -132,8 +132,9 @@ def seaweed() -> Iterator[SeaweedFixture]:
 
 async def _allocated(database: Database) -> ArtifactAllocationDTO:
     scope = await seed_artifact_scope(database)
-    allocation = await allocate_artifact(database, artifact_scenario(scope), transfer_seconds=0.05)
-    await asyncio.sleep(0.06)
+    # Give the real allocator time to commit before testing an expired transfer.
+    allocation = await allocate_artifact(database, artifact_scenario(scope), transfer_seconds=1)
+    await asyncio.sleep(1)
     return allocation
 
 

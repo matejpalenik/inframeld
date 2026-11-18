@@ -14,6 +14,7 @@ from inframeld_backend.shared.application.protocols.artifact_staging import Arti
 from inframeld_backend.shared.application.services.artifact_verification_service import (
     ArtifactVerificationService,
 )
+from inframeld_backend.shared.application.value_objects.job_effect_id import JobEffectId
 from inframeld_backend.shared.infrastructure.resources.s3_artifact_store import S3ArtifactStore
 
 
@@ -87,11 +88,17 @@ class PrivateArtifactPreparation(ArtifactPreparationIO):
         )
 
     @override
-    async def verify(self, attempt: ArtifactAttemptDTO, *, upload: bool) -> VerifiedArtifactDTO:
+    async def verify(
+        self,
+        attempt: ArtifactAttemptDTO,
+        *,
+        upload: bool,
+        observation: JobEffectId | None = None,
+    ) -> VerifiedArtifactDTO:
         store = self._artifact_store
         if store is None:
             raise ArtifactReservationError("Private preparation requires its owned lifetime.")
         if upload:
             content = await self._handles.enter_async_context(self._artifact_staging.open(attempt))
-            await store.put(attempt, content)
+            await store.put(attempt, content, observation=observation)
         return await ArtifactVerificationService(store).verify(attempt)

@@ -19,6 +19,7 @@ from inframeld_backend.access.domain.policies.project_action_eligibility_policy 
 from inframeld_backend.access.domain.policy_inputs.principal_access_policy_input import (
     PrincipalAccessPolicyInput,
 )
+from inframeld_backend.pipelines.domain.enums.pipeline_action import PipelineAction
 from inframeld_backend.shared.application.errors.application_errors import AccessDeniedError
 
 
@@ -28,10 +29,15 @@ class AdmittedWorkAuthorizationService(AdmittedWorkAuthorizer):
 
     @override
     async def require_current(self, authority: AdmittedWorkAuthorityDTO) -> None:
-        if not ProjectActionEligibilityPolicy.may_use(
-            action_id=authority.action_id, principal_kind=authority.principal_kind
-        ):
-            raise AccessDeniedError("The admitted Project action is not eligible for this caller.")
+        if authority.pipeline_id is None:
+            if not ProjectActionEligibilityPolicy.may_use(
+                action_id=authority.action_id, principal_kind=authority.principal_kind
+            ):
+                raise AccessDeniedError(
+                    "The admitted Project action is not eligible for this caller."
+                )
+        elif authority.action_id.value != PipelineAction.BUILD.value:
+            raise AccessDeniedError("The admitted Pipeline action is not eligible for this job.")
 
         facts = await self._admitted_work_facts_reader.read(authority)
         if facts is None or (

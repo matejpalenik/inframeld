@@ -4,7 +4,7 @@ from datetime import UTC, datetime, timedelta
 from typing import override
 from uuid import UUID, uuid4
 
-from sqlalchemy import DateTime, String, case, func, or_, select, update
+from sqlalchemy import ColumnElement, DateTime, String, and_, case, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql.selectable import ScalarSelect
 
@@ -16,6 +16,8 @@ from inframeld_backend.access.domain.value_objects.project_id import ProjectId
 from inframeld_backend.access.infrastructure.writers.postgres_restored_job_quarantine_audit_writer import (
     PostgresRestoredJobQuarantineAuditWriter,
 )
+from inframeld_backend.pipelines.domain.enums.pipeline_action import PipelineAction
+from inframeld_backend.pipelines.domain.value_objects.pipeline_id import PipelineId
 from inframeld_backend.shared.application.commands.restored_job_quarantine_command import (
     RestoredJobQuarantineCommand,
 )
@@ -43,6 +45,7 @@ from inframeld_backend.shared.application.dtos.project_deletion_job_binding_dto 
 from inframeld_backend.shared.application.dtos.restored_job_quarantine_result_dto import (
     RestoredJobQuarantineResultDTO,
 )
+from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.enums.job_effect_action import JobEffectAction
 from inframeld_backend.shared.application.enums.job_effect_observation_kind import (
     JobEffectObservationKind,
@@ -334,6 +337,8 @@ class PostgresJobStore(JobStore, RestoredJobQuarantineRepository):
                         str(human.version.value).encode(),
                     ]
                 )
+            if authority.pipeline_id is not None:
+                parts.extend([b"pipeline", authority.pipeline_id.value.bytes])
         else:
             parts.extend(
                 [
@@ -530,7 +535,7 @@ class PostgresJobStore(JobStore, RestoredJobQuarantineRepository):
 
     async def _expired_effect_job(self, job: JobSnapshotDTO) -> tuple[DurableJobRow, datetime]:
         """Lock the observed expired attempt without reviving its former ownership."""
-        await self._queue_turn()
+        await self.lock_queue()
         row = await self._session.scalar(
             select(DurableJobRow)
             .where(DurableJobRow.id == job.job_id.value)
@@ -595,6 +600,9 @@ class PostgresJobStore(JobStore, RestoredJobQuarantineRepository):
             raise RuntimeError("Job admission requires its caller-owned transaction.")
         if not 1 <= capacity <= 8:
             raise ValueError("Ordinary job capacity must be between one and eight.")
+        pipeline_id = authority.pipeline_id
+        if (pipeline_id is not None) != (authority.action_id.value == PipelineAction.BUILD.value):
+            raise ConflictError("The admitted Pipeline job target is inconsistent.")
         queue = await self._session.scalar(
             select(ApplicationJobQueueRow)
             .where(ApplicationJobQueueRow.singleton_key == 1)
@@ -603,11 +611,14 @@ class PostgresJobStore(JobStore, RestoredJobQuarantineRepository):
         if queue is None:
             raise RuntimeError("The ordinary job queue is not initialized.")
 
-        reservation = await self._session.scalar(
-            select(IdempotencyReservationRow).where(
-                IdempotencyReservationRow.operation_id == operation_id.value
-            )
+        statement = select(IdempotencyReservationRow).where(
+            IdempotencyReservationRow.operation_id == operation_id.value
         )
+        if pipeline_id is not None:
+            statement = statement.where(
+                self._private_build_reservation(authority.project_id, pipeline_id)
+            )
+        reservation = await self._session.scalar(statement)
         if reservation is None or (
             reservation.state is not OperationReservationState.IN_PROGRESS
             or reservation.principal_id != authority.principal_id.value
@@ -642,6 +653,7 @@ class PostgresJobStore(JobStore, RestoredJobQuarantineRepository):
                 human_authority=binding.identity.authority.value if binding is not None else None,
                 human_subject=binding.identity.subject.value if binding is not None else None,
                 human_version=binding.version.value if binding is not None else None,
+                pipeline_id=pipeline_id.value if pipeline_id is not None else None,
             )
         )
         await self._session.flush()
@@ -672,7 +684,7 @@ class PostgresJobStore(JobStore, RestoredJobQuarantineRepository):
         self, command: RestoredJobQuarantineCommand, observed: JobSnapshotDTO
     ) -> JobSnapshotDTO:
         await self._require_read_committed()
-        await self._queue_turn()
+        await self.lock_queue()
         row = await self._restored_product_row(command, lock=True)
         now = await self._now()
         current = await self._snapshot(row, now)
@@ -749,17 +761,37 @@ class PostgresJobStore(JobStore, RestoredJobQuarantineRepository):
             IdempotencyReservationRow.project_id == authority.project_id.value,
             IdempotencyReservationRow.state == OperationReservationState.REPLAYABLE,
             IdempotencyReservationRow.replay_kind == OperationReplayKind.ASYNC_JOB,
-            IdempotencyReservationRow.lookup_authority_family
-            == OperationLookupAuthorityFamily.PROJECT_ACTION_USE,
-            IdempotencyReservationRow.lookup_action_id == authority.action_id.value,
             IdempotencyReservationRow.expires_at.is_(None),
         )
+        pipeline_id = authority.pipeline_id
+        if pipeline_id is None:
+            statement = statement.where(
+                IdempotencyReservationRow.lookup_authority_family
+                == OperationLookupAuthorityFamily.PROJECT_ACTION_USE,
+                IdempotencyReservationRow.lookup_action_id == authority.action_id.value,
+            )
+        else:
+            statement = statement.where(
+                self._private_build_reservation(authority.project_id, pipeline_id)
+            )
         if lock:
             statement = statement.with_for_update()
         if await self._session.scalar(statement) is None:
             raise RestoredJobQuarantineError(
                 "The original asynchronous reservation is unavailable."
             )
+
+    @staticmethod
+    def _private_build_reservation(
+        project_id: ProjectId, pipeline_id: PipelineId
+    ) -> ColumnElement[bool]:
+        route = f"/internal/projects/{project_id.value}/pipelines/{pipeline_id.value}/builds"
+        return and_(
+            IdempotencyReservationRow.method == HttpMethod.POST.value,
+            IdempotencyReservationRow.requested_route == route,
+            IdempotencyReservationRow.lookup_authority_family.is_(None),
+            IdempotencyReservationRow.lookup_action_id.is_(None),
+        )
 
     async def _require_restored_attempt_owner(self, row: DurableJobRow) -> None:
         if row.status == JobStatus.QUEUED:
@@ -807,14 +839,14 @@ class PostgresJobStore(JobStore, RestoredJobQuarantineRepository):
 
     @override
     async def next_candidate(self) -> JobSnapshotDTO | None:
-        await self._queue_turn()
+        await self.lock_queue()
         return await self._candidate(lock=True)
 
     @override
     async def start_attempt(
         self, job: JobSnapshotDTO, *, worker_id: UUID, lease_seconds: float, work_seconds: float
     ) -> JobAttemptContextDTO:
-        await self._queue_turn()
+        await self.lock_queue()
         if not 0 < lease_seconds <= 120 or not 0 < work_seconds <= 7200:
             raise ValueError("The ordinary attempt budget is outside its finite bounds.")
         now = await self._now()
@@ -951,7 +983,7 @@ class PostgresJobStore(JobStore, RestoredJobQuarantineRepository):
     async def retire_attempt(
         self, job: JobSnapshotDTO, *, status: JobStatus, reason: str, due_at: datetime
     ) -> None:
-        await self._queue_turn()
+        await self.lock_queue()
         row = await self._session.scalar(
             select(DurableJobRow)
             .where(DurableJobRow.id == job.job_id.value)
@@ -1006,7 +1038,7 @@ class PostgresJobStore(JobStore, RestoredJobQuarantineRepository):
         if not self._session.in_transaction():
             raise RuntimeError("Job persistence requires its caller-owned transaction.")
 
-    async def _queue_turn(self) -> None:
+    async def lock_queue(self) -> None:
         """Serialize ordinary queue decisions using the shared queue-row lock."""
         self._require_transaction()
         row = await self._session.scalar(
