@@ -8,6 +8,7 @@ from inframeld_backend.access.domain.value_objects.action_id import ActionId
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
+from inframeld_backend.pipelines.domain.value_objects.pipeline_id import PipelineId
 from inframeld_backend.shared.domain.value_objects.installation_id import InstallationId
 
 
@@ -26,3 +27,4 @@ class AdmittedWorkAuthorityDTO:
     project_id: ProjectId
     action_id: ActionId
     human_binding: HumanOAuthCredentialBindingDTO | None
+    pipeline_id: PipelineId | None = None

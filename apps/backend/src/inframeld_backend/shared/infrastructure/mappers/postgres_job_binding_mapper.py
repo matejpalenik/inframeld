@@ -18,6 +18,8 @@ from inframeld_backend.access.domain.value_objects.identity_subject import Ident
 from inframeld_backend.access.domain.value_objects.organization_id import OrganizationId
 from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
+from inframeld_backend.pipelines.domain.enums.pipeline_action import PipelineAction
+from inframeld_backend.pipelines.domain.value_objects.pipeline_id import PipelineId
 from inframeld_backend.shared.application.dtos.artifact_cleanup_job_binding_dto import (
     ArtifactCleanupJobBindingDTO,
 )
@@ -106,6 +108,7 @@ class PostgresJobBindingMapper:
             or row.principal_id is None
             or row.principal_kind is None
             or row.action_id is None
+            or (row.action_id == PipelineAction.BUILD.value) != (row.pipeline_id is not None)
         ):
             raise ArtifactReservationError("The original product job binding is incomplete.")
         human = None
@@ -137,6 +140,7 @@ class PostgresJobBindingMapper:
             project_id=ProjectId(row.project_id),
             action_id=ActionId(row.action_id),
             human_binding=human,
+            pipeline_id=PipelineId(row.pipeline_id) if row.pipeline_id is not None else None,
         )
         return ProductJobBindingDTO(
             OperationId(row.operation_id), RequestId(row.request_id), authority

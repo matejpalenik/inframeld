@@ -12,6 +12,15 @@ from sqlalchemy.dialects.postgresql import ARRAY
 from tests.support.project_creation_scenarios import create_project, seed_project_creator
 
 from inframeld_backend.access.application.dtos.access_context_dto import AccessContextDTO
+from inframeld_backend.access.application.dtos.admitted_work_authority_dto import (
+    AdmittedWorkAuthorityDTO,
+)
+from inframeld_backend.access.application.dtos.human_oauth_credential_binding_dto import (
+    HumanOAuthCredentialBindingDTO,
+)
+from inframeld_backend.access.application.services.admitted_work_authorization_service import (
+    AdmittedWorkAuthorizationService,
+)
 from inframeld_backend.access.domain.enums.model_connection_action import ModelConnectionAction
 from inframeld_backend.access.domain.enums.model_connection_authentication import (
     ModelConnectionAuthentication,
@@ -21,6 +30,9 @@ from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
 from inframeld_backend.access.domain.enums.project_action import ProjectAction
 from inframeld_backend.access.domain.value_objects.action_id import ActionId
 from inframeld_backend.access.domain.value_objects.project_id import ProjectId
+from inframeld_backend.access.infrastructure.readers.postgres_admitted_work_facts_reader import (
+    PostgresAdmittedWorkFactsReader,
+)
 from inframeld_backend.access.infrastructure.readers.postgres_project_scope_lock import (
     PostgresProjectScopeLock,
 )
@@ -82,6 +94,9 @@ from inframeld_backend.releases.infrastructure.readers.postgres_deployment_assoc
     PostgresDeploymentAssociationReader,
 )
 from inframeld_backend.releases.infrastructure.rows.deployment_row import DeploymentRow
+from inframeld_backend.shared.application.commands.restored_job_quarantine_command import (
+    RestoredJobQuarantineCommand,
+)
 from inframeld_backend.shared.application.dtos.artifact_scope_dto import ArtifactScopeDTO
 from inframeld_backend.shared.application.dtos.generation_model_settings_dto import (
     GenerationModelSettingsDTO,
@@ -89,12 +104,18 @@ from inframeld_backend.shared.application.dtos.generation_model_settings_dto imp
 from inframeld_backend.shared.application.dtos.operation_reservation_request_dto import (
     OperationReservationRequestDTO,
 )
+from inframeld_backend.shared.application.dtos.product_job_binding_dto import (
+    ProductJobBindingDTO,
+)
 from inframeld_backend.shared.application.enums.http_method import HttpMethod
 from inframeld_backend.shared.application.enums.model_role import ModelRole
 from inframeld_backend.shared.application.enums.operation_lookup_authority_family import (
     OperationLookupAuthorityFamily,
 )
 from inframeld_backend.shared.application.enums.operation_replay_kind import OperationReplayKind
+from inframeld_backend.shared.application.enums.restored_job_quarantine_intent import (
+    RestoredJobQuarantineIntent,
+)
 from inframeld_backend.shared.application.errors.application_errors import (
     AccessDeniedError,
     ConflictError,
@@ -102,13 +123,19 @@ from inframeld_backend.shared.application.errors.application_errors import (
     StaleRevisionError,
 )
 from inframeld_backend.shared.application.value_objects.idempotency_key import IdempotencyKey
+from inframeld_backend.shared.application.value_objects.job_payload import JobPayload
 from inframeld_backend.shared.application.value_objects.model_connection_id import ModelConnectionId
+from inframeld_backend.shared.application.value_objects.operation_id import OperationId
 from inframeld_backend.shared.application.value_objects.operation_lookup_authority import (
     OperationLookupAuthority,
 )
+from inframeld_backend.shared.application.value_objects.request_id import RequestId
 from inframeld_backend.shared.domain.value_objects.resource_name import ResourceName
 from inframeld_backend.shared.domain.value_objects.submitted_display_name import (
     SubmittedDisplayName,
+)
+from inframeld_backend.shared.infrastructure.repositories.postgres_job_store import (
+    PostgresJobStore,
 )
 from inframeld_backend.shared.infrastructure.resources.database import Database
 from inframeld_backend.shared.infrastructure.rows.idempotency_reservation_row import (
@@ -148,6 +175,7 @@ class _Scenario:
     scope: ArtifactScopeDTO
     other_project: ProjectId
     configuration: PipelineConfiguration
+    binding: HumanOAuthCredentialBindingDTO
 
 
 @pytest_asyncio.fixture
@@ -296,7 +324,7 @@ async def scenario(database: Database) -> _Scenario:
                 can_grant=True,
             )
         )
-    return _Scenario(actor.access, scope, other, configuration)
+    return _Scenario(actor.access, scope, other, configuration, actor.binding)
 
 
 async def _create(
@@ -557,3 +585,92 @@ async def test_no_deployment_check_uses_exact_locked_pipeline_scope(
                 scope=replace(scope, project_id=scenario.other_project),
                 pipeline_id=saved.pipeline_id,
             )
+
+
+async def test_admitted_build_loses_authority_when_its_exact_pipeline_grant_is_revoked(
+    database: Database, scenario: _Scenario
+) -> None:
+    saved = (await _create(database, scenario)).pipeline
+    authority = AdmittedWorkAuthorityDTO(
+        principal_id=scenario.access.actor_principal_id,
+        principal_kind=PrincipalKind.HUMAN,
+        installation_id=saved.installation_id,
+        organization_id=saved.organization_id,
+        project_id=saved.project_id,
+        action_id=ActionId(PipelineAction.BUILD.value),
+        human_binding=scenario.binding,
+        pipeline_id=saved.pipeline_id,
+    )
+    request_id = RequestId(uuid4())
+    payload = JobPayload("test.pipeline-build", 1, b"reviewed")
+    async with database.session() as session, session.begin():
+        await AdmittedWorkAuthorizationService(
+            PostgresAdmittedWorkFactsReader(session)
+        ).require_current(authority)
+        writer = PostgresOperationReservationWriter(session)
+        original = await writer.reserve(
+            OperationReservationRequestDTO(
+                principal_id=authority.principal_id,
+                organization_id=authority.organization_id,
+                project_id=authority.project_id,
+                method=HttpMethod.POST,
+                requested_route=(
+                    f"/internal/projects/{saved.project_id.value}"
+                    f"/pipelines/{saved.pipeline_id.value}/builds"
+                ),
+                key=IdempotencyKey("fixture-build"),
+                fingerprint=b"B" * 32,
+            )
+        )
+        admission = await PostgresJobStore(session).admit(
+            operation_id=original.operation_id,
+            request_id=request_id,
+            authority=authority,
+            payload=payload,
+            capacity=8,
+        )
+        await writer.mark_replayable(original.operation_id, OperationReplayKind.ASYNC_JOB)
+
+    async with database.session() as session, session.begin():
+        store = PostgresJobStore(session)
+        durable = await store.find(original.operation_id)
+        assert durable is not None and durable.job_id == admission.job_id
+        assert durable.binding == ProductJobBindingDTO(original.operation_id, request_id, authority)
+        assert durable.payload == payload
+        restored = await store.observe_restored_job(
+            RestoredJobQuarantineCommand(
+                operation_id=OperationId(str(uuid4())),
+                expected_installation_id=saved.installation_id,
+                job_id=admission.job_id,
+                job_operation_id=original.operation_id,
+                intent=RestoredJobQuarantineIntent.INSPECT,
+            )
+        )
+        assert restored == replace(durable, observed_at=restored.observed_at)
+        authorizer = AdmittedWorkAuthorizationService(PostgresAdmittedWorkFactsReader(session))
+        await authorizer.require_current(authority)
+        with pytest.raises(AccessDeniedError):
+            await authorizer.require_current(replace(authority, project_id=scenario.other_project))
+
+    async with database.session() as session, session.begin():
+        assert (
+            await PostgresProjectScopeLock.acquire(
+                session, authority.principal_id, authority.project_id, shared=False
+            )
+            == authority.organization_id.value
+        )
+        await session.execute(
+            delete(PipelineActionGrantRow).where(
+                PipelineActionGrantRow.pipeline_id == saved.pipeline_id.value,
+                PipelineActionGrantRow.recipient_principal_id == authority.principal_id.value,
+                PipelineActionGrantRow.action == authority.action_id.value,
+            )
+        )
+
+    async with database.session() as session, session.begin():
+        durable = await PostgresJobStore(session).find(original.operation_id)
+        assert durable is not None and isinstance(durable.binding, ProductJobBindingDTO)
+        with pytest.raises(AccessDeniedError):
+            await AdmittedWorkAuthorizationService(
+                PostgresAdmittedWorkFactsReader(session)
+            ).require_current(durable.binding.authority)
