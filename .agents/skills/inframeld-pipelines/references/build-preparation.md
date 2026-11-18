@@ -70,6 +70,22 @@ The server validates and saves the request. It may reserve the name P13 immediat
 
 Retries find the same build and target. To use later edits, Alice makes a new request rather than changing an already accepted build's inputs. If the reviewed configuration or publication policy changed before admission, reject the stale decision. Never refresh revisions and retry consent automatically.
 
+<a id="admit-a-build-with-no-deployment"></a>
+
+#### Admit a Build with no Deployment
+
+Alice uploads a document, saves a Collection revision that includes its exact version, and selects that Collection and the processing and embedding profiles in her Pipeline. She reviews the saved configuration and corpus revisions and confirms that the Build has no Deployment. Her request identifies the exact Pipeline and binds both the reviewed revisions and the absence of a target. The server handles the following checks and effects in a short transaction.
+
+1. **Authorize the exact Pipeline.** Require current `build-pipeline` on that Pipeline, current credential authority, and a Project that permits the work. Under that authority, recover a matching original request before reading newer working settings or resolving a fresh Deployment. A different reviewed configuration, corpus or target selection with the same key conflicts.
+2. **Confirm the reviewed inputs for a new request.** Compare the current saved revision and resolved Collection revisions with the reviewed selection. Resolve only exact admitted DocumentVersions, check current source access, and check the saved profiles, current connection access and required budgets. Observe Deployment association through the Releases owner under its association guard. The no-Deployment branch requires confirmed absence across the Pipeline's associations, including Deployments that the caller cannot inspect.
+3. **Commit the fixed capture and preparation admission together.** Save the installation, Organization, Project, Pipeline, original operation, initiating principal, verified human credential generation or original application authority, and the server-owned Build purpose. Bind the saved configuration, exact corpus and profile identities, connection access preconditions, explicit Deployment absence, and the original readiness child. Record the required capacity reservations, audit and retry result in the same transaction. Return accepted preparation only after that commit is confirmed.
+
+The readiness child loads the original capture. Its Indexing work checks current source and profile authority before reading a sealed DocumentVersion. Keep parser and storage waits outside the transaction. In the final artifact transaction, recheck the job attempt, current credential and resource authority, and Project and Document lifecycle under Knowledge's source-erasure guard. Commit the verified processing artifact and its ordered chunk mappings together.
+
+In its own final transaction, the Build rechecks attempt ownership, current authority, Project and source lifecycle, and the complete verified materializations. It commits the ready unpublished version, exact bindings, outcome, audit and job completion together. A later Deployment association cannot add publication authority to this capture.
+
+This sequence specifies the no-Deployment part of [native Build contracts #128](https://github.com/matejpalenik/inframeld/issues/128) and [Build admission #130](https://github.com/matejpalenik/inframeld/issues/130). It needs the ordinary Pipeline and immutable Collection producers and the Releases association guard before it can accept a production request. [Source erasure #249](https://github.com/matejpalenik/inframeld/issues/249) owns the Document-wide block used by finalization.
+
 <a id="step-3-reuse-compatible-results-and-create-what-is-missing"></a>
 
 ### Step 3: Reuse compatible results and create what is missing
