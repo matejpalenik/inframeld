@@ -25,6 +25,15 @@ from inframeld_backend.access.infrastructure.writers.postgres_project_applicatio
 from inframeld_backend.access.infrastructure.writers.postgres_project_deletion_shutdown_writer import (
     PostgresProjectDeletionShutdownWriter,
 )
+from inframeld_backend.indexing.infrastructure.readers.postgres_admitted_pdf_source_reader import (
+    PostgresAdmittedPdfSourceReader,
+)
+from inframeld_backend.indexing.infrastructure.readers.postgres_processing_profile_use_reader import (
+    PostgresProcessingProfileUseReader,
+)
+from inframeld_backend.pipelines.application.value_objects.pipeline_pdf_preparation_input import (
+    PipelinePdfPreparationInput,
+)
 from inframeld_backend.shared.application.dtos.artifact_attempt_dto import ArtifactAttemptDTO
 from inframeld_backend.shared.application.dtos.artifact_cleanup_job_binding_dto import (
     ArtifactCleanupJobBindingDTO,
@@ -35,10 +44,12 @@ from inframeld_backend.shared.application.dtos.artifact_cleanup_target_dto impor
 from inframeld_backend.shared.application.dtos.artifact_scope_dto import ArtifactScopeDTO
 from inframeld_backend.shared.application.dtos.job_attempt_context_dto import JobAttemptContextDTO
 from inframeld_backend.shared.application.dtos.job_effect_binding_dto import JobEffectBindingDTO
+from inframeld_backend.shared.application.dtos.product_job_binding_dto import ProductJobBindingDTO
 from inframeld_backend.shared.application.dtos.project_deletion_job_binding_dto import (
     ProjectDeletionJobBindingDTO,
 )
 from inframeld_backend.shared.application.errors.application_errors import (
+    ConflictError,
     DependencyUnavailableError,
 )
 from inframeld_backend.shared.application.errors.job_errors import JobWorkerStoppingError
@@ -162,11 +173,29 @@ class ApplicationWorkerOperations(
     async def _observations(self) -> AsyncGenerator[JobEffectObservationService]:
         """Bind physical-effect recording to one bounded database session."""
         async with self._session() as session:
+
+            async def check_pdf_inputs(context: JobAttemptContextDTO) -> None:
+                if context.payload.kind != PipelinePdfPreparationInput.KIND:
+                    return
+                if not isinstance(context.binding, ProductJobBindingDTO):
+                    raise ConflictError("PDF PUT needs its original product binding.")
+                inputs = PipelinePdfPreparationInput.from_payload(context.payload)
+                authority = context.binding.authority
+                # Current Build authorization has already locked identity and Project.
+                # Keep the Document turn through the physical invocation admission.
+                await PostgresAdmittedPdfSourceReader(session).read(
+                    authority, inputs.source, for_publication=True
+                )
+                await PostgresProcessingProfileUseReader(session).read(
+                    authority, inputs.processing_profile_id
+                )
+
             yield JobEffectObservationService(
                 SqlAlchemyTransactionManager(session),
                 PostgresJobStore(session),
                 AdmittedWorkAuthorizationService(PostgresAdmittedWorkFactsReader(session)),
                 ArtifactCleanupAuthorizationService(PostgresArtifactCleanupFactsReader(session)),
+                before_product_put=check_pdf_inputs,
             )
 
     @override

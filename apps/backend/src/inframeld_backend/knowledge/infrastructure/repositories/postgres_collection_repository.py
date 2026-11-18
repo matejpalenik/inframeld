@@ -324,6 +324,46 @@ class PostgresCollectionRepository:
             version_ids=canonical,
         )
 
+    async def require_reviewed_sources(
+        self,
+        *,
+        access: AccessContextDTO,
+        project_id: ProjectId,
+        collection_id: CollectionId,
+        revision_id: CollectionRevisionId,
+    ) -> tuple[DocumentSourceId, ...]:
+        """Read a freshly reviewed selection under the same turn as its writes."""
+        installation, organization = await self._lock_scope(access, project_id)
+        collection = await self._collection(
+            installation, organization, project_id, collection_id.value
+        )
+        if collection is None:
+            raise ResourceNotFoundError()
+        if collection.current_revision_id != revision_id.value:
+            raise StaleRevisionError()
+        grant = CollectionActionGrantRow
+        facts = await self._action_facts.read_scope_facts(
+            access=access, target=ProjectActionTargetDTO(project_id)
+        )
+        if facts is None:
+            raise ResourceNotFoundError()
+        can_view = await self._session.scalar(
+            select(
+                exists().where(
+                    grant.project_id == project_id.value,
+                    grant.collection_id == collection_id.value,
+                    grant.recipient_principal_id == access.actor_principal_id.value,
+                    grant.recipient_kind == facts.principal.kind,
+                    grant.action == "view-collection",
+                )
+            )
+        )
+        ActionAuthorizationService.require_authorization_from_facts(
+            access=access, facts=replace(facts, has_exact_action_grant=bool(can_view))
+        )
+        versions = await self._version_ids(revision_id.value)
+        return await self._require_source_access(access, collection, versions)
+
     async def _lock_scope(self, access: AccessContextDTO, project: ProjectId) -> tuple[UUID, UUID]:
         try:
             async with asyncio.timeout(5):

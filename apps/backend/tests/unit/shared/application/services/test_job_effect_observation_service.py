@@ -14,15 +14,26 @@ from tests.unit.shared.application.services.test_project_deletion_job_authorizat
     FACTS,
 )
 
+from inframeld_backend.access.application.dtos.admitted_work_authority_dto import (
+    AdmittedWorkAuthorityDTO,
+)
 from inframeld_backend.access.application.dtos.verified_human_identity_dto import (
     VerifiedHumanIdentityDTO,
 )
+from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
+from inframeld_backend.access.domain.value_objects.action_id import ActionId
 from inframeld_backend.access.domain.value_objects.human_suspension_id import HumanSuspensionId
 from inframeld_backend.access.domain.value_objects.identity_authority import IdentityAuthority
 from inframeld_backend.access.domain.value_objects.identity_subject import IdentitySubject
+from inframeld_backend.access.domain.value_objects.principal_id import PrincipalId
+from inframeld_backend.pipelines.domain.value_objects.pipeline_id import PipelineId
+from inframeld_backend.shared.application.dtos.artifact_attempt_dto import ArtifactAttemptDTO
 from inframeld_backend.shared.application.dtos.human_suspension_job_binding_dto import (
     HumanSuspensionJobBindingDTO,
 )
+from inframeld_backend.shared.application.dtos.job_attempt_context_dto import JobAttemptContextDTO
+from inframeld_backend.shared.application.dtos.product_job_binding_dto import ProductJobBindingDTO
+from inframeld_backend.shared.application.enums.job_effect_action import JobEffectAction
 from inframeld_backend.shared.application.errors.application_errors import (
     ConflictError,
     DependencyUnavailableError,
@@ -32,6 +43,9 @@ from inframeld_backend.shared.application.services.job_effect_observation_servic
     JobEffectObservationService,
 )
 from inframeld_backend.shared.application.value_objects.artifact_attempt_id import ArtifactAttemptId
+from inframeld_backend.shared.application.value_objects.artifact_content_digest import (
+    ArtifactContentDigest,
+)
 from inframeld_backend.shared.application.value_objects.job_payload import JobPayload
 
 
@@ -178,3 +192,49 @@ async def test_nonartifact_cleanup_never_acquires_artifact_dispatch_or_abort_pro
     assert not {"fence", "product", "target", "admit", "register", "abort"}.intersection(
         store.events
     )
+
+
+@pytest.mark.asyncio
+async def test_product_put_checks_source_before_authorizing_dispatch() -> None:
+    original = original_effect()
+    scope = original.scope
+    authority = AdmittedWorkAuthorityDTO(
+        principal_id=PrincipalId(BINDING.initiator_principal_id),
+        principal_kind=PrincipalKind.HUMAN,
+        installation_id=scope.installation_id,
+        organization_id=scope.organization_id,
+        project_id=scope.project_id,
+        action_id=ActionId("build-pipeline"),
+        human_binding=None,
+        pipeline_id=PipelineId(uuid4()),
+    )
+    payload = JobPayload("pipeline_pdf_preparation", 1, b"original")
+    context = replace(
+        original.context,
+        binding=ProductJobBindingDTO(BINDING.operation_id, BINDING.request_id, authority),
+        payload=payload,
+    )
+    digest = ArtifactContentDigest.from_content(b"abc")
+    binding = replace(
+        original, context=context, action=JobEffectAction.PUT, length=3, digest=digest
+    )
+    attempt = ArtifactAttemptDTO(binding.artifact_id, binding.artifact_attempt_id, scope, 3, digest)
+    store = MockEffectStore(binding)
+
+    async def check_source(observed: JobAttemptContextDTO) -> None:
+        assert observed == context
+        store.events.append("source")
+        raise ConflictError("Source was erased after the invocation was registered.")
+
+    operation = JobEffectObservationService(
+        MockEffectTransactions(store.events),
+        store,
+        MockEffectProductAuthority(store.events),
+        MockEffectCleanupAuthority(MockEffectStore(original)),
+        before_product_put=check_source,
+    )
+    with pytest.raises(ConflictError, match="Source was erased"):
+        await operation.admit_put(binding.effect_id, attempt)
+
+    assert store.events == ["begin", "effect", "product", "source", "rollback"]
+    assert store.observation is not None and store.observation.admitted_at is None

@@ -535,7 +535,7 @@ class PostgresJobStore(JobStore, RestoredJobQuarantineRepository):
 
     async def _expired_effect_job(self, job: JobSnapshotDTO) -> tuple[DurableJobRow, datetime]:
         """Lock the observed expired attempt without reviving its former ownership."""
-        await self._queue_turn()
+        await self.lock_queue()
         row = await self._session.scalar(
             select(DurableJobRow)
             .where(DurableJobRow.id == job.job_id.value)
@@ -684,7 +684,7 @@ class PostgresJobStore(JobStore, RestoredJobQuarantineRepository):
         self, command: RestoredJobQuarantineCommand, observed: JobSnapshotDTO
     ) -> JobSnapshotDTO:
         await self._require_read_committed()
-        await self._queue_turn()
+        await self.lock_queue()
         row = await self._restored_product_row(command, lock=True)
         now = await self._now()
         current = await self._snapshot(row, now)
@@ -839,14 +839,14 @@ class PostgresJobStore(JobStore, RestoredJobQuarantineRepository):
 
     @override
     async def next_candidate(self) -> JobSnapshotDTO | None:
-        await self._queue_turn()
+        await self.lock_queue()
         return await self._candidate(lock=True)
 
     @override
     async def start_attempt(
         self, job: JobSnapshotDTO, *, worker_id: UUID, lease_seconds: float, work_seconds: float
     ) -> JobAttemptContextDTO:
-        await self._queue_turn()
+        await self.lock_queue()
         if not 0 < lease_seconds <= 120 or not 0 < work_seconds <= 7200:
             raise ValueError("The ordinary attempt budget is outside its finite bounds.")
         now = await self._now()
@@ -983,7 +983,7 @@ class PostgresJobStore(JobStore, RestoredJobQuarantineRepository):
     async def retire_attempt(
         self, job: JobSnapshotDTO, *, status: JobStatus, reason: str, due_at: datetime
     ) -> None:
-        await self._queue_turn()
+        await self.lock_queue()
         row = await self._session.scalar(
             select(DurableJobRow)
             .where(DurableJobRow.id == job.job_id.value)
@@ -1038,7 +1038,7 @@ class PostgresJobStore(JobStore, RestoredJobQuarantineRepository):
         if not self._session.in_transaction():
             raise RuntimeError("Job persistence requires its caller-owned transaction.")
 
-    async def _queue_turn(self) -> None:
+    async def lock_queue(self) -> None:
         """Serialize ordinary queue decisions using the shared queue-row lock."""
         self._require_transaction()
         row = await self._session.scalar(

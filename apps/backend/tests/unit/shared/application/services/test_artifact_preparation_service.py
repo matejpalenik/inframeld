@@ -47,6 +47,7 @@ from inframeld_backend.shared.application.value_objects.artifact_id import Artif
 from inframeld_backend.shared.application.value_objects.artifact_staging_reservation_id import (
     ArtifactStagingReservationId,
 )
+from inframeld_backend.shared.application.value_objects.job_effect_id import JobEffectId
 from inframeld_backend.shared.application.value_objects.job_id import JobId
 from inframeld_backend.shared.application.value_objects.request_id import RequestId
 from inframeld_backend.shared.domain.value_objects.installation_id import InstallationId
@@ -159,7 +160,13 @@ class MockContent(ArtifactPreparationIO):
         return SEALED
 
     @override
-    async def verify(self, attempt: ArtifactAttemptDTO, *, upload: bool) -> VerifiedArtifactDTO:
+    async def verify(
+        self,
+        attempt: ArtifactAttemptDTO,
+        *,
+        upload: bool,
+        observation: JobEffectId | None = None,
+    ) -> VerifiedArtifactDTO:
         assert not self._transactions.active
         self.events.append("put" if upload else "readback_only")
         if self.failure:

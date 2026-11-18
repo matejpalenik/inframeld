@@ -53,6 +53,10 @@ The initial real starting case is the creator's membership from ordinary Project
 
 `python -m inframeld_backend.application_worker` starts the shared PostgreSQL-backed worker without an HTTP listener. It runs `artifact.cleanup` and `project.application-shutdown`. Configure private S3 and staging before starting the worker on the host or through the opt-in Compose `jobs` profile. [Run the ordinary application worker](../../docs/development/operations/application-jobs.md) covers prerequisites, events and safe shutdown.
 
+The private PDF preparation composition admits one reviewed saved Pipeline and Collection revision with one live PDF and no associated Deployment. It reserves mandatory history in the admission transaction. The ordinary worker reads the original source, verifies the isolated parser result and stores canonical bytes and ordered chunk ranges. Current source and profile permissions are checked before the storage invocation and again before publication.
+
+This composition requires explicit trusted capacity inputs and a qualified parser socket. The default worker entrypoint registers the two job kinds above. Production activation, vector preparation and release readiness are tracked separately in [#95](https://github.com/matejpalenik/inframeld/issues/95), [#48](https://github.com/matejpalenik/inframeld/issues/48) and [#130](https://github.com/matejpalenik/inframeld/issues/130). [#347](https://github.com/matejpalenik/inframeld/issues/347) owns installation-wide history reconciliation and expiry.
+
 ## Private recovery notifications
 
 `inframeld_backend.recovery_main:app` serves the three private v2 Kratos callbacks on port 8081. It requires only database configuration, `INFRAMELD_RECOVERY__AUTHORITY` and protected hook-key files. It has no public documentation endpoint and is not mounted in the product API.

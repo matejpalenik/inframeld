@@ -3,6 +3,7 @@
 import asyncio
 import os
 from dataclasses import dataclass, replace
+from typing import override
 from uuid import uuid4
 
 import pytest
@@ -45,6 +46,9 @@ from inframeld_backend.access.infrastructure.rows.project_action_grant_row impor
     ProjectActionGrantRow,
 )
 from inframeld_backend.access.infrastructure.rows.project_row import ProjectRow
+from inframeld_backend.bootstrap.pipeline_pdf_preparation_composition import (
+    open_pipeline_pdf_preparation,
+)
 from inframeld_backend.indexing.domain.enums.embedding_profile_action import EmbeddingProfileAction
 from inframeld_backend.indexing.domain.enums.processing_profile_action import (
     ProcessingProfileAction,
@@ -64,6 +68,9 @@ from inframeld_backend.indexing.infrastructure.rows.processing_profile_row impor
     ProcessingProfileRow,
 )
 from inframeld_backend.knowledge.application.value_objects.collection_id import CollectionId
+from inframeld_backend.knowledge.application.value_objects.collection_revision_id import (
+    CollectionRevisionId,
+)
 from inframeld_backend.knowledge.infrastructure.rows.collection_action_grant_row import (
     CollectionActionGrantRow,
 )
@@ -119,8 +126,15 @@ from inframeld_backend.shared.application.enums.restored_job_quarantine_intent i
 from inframeld_backend.shared.application.errors.application_errors import (
     AccessDeniedError,
     ConflictError,
+    InvalidInputError,
     ResourceNotFoundError,
     StaleRevisionError,
+)
+from inframeld_backend.shared.application.protocols.retained_history_safety_headroom import (
+    RetainedHistorySafetyHeadroom,
+)
+from inframeld_backend.shared.application.services.request_fingerprint_service import (
+    RequestFingerprintService,
 )
 from inframeld_backend.shared.application.value_objects.idempotency_key import IdempotencyKey
 from inframeld_backend.shared.application.value_objects.job_payload import JobPayload
@@ -129,7 +143,11 @@ from inframeld_backend.shared.application.value_objects.operation_id import Oper
 from inframeld_backend.shared.application.value_objects.operation_lookup_authority import (
     OperationLookupAuthority,
 )
+from inframeld_backend.shared.application.value_objects.request_fingerprint_key import (
+    RequestFingerprintKey,
+)
 from inframeld_backend.shared.application.value_objects.request_id import RequestId
+from inframeld_backend.shared.domain.value_objects.installation_id import InstallationId
 from inframeld_backend.shared.domain.value_objects.resource_name import ResourceName
 from inframeld_backend.shared.domain.value_objects.submitted_display_name import (
     SubmittedDisplayName,
@@ -138,8 +156,12 @@ from inframeld_backend.shared.infrastructure.repositories.postgres_job_store imp
     PostgresJobStore,
 )
 from inframeld_backend.shared.infrastructure.resources.database import Database
+from inframeld_backend.shared.infrastructure.rows.durable_job_row import DurableJobRow
 from inframeld_backend.shared.infrastructure.rows.idempotency_reservation_row import (
     IdempotencyReservationRow,
+)
+from inframeld_backend.shared.infrastructure.rows.retained_history_reservation_row import (
+    RetainedHistoryReservationRow,
 )
 from inframeld_backend.shared.infrastructure.writers.postgres_operation_reservation_writer import (
     PostgresOperationReservationWriter,
@@ -674,3 +696,62 @@ async def test_admitted_build_loses_authority_when_its_exact_pipeline_grant_is_r
             await AdmittedWorkAuthorizationService(
                 PostgresAdmittedWorkFactsReader(session)
             ).require_current(durable.binding.authority)
+
+
+class _NoHistoryForRejectedBuild(RetainedHistorySafetyHeadroom):
+    @override
+    async def require_headroom(self, *, installation_id: InstallationId) -> None:
+        raise AssertionError("A rejected Build must never reach capacity admission.")
+
+
+async def test_private_build_rejects_empty_or_stale_selection_before_any_commit(
+    database: Database, scenario: _Scenario
+) -> None:
+    saved = (await _create(database, scenario)).pipeline
+    access = AccessContextDTO(scenario.access.actor_principal_id, scenario.binding)
+    async with database.session() as session:
+        collection = await session.get(CollectionRow, scenario.configuration.collection_id.value)
+        assert collection is not None
+        reviewed = CollectionRevisionId(collection.current_revision_id)
+
+    async with open_pipeline_pdf_preparation(
+        database,
+        RequestFingerprintService(
+            RequestFingerprintKey(b"fixture build fingerprint key".ljust(32))
+        ),
+        _NoHistoryForRejectedBuild(),
+    ) as admission:
+        with pytest.raises(StaleRevisionError):
+            await admission.admit(
+                access=access,
+                project_id=saved.project_id,
+                pipeline_id=saved.pipeline_id,
+                configuration_revision=saved.revision + 1,
+                collection_revision_id=reviewed,
+                key=IdempotencyKey("stale-build"),
+                request_id=RequestId(uuid4()),
+            )
+        with pytest.raises(InvalidInputError, match="exactly one selected PDF"):
+            await admission.admit(
+                access=access,
+                project_id=saved.project_id,
+                pipeline_id=saved.pipeline_id,
+                configuration_revision=saved.revision,
+                collection_revision_id=reviewed,
+                key=IdempotencyKey("empty-build"),
+                request_id=RequestId(uuid4()),
+            )
+
+    async with database.session() as session:
+        original = await session.scalar(
+            select(IdempotencyReservationRow.operation_id).where(
+                IdempotencyReservationRow.requested_route
+                == f"/internal/projects/{saved.project_id.value}/pipelines/{saved.pipeline_id.value}/builds"
+            )
+        )
+        assert original is None
+        assert await session.scalar(select(func.count()).select_from(DurableJobRow)) == 0
+        assert (
+            await session.scalar(select(func.count()).select_from(RetainedHistoryReservationRow))
+            == 0
+        )
