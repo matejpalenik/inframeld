@@ -3,6 +3,7 @@
 import asyncio
 import os
 from collections.abc import AsyncIterator
+from dataclasses import replace
 from datetime import datetime, timedelta
 from functools import partial
 from pathlib import Path
@@ -34,7 +35,9 @@ from inframeld_backend.access.application.dtos.verified_human_identity_dto impor
 )
 from inframeld_backend.access.domain.enums.access_group_action import AccessGroupAction
 from inframeld_backend.access.domain.enums.principal_kind import PrincipalKind
+from inframeld_backend.access.domain.value_objects.document_version_id import DocumentVersionId
 from inframeld_backend.access.domain.value_objects.identity_authority import IdentityAuthority
+from inframeld_backend.access.domain.value_objects.project_id import ProjectId
 from inframeld_backend.access.infrastructure.rows.access_group_row import AccessGroupRow
 from inframeld_backend.access.infrastructure.rows.group_action_grant_row import GroupActionGrantRow
 from inframeld_backend.access.infrastructure.settings.csrf_settings import CSRFSettings
@@ -42,6 +45,16 @@ from inframeld_backend.access.infrastructure.settings.kratos_settings import Kra
 from inframeld_backend.bootstrap.application_factory import create_app
 from inframeld_backend.bootstrap.application_settings import get_settings
 from inframeld_backend.bootstrap.document_upload_composition import open_document_upload
+from inframeld_backend.indexing.application.services.sealed_pdf_processing_service import (
+    SealedPdfProcessingService,
+)
+from inframeld_backend.indexing.domain.value_objects.docling_processing_definition import (
+    DoclingProcessingDefinition,
+)
+from inframeld_backend.indexing.infrastructure.resources.unix_pdf_parser import UnixPdfParser
+from inframeld_backend.knowledge.infrastructure.readers.postgres_sealed_pdf_source_reader import (
+    PostgresSealedPdfSourceReader,
+)
 from inframeld_backend.knowledge.infrastructure.rows.document_upload_row import DocumentUploadRow
 from inframeld_backend.knowledge.infrastructure.rows.document_version_row import DocumentVersionRow
 from inframeld_backend.shared.application.dtos.artifact_attempt_dto import ArtifactAttemptDTO
@@ -127,6 +140,20 @@ def _migrate_legacy_receipt(
     run_migrations(settings)
 
 
+@pytest.mark.parametrize(
+    "parse_uploaded_pdf",
+    [
+        pytest.param(False, id="upload"),
+        pytest.param(
+            True,
+            id="native-parser",
+            marks=pytest.mark.skipif(
+                os.getenv("INFRAMELD_TEST_PDF_PARSER_SOCKET") != "1",
+                reason="Requires the separately confined native parser socket.",
+            ),
+        ),
+    ],
+)
 async def test_registered_human_upload_preserves_original_after_worker_settlement(
     database: Database,
     temporary_postgres_settings: DatabaseSettings,
@@ -134,6 +161,7 @@ async def test_registered_human_upload_preserves_original_after_worker_settlemen
     seaweed: SeaweedFixture,
     alice_pdf: bytes,
     monkeypatch: pytest.MonkeyPatch,
+    parse_uploaded_pdf: bool,
 ) -> None:
     staging = ArtifactStagingSettings(root=tmp_path / "staging")
     staging.root.mkdir(mode=0o700)
@@ -331,8 +359,55 @@ async def test_registered_human_upload_preserves_original_after_worker_settlemen
         stored.attempt_id.value.hex,
     )
     assert not owned_directory.exists()
+    version_id = DocumentVersionId(original.version_id)
+    async with database.session() as session:
+        reader = PostgresSealedPdfSourceReader(session)
+        source = await reader.read(scope, version_id)
+        assert source is not None and source == stored
+        assert await reader.read(scope, DocumentVersionId(uuid4())) is None
+        assert await reader.read(replace(scope, project_id=ProjectId(uuid4())), version_id) is None
+        attempt = await session.get(ArtifactAttemptRow, stored.attempt_id.value)
+        assert attempt is not None
+        attempt.digest = ArtifactContentDigest.from_content(b"other bytes").value
+        await session.flush()
+        assert await reader.read(scope, version_id) is None
+        attempt.digest = digest.value
+        attempt.published = False
+        attempt.retired = True
+        attempt.state = "retired"
+        await session.flush()
+        assert await reader.read(scope, version_id) is None
+        await session.rollback()
     async with seaweed.open_store() as store:
-        assert b"".join([chunk async for chunk in store.read(stored)]) == content
+        if parse_uploaded_pdf:
+            parser = UnixPdfParser(
+                Path("/run/inframeld-parser/parser.sock"), expected_peer_uid=10001
+            )
+            attempt_id = uuid4()
+            result = await SealedPdfProcessingService(store, parser).process(
+                source,
+                attempt_id=attempt_id,
+                definition=DoclingProcessingDefinition(
+                    docling_slim_version="2.148.0",
+                    docling_core_version="2.106.0",
+                    asset_manifest_sha256=(
+                        "7ea9f3c967a7bc66d2501e466334e7aef46a639e01a11376888321e0f0a51d0e"
+                    ),
+                    max_content_tokens=8,
+                    merge_peers=False,
+                    repeat_table_header=True,
+                    ocr_enabled=False,
+                ),
+                deadline=asyncio.get_running_loop().time() + 300,
+            )
+            assert (result.attempt_id, result.source_digest) == (attempt_id, digest)
+            assert result.canonical_digest == ArtifactContentDigest.from_content(
+                result.canonical_bytes
+            )
+            assert b"Oh dear! Oh dear! I shall be late!" in result.canonical_bytes
+            assert len(result.chunk_ranges) > 1
+        else:
+            assert b"".join([chunk async for chunk in store.read(source)]) == content
     assert sent == [stored.attempt_id]
     with database_session(temporary_postgres_settings) as session:
         retained = session.get(DocumentUploadRow, operation_id)
